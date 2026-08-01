@@ -14,7 +14,241 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clientes: {
+        Row: {
+          ativo: boolean
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
+          created_at: string
+          created_by: string | null
+          documento: string | null
+          email: string | null
+          estado: string | null
+          id: string
+          logradouro: string | null
+          nome: string
+          numero: string | null
+          observacoes: string | null
+          telefone: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          estado?: string | null
+          id?: string
+          logradouro?: string | null
+          nome: string
+          numero?: string | null
+          observacoes?: string | null
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          email?: string | null
+          estado?: string | null
+          id?: string
+          logradouro?: string | null
+          nome?: string
+          numero?: string | null
+          observacoes?: string | null
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contas: {
+        Row: {
+          categoria: string | null
+          cliente_id: string | null
+          created_at: string
+          created_by: string | null
+          data_pagamento: string | null
+          descricao: string
+          id: string
+          observacoes: string | null
+          parceiro: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          categoria?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string | null
+          descricao: string
+          id?: string
+          observacoes?: string | null
+          parceiro?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          valor?: number
+          vencimento?: string
+        }
+        Update: {
+          categoria?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string | null
+          descricao?: string
+          id?: string
+          observacoes?: string | null
+          parceiro?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_servico: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          data_agendada: string | null
+          descricao: string | null
+          id: string
+          numero: string | null
+          prioridade: string
+          responsavel: string | null
+          status: string
+          tipo_servico: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_agendada?: string | null
+          descricao?: string | null
+          id?: string
+          numero?: string | null
+          prioridade?: string
+          responsavel?: string | null
+          status?: string
+          tipo_servico?: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_agendada?: string | null
+          descricao?: string | null
+          id?: string
+          numero?: string | null
+          prioridade?: string
+          responsavel?: string | null
+          status?: string
+          tipo_servico?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_servico_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      produtos: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          codigo: string | null
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          estoque_atual: number
+          estoque_minimo: number
+          id: string
+          nome: string
+          preco_custo: number
+          preco_venda: number
+          tipo: string
+          unidade: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          codigo?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          estoque_atual?: number
+          estoque_minimo?: number
+          id?: string
+          nome: string
+          preco_custo?: number
+          preco_venda?: number
+          tipo?: string
+          unidade?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          codigo?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          estoque_atual?: number
+          estoque_minimo?: number
+          id?: string
+          nome?: string
+          preco_custo?: number
+          preco_venda?: number
+          tipo?: string
+          unidade?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
