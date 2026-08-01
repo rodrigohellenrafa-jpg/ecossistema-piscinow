@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProdutosRouteImport } from './routes/produtos'
+import { Route as OrdensRouteImport } from './routes/ordens'
 import { Route as LogisticaRouteImport } from './routes/logistica'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as ComprasRouteImport } from './routes/compras'
@@ -22,6 +23,11 @@ import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
 const ProdutosRoute = ProdutosRouteImport.update({
   id: '/produtos',
   path: '/produtos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdensRoute = OrdensRouteImport.update({
+  id: '/ordens',
+  path: '/ordens',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LogisticaRoute = LogisticaRouteImport.update({
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/compras': typeof ComprasRoute
   '/financeiro': typeof FinanceiroRoute
   '/logistica': typeof LogisticaRoute
+  '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/compras': typeof ComprasRoute
   '/financeiro': typeof FinanceiroRoute
   '/logistica': typeof LogisticaRoute
+  '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas': typeof VendasIndexRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/compras': typeof ComprasRoute
   '/financeiro': typeof FinanceiroRoute
   '/logistica': typeof LogisticaRoute
+  '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/compras'
     | '/financeiro'
     | '/logistica'
+    | '/ordens'
     | '/produtos'
     | '/vendas/novo'
     | '/vendas/'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/compras'
     | '/financeiro'
     | '/logistica'
+    | '/ordens'
     | '/produtos'
     | '/vendas/novo'
     | '/vendas'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/compras'
     | '/financeiro'
     | '/logistica'
+    | '/ordens'
     | '/produtos'
     | '/vendas/novo'
     | '/vendas/'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   ComprasRoute: typeof ComprasRoute
   FinanceiroRoute: typeof FinanceiroRoute
   LogisticaRoute: typeof LogisticaRoute
+  OrdensRoute: typeof OrdensRoute
   ProdutosRoute: typeof ProdutosRoute
   VendasNovoRoute: typeof VendasNovoRoute
   VendasIndexRoute: typeof VendasIndexRoute
@@ -154,6 +167,13 @@ declare module '@tanstack/react-router' {
       path: '/produtos'
       fullPath: '/produtos'
       preLoaderRoute: typeof ProdutosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ordens': {
+      id: '/ordens'
+      path: '/ordens'
+      fullPath: '/ordens'
+      preLoaderRoute: typeof OrdensRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/logistica': {
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   ComprasRoute: ComprasRoute,
   FinanceiroRoute: FinanceiroRoute,
   LogisticaRoute: LogisticaRoute,
+  OrdensRoute: OrdensRoute,
   ProdutosRoute: ProdutosRoute,
   VendasNovoRoute: VendasNovoRoute,
   VendasIndexRoute: VendasIndexRoute,
