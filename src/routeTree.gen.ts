@@ -10,10 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProdutosRouteImport } from './routes/produtos'
+import { Route as OrdensRouteImport } from './routes/ordens'
 import { Route as LogisticaRouteImport } from './routes/logistica'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
+import { Route as ContasRouteImport } from './routes/contas'
 import { Route as ComprasRouteImport } from './routes/compras'
 import { Route as ClientesRouteImport } from './routes/clientes'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VendasIndexRouteImport } from './routes/vendas.index'
 import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
@@ -21,6 +24,11 @@ import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
 const ProdutosRoute = ProdutosRouteImport.update({
   id: '/produtos',
   path: '/produtos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdensRoute = OrdensRouteImport.update({
+  id: '/ordens',
+  path: '/ordens',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LogisticaRoute = LogisticaRouteImport.update({
@@ -33,6 +41,11 @@ const FinanceiroRoute = FinanceiroRouteImport.update({
   path: '/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContasRoute = ContasRouteImport.update({
+  id: '/contas',
+  path: '/contas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ComprasRoute = ComprasRouteImport.update({
   id: '/compras',
   path: '/compras',
@@ -41,6 +54,11 @@ const ComprasRoute = ComprasRouteImport.update({
 const ClientesRoute = ClientesRouteImport.update({
   id: '/clientes',
   path: '/clientes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -61,20 +79,26 @@ const VendasNovoRoute = VendasNovoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
+  '/contas': typeof ContasRoute
   '/financeiro': typeof FinanceiroRoute
   '/logistica': typeof LogisticaRoute
+  '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
+  '/contas': typeof ContasRoute
   '/financeiro': typeof FinanceiroRoute
   '/logistica': typeof LogisticaRoute
+  '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas': typeof VendasIndexRoute
@@ -82,10 +106,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
+  '/contas': typeof ContasRoute
   '/financeiro': typeof FinanceiroRoute
   '/logistica': typeof LogisticaRoute
+  '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
@@ -94,30 +121,39 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/clientes'
     | '/compras'
+    | '/contas'
     | '/financeiro'
     | '/logistica'
+    | '/ordens'
     | '/produtos'
     | '/vendas/novo'
     | '/vendas/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/clientes'
     | '/compras'
+    | '/contas'
     | '/financeiro'
     | '/logistica'
+    | '/ordens'
     | '/produtos'
     | '/vendas/novo'
     | '/vendas'
   id:
     | '__root__'
     | '/'
+    | '/auth'
     | '/clientes'
     | '/compras'
+    | '/contas'
     | '/financeiro'
     | '/logistica'
+    | '/ordens'
     | '/produtos'
     | '/vendas/novo'
     | '/vendas/'
@@ -125,10 +161,13 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   ClientesRoute: typeof ClientesRoute
   ComprasRoute: typeof ComprasRoute
+  ContasRoute: typeof ContasRoute
   FinanceiroRoute: typeof FinanceiroRoute
   LogisticaRoute: typeof LogisticaRoute
+  OrdensRoute: typeof OrdensRoute
   ProdutosRoute: typeof ProdutosRoute
   VendasNovoRoute: typeof VendasNovoRoute
   VendasIndexRoute: typeof VendasIndexRoute
@@ -141,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/produtos'
       fullPath: '/produtos'
       preLoaderRoute: typeof ProdutosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ordens': {
+      id: '/ordens'
+      path: '/ordens'
+      fullPath: '/ordens'
+      preLoaderRoute: typeof OrdensRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/logistica': {
@@ -157,6 +203,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contas': {
+      id: '/contas'
+      path: '/contas'
+      fullPath: '/contas'
+      preLoaderRoute: typeof ContasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/compras': {
       id: '/compras'
       path: '/compras'
@@ -169,6 +222,13 @@ declare module '@tanstack/react-router' {
       path: '/clientes'
       fullPath: '/clientes'
       preLoaderRoute: typeof ClientesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -197,10 +257,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   ClientesRoute: ClientesRoute,
   ComprasRoute: ComprasRoute,
+  ContasRoute: ContasRoute,
   FinanceiroRoute: FinanceiroRoute,
   LogisticaRoute: LogisticaRoute,
+  OrdensRoute: OrdensRoute,
   ProdutosRoute: ProdutosRoute,
   VendasNovoRoute: VendasNovoRoute,
   VendasIndexRoute: VendasIndexRoute,

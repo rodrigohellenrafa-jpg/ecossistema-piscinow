@@ -9,6 +9,7 @@ import {
   KanbanSquare,
   Waves,
   ClipboardList,
+  Receipt,
 } from "lucide-react";
 
 import {
@@ -44,12 +45,16 @@ const groups = [
   },
   {
     label: "Logística",
-    items: [{ title: "Flight Board", url: "/logistica", icon: KanbanSquare }],
+    items: [
+      { title: "Ordens de Serviço", url: "/ordens", icon: ClipboardList },
+      { title: "Flight Board", url: "/logistica", icon: KanbanSquare },
+    ],
   },
   {
     label: "Financeiro",
     items: [
       { title: "Fluxo de Caixa", url: "/financeiro", icon: Wallet },
+      { title: "Contas a Pagar/Receber", url: "/contas", icon: Receipt },
       { title: "Compras", url: "/compras", icon: Truck },
     ],
   },
