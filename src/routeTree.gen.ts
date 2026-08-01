@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LogisticaRouteImport } from './routes/logistica'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VendasIndexRouteImport } from './routes/vendas.index'
+import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
 
 const LogisticaRoute = LogisticaRouteImport.update({
   id: '/logistica',
@@ -22,31 +24,49 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VendasIndexRoute = VendasIndexRouteImport.update({
+  id: '/vendas/',
+  path: '/vendas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendasNovoRoute = VendasNovoRouteImport.update({
+  id: '/vendas/novo',
+  path: '/vendas/novo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/logistica': typeof LogisticaRoute
+  '/vendas/novo': typeof VendasNovoRoute
+  '/vendas/': typeof VendasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/logistica': typeof LogisticaRoute
+  '/vendas/novo': typeof VendasNovoRoute
+  '/vendas': typeof VendasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/logistica': typeof LogisticaRoute
+  '/vendas/novo': typeof VendasNovoRoute
+  '/vendas/': typeof VendasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/logistica'
+  fullPaths: '/' | '/logistica' | '/vendas/novo' | '/vendas/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/logistica'
-  id: '__root__' | '/' | '/logistica'
+  to: '/' | '/logistica' | '/vendas/novo' | '/vendas'
+  id: '__root__' | '/' | '/logistica' | '/vendas/novo' | '/vendas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LogisticaRoute: typeof LogisticaRoute
+  VendasNovoRoute: typeof VendasNovoRoute
+  VendasIndexRoute: typeof VendasIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +85,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vendas/': {
+      id: '/vendas/'
+      path: '/vendas'
+      fullPath: '/vendas/'
+      preLoaderRoute: typeof VendasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendas/novo': {
+      id: '/vendas/novo'
+      path: '/vendas/novo'
+      fullPath: '/vendas/novo'
+      preLoaderRoute: typeof VendasNovoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LogisticaRoute: LogisticaRoute,
+  VendasNovoRoute: VendasNovoRoute,
+  VendasIndexRoute: VendasIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
