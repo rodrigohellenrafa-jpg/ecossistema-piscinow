@@ -10,6 +10,8 @@ import {
   Waves,
   ClipboardList,
   Receipt,
+  BarChart3,
+
 } from "lucide-react";
 
 import {
@@ -55,7 +57,9 @@ const groups = [
     items: [
       { title: "Fluxo de Caixa", url: "/financeiro", icon: Wallet },
       { title: "Contas a Pagar/Receber", url: "/contas", icon: Receipt },
+      { title: "Relatório de Contas", url: "/relatorio-contas", icon: BarChart3 },
       { title: "Compras", url: "/compras", icon: Truck },
+
     ],
   },
 ] as const;
