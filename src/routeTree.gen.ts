@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
 import { Route as ProdutosRouteImport } from './routes/produtos'
 import { Route as OrdensRouteImport } from './routes/ordens'
 import { Route as LogisticaRouteImport } from './routes/logistica'
@@ -21,6 +22,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VendasIndexRouteImport } from './routes/vendas.index'
 import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
 
+const RelatorioContasRoute = RelatorioContasRouteImport.update({
+  id: '/relatorio-contas',
+  path: '/relatorio-contas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProdutosRoute = ProdutosRouteImport.update({
   id: '/produtos',
   path: '/produtos',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/logistica': typeof LogisticaRoute
   '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
+  '/relatorio-contas': typeof RelatorioContasRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
 }
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/logistica': typeof LogisticaRoute
   '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
+  '/relatorio-contas': typeof RelatorioContasRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas': typeof VendasIndexRoute
 }
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/logistica': typeof LogisticaRoute
   '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
+  '/relatorio-contas': typeof RelatorioContasRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
 }
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/logistica'
     | '/ordens'
     | '/produtos'
+    | '/relatorio-contas'
     | '/vendas/novo'
     | '/vendas/'
   fileRoutesByTo: FileRoutesByTo
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/logistica'
     | '/ordens'
     | '/produtos'
+    | '/relatorio-contas'
     | '/vendas/novo'
     | '/vendas'
   id:
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/logistica'
     | '/ordens'
     | '/produtos'
+    | '/relatorio-contas'
     | '/vendas/novo'
     | '/vendas/'
   fileRoutesById: FileRoutesById
@@ -169,12 +181,20 @@ export interface RootRouteChildren {
   LogisticaRoute: typeof LogisticaRoute
   OrdensRoute: typeof OrdensRoute
   ProdutosRoute: typeof ProdutosRoute
+  RelatorioContasRoute: typeof RelatorioContasRoute
   VendasNovoRoute: typeof VendasNovoRoute
   VendasIndexRoute: typeof VendasIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/relatorio-contas': {
+      id: '/relatorio-contas'
+      path: '/relatorio-contas'
+      fullPath: '/relatorio-contas'
+      preLoaderRoute: typeof RelatorioContasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/produtos': {
       id: '/produtos'
       path: '/produtos'
@@ -265,6 +285,7 @@ const rootRouteChildren: RootRouteChildren = {
   LogisticaRoute: LogisticaRoute,
   OrdensRoute: OrdensRoute,
   ProdutosRoute: ProdutosRoute,
+  RelatorioContasRoute: RelatorioContasRoute,
   VendasNovoRoute: VendasNovoRoute,
   VendasIndexRoute: VendasIndexRoute,
 }
