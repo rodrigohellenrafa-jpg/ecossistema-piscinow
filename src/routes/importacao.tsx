@@ -352,13 +352,49 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
         )}
 
         {progresso !== null && (
-          <div className="space-y-1">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-medium">
+              <span>
+                Lote {loteAtual}/{totalLotes}
+              </span>
+              <span className="text-muted-foreground">{progresso}%</span>
+            </div>
             <Progress value={progresso} />
             <p className="text-xs text-muted-foreground">
               {importados} de {linhas.length} registros enviados
             </p>
           </div>
         )}
+
+        {logs.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Log da importação</p>
+              <Button size="sm" variant="ghost" onClick={() => setLogs([])}>
+                Limpar log
+              </Button>
+            </div>
+            <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs">
+              {logs.map((l, i) => (
+                <p
+                  key={i}
+                  className={
+                    l.tipo === "erro"
+                      ? "text-destructive"
+                      : l.tipo === "ok"
+                        ? "text-primary"
+                        : l.tipo === "aviso"
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
+                  }
+                >
+                  [{l.hora}] {l.texto}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
 
         <div className="flex items-center gap-3">
           <Button
