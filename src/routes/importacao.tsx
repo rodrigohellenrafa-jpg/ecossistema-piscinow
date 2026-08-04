@@ -90,6 +90,20 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
   const [dragging, setDragging] = useState(false);
   const [progresso, setProgresso] = useState<number | null>(null);
   const [importados, setImportados] = useState(0);
+  const [loteAtual, setLoteAtual] = useState(0);
+  const [totalLotes, setTotalLotes] = useState(0);
+  const [logs, setLogs] = useState<
+    { hora: string; tipo: "info" | "ok" | "aviso" | "erro"; texto: string }[]
+  >([]);
+
+  const log = useCallback(
+    (tipo: "info" | "ok" | "aviso" | "erro", texto: string) =>
+      setLogs((prev) => [
+        ...prev,
+        { hora: new Date().toLocaleTimeString("pt-BR"), tipo, texto },
+      ]),
+    [],
+  );
 
   const mapa = useMemo(() => {
     return entidade.campos.map((campo) => ({
@@ -106,43 +120,66 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
     setLinhas([]);
     setProgresso(null);
     setImportados(0);
+    setLoteAtual(0);
+    setTotalLotes(0);
+    setLogs([]);
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const carregar = useCallback((file: File) => {
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast.error("Envie um arquivo .csv");
-      return;
-    }
-    Papa.parse<Linha>(file, {
-      header: true,
-      skipEmptyLines: "greedy",
-      transformHeader: (h) => h.trim(),
-      complete: (res) => {
-        const dados = (res.data ?? []).filter((l) =>
-          Object.values(l).some((v) => String(v ?? "").trim() !== ""),
-        );
-        if (dados.length === 0) {
-          toast.error("O arquivo não tem linhas preenchidas.");
-          return;
-        }
-        setArquivo(file.name);
-        setCabecalhos((res.meta.fields ?? []).map((f) => f.trim()));
-        setLinhas(dados);
-        setImportados(0);
-        setProgresso(null);
-        toast.success(`${dados.length} linhas lidas de ${file.name}`);
-      },
-      error: () => toast.error("Não consegui ler esse CSV."),
-    });
-  }, []);
+  const carregar = useCallback(
+    (file: File) => {
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        toast.error("Envie um arquivo .csv");
+        return;
+      }
+      Papa.parse<Linha>(file, {
+        header: true,
+        skipEmptyLines: "greedy",
+        transformHeader: (h) => h.trim(),
+        complete: (res) => {
+          const brutas = res.data ?? [];
+          const dados = brutas.filter((l) =>
+            Object.values(l).some((v) => String(v ?? "").trim() !== ""),
+          );
+          if (dados.length === 0) {
+            toast.error("O arquivo não tem linhas preenchidas.");
+            return;
+          }
+          setArquivo(file.name);
+          setCabecalhos((res.meta.fields ?? []).map((f) => f.trim()));
+          setLinhas(dados);
+          setImportados(0);
+          setProgresso(null);
+          setLoteAtual(0);
+          setTotalLotes(0);
+          setLogs([]);
+          log("info", `Arquivo "${file.name}" lido: ${dados.length} linhas válidas.`);
+          if (brutas.length > dados.length) {
+            log("aviso", `${brutas.length - dados.length} linha(s) em branco ignorada(s).`);
+          }
+          if (res.errors?.length) {
+            log("aviso", `${res.errors.length} aviso(s) de leitura do CSV.`);
+          }
+          toast.success(`${dados.length} linhas lidas de ${file.name}`);
+        },
+        error: () => toast.error("Não consegui ler esse CSV."),
+      });
+    },
+    [log],
+  );
 
   async function processar() {
     if (semObrigatorio) {
       toast.error(`Falta a coluna obrigatória: ${semObrigatorio.campo.rotulo}`);
+      log("erro", `Coluna obrigatória ausente: ${semObrigatorio.campo.rotulo}.`);
       return;
     }
     const usuario = (await supabase.auth.getUser()).data.user?.id ?? null;
+
+    const naoMapeadas = mapa.filter((m) => !m.origem).map((m) => m.campo.rotulo);
+    if (naoMapeadas.length) {
+      log("aviso", `Campos sem coluna no CSV (ficarão vazios): ${naoMapeadas.join(", ")}.`);
+    }
 
     const registros = linhas.map((linha) => {
       const reg: Record<string, unknown> = { created_by: usuario };
@@ -154,30 +191,54 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
       return reg;
     });
 
+    const lote = 500;
+    const total = Math.ceil(registros.length / lote);
+
     setProgresso(0);
     setImportados(0);
-    const lote = 500;
+    setLoteAtual(0);
+    setTotalLotes(total);
+    log(
+      "info",
+      `Iniciando importação de ${registros.length} registros em ${total} lote(s) de até ${lote}.`,
+    );
+
     let ok = 0;
 
     for (let i = 0; i < registros.length; i += lote) {
       const bloco = registros.slice(i, i + lote);
+      const indice = Math.floor(i / lote) + 1;
+      setLoteAtual(indice);
+      log("info", `Lote ${indice}/${total}: enviando ${bloco.length} registros…`);
+
       const { error } = await supabase
         .from(entidade.tabela as never)
         .insert(bloco as never);
+
       if (error) {
         setProgresso(null);
+        log(
+          "erro",
+          `Lote ${indice}/${total} falhou a partir da linha ${i + 2} do arquivo: ${error.message}`,
+        );
         toast.error(
           `Erro a partir da linha ${i + 2} do arquivo (${bloco.length} registros): ${error.message}`,
         );
-        if (ok > 0) toast.message(`${ok} registros foram importados antes do erro.`);
+        if (ok > 0) {
+          log("aviso", `${ok} registros haviam sido importados antes do erro.`);
+          toast.message(`${ok} registros foram importados antes do erro.`);
+        }
         setImportados(ok);
         return;
       }
+
       ok += bloco.length;
       setImportados(ok);
       setProgresso(Math.round((ok / registros.length) * 100));
+      log("ok", `Lote ${indice}/${total} concluído — ${ok}/${registros.length} registros.`);
     }
 
+    log("ok", `Importação finalizada: ${ok} registros em ${entidade.titulo}.`);
     toast.success(`${ok} registros importados em ${entidade.titulo}.`);
   }
 
@@ -291,13 +352,49 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
         )}
 
         {progresso !== null && (
-          <div className="space-y-1">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs font-medium">
+              <span>
+                Lote {loteAtual}/{totalLotes}
+              </span>
+              <span className="text-muted-foreground">{progresso}%</span>
+            </div>
             <Progress value={progresso} />
             <p className="text-xs text-muted-foreground">
               {importados} de {linhas.length} registros enviados
             </p>
           </div>
         )}
+
+        {logs.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Log da importação</p>
+              <Button size="sm" variant="ghost" onClick={() => setLogs([])}>
+                Limpar log
+              </Button>
+            </div>
+            <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs">
+              {logs.map((l, i) => (
+                <p
+                  key={i}
+                  className={
+                    l.tipo === "erro"
+                      ? "text-destructive"
+                      : l.tipo === "ok"
+                        ? "text-primary"
+                        : l.tipo === "aviso"
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
+                  }
+                >
+                  [{l.hora}] {l.texto}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
 
         <div className="flex items-center gap-3">
           <Button
