@@ -62,6 +62,10 @@ const groups = [
 
     ],
   },
+  {
+    label: "Administrativo",
+    items: [{ title: "Importação de Dados", url: "/importacao", icon: Upload }],
+  },
 ] as const;
 
 export function AppSidebar() {
