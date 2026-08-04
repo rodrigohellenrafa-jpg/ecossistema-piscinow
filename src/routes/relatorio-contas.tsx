@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -69,7 +70,7 @@ function RelatorioContas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("tipo,valor,vencimento,status")
+        .select("id,descricao,parceiro,tipo,valor,vencimento,status")
         .order("vencimento", { ascending: true });
       if (error) throw error;
       return data;
@@ -160,6 +161,43 @@ function RelatorioContas() {
     { titulo: "Saldo previsto", valor: saldo },
   ];
 
+  // Alertas de vencimento
+  const abertas = contas.filter((c) => c.status !== "pago");
+  const dias = (venc: string) =>
+    Math.round(
+      (new Date(`${venc}T00:00:00`).getTime() - new Date(`${hoje}T00:00:00`).getTime()) / 86400000,
+    );
+
+  const alertas = abertas
+    .map((c) => ({ ...c, dias: dias(c.vencimento) }))
+    .filter((c) => c.dias <= 30)
+    .sort((a, b) => a.dias - b.dias);
+
+  const risco = (d: number) =>
+    d < 0
+      ? { label: "Vencido", variant: "destructive" as const }
+      : d <= 7
+        ? { label: d === 0 ? "Vence hoje" : `Em ${d} dia${d > 1 ? "s" : ""}`, variant: "destructive" as const }
+        : { label: `Em ${d} dias`, variant: "secondary" as const };
+
+  const somaAl = (f: (d: number) => boolean) =>
+    alertas.filter((c) => f(c.dias)).reduce((s, c) => s + (Number(c.valor) || 0), 0);
+
+  const resumoAlertas = [
+    { titulo: "Vencidas", valor: somaAl((d) => d < 0), qtd: alertas.filter((c) => c.dias < 0).length, critico: true },
+    {
+      titulo: "Vencem em 7 dias",
+      valor: somaAl((d) => d >= 0 && d <= 7),
+      qtd: alertas.filter((c) => c.dias >= 0 && c.dias <= 7).length,
+      critico: true,
+    },
+    {
+      titulo: "Vencem em 30 dias",
+      valor: somaAl((d) => d >= 0 && d <= 30),
+      qtd: alertas.filter((c) => c.dias >= 0 && c.dias <= 30).length,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -191,6 +229,75 @@ function RelatorioContas() {
           </Card>
         ))}
       </div>
+
+      <Card className={alertas.some((c) => c.dias <= 7) ? "border-destructive/50" : undefined}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-destructive" />
+            Alertas de vencimento
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {resumoAlertas.map((r) => (
+              <div key={r.titulo} className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">{r.titulo}</p>
+                <p
+                  className={
+                    r.critico && r.valor > 0
+                      ? "text-xl font-semibold text-destructive"
+                      : "text-xl font-semibold"
+                  }
+                >
+                  {brl(r.valor)}
+                </p>
+                <p className="text-xs text-muted-foreground">{r.qtd} título(s)</p>
+              </div>
+            ))}
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Título</TableHead>
+                <TableHead>Parceiro</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Vencimento</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead>Risco</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {alertas.map((c) => {
+                const r = risco(c.dias);
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium">{c.descricao}</TableCell>
+                    <TableCell>{c.parceiro ?? "—"}</TableCell>
+                    <TableCell className="capitalize">
+                      {c.tipo === "pagar" ? "A pagar" : "A receber"}
+                    </TableCell>
+                    <TableCell className={c.dias <= 7 ? "text-destructive" : undefined}>
+                      {new Date(`${c.vencimento}T00:00:00`).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="text-right">{brl(Number(c.valor))}</TableCell>
+                    <TableCell>
+                      <Badge variant={r.variant}>{r.label}</Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {alertas.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    Nenhuma conta vencendo nos próximos 30 dias.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
