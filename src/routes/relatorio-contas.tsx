@@ -229,6 +229,75 @@ function RelatorioContas() {
         ))}
       </div>
 
+      <Card className={alertas.some((c) => c.dias <= 7) ? "border-destructive/50" : undefined}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-destructive" />
+            Alertas de vencimento
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {resumoAlertas.map((r) => (
+              <div key={r.titulo} className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">{r.titulo}</p>
+                <p
+                  className={
+                    r.critico && r.valor > 0
+                      ? "text-xl font-semibold text-destructive"
+                      : "text-xl font-semibold"
+                  }
+                >
+                  {brl(r.valor)}
+                </p>
+                <p className="text-xs text-muted-foreground">{r.qtd} título(s)</p>
+              </div>
+            ))}
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Título</TableHead>
+                <TableHead>Parceiro</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Vencimento</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead>Risco</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {alertas.map((c) => {
+                const r = risco(c.dias);
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell className="font-medium">{c.descricao}</TableCell>
+                    <TableCell>{c.parceiro ?? "—"}</TableCell>
+                    <TableCell className="capitalize">
+                      {c.tipo === "pagar" ? "A pagar" : "A receber"}
+                    </TableCell>
+                    <TableCell className={c.dias <= 7 ? "text-destructive" : undefined}>
+                      {new Date(`${c.vencimento}T00:00:00`).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="text-right">{brl(Number(c.valor))}</TableCell>
+                    <TableCell>
+                      <Badge variant={r.variant}>{r.label}</Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {alertas.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    Nenhuma conta vencendo nos próximos 30 dias.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Pagar x Receber por mês</CardTitle>
