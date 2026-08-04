@@ -1,0 +1,406 @@
+import { useMemo, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { Field } from "@/components/field";
+import { RequireAuth } from "@/components/require-auth";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client";
+
+export const Route = createFileRoute("/notas-compra")({
+  head: () => ({
+    meta: [
+      { title: "Notas de Compra | Piscinow ERP" },
+      {
+        name: "description",
+        content:
+          "Lance notas fiscais de entrada, guarde a chave de acesso e consulte a nota direto no portal da SEFAZ.",
+      },
+      { property: "og:title", content: "Notas de Compra | Piscinow ERP" },
+      {
+        property: "og:description",
+        content: "Entrada de notas fiscais de compra com consulta na SEFAZ pela chave de acesso.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: () => (
+    <RequireAuth>
+      <NotasCompra />
+    </RequireAuth>
+  ),
+});
+
+const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const PORTAL_NFE = "https://www.nfe.fazenda.gov.br/portal/consultaResumo.aspx";
+
+/** Somente dígitos da chave de acesso (44 posições). */
+const soDigitos = (v: string) => v.replace(/\D/g, "").slice(0, 44);
+
+const chaveValida = (v: string) => soDigitos(v).length === 44;
+
+const STATUS = ["pendente", "conferida", "lancada", "cancelada"] as const;
+
+const statusLabel: Record<string, string> = {
+  pendente: "Pendente",
+  conferida: "Conferida",
+  lancada: "Lançada",
+  cancelada: "Cancelada",
+};
+
+const vazio = {
+  chave_acesso: "",
+  numero: "",
+  serie: "",
+  fornecedor: "",
+  fornecedor_cnpj: "",
+  natureza_operacao: "",
+  data_emissao: "",
+  data_entrada: new Date().toISOString().slice(0, 10),
+  valor_produtos: "0",
+  valor_frete: "0",
+  valor_total: "0",
+  status: "pendente",
+  observacoes: "",
+};
+
+function NotasCompra() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(vazio);
+
+  const set = (campo: keyof typeof vazio, valor: string) =>
+    setForm((f) => ({ ...f, [campo]: valor }));
+
+  const { data = [] } = useQuery({
+    queryKey: ["notas_compra"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notas_compra")
+        .select("*")
+        .order("data_entrada", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const totalMes = useMemo(() => {
+    const mes = new Date().toISOString().slice(0, 7);
+    return data
+      .filter((n) => (n.data_entrada ?? "").startsWith(mes))
+      .reduce((s, n) => s + Number(n.valor_total ?? 0), 0);
+  }, [data]);
+
+  const salvar = useMutation({
+    mutationFn: async () => {
+      if (!form.fornecedor.trim()) throw new Error("Informe o fornecedor");
+      if (form.chave_acesso && !chaveValida(form.chave_acesso)) {
+        throw new Error("A chave de acesso precisa ter 44 dígitos");
+      }
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase.from("notas_compra").insert({
+        chave_acesso: form.chave_acesso ? soDigitos(form.chave_acesso) : null,
+        numero: form.numero || null,
+        serie: form.serie || null,
+        fornecedor: form.fornecedor.trim(),
+        fornecedor_cnpj: form.fornecedor_cnpj || null,
+        natureza_operacao: form.natureza_operacao || null,
+        data_emissao: form.data_emissao || null,
+        data_entrada: form.data_entrada || new Date().toISOString().slice(0, 10),
+        valor_produtos: Number(form.valor_produtos) || 0,
+        valor_frete: Number(form.valor_frete) || 0,
+        valor_total: Number(form.valor_total) || 0,
+        status: form.status,
+        observacoes: form.observacoes || null,
+        created_by: auth.user?.id ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Nota de compra lançada");
+      qc.invalidateQueries({ queryKey: ["notas_compra"] });
+      setForm(vazio);
+      setOpen(false);
+    },
+    onError: (e: Error) =>
+      toast.error(
+        e.message.includes("duplicate") ? "Esta chave de acesso já foi lançada" : e.message,
+      ),
+  });
+
+  const excluir = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("notas_compra").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Nota removida");
+      qc.invalidateQueries({ queryKey: ["notas_compra"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const abrirSefaz = (chave?: string | null) => {
+    if (chave) {
+      void navigator.clipboard?.writeText(chave).catch(() => undefined);
+      toast.info("Chave copiada — cole no campo do portal da SEFAZ");
+    }
+    window.open(PORTAL_NFE, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Notas de Compra</h1>
+          <p className="text-sm text-muted-foreground">
+            Lance as notas de entrada e consulte cada uma no portal da SEFAZ.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => abrirSefaz(null)}>
+            <ExternalLink /> Portal SEFAZ
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus /> Nova nota
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Lançar nota de compra</DialogTitle>
+                <DialogDescription>
+                  Informe a chave de acesso de 44 dígitos para poder consultar a nota na SEFAZ.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Chave de acesso (44 dígitos)" className="sm:col-span-2">
+                  <Input
+                    value={form.chave_acesso}
+                    onChange={(e) => set("chave_acesso", soDigitos(e.target.value))}
+                    placeholder="Somente números"
+                    inputMode="numeric"
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {soDigitos(form.chave_acesso).length}/44
+                  </p>
+                </Field>
+                <Field label="Fornecedor *">
+                  <Input
+                    value={form.fornecedor}
+                    onChange={(e) => set("fornecedor", e.target.value)}
+                  />
+                </Field>
+                <Field label="CNPJ do fornecedor">
+                  <Input
+                    value={form.fornecedor_cnpj}
+                    onChange={(e) => set("fornecedor_cnpj", e.target.value)}
+                  />
+                </Field>
+                <Field label="Número">
+                  <Input value={form.numero} onChange={(e) => set("numero", e.target.value)} />
+                </Field>
+                <Field label="Série">
+                  <Input value={form.serie} onChange={(e) => set("serie", e.target.value)} />
+                </Field>
+                <Field label="Natureza da operação" className="sm:col-span-2">
+                  <Input
+                    value={form.natureza_operacao}
+                    onChange={(e) => set("natureza_operacao", e.target.value)}
+                    placeholder="Compra para revenda, remessa, devolução..."
+                  />
+                </Field>
+                <Field label="Emissão">
+                  <Input
+                    type="date"
+                    value={form.data_emissao}
+                    onChange={(e) => set("data_emissao", e.target.value)}
+                  />
+                </Field>
+                <Field label="Entrada">
+                  <Input
+                    type="date"
+                    value={form.data_entrada}
+                    onChange={(e) => set("data_entrada", e.target.value)}
+                  />
+                </Field>
+                <Field label="Valor dos produtos">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.valor_produtos}
+                    onChange={(e) => set("valor_produtos", e.target.value)}
+                  />
+                </Field>
+                <Field label="Frete">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.valor_frete}
+                    onChange={(e) => set("valor_frete", e.target.value)}
+                  />
+                </Field>
+                <Field label="Valor total">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.valor_total}
+                    onChange={(e) => set("valor_total", e.target.value)}
+                  />
+                </Field>
+                <Field label="Status">
+                  <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {statusLabel[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Observações" className="sm:col-span-2">
+                  <Textarea
+                    value={form.observacoes}
+                    onChange={(e) => set("observacoes", e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  disabled={!chaveValida(form.chave_acesso)}
+                  onClick={() => abrirSefaz(soDigitos(form.chave_acesso))}
+                >
+                  <ExternalLink /> Consultar na SEFAZ
+                </Button>
+                <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+                  Salvar nota
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            Notas lançadas <Badge variant="secondary">{data.length}</Badge>
+            <span className="ml-auto text-sm font-normal text-muted-foreground">
+              Entradas do mês: <span className="font-medium">{brl(totalMes)}</span>
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Nenhuma nota de compra lançada ainda.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Entrada</TableHead>
+                    <TableHead>Fornecedor</TableHead>
+                    <TableHead>Nº / Série</TableHead>
+                    <TableHead>Chave</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">SEFAZ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.map((n) => (
+                    <TableRow key={n.id}>
+                      <TableCell>
+                        {n.data_entrada
+                          ? new Date(`${n.data_entrada}T00:00:00`).toLocaleDateString("pt-BR")
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="font-medium">{n.fornecedor}</TableCell>
+                      <TableCell>
+                        {n.numero ?? "—"}
+                        {n.serie ? ` / ${n.serie}` : ""}
+                      </TableCell>
+                      <TableCell className="max-w-40 truncate font-mono text-xs">
+                        {n.chave_acesso ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={n.status === "cancelada" ? "destructive" : "secondary"}>
+                          {statusLabel[n.status] ?? n.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {brl(Number(n.valor_total ?? 0))}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Consultar na SEFAZ"
+                          disabled={!n.chave_acesso}
+                          onClick={() => abrirSefaz(n.chave_acesso)}
+                        >
+                          <ExternalLink />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Excluir"
+                          onClick={() => excluir.mutate(n.id)}
+                        >
+                          <Trash2 className="text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
