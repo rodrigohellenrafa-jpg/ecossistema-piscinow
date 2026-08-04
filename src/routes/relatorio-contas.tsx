@@ -69,7 +69,7 @@ function RelatorioContas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("tipo,valor,vencimento,status")
+        .select("id,descricao,parceiro,tipo,valor,vencimento,status")
         .order("vencimento", { ascending: true });
       if (error) throw error;
       return data;
