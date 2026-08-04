@@ -11,7 +11,7 @@ import {
   ClipboardList,
   Receipt,
   BarChart3,
-
+  Upload,
 } from "lucide-react";
 
 import {
@@ -61,6 +61,10 @@ const groups = [
       { title: "Compras", url: "/compras", icon: Truck },
 
     ],
+  },
+  {
+    label: "Administrativo",
+    items: [{ title: "Importação de Dados", url: "/importacao", icon: Upload }],
   },
 ] as const;
 
