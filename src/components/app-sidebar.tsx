@@ -12,6 +12,8 @@ import {
   Receipt,
   BarChart3,
   Upload,
+  FileText,
+
 } from "lucide-react";
 
 import {
