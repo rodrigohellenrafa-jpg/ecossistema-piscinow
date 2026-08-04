@@ -136,6 +136,69 @@ export type Database = {
           },
         ]
       }
+      notas_compra: {
+        Row: {
+          chave_acesso: string | null
+          created_at: string
+          created_by: string | null
+          data_emissao: string | null
+          data_entrada: string
+          fornecedor: string
+          fornecedor_cnpj: string | null
+          id: string
+          natureza_operacao: string | null
+          numero: string | null
+          observacoes: string | null
+          serie: string | null
+          status: string
+          updated_at: string
+          valor_frete: number
+          valor_produtos: number
+          valor_total: number
+          xml: string | null
+        }
+        Insert: {
+          chave_acesso?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string | null
+          data_entrada?: string
+          fornecedor: string
+          fornecedor_cnpj?: string | null
+          id?: string
+          natureza_operacao?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          serie?: string | null
+          status?: string
+          updated_at?: string
+          valor_frete?: number
+          valor_produtos?: number
+          valor_total?: number
+          xml?: string | null
+        }
+        Update: {
+          chave_acesso?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string | null
+          data_entrada?: string
+          fornecedor?: string
+          fornecedor_cnpj?: string | null
+          id?: string
+          natureza_operacao?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          serie?: string | null
+          status?: string
+          updated_at?: string
+          valor_frete?: number
+          valor_produtos?: number
+          valor_total?: number
+          xml?: string | null
+        }
+        Relationships: []
+      }
       ordens_servico: {
         Row: {
           cliente_id: string | null
