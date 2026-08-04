@@ -160,6 +160,43 @@ function RelatorioContas() {
     { titulo: "Saldo previsto", valor: saldo },
   ];
 
+  // Alertas de vencimento
+  const abertas = contas.filter((c) => c.status !== "pago");
+  const dias = (venc: string) =>
+    Math.round(
+      (new Date(`${venc}T00:00:00`).getTime() - new Date(`${hoje}T00:00:00`).getTime()) / 86400000,
+    );
+
+  const alertas = abertas
+    .map((c) => ({ ...c, dias: dias(c.vencimento) }))
+    .filter((c) => c.dias <= 30)
+    .sort((a, b) => a.dias - b.dias);
+
+  const risco = (d: number) =>
+    d < 0
+      ? { label: "Vencido", variant: "destructive" as const }
+      : d <= 7
+        ? { label: d === 0 ? "Vence hoje" : `Em ${d} dia${d > 1 ? "s" : ""}`, variant: "destructive" as const }
+        : { label: `Em ${d} dias`, variant: "secondary" as const };
+
+  const somaAl = (f: (d: number) => boolean) =>
+    alertas.filter((c) => f(c.dias)).reduce((s, c) => s + (Number(c.valor) || 0), 0);
+
+  const resumoAlertas = [
+    { titulo: "Vencidas", valor: somaAl((d) => d < 0), qtd: alertas.filter((c) => c.dias < 0).length, critico: true },
+    {
+      titulo: "Vencem em 7 dias",
+      valor: somaAl((d) => d >= 0 && d <= 7),
+      qtd: alertas.filter((c) => c.dias >= 0 && c.dias <= 7).length,
+      critico: true,
+    },
+    {
+      titulo: "Vencem em 30 dias",
+      valor: somaAl((d) => d >= 0 && d <= 30),
+      qtd: alertas.filter((c) => c.dias >= 0 && c.dias <= 30).length,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
