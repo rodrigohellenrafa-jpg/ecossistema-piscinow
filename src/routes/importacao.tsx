@@ -90,6 +90,20 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
   const [dragging, setDragging] = useState(false);
   const [progresso, setProgresso] = useState<number | null>(null);
   const [importados, setImportados] = useState(0);
+  const [loteAtual, setLoteAtual] = useState(0);
+  const [totalLotes, setTotalLotes] = useState(0);
+  const [logs, setLogs] = useState<
+    { hora: string; tipo: "info" | "ok" | "aviso" | "erro"; texto: string }[]
+  >([]);
+
+  const log = useCallback(
+    (tipo: "info" | "ok" | "aviso" | "erro", texto: string) =>
+      setLogs((prev) => [
+        ...prev,
+        { hora: new Date().toLocaleTimeString("pt-BR"), tipo, texto },
+      ]),
+    [],
+  );
 
   const mapa = useMemo(() => {
     return entidade.campos.map((campo) => ({
