@@ -59,6 +59,8 @@ const groups = [
       { title: "Contas a Pagar/Receber", url: "/contas", icon: Receipt },
       { title: "Relatório de Contas", url: "/relatorio-contas", icon: BarChart3 },
       { title: "Compras", url: "/compras", icon: Truck },
+      { title: "Notas de Compra", url: "/notas-compra", icon: FileText },
+
 
     ],
   },

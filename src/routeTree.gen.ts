@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
 import { Route as ProdutosRouteImport } from './routes/produtos'
 import { Route as OrdensRouteImport } from './routes/ordens'
+import { Route as NotasCompraRouteImport } from './routes/notas-compra'
 import { Route as LogisticaRouteImport } from './routes/logistica'
 import { Route as ImportacaoRouteImport } from './routes/importacao'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
@@ -36,6 +37,11 @@ const ProdutosRoute = ProdutosRouteImport.update({
 const OrdensRoute = OrdensRouteImport.update({
   id: '/ordens',
   path: '/ordens',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotasCompraRoute = NotasCompraRouteImport.update({
+  id: '/notas-compra',
+  path: '/notas-compra',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LogisticaRoute = LogisticaRouteImport.update({
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof FinanceiroRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
+  '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/relatorio-contas': typeof RelatorioContasRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof FinanceiroRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
+  '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/relatorio-contas': typeof RelatorioContasRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/financeiro': typeof FinanceiroRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
+  '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
   '/produtos': typeof ProdutosRoute
   '/relatorio-contas': typeof RelatorioContasRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/importacao'
     | '/logistica'
+    | '/notas-compra'
     | '/ordens'
     | '/produtos'
     | '/relatorio-contas'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/importacao'
     | '/logistica'
+    | '/notas-compra'
     | '/ordens'
     | '/produtos'
     | '/relatorio-contas'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/importacao'
     | '/logistica'
+    | '/notas-compra'
     | '/ordens'
     | '/produtos'
     | '/relatorio-contas'
@@ -192,6 +204,7 @@ export interface RootRouteChildren {
   FinanceiroRoute: typeof FinanceiroRoute
   ImportacaoRoute: typeof ImportacaoRoute
   LogisticaRoute: typeof LogisticaRoute
+  NotasCompraRoute: typeof NotasCompraRoute
   OrdensRoute: typeof OrdensRoute
   ProdutosRoute: typeof ProdutosRoute
   RelatorioContasRoute: typeof RelatorioContasRoute
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/ordens'
       fullPath: '/ordens'
       preLoaderRoute: typeof OrdensRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notas-compra': {
+      id: '/notas-compra'
+      path: '/notas-compra'
+      fullPath: '/notas-compra'
+      preLoaderRoute: typeof NotasCompraRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/logistica': {
@@ -304,6 +324,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceiroRoute: FinanceiroRoute,
   ImportacaoRoute: ImportacaoRoute,
   LogisticaRoute: LogisticaRoute,
+  NotasCompraRoute: NotasCompraRoute,
   OrdensRoute: OrdensRoute,
   ProdutosRoute: ProdutosRoute,
   RelatorioContasRoute: RelatorioContasRoute,
