@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
+import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { ETAPAS_FUNIL, proximoCodigo } from "@/lib/erp";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/clientes")({
   head: () => ({
@@ -61,7 +64,12 @@ export const Route = createFileRoute("/clientes")({
   ),
 });
 
+type Cliente = Tables<"clientes">;
+
+const TODAS_ETAPAS = "__todas__";
+
 const vazio = {
+  codigo: "",
   nome: "",
   tipo: "PF",
   documento: "",
@@ -74,13 +82,17 @@ const vazio = {
   bairro: "",
   cidade: "",
   estado: "",
+  endereco_obra: "",
+  etapa: "Lead" as (typeof ETAPAS_FUNIL)[number],
   observacoes: "",
 };
 
 function Clientes() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  const [filtroEtapa, setFiltroEtapa] = useState<string>(TODAS_ETAPAS);
   const [open, setOpen] = useState(false);
+  const [editando, setEditando] = useState<Cliente | null>(null);
   const [form, setForm] = useState(vazio);
 
   const { data = [], isLoading } = useQuery({
@@ -95,19 +107,54 @@ function Clientes() {
     },
   });
 
+  const abrirNovo = () => {
+    setEditando(null);
+    setForm({ ...vazio, codigo: proximoCodigo("CLI", data.map((c) => c.codigo)) });
+    setOpen(true);
+  };
+
+  const abrirEdicao = (c: Cliente) => {
+    setEditando(c);
+    setForm({
+      codigo: c.codigo ?? "",
+      nome: c.nome,
+      tipo: c.tipo,
+      documento: c.documento ?? "",
+      email: c.email ?? "",
+      telefone: c.telefone ?? "",
+      cep: c.cep ?? "",
+      logradouro: c.logradouro ?? "",
+      numero: c.numero ?? "",
+      complemento: c.complemento ?? "",
+      bairro: c.bairro ?? "",
+      cidade: c.cidade ?? "",
+      estado: c.estado ?? "",
+      endereco_obra: c.endereco_obra ?? "",
+      etapa: (c.etapa as (typeof ETAPAS_FUNIL)[number]) ?? "Lead",
+      observacoes: c.observacoes ?? "",
+    });
+    setOpen(true);
+  };
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.nome.trim()) throw new Error("Informe o nome do cliente.");
-      const { error } = await supabase.from("clientes").insert({
-        ...form,
-        nome: form.nome.trim(),
-        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
-      });
-      if (error) throw error;
+      const payload = { ...form, nome: form.nome.trim(), codigo: form.codigo || null };
+      if (editando) {
+        const { error } = await supabase.from("clientes").update(payload).eq("id", editando.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("clientes").insert({
+          ...payload,
+          created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success("Cliente cadastrado!");
+      toast.success(editando ? "Cliente atualizado!" : "Cliente cadastrado!");
       setForm(vazio);
+      setEditando(null);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["clientes"] });
     },
@@ -126,163 +173,222 @@ function Clientes() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const lista = data.filter((c) =>
-    `${c.nome} ${c.cidade ?? ""} ${c.telefone ?? ""} ${c.documento ?? ""}`
-      .toLowerCase()
-      .includes(q.toLowerCase()),
-  );
+  const lista = data
+    .filter((c) => filtroEtapa === TODAS_ETAPAS || c.etapa === filtroEtapa)
+    .filter((c) =>
+      `${c.nome} ${c.codigo ?? ""} ${c.cidade ?? ""} ${c.telefone ?? ""} ${c.documento ?? ""}`
+        .toLowerCase()
+        .includes(q.toLowerCase()),
+    );
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
-          <p className="text-sm text-muted-foreground">
-            Cadastro salvo no banco de dados da equipe.
-          </p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus /> Novo cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Novo cliente</DialogTitle>
-              <DialogDescription>Preencha os dados cadastrais.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nome / Razão social" className="sm:col-span-2">
-                <Input value={form.nome} onChange={(e) => set("nome")(e.target.value)} />
-              </Field>
-              <Field label="Tipo">
-                <Select value={form.tipo} onValueChange={set("tipo")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PF">Pessoa física</SelectItem>
-                    <SelectItem value="PJ">Pessoa jurídica</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="CPF / CNPJ">
-                <Input value={form.documento} onChange={(e) => set("documento")(e.target.value)} />
-              </Field>
-              <Field label="E-mail">
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => set("email")(e.target.value)}
-                />
-              </Field>
-              <Field label="Telefone">
-                <Input value={form.telefone} onChange={(e) => set("telefone")(e.target.value)} />
-              </Field>
-              <Field label="CEP">
-                <Input value={form.cep} onChange={(e) => set("cep")(e.target.value)} />
-              </Field>
-              <Field label="Logradouro">
-                <Input
-                  value={form.logradouro}
-                  onChange={(e) => set("logradouro")(e.target.value)}
-                />
-              </Field>
-              <Field label="Número">
-                <Input value={form.numero} onChange={(e) => set("numero")(e.target.value)} />
-              </Field>
-              <Field label="Complemento">
-                <Input
-                  value={form.complemento}
-                  onChange={(e) => set("complemento")(e.target.value)}
-                />
-              </Field>
-              <Field label="Bairro">
-                <Input value={form.bairro} onChange={(e) => set("bairro")(e.target.value)} />
-              </Field>
-              <Field label="Cidade">
-                <Input value={form.cidade} onChange={(e) => set("cidade")(e.target.value)} />
-              </Field>
-              <Field label="Estado">
-                <Input
-                  maxLength={2}
-                  value={form.estado}
-                  onChange={(e) => set("estado")(e.target.value.toUpperCase())}
-                />
-              </Field>
-              <Field label="Observações" className="sm:col-span-2">
-                <Textarea
-                  rows={3}
-                  value={form.observacoes}
-                  onChange={(e) => set("observacoes")(e.target.value)}
-                />
-              </Field>
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={() => salvar.mutate()}
-                disabled={salvar.isPending}
-              >
-                Salvar cliente
+      <PageHeader
+        title="Clientes"
+        subtitle="Cadastro salvo no banco de dados da equipe."
+        actions={
+          <Dialog
+            open={open}
+            onOpenChange={(v) => {
+              setOpen(v);
+              if (!v) setEditando(null);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button onClick={abrirNovo}>
+                <Plus /> Novo cliente
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogTrigger>
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{editando ? "Editar cliente" : "Novo cliente"}</DialogTitle>
+                <DialogDescription>Preencha os dados cadastrais.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Código">
+                  <Input value={form.codigo} onChange={(e) => set("codigo")(e.target.value)} />
+                </Field>
+                <Field label="Etapa no funil">
+                  <Select value={form.etapa} onValueChange={(v) => set("etapa")(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ETAPAS_FUNIL.map((e) => (
+                        <SelectItem key={e} value={e}>
+                          {e}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Nome / Razão social" className="sm:col-span-2">
+                  <Input value={form.nome} onChange={(e) => set("nome")(e.target.value)} />
+                </Field>
+                <Field label="Tipo">
+                  <Select value={form.tipo} onValueChange={set("tipo")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PF">Pessoa física</SelectItem>
+                      <SelectItem value="PJ">Pessoa jurídica</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="CPF / CNPJ">
+                  <Input value={form.documento} onChange={(e) => set("documento")(e.target.value)} />
+                </Field>
+                <Field label="E-mail">
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => set("email")(e.target.value)}
+                  />
+                </Field>
+                <Field label="Telefone">
+                  <Input value={form.telefone} onChange={(e) => set("telefone")(e.target.value)} />
+                </Field>
+                <Field label="CEP">
+                  <Input value={form.cep} onChange={(e) => set("cep")(e.target.value)} />
+                </Field>
+                <Field label="Logradouro">
+                  <Input
+                    value={form.logradouro}
+                    onChange={(e) => set("logradouro")(e.target.value)}
+                  />
+                </Field>
+                <Field label="Número">
+                  <Input value={form.numero} onChange={(e) => set("numero")(e.target.value)} />
+                </Field>
+                <Field label="Complemento">
+                  <Input
+                    value={form.complemento}
+                    onChange={(e) => set("complemento")(e.target.value)}
+                  />
+                </Field>
+                <Field label="Bairro">
+                  <Input value={form.bairro} onChange={(e) => set("bairro")(e.target.value)} />
+                </Field>
+                <Field label="Cidade">
+                  <Input value={form.cidade} onChange={(e) => set("cidade")(e.target.value)} />
+                </Field>
+                <Field label="Estado">
+                  <Input
+                    maxLength={2}
+                    value={form.estado}
+                    onChange={(e) => set("estado")(e.target.value.toUpperCase())}
+                  />
+                </Field>
+                <Field label="Endereço da obra" className="sm:col-span-2">
+                  <Input
+                    value={form.endereco_obra}
+                    onChange={(e) => set("endereco_obra")(e.target.value)}
+                  />
+                </Field>
+                <Field label="Observações" className="sm:col-span-2">
+                  <Textarea
+                    rows={3}
+                    value={form.observacoes}
+                    onChange={(e) => set("observacoes")(e.target.value)}
+                  />
+                </Field>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+                  {editando ? "Salvar alterações" : "Salvar cliente"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <Card>
         <CardHeader className="gap-3">
           <CardTitle>Base de clientes ({lista.length})</CardTitle>
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-9"
-              placeholder="Buscar por nome, cidade, telefone ou documento"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative max-w-sm flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar por nome, código, cidade, telefone ou documento"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+            <Select value={filtroEtapa} onValueChange={setFiltroEtapa}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TODAS_ETAPAS}>Todas as etapas</SelectItem>
+                {ETAPAS_FUNIL.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Código</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Tipo</TableHead>
+                <TableHead>Etapa</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead>Cidade</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {lista.map((c) => (
                 <TableRow key={c.id}>
+                  <TableCell>
+                    <Badge variant="secondary">{c.codigo ?? "—"}</Badge>
+                  </TableCell>
                   <TableCell className="font-medium">{c.nome}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{c.tipo}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge>{c.etapa}</Badge>
                   </TableCell>
                   <TableCell>{c.telefone || c.email || "—"}</TableCell>
                   <TableCell>
                     {c.cidade ? `${c.cidade}${c.estado ? `/${c.estado}` : ""}` : "—"}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => excluir.mutate(c.id)}
-                      aria-label={`Excluir ${c.nome}`}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => abrirEdicao(c)}
+                        aria-label={`Editar ${c.nome}`}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => excluir.mutate(c.id)}
+                        aria-label={`Excluir ${c.nome}`}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
               {!isLoading && lista.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                     Nenhum cliente cadastrado ainda.
                   </TableCell>
                 </TableRow>
