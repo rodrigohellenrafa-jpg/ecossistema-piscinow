@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Hammer, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { addDiasUteis, hojeISO, proximoCodigo } from "@/lib/erp";
 
 export const Route = createFileRoute("/ordens")({
   head: () => ({
@@ -73,6 +74,13 @@ const LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+const PRIORIDADES = ["baixa", "media", "alta"] as const;
+const PRIORIDADE_LABEL: Record<string, string> = {
+  baixa: "Baixa",
+  media: "Média",
+  alta: "Alta",
+};
+
 const vazio = {
   numero: "",
   cliente_id: "",
@@ -89,11 +97,13 @@ function Ordens() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");
 
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
+      const { data, error } = await supabase.from("clientes").select("id, nome, endereco_obra").order("nome");
       if (error) throw error;
       return data;
     },
@@ -110,6 +120,27 @@ function Ordens() {
       return data;
     },
   });
+
+  const { data: obras = [] } = useQuery({
+    queryKey: ["obras-codigos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("obras")
+        .select("numero, os_instalacao, os_logistica, os_acabamento");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const filtradas = useMemo(
+    () =>
+      data.filter(
+        (o) =>
+          (filtroStatus === "todos" || o.status === filtroStatus) &&
+          (filtroPrioridade === "todos" || o.prioridade === filtroPrioridade),
+      ),
+    [data, filtroStatus, filtroPrioridade],
+  );
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -146,6 +177,38 @@ function Ordens() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ordens"] }),
+  });
+
+  const gerarObra = useMutation({
+    mutationFn: async (os: (typeof data)[number]) => {
+      const cliente = clientes.find((c) => c.id === os.cliente_id);
+      const dataPedido = hojeISO();
+      const prazoDias = 30;
+      const dataLimite = addDiasUteis(dataPedido, prazoDias);
+      const { error } = await supabase.from("obras").insert({
+        cliente_id: os.cliente_id,
+        cliente_nome: os.cliente_nome ?? cliente?.nome ?? null,
+        numero: proximoCodigo("OBRA", obras.map((o) => o.numero)),
+        tipo_servico: os.tipo_servico,
+        data_pedido: dataPedido,
+        prazo_dias: prazoDias,
+        data_limite: dataLimite,
+        responsavel: os.responsavel ?? null,
+        endereco_obra: cliente?.endereco_obra ?? null,
+        os_instalacao: proximoCodigo("OS-02", obras.map((o) => o.os_instalacao)),
+        os_logistica: proximoCodigo("OL", obras.map((o) => o.os_logistica)),
+        os_acabamento: proximoCodigo("OS-03", obras.map((o) => o.os_acabamento)),
+        status_geral: "Agendado",
+        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Obra criada no Flight Board!");
+      qc.invalidateQueries({ queryKey: ["obras"] });
+      qc.invalidateQueries({ queryKey: ["obras-codigos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -261,7 +324,35 @@ function Ordens() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ordens abertas ({data.length})</CardTitle>
+          <CardTitle>Ordens abertas ({filtradas.length})</CardTitle>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                {STATUS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {LABEL[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filtroPrioridade} onValueChange={setFiltroPrioridade}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as prioridades</SelectItem>
+                {PRIORIDADES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PRIORIDADE_LABEL[p]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -273,17 +364,18 @@ function Ordens() {
                 <TableHead>Agenda</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="w-44">Status</TableHead>
+                <TableHead className="w-36">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((o) => (
+              {filtradas.map((o) => (
                 <TableRow key={o.id}>
                   <TableCell className="font-medium">{o.numero}</TableCell>
                   <TableCell>{o.cliente_nome ?? "—"}</TableCell>
                   <TableCell>
                     {o.tipo_servico}
                     <Badge variant="secondary" className="ml-2">
-                      {o.prioridade}
+                      {PRIORIDADE_LABEL[o.prioridade] ?? o.prioridade}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -309,12 +401,22 @@ function Ordens() {
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => gerarObra.mutate(o)}
+                      disabled={gerarObra.isPending}
+                    >
+                      <Hammer /> Gerar obra
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
-              {data.length === 0 && (
+              {filtradas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    Nenhuma ordem de serviço cadastrada.
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    Nenhuma ordem de serviço encontrada.
                   </TableCell>
                 </TableRow>
               )}
@@ -322,6 +424,14 @@ function Ordens() {
           </Table>
         </CardContent>
       </Card>
+
+      <p className="text-xs text-muted-foreground">
+        Acompanhe as obras geradas em{" "}
+        <Link to="/logistica" className="underline">
+          Flight Board
+        </Link>
+        .
+      </p>
     </div>
   );
 }

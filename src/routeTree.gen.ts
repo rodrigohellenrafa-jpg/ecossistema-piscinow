@@ -11,18 +11,28 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
 import { Route as ProdutosRouteImport } from './routes/produtos'
+import { Route as OrdensCompraRouteImport } from './routes/ordens-compra'
 import { Route as OrdensRouteImport } from './routes/ordens'
 import { Route as NotasCompraRouteImport } from './routes/notas-compra'
 import { Route as LogisticaRouteImport } from './routes/logistica'
 import { Route as ImportacaoRouteImport } from './routes/importacao'
+import { Route as HoleriteRouteImport } from './routes/holerite'
+import { Route as FuncionariosRouteImport } from './routes/funcionarios'
+import { Route as FornecedoresRouteImport } from './routes/fornecedores'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
+import { Route as DreRouteImport } from './routes/dre'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as ComprasRouteImport } from './routes/compras'
 import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AcessosRouteImport } from './routes/acessos'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VendasIndexRouteImport } from './routes/vendas.index'
 import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
+import { Route as VendasIdRouteImport } from './routes/vendas.$id'
+import { Route as ObrasIdRouteImport } from './routes/obras.$id'
+import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventario'
+import { Route as EstoqueEntradasRouteImport } from './routes/estoque.entradas'
 
 const RelatorioContasRoute = RelatorioContasRouteImport.update({
   id: '/relatorio-contas',
@@ -32,6 +42,11 @@ const RelatorioContasRoute = RelatorioContasRouteImport.update({
 const ProdutosRoute = ProdutosRouteImport.update({
   id: '/produtos',
   path: '/produtos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdensCompraRoute = OrdensCompraRouteImport.update({
+  id: '/ordens-compra',
+  path: '/ordens-compra',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdensRoute = OrdensRouteImport.update({
@@ -54,9 +69,29 @@ const ImportacaoRoute = ImportacaoRouteImport.update({
   path: '/importacao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HoleriteRoute = HoleriteRouteImport.update({
+  id: '/holerite',
+  path: '/holerite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FuncionariosRoute = FuncionariosRouteImport.update({
+  id: '/funcionarios',
+  path: '/funcionarios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FornecedoresRoute = FornecedoresRouteImport.update({
+  id: '/fornecedores',
+  path: '/fornecedores',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DreRoute = DreRouteImport.update({
+  id: '/dre',
+  path: '/dre',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContasRoute = ContasRouteImport.update({
@@ -79,6 +114,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AcessosRoute = AcessosRouteImport.update({
+  id: '/acessos',
+  path: '/acessos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -94,53 +134,103 @@ const VendasNovoRoute = VendasNovoRouteImport.update({
   path: '/vendas/novo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VendasIdRoute = VendasIdRouteImport.update({
+  id: '/vendas/$id',
+  path: '/vendas/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ObrasIdRoute = ObrasIdRouteImport.update({
+  id: '/obras/$id',
+  path: '/obras/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueInventarioRoute = EstoqueInventarioRouteImport.update({
+  id: '/estoque/inventario',
+  path: '/estoque/inventario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueEntradasRoute = EstoqueEntradasRouteImport.update({
+  id: '/estoque/entradas',
+  path: '/estoque/entradas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/acessos': typeof AcessosRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
+  '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fornecedores': typeof FornecedoresRoute
+  '/funcionarios': typeof FuncionariosRoute
+  '/holerite': typeof HoleriteRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
+  '/ordens-compra': typeof OrdensCompraRoute
   '/produtos': typeof ProdutosRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/estoque/entradas': typeof EstoqueEntradasRoute
+  '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/obras/$id': typeof ObrasIdRoute
+  '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/acessos': typeof AcessosRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
+  '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fornecedores': typeof FornecedoresRoute
+  '/funcionarios': typeof FuncionariosRoute
+  '/holerite': typeof HoleriteRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
+  '/ordens-compra': typeof OrdensCompraRoute
   '/produtos': typeof ProdutosRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/estoque/entradas': typeof EstoqueEntradasRoute
+  '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/obras/$id': typeof ObrasIdRoute
+  '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas': typeof VendasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/acessos': typeof AcessosRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
+  '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fornecedores': typeof FornecedoresRoute
+  '/funcionarios': typeof FuncionariosRoute
+  '/holerite': typeof HoleriteRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
+  '/ordens-compra': typeof OrdensCompraRoute
   '/produtos': typeof ProdutosRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/estoque/entradas': typeof EstoqueEntradasRoute
+  '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/obras/$id': typeof ObrasIdRoute
+  '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/': typeof VendasIndexRoute
 }
@@ -148,66 +238,106 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/acessos'
     | '/auth'
     | '/clientes'
     | '/compras'
     | '/contas'
+    | '/dre'
     | '/financeiro'
+    | '/fornecedores'
+    | '/funcionarios'
+    | '/holerite'
     | '/importacao'
     | '/logistica'
     | '/notas-compra'
     | '/ordens'
+    | '/ordens-compra'
     | '/produtos'
     | '/relatorio-contas'
+    | '/estoque/entradas'
+    | '/estoque/inventario'
+    | '/obras/$id'
+    | '/vendas/$id'
     | '/vendas/novo'
     | '/vendas/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/acessos'
     | '/auth'
     | '/clientes'
     | '/compras'
     | '/contas'
+    | '/dre'
     | '/financeiro'
+    | '/fornecedores'
+    | '/funcionarios'
+    | '/holerite'
     | '/importacao'
     | '/logistica'
     | '/notas-compra'
     | '/ordens'
+    | '/ordens-compra'
     | '/produtos'
     | '/relatorio-contas'
+    | '/estoque/entradas'
+    | '/estoque/inventario'
+    | '/obras/$id'
+    | '/vendas/$id'
     | '/vendas/novo'
     | '/vendas'
   id:
     | '__root__'
     | '/'
+    | '/acessos'
     | '/auth'
     | '/clientes'
     | '/compras'
     | '/contas'
+    | '/dre'
     | '/financeiro'
+    | '/fornecedores'
+    | '/funcionarios'
+    | '/holerite'
     | '/importacao'
     | '/logistica'
     | '/notas-compra'
     | '/ordens'
+    | '/ordens-compra'
     | '/produtos'
     | '/relatorio-contas'
+    | '/estoque/entradas'
+    | '/estoque/inventario'
+    | '/obras/$id'
+    | '/vendas/$id'
     | '/vendas/novo'
     | '/vendas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AcessosRoute: typeof AcessosRoute
   AuthRoute: typeof AuthRoute
   ClientesRoute: typeof ClientesRoute
   ComprasRoute: typeof ComprasRoute
   ContasRoute: typeof ContasRoute
+  DreRoute: typeof DreRoute
   FinanceiroRoute: typeof FinanceiroRoute
+  FornecedoresRoute: typeof FornecedoresRoute
+  FuncionariosRoute: typeof FuncionariosRoute
+  HoleriteRoute: typeof HoleriteRoute
   ImportacaoRoute: typeof ImportacaoRoute
   LogisticaRoute: typeof LogisticaRoute
   NotasCompraRoute: typeof NotasCompraRoute
   OrdensRoute: typeof OrdensRoute
+  OrdensCompraRoute: typeof OrdensCompraRoute
   ProdutosRoute: typeof ProdutosRoute
   RelatorioContasRoute: typeof RelatorioContasRoute
+  EstoqueEntradasRoute: typeof EstoqueEntradasRoute
+  EstoqueInventarioRoute: typeof EstoqueInventarioRoute
+  ObrasIdRoute: typeof ObrasIdRoute
+  VendasIdRoute: typeof VendasIdRoute
   VendasNovoRoute: typeof VendasNovoRoute
   VendasIndexRoute: typeof VendasIndexRoute
 }
@@ -226,6 +356,13 @@ declare module '@tanstack/react-router' {
       path: '/produtos'
       fullPath: '/produtos'
       preLoaderRoute: typeof ProdutosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ordens-compra': {
+      id: '/ordens-compra'
+      path: '/ordens-compra'
+      fullPath: '/ordens-compra'
+      preLoaderRoute: typeof OrdensCompraRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ordens': {
@@ -256,11 +393,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImportacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/holerite': {
+      id: '/holerite'
+      path: '/holerite'
+      fullPath: '/holerite'
+      preLoaderRoute: typeof HoleriteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/funcionarios': {
+      id: '/funcionarios'
+      path: '/funcionarios'
+      fullPath: '/funcionarios'
+      preLoaderRoute: typeof FuncionariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fornecedores': {
+      id: '/fornecedores'
+      path: '/fornecedores'
+      fullPath: '/fornecedores'
+      preLoaderRoute: typeof FornecedoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/financeiro': {
       id: '/financeiro'
       path: '/financeiro'
       fullPath: '/financeiro'
       preLoaderRoute: typeof FinanceiroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dre': {
+      id: '/dre'
+      path: '/dre'
+      fullPath: '/dre'
+      preLoaderRoute: typeof DreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contas': {
@@ -291,6 +456,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/acessos': {
+      id: '/acessos'
+      path: '/acessos'
+      fullPath: '/acessos'
+      preLoaderRoute: typeof AcessosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -312,22 +484,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VendasNovoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vendas/$id': {
+      id: '/vendas/$id'
+      path: '/vendas/$id'
+      fullPath: '/vendas/$id'
+      preLoaderRoute: typeof VendasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/obras/$id': {
+      id: '/obras/$id'
+      path: '/obras/$id'
+      fullPath: '/obras/$id'
+      preLoaderRoute: typeof ObrasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque/inventario': {
+      id: '/estoque/inventario'
+      path: '/estoque/inventario'
+      fullPath: '/estoque/inventario'
+      preLoaderRoute: typeof EstoqueInventarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque/entradas': {
+      id: '/estoque/entradas'
+      path: '/estoque/entradas'
+      fullPath: '/estoque/entradas'
+      preLoaderRoute: typeof EstoqueEntradasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AcessosRoute: AcessosRoute,
   AuthRoute: AuthRoute,
   ClientesRoute: ClientesRoute,
   ComprasRoute: ComprasRoute,
   ContasRoute: ContasRoute,
+  DreRoute: DreRoute,
   FinanceiroRoute: FinanceiroRoute,
+  FornecedoresRoute: FornecedoresRoute,
+  FuncionariosRoute: FuncionariosRoute,
+  HoleriteRoute: HoleriteRoute,
   ImportacaoRoute: ImportacaoRoute,
   LogisticaRoute: LogisticaRoute,
   NotasCompraRoute: NotasCompraRoute,
   OrdensRoute: OrdensRoute,
+  OrdensCompraRoute: OrdensCompraRoute,
   ProdutosRoute: ProdutosRoute,
   RelatorioContasRoute: RelatorioContasRoute,
+  EstoqueEntradasRoute: EstoqueEntradasRoute,
+  EstoqueInventarioRoute: EstoqueInventarioRoute,
+  ObrasIdRoute: ObrasIdRoute,
+  VendasIdRoute: VendasIdRoute,
   VendasNovoRoute: VendasNovoRoute,
   VendasIndexRoute: VendasIndexRoute,
 }

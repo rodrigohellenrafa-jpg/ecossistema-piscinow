@@ -13,7 +13,13 @@ import {
   BarChart3,
   Upload,
   FileText,
-
+  Factory,
+  Contact,
+  Boxes,
+  ClipboardCheck,
+  PiggyBank,
+  BadgeDollarSign,
+  ShieldCheck,
 } from "lucide-react";
 
 import {
@@ -27,53 +33,85 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useRoles, type ACESSO } from "@/hooks/use-role";
 
-const groups = [
+type Area = keyof typeof ACESSO;
+
+const groups: {
+  label: string;
+  area: Area;
+  items: { title: string; url: string; icon: typeof Users }[];
+}[] = [
   {
     label: "Principal",
+    area: "cadastros",
     items: [{ title: "Dashboard", url: "/", icon: LayoutDashboard }],
   },
   {
     label: "Cadastros",
+    area: "cadastros",
     items: [
       { title: "Clientes", url: "/clientes", icon: Users },
-      { title: "Produtos", url: "/produtos", icon: Package },
+      { title: "Produtos & Estoque", url: "/produtos", icon: Package },
+      { title: "Fornecedores", url: "/fornecedores", icon: Factory },
+      { title: "Colaboradores", url: "/funcionarios", icon: Contact },
     ],
   },
   {
     label: "Vendas",
+    area: "vendas",
     items: [
       { title: "Novo Pedido (PDV)", url: "/vendas/novo", icon: ShoppingCart },
-      { title: "Histórico", url: "/vendas", icon: ClipboardList },
+      { title: "Histórico de Pedidos", url: "/vendas", icon: ClipboardList },
     ],
   },
   {
-    label: "Logística",
+    label: "Logística & Obras",
+    area: "logistica",
     items: [
-      { title: "Ordens de Serviço", url: "/ordens", icon: ClipboardList },
       { title: "Flight Board", url: "/logistica", icon: KanbanSquare },
+      { title: "Ordens de Serviço", url: "/ordens", icon: ClipboardCheck },
+    ],
+  },
+  {
+    label: "Compras & Estoque",
+    area: "compras",
+    items: [
+      { title: "Central de Reposição", url: "/compras", icon: Truck },
+      { title: "Ordens de Compra", url: "/ordens-compra", icon: FileText },
+      { title: "Entradas de Estoque", url: "/estoque/entradas", icon: Boxes },
+      { title: "Inventário Físico", url: "/estoque/inventario", icon: ClipboardList },
+      { title: "Notas de Compra", url: "/notas-compra", icon: Receipt },
     ],
   },
   {
     label: "Financeiro",
+    area: "financeiro",
     items: [
       { title: "Fluxo de Caixa", url: "/financeiro", icon: Wallet },
       { title: "Contas a Pagar/Receber", url: "/contas", icon: Receipt },
       { title: "Relatório de Contas", url: "/relatorio-contas", icon: BarChart3 },
-      { title: "Compras", url: "/compras", icon: Truck },
-      { title: "Notas de Compra", url: "/notas-compra", icon: FileText },
-
-
+      { title: "DRE", url: "/dre", icon: PiggyBank },
     ],
   },
   {
-    label: "Administrativo",
-    items: [{ title: "Importação de Dados", url: "/importacao", icon: Upload }],
+    label: "RH & Comissões",
+    area: "rh",
+    items: [{ title: "Holerite & Comissões", url: "/holerite", icon: BadgeDollarSign }],
   },
-] as const;
+  {
+    label: "Administração",
+    area: "admin",
+    items: [
+      { title: "Importação de Dados", url: "/importacao", icon: Upload },
+      { title: "Controle de Acesso", url: "/acessos", icon: ShieldCheck },
+    ],
+  },
+];
 
 export function AppSidebar() {
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  const { pode } = useRoles();
 
   return (
     <Sidebar collapsible="icon">
@@ -89,29 +127,31 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {groups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={item.title}
-                      isActive={currentPath === item.url}
-                    >
-                      <Link to={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {groups
+          .filter((g) => pode(g.area))
+          .map((group) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={item.title}
+                        isActive={currentPath === item.url}
+                      >
+                        <Link to={item.url}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
       </SidebarContent>
     </Sidebar>
   );
