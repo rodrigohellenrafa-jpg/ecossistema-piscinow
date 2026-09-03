@@ -20,12 +20,15 @@ export type Database = {
           bairro: string | null
           cep: string | null
           cidade: string | null
+          codigo: string | null
           complemento: string | null
           created_at: string
           created_by: string | null
           documento: string | null
           email: string | null
+          endereco_obra: string | null
           estado: string | null
+          etapa: string
           id: string
           logradouro: string | null
           nome: string
@@ -40,12 +43,15 @@ export type Database = {
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
+          codigo?: string | null
           complemento?: string | null
           created_at?: string
           created_by?: string | null
           documento?: string | null
           email?: string | null
+          endereco_obra?: string | null
           estado?: string | null
+          etapa?: string
           id?: string
           logradouro?: string | null
           nome: string
@@ -60,12 +66,15 @@ export type Database = {
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
+          codigo?: string | null
           complemento?: string | null
           created_at?: string
           created_by?: string | null
           documento?: string | null
           email?: string | null
+          endereco_obra?: string | null
           estado?: string | null
+          etapa?: string
           id?: string
           logradouro?: string | null
           nome?: string
@@ -136,6 +145,264 @@ export type Database = {
           },
         ]
       }
+      estoque_movimentos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          documento: string | null
+          id: string
+          observacoes: string | null
+          origem: string | null
+          produto_id: string
+          quantidade: number
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          id?: string
+          observacoes?: string | null
+          origem?: string | null
+          produto_id: string
+          quantidade?: number
+          tipo?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          documento?: string | null
+          id?: string
+          observacoes?: string | null
+          origem?: string | null
+          produto_id?: string
+          quantidade?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_movimentos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fornecedores: {
+        Row: {
+          ativo: boolean
+          cnpj: string | null
+          codigo: string | null
+          contato: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          prazo_entrega_dias: number
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cnpj?: string | null
+          codigo?: string | null
+          contato?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          prazo_entrega_dias?: number
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cnpj?: string | null
+          codigo?: string | null
+          contato?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          prazo_entrega_dias?: number
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      funcionarios: {
+        Row: {
+          ativo: boolean
+          bonificacao: number
+          cargo: string
+          codigo: string | null
+          comissao_acessorios: number
+          comissao_piscinas: number
+          comissao_quimicos: number
+          created_at: string
+          created_by: string | null
+          data_admissao: string | null
+          email: string | null
+          id: string
+          inss_perc: number
+          irrf_perc: number
+          nome: string
+          perfil: Database["public"]["Enums"]["app_role"]
+          salario_base: number
+          sindicato: number
+          telefone: string | null
+          updated_at: string
+          user_id: string | null
+          vr: number
+          vt: number
+        }
+        Insert: {
+          ativo?: boolean
+          bonificacao?: number
+          cargo?: string
+          codigo?: string | null
+          comissao_acessorios?: number
+          comissao_piscinas?: number
+          comissao_quimicos?: number
+          created_at?: string
+          created_by?: string | null
+          data_admissao?: string | null
+          email?: string | null
+          id?: string
+          inss_perc?: number
+          irrf_perc?: number
+          nome: string
+          perfil?: Database["public"]["Enums"]["app_role"]
+          salario_base?: number
+          sindicato?: number
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vr?: number
+          vt?: number
+        }
+        Update: {
+          ativo?: boolean
+          bonificacao?: number
+          cargo?: string
+          codigo?: string | null
+          comissao_acessorios?: number
+          comissao_piscinas?: number
+          comissao_quimicos?: number
+          created_at?: string
+          created_by?: string | null
+          data_admissao?: string | null
+          email?: string | null
+          id?: string
+          inss_perc?: number
+          irrf_perc?: number
+          nome?: string
+          perfil?: Database["public"]["Enums"]["app_role"]
+          salario_base?: number
+          sindicato?: number
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vr?: number
+          vt?: number
+        }
+        Relationships: []
+      }
+      lancamentos_financeiros: {
+        Row: {
+          categoria: string
+          conciliado: boolean
+          conta_bancaria: string | null
+          created_at: string
+          created_by: string | null
+          data_competencia: string
+          data_pagamento: string | null
+          descricao: string
+          forma_pagamento: string | null
+          fornecedor_id: string | null
+          funcionario_id: string | null
+          id: string
+          observacoes: string | null
+          status: string
+          tipo_fluxo: string
+          updated_at: string
+          valor: number
+          vencimento: string | null
+          venda_id: string | null
+        }
+        Insert: {
+          categoria?: string
+          conciliado?: boolean
+          conta_bancaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_competencia?: string
+          data_pagamento?: string | null
+          descricao: string
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          funcionario_id?: string | null
+          id?: string
+          observacoes?: string | null
+          status?: string
+          tipo_fluxo?: string
+          updated_at?: string
+          valor?: number
+          vencimento?: string | null
+          venda_id?: string | null
+        }
+        Update: {
+          categoria?: string
+          conciliado?: boolean
+          conta_bancaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_competencia?: string
+          data_pagamento?: string | null
+          descricao?: string
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          funcionario_id?: string | null
+          id?: string
+          observacoes?: string | null
+          status?: string
+          tipo_fluxo?: string
+          updated_at?: string
+          valor?: number
+          vencimento?: string | null
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamentos_financeiros_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_financeiros_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_financeiros_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notas_compra: {
         Row: {
           chave_acesso: string | null
@@ -198,6 +465,254 @@ export type Database = {
           xml?: string | null
         }
         Relationships: []
+      }
+      obras: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          data_limite: string | null
+          data_pedido: string
+          endereco_obra: string | null
+          etapa_aquecimento: string
+          etapa_base: string
+          etapa_casa_maquinas: string
+          etapa_cascata: string
+          etapa_escavacao: string
+          etapa_esquadro: string
+          etapa_furacao: string
+          etapa_motor: string
+          etapa_nivel: string
+          etapa_tubulacao: string
+          id: string
+          numero: string | null
+          observacoes: string | null
+          os_acabamento: string | null
+          os_instalacao: string | null
+          os_logistica: string | null
+          prazo_dias: number
+          responsavel: string | null
+          status_geral: string
+          tipo_servico: string
+          updated_at: string
+          venda_id: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_limite?: string | null
+          data_pedido?: string
+          endereco_obra?: string | null
+          etapa_aquecimento?: string
+          etapa_base?: string
+          etapa_casa_maquinas?: string
+          etapa_cascata?: string
+          etapa_escavacao?: string
+          etapa_esquadro?: string
+          etapa_furacao?: string
+          etapa_motor?: string
+          etapa_nivel?: string
+          etapa_tubulacao?: string
+          id?: string
+          numero?: string | null
+          observacoes?: string | null
+          os_acabamento?: string | null
+          os_instalacao?: string | null
+          os_logistica?: string | null
+          prazo_dias?: number
+          responsavel?: string | null
+          status_geral?: string
+          tipo_servico?: string
+          updated_at?: string
+          venda_id?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_limite?: string | null
+          data_pedido?: string
+          endereco_obra?: string | null
+          etapa_aquecimento?: string
+          etapa_base?: string
+          etapa_casa_maquinas?: string
+          etapa_cascata?: string
+          etapa_escavacao?: string
+          etapa_esquadro?: string
+          etapa_furacao?: string
+          etapa_motor?: string
+          etapa_nivel?: string
+          etapa_tubulacao?: string
+          id?: string
+          numero?: string | null
+          observacoes?: string | null
+          os_acabamento?: string | null
+          os_instalacao?: string | null
+          os_logistica?: string | null
+          prazo_dias?: number
+          responsavel?: string | null
+          status_geral?: string
+          tipo_servico?: string
+          updated_at?: string
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obras_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obras_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordem_compra_itens: {
+        Row: {
+          codigo: string | null
+          created_at: string
+          cst: string | null
+          desconto: number
+          descricao: string
+          id: string
+          ncm: string | null
+          ordem_id: string
+          produto_id: string | null
+          quantidade: number
+          total: number
+          unidade: string
+          valor_unitario: number
+        }
+        Insert: {
+          codigo?: string | null
+          created_at?: string
+          cst?: string | null
+          desconto?: number
+          descricao: string
+          id?: string
+          ncm?: string | null
+          ordem_id: string
+          produto_id?: string | null
+          quantidade?: number
+          total?: number
+          unidade?: string
+          valor_unitario?: number
+        }
+        Update: {
+          codigo?: string | null
+          created_at?: string
+          cst?: string | null
+          desconto?: number
+          descricao?: string
+          id?: string
+          ncm?: string | null
+          ordem_id?: string
+          produto_id?: string | null
+          quantidade?: number
+          total?: number
+          unidade?: string
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordem_compra_itens_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordem_compra_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_compra: {
+        Row: {
+          condicoes: string | null
+          created_at: string
+          created_by: string | null
+          data_pedido: string
+          desconto: number
+          fornecedor_id: string | null
+          fornecedor_nome: string | null
+          icms_base: number
+          icms_st_base: number
+          icms_st_valor: number
+          icms_valor: number
+          id: string
+          numero: string | null
+          observacoes: string | null
+          previsao_entrega: string | null
+          status: string
+          updated_at: string
+          valor_produtos: number
+          valor_total: number
+        }
+        Insert: {
+          condicoes?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pedido?: string
+          desconto?: number
+          fornecedor_id?: string | null
+          fornecedor_nome?: string | null
+          icms_base?: number
+          icms_st_base?: number
+          icms_st_valor?: number
+          icms_valor?: number
+          id?: string
+          numero?: string | null
+          observacoes?: string | null
+          previsao_entrega?: string | null
+          status?: string
+          updated_at?: string
+          valor_produtos?: number
+          valor_total?: number
+        }
+        Update: {
+          condicoes?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pedido?: string
+          desconto?: number
+          fornecedor_id?: string | null
+          fornecedor_nome?: string | null
+          icms_base?: number
+          icms_st_base?: number
+          icms_st_valor?: number
+          icms_valor?: number
+          id?: string
+          numero?: string | null
+          observacoes?: string | null
+          previsao_entrega?: string | null
+          status?: string
+          updated_at?: string
+          valor_produtos?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_compra_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ordens_servico: {
         Row: {
@@ -262,13 +777,20 @@ export type Database = {
         Row: {
           ativo: boolean
           categoria: string | null
+          cfop: string | null
           codigo: string | null
           created_at: string
           created_by: string | null
+          cst: string | null
+          custo_fabricacao: number
+          custo_logistico: number
           descricao: string | null
           estoque_atual: number
           estoque_minimo: number
+          fornecedor_id: string | null
           id: string
+          localizacao: string | null
+          ncm: string | null
           nome: string
           preco_custo: number
           preco_venda: number
@@ -279,13 +801,20 @@ export type Database = {
         Insert: {
           ativo?: boolean
           categoria?: string | null
+          cfop?: string | null
           codigo?: string | null
           created_at?: string
           created_by?: string | null
+          cst?: string | null
+          custo_fabricacao?: number
+          custo_logistico?: number
           descricao?: string | null
           estoque_atual?: number
           estoque_minimo?: number
+          fornecedor_id?: string | null
           id?: string
+          localizacao?: string | null
+          ncm?: string | null
           nome: string
           preco_custo?: number
           preco_venda?: number
@@ -296,13 +825,20 @@ export type Database = {
         Update: {
           ativo?: boolean
           categoria?: string | null
+          cfop?: string | null
           codigo?: string | null
           created_at?: string
           created_by?: string | null
+          cst?: string | null
+          custo_fabricacao?: number
+          custo_logistico?: number
           descricao?: string | null
           estoque_atual?: number
           estoque_minimo?: number
+          fornecedor_id?: string | null
           id?: string
+          localizacao?: string | null
+          ncm?: string | null
           nome?: string
           preco_custo?: number
           preco_venda?: number
@@ -310,7 +846,15 @@ export type Database = {
           unidade?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "produtos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -369,51 +913,211 @@ export type Database = {
         }
         Relationships: []
       }
+      venda_itens: {
+        Row: {
+          created_at: string
+          custo_unitario: number
+          desconto_perc: number
+          descricao: string
+          id: string
+          preco_unitario: number
+          produto_id: string | null
+          quantidade: number
+          sku: string | null
+          total: number
+          venda_id: string
+        }
+        Insert: {
+          created_at?: string
+          custo_unitario?: number
+          desconto_perc?: number
+          descricao: string
+          id?: string
+          preco_unitario?: number
+          produto_id?: string | null
+          quantidade?: number
+          sku?: string | null
+          total?: number
+          venda_id: string
+        }
+        Update: {
+          created_at?: string
+          custo_unitario?: number
+          desconto_perc?: number
+          descricao?: string
+          id?: string
+          preco_unitario?: number
+          produto_id?: string | null
+          quantidade?: number
+          sku?: string | null
+          total?: number
+          venda_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_itens_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venda_kit: {
+        Row: {
+          acessorios: Json
+          casco_id: string | null
+          created_at: string
+          custo_frete: number
+          custo_mao_obra: number
+          custo_total_kit: number
+          filtro_id: string | null
+          id: string
+          impostos: number
+          preco_venda_kit: number
+          updated_at: string
+          venda_id: string
+        }
+        Insert: {
+          acessorios?: Json
+          casco_id?: string | null
+          created_at?: string
+          custo_frete?: number
+          custo_mao_obra?: number
+          custo_total_kit?: number
+          filtro_id?: string | null
+          id?: string
+          impostos?: number
+          preco_venda_kit?: number
+          updated_at?: string
+          venda_id: string
+        }
+        Update: {
+          acessorios?: Json
+          casco_id?: string | null
+          created_at?: string
+          custo_frete?: number
+          custo_mao_obra?: number
+          custo_total_kit?: number
+          filtro_id?: string | null
+          id?: string
+          impostos?: number
+          preco_venda_kit?: number
+          updated_at?: string
+          venda_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_kit_casco_id_fkey"
+            columns: ["casco_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_kit_filtro_id_fkey"
+            columns: ["filtro_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_kit_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendas: {
         Row: {
           cliente_id: string | null
           cliente_nome: string | null
           created_at: string
           created_by: string | null
+          custo_total: number
           data: string
           forma_pagamento: string | null
           id: string
           numero: string | null
           observacoes: string | null
+          parcelas: number
+          pdf_link: string | null
+          saldo_devedor: number
           status_pagamento: string
+          status_pedido: string
+          subtotal_produtos: number
           updated_at: string
+          valor_entrada: number
+          valor_frete: number
+          valor_impostos: number
+          valor_mao_obra: number
+          valor_parcela: number
           valor_total: number
           vendedor: string | null
+          vendedor_id: string | null
         }
         Insert: {
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
           created_by?: string | null
+          custo_total?: number
           data?: string
           forma_pagamento?: string | null
           id?: string
           numero?: string | null
           observacoes?: string | null
+          parcelas?: number
+          pdf_link?: string | null
+          saldo_devedor?: number
           status_pagamento?: string
+          status_pedido?: string
+          subtotal_produtos?: number
           updated_at?: string
+          valor_entrada?: number
+          valor_frete?: number
+          valor_impostos?: number
+          valor_mao_obra?: number
+          valor_parcela?: number
           valor_total?: number
           vendedor?: string | null
+          vendedor_id?: string | null
         }
         Update: {
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
           created_by?: string | null
+          custo_total?: number
           data?: string
           forma_pagamento?: string | null
           id?: string
           numero?: string | null
           observacoes?: string | null
+          parcelas?: number
+          pdf_link?: string | null
+          saldo_devedor?: number
           status_pagamento?: string
+          status_pedido?: string
+          subtotal_produtos?: number
           updated_at?: string
+          valor_entrada?: number
+          valor_frete?: number
+          valor_impostos?: number
+          valor_mao_obra?: number
+          valor_parcela?: number
           valor_total?: number
           vendedor?: string | null
+          vendedor_id?: string | null
         }
         Relationships: [
           {
@@ -421,6 +1125,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendas_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
         ]
