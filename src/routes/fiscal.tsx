@@ -523,7 +523,7 @@ function Fiscal() {
         serie = String((config as any)[campoSerie] ?? "1");
         const { error: erroCfg } = await supabase
           .from("configuracao_fiscal")
-          .update({ [campoNumero]: Number(numero) + 1 } as Record<string, number>)
+          .update({ [campoNumero]: Number(numero) + 1 } as Record<string, never>)
           .eq("id", config.id);
         if (erroCfg) throw erroCfg;
       }
