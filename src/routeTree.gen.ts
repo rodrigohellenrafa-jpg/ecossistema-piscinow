@@ -15,6 +15,8 @@ import { Route as OrdensRouteImport } from './routes/ordens'
 import { Route as NotasCompraRouteImport } from './routes/notas-compra'
 import { Route as LogisticaRouteImport } from './routes/logistica'
 import { Route as ImportacaoRouteImport } from './routes/importacao'
+import { Route as FuncionariosRouteImport } from './routes/funcionarios'
+import { Route as FornecedoresRouteImport } from './routes/fornecedores'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as ComprasRouteImport } from './routes/compras'
@@ -52,6 +54,16 @@ const LogisticaRoute = LogisticaRouteImport.update({
 const ImportacaoRoute = ImportacaoRouteImport.update({
   id: '/importacao',
   path: '/importacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FuncionariosRoute = FuncionariosRouteImport.update({
+  id: '/funcionarios',
+  path: '/funcionarios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FornecedoresRoute = FornecedoresRouteImport.update({
+  id: '/fornecedores',
+  path: '/fornecedores',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
@@ -102,6 +114,8 @@ export interface FileRoutesByFullPath {
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fornecedores': typeof FornecedoresRoute
+  '/funcionarios': typeof FuncionariosRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
   '/notas-compra': typeof NotasCompraRoute
@@ -118,6 +132,8 @@ export interface FileRoutesByTo {
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fornecedores': typeof FornecedoresRoute
+  '/funcionarios': typeof FuncionariosRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
   '/notas-compra': typeof NotasCompraRoute
@@ -135,6 +151,8 @@ export interface FileRoutesById {
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fornecedores': typeof FornecedoresRoute
+  '/funcionarios': typeof FuncionariosRoute
   '/importacao': typeof ImportacaoRoute
   '/logistica': typeof LogisticaRoute
   '/notas-compra': typeof NotasCompraRoute
@@ -153,6 +171,8 @@ export interface FileRouteTypes {
     | '/compras'
     | '/contas'
     | '/financeiro'
+    | '/fornecedores'
+    | '/funcionarios'
     | '/importacao'
     | '/logistica'
     | '/notas-compra'
@@ -169,6 +189,8 @@ export interface FileRouteTypes {
     | '/compras'
     | '/contas'
     | '/financeiro'
+    | '/fornecedores'
+    | '/funcionarios'
     | '/importacao'
     | '/logistica'
     | '/notas-compra'
@@ -185,6 +207,8 @@ export interface FileRouteTypes {
     | '/compras'
     | '/contas'
     | '/financeiro'
+    | '/fornecedores'
+    | '/funcionarios'
     | '/importacao'
     | '/logistica'
     | '/notas-compra'
@@ -202,6 +226,8 @@ export interface RootRouteChildren {
   ComprasRoute: typeof ComprasRoute
   ContasRoute: typeof ContasRoute
   FinanceiroRoute: typeof FinanceiroRoute
+  FornecedoresRoute: typeof FornecedoresRoute
+  FuncionariosRoute: typeof FuncionariosRoute
   ImportacaoRoute: typeof ImportacaoRoute
   LogisticaRoute: typeof LogisticaRoute
   NotasCompraRoute: typeof NotasCompraRoute
@@ -254,6 +280,20 @@ declare module '@tanstack/react-router' {
       path: '/importacao'
       fullPath: '/importacao'
       preLoaderRoute: typeof ImportacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/funcionarios': {
+      id: '/funcionarios'
+      path: '/funcionarios'
+      fullPath: '/funcionarios'
+      preLoaderRoute: typeof FuncionariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fornecedores': {
+      id: '/fornecedores'
+      path: '/fornecedores'
+      fullPath: '/fornecedores'
+      preLoaderRoute: typeof FornecedoresRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/financeiro': {
@@ -322,6 +362,8 @@ const rootRouteChildren: RootRouteChildren = {
   ComprasRoute: ComprasRoute,
   ContasRoute: ContasRoute,
   FinanceiroRoute: FinanceiroRoute,
+  FornecedoresRoute: FornecedoresRoute,
+  FuncionariosRoute: FuncionariosRoute,
   ImportacaoRoute: ImportacaoRoute,
   LogisticaRoute: LogisticaRoute,
   NotasCompraRoute: NotasCompraRoute,
