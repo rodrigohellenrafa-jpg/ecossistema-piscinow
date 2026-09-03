@@ -95,6 +95,14 @@ const groups: {
     ],
   },
   {
+    label: "Fiscal",
+    area: "financeiro",
+    items: [
+      { title: "Emissão de Notas", url: "/fiscal", icon: FileText },
+      { title: "Configuração Fiscal", url: "/fiscal/config", icon: ShieldCheck },
+    ],
+  },
+  {
     label: "RH & Comissões",
     area: "rh",
     items: [{ title: "Holerite & Comissões", url: "/holerite", icon: BadgeDollarSign }],
@@ -107,6 +115,7 @@ const groups: {
       { title: "Controle de Acesso", url: "/acessos", icon: ShieldCheck },
     ],
   },
+
 ];
 
 export function AppSidebar() {

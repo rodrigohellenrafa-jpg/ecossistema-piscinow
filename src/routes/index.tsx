@@ -107,6 +107,32 @@ function Dashboard() {
     },
   });
 
+  const { data: notasFiscais = [] } = useQuery({
+    queryKey: ["dash-notas-fiscais"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notas_fiscais")
+        .select("*")
+        .order("data_emissao", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data as Record<string, unknown>[];
+    },
+  });
+
+  const { data: notasCompra = [] } = useQuery({
+    queryKey: ["dash-notas-compra"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notas_compra")
+        .select("*")
+        .order("data_entrada", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data as Record<string, unknown>[];
+    },
+  });
+
   const ini = inicioMes();
   const n = (v: unknown) => Number(v ?? 0);
   const s = (v: unknown) => String(v ?? "");
@@ -129,9 +155,26 @@ function Dashboard() {
     receitas.reduce((a, l) => a + n(l["valor"]), 0) -
     despesas.reduce((a, l) => a + n(l["valor"]), 0);
 
+  // Margem líquida do mês: faturamento - custo das vendas - despesas do mês.
+  const despesasMes = despesas
+    .filter((l) => s(l["data_competencia"]) >= ini)
+    .reduce((a, l) => a + n(l["valor"]), 0);
+  const lucroLiquidoMes = faturamentoMes - custoMes - despesasMes;
+  const margemLiquida = faturamentoMes > 0 ? lucroLiquidoMes / faturamentoMes : 0;
+
+  const nfMes = notasFiscais.filter((f) => s(f["data_emissao"]) >= ini);
+  const nfAutorizadas = nfMes.filter((f) => s(f["status"]) === "autorizada");
+  const nfValor = nfAutorizadas.reduce((a, f) => a + n(f["valor_total"]), 0);
+  const nfPendentes = nfMes.filter((f) =>
+    ["rascunho", "processando", "rejeitada"].includes(s(f["status"])),
+  );
+  const ncMes = notasCompra.filter((f) => s(f["data_entrada"]) >= ini);
+  const ncValor = ncMes.reduce((a, f) => a + n(f["valor_total"]), 0);
+
   const criticos = produtos.filter(
     (p) => n(p["estoque_atual"]) <= n(p["estoque_minimo"]) && s(p["tipo"]) !== "servico",
   );
+
 
   // Série mensal (últimos 6 meses) de faturamento x custo.
   const serie = (() => {
@@ -221,6 +264,32 @@ function Dashboard() {
           tone={saldo >= 0 ? "positive" : "negative"}
         />
       </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi
+          label="Margem líquida do mês"
+          value={pct(margemLiquida)}
+          hint={`Lucro ${brl(lucroLiquidoMes)} · despesas ${brl(despesasMes)}`}
+          tone={margemLiquida >= 0.15 ? "positive" : margemLiquida >= 0 ? "warning" : "negative"}
+        />
+        <Kpi
+          label="Notas emitidas no mês"
+          value={String(nfAutorizadas.length)}
+          hint={`${nfPendentes.length} pendentes de transmissão`}
+          tone={nfPendentes.length ? "warning" : "positive"}
+        />
+        <Kpi
+          label="Valor autorizado (NF-e/NFS-e)"
+          value={brl(nfValor)}
+          hint="Somatório das notas autorizadas no mês"
+        />
+        <Kpi
+          label="Notas recebidas no mês"
+          value={String(ncMes.length)}
+          hint={`${brl(ncValor)} em compras lançadas`}
+        />
+      </div>
+
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

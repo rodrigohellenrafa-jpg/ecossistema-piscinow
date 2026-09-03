@@ -19,6 +19,7 @@ import { Route as ImportacaoRouteImport } from './routes/importacao'
 import { Route as HoleriteRouteImport } from './routes/holerite'
 import { Route as FuncionariosRouteImport } from './routes/funcionarios'
 import { Route as FornecedoresRouteImport } from './routes/fornecedores'
+import { Route as FiscalRouteImport } from './routes/fiscal'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as DreRouteImport } from './routes/dre'
 import { Route as ContasRouteImport } from './routes/contas'
@@ -31,6 +32,7 @@ import { Route as VendasIndexRouteImport } from './routes/vendas.index'
 import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
 import { Route as VendasIdRouteImport } from './routes/vendas.$id'
 import { Route as ObrasIdRouteImport } from './routes/obras.$id'
+import { Route as FiscalConfigRouteImport } from './routes/fiscal.config'
 import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventario'
 import { Route as EstoqueEntradasRouteImport } from './routes/estoque.entradas'
 
@@ -82,6 +84,11 @@ const FuncionariosRoute = FuncionariosRouteImport.update({
 const FornecedoresRoute = FornecedoresRouteImport.update({
   id: '/fornecedores',
   path: '/fornecedores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FiscalRoute = FiscalRouteImport.update({
+  id: '/fiscal',
+  path: '/fiscal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinanceiroRoute = FinanceiroRouteImport.update({
@@ -144,6 +151,11 @@ const ObrasIdRoute = ObrasIdRouteImport.update({
   path: '/obras/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FiscalConfigRoute = FiscalConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
+  getParentRoute: () => FiscalRoute,
+} as any)
 const EstoqueInventarioRoute = EstoqueInventarioRouteImport.update({
   id: '/estoque/inventario',
   path: '/estoque/inventario',
@@ -164,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/contas': typeof ContasRoute
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fiscal': typeof FiscalRouteWithChildren
   '/fornecedores': typeof FornecedoresRoute
   '/funcionarios': typeof FuncionariosRoute
   '/holerite': typeof HoleriteRoute
@@ -176,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/relatorio-contas': typeof RelatorioContasRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
   '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
@@ -190,6 +204,7 @@ export interface FileRoutesByTo {
   '/contas': typeof ContasRoute
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fiscal': typeof FiscalRouteWithChildren
   '/fornecedores': typeof FornecedoresRoute
   '/funcionarios': typeof FuncionariosRoute
   '/holerite': typeof HoleriteRoute
@@ -202,6 +217,7 @@ export interface FileRoutesByTo {
   '/relatorio-contas': typeof RelatorioContasRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
   '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
@@ -217,6 +233,7 @@ export interface FileRoutesById {
   '/contas': typeof ContasRoute
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
+  '/fiscal': typeof FiscalRouteWithChildren
   '/fornecedores': typeof FornecedoresRoute
   '/funcionarios': typeof FuncionariosRoute
   '/holerite': typeof HoleriteRoute
@@ -229,6 +246,7 @@ export interface FileRoutesById {
   '/relatorio-contas': typeof RelatorioContasRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
   '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
@@ -245,6 +263,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/dre'
     | '/financeiro'
+    | '/fiscal'
     | '/fornecedores'
     | '/funcionarios'
     | '/holerite'
@@ -257,6 +276,7 @@ export interface FileRouteTypes {
     | '/relatorio-contas'
     | '/estoque/entradas'
     | '/estoque/inventario'
+    | '/fiscal/config'
     | '/obras/$id'
     | '/vendas/$id'
     | '/vendas/novo'
@@ -271,6 +291,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/dre'
     | '/financeiro'
+    | '/fiscal'
     | '/fornecedores'
     | '/funcionarios'
     | '/holerite'
@@ -283,6 +304,7 @@ export interface FileRouteTypes {
     | '/relatorio-contas'
     | '/estoque/entradas'
     | '/estoque/inventario'
+    | '/fiscal/config'
     | '/obras/$id'
     | '/vendas/$id'
     | '/vendas/novo'
@@ -297,6 +319,7 @@ export interface FileRouteTypes {
     | '/contas'
     | '/dre'
     | '/financeiro'
+    | '/fiscal'
     | '/fornecedores'
     | '/funcionarios'
     | '/holerite'
@@ -309,6 +332,7 @@ export interface FileRouteTypes {
     | '/relatorio-contas'
     | '/estoque/entradas'
     | '/estoque/inventario'
+    | '/fiscal/config'
     | '/obras/$id'
     | '/vendas/$id'
     | '/vendas/novo'
@@ -324,6 +348,7 @@ export interface RootRouteChildren {
   ContasRoute: typeof ContasRoute
   DreRoute: typeof DreRoute
   FinanceiroRoute: typeof FinanceiroRoute
+  FiscalRoute: typeof FiscalRouteWithChildren
   FornecedoresRoute: typeof FornecedoresRoute
   FuncionariosRoute: typeof FuncionariosRoute
   HoleriteRoute: typeof HoleriteRoute
@@ -414,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FornecedoresRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/fiscal': {
+      id: '/fiscal'
+      path: '/fiscal'
+      fullPath: '/fiscal'
+      preLoaderRoute: typeof FiscalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/financeiro': {
       id: '/financeiro'
       path: '/financeiro'
@@ -498,6 +530,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ObrasIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/fiscal/config': {
+      id: '/fiscal/config'
+      path: '/config'
+      fullPath: '/fiscal/config'
+      preLoaderRoute: typeof FiscalConfigRouteImport
+      parentRoute: typeof FiscalRoute
+    }
     '/estoque/inventario': {
       id: '/estoque/inventario'
       path: '/estoque/inventario'
@@ -515,6 +554,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface FiscalRouteChildren {
+  FiscalConfigRoute: typeof FiscalConfigRoute
+}
+
+const FiscalRouteChildren: FiscalRouteChildren = {
+  FiscalConfigRoute: FiscalConfigRoute,
+}
+
+const FiscalRouteWithChildren =
+  FiscalRoute._addFileChildren(FiscalRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcessosRoute: AcessosRoute,
@@ -524,6 +574,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContasRoute: ContasRoute,
   DreRoute: DreRoute,
   FinanceiroRoute: FinanceiroRoute,
+  FiscalRoute: FiscalRouteWithChildren,
   FornecedoresRoute: FornecedoresRoute,
   FuncionariosRoute: FuncionariosRoute,
   HoleriteRoute: HoleriteRoute,
