@@ -21,6 +21,7 @@ export type Database = {
           cep: string | null
           cidade: string | null
           codigo: string | null
+          codigo_municipio: string | null
           complemento: string | null
           created_at: string
           created_by: string | null
@@ -30,10 +31,14 @@ export type Database = {
           estado: string | null
           etapa: string
           id: string
+          indicador_ie: string
+          inscricao_estadual: string | null
+          inscricao_municipal: string | null
           logradouro: string | null
           nome: string
           numero: string | null
           observacoes: string | null
+          regime_tributario: string | null
           telefone: string | null
           tipo: string
           updated_at: string
@@ -44,6 +49,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           codigo?: string | null
+          codigo_municipio?: string | null
           complemento?: string | null
           created_at?: string
           created_by?: string | null
@@ -53,10 +59,14 @@ export type Database = {
           estado?: string | null
           etapa?: string
           id?: string
+          indicador_ie?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           logradouro?: string | null
           nome: string
           numero?: string | null
           observacoes?: string | null
+          regime_tributario?: string | null
           telefone?: string | null
           tipo?: string
           updated_at?: string
@@ -67,6 +77,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           codigo?: string | null
+          codigo_municipio?: string | null
           complemento?: string | null
           created_at?: string
           created_by?: string | null
@@ -76,12 +87,109 @@ export type Database = {
           estado?: string | null
           etapa?: string
           id?: string
+          indicador_ie?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           logradouro?: string | null
           nome?: string
           numero?: string | null
           observacoes?: string | null
+          regime_tributario?: string | null
           telefone?: string | null
           tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      configuracao_fiscal: {
+        Row: {
+          ambiente: string
+          bairro: string | null
+          cep: string | null
+          certificado_valido_ate: string | null
+          cnae: string | null
+          cnpj: string
+          codigo_municipio: string | null
+          complemento: string | null
+          created_at: string
+          email: string | null
+          id: string
+          inscricao_estadual: string | null
+          inscricao_municipal: string | null
+          logradouro: string | null
+          municipio: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          provedor: string
+          proximo_numero_nfe: number
+          proximo_numero_nfse: number
+          razao_social: string
+          regime_tributario: string
+          serie_nfe: string
+          serie_nfse: string
+          telefone: string | null
+          token_configurado: boolean
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          ambiente?: string
+          bairro?: string | null
+          cep?: string | null
+          certificado_valido_ate?: string | null
+          cnae?: string | null
+          cnpj?: string
+          codigo_municipio?: string | null
+          complemento?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          logradouro?: string | null
+          municipio?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          provedor?: string
+          proximo_numero_nfe?: number
+          proximo_numero_nfse?: number
+          razao_social?: string
+          regime_tributario?: string
+          serie_nfe?: string
+          serie_nfse?: string
+          telefone?: string | null
+          token_configurado?: boolean
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ambiente?: string
+          bairro?: string | null
+          cep?: string | null
+          certificado_valido_ate?: string | null
+          cnae?: string | null
+          cnpj?: string
+          codigo_municipio?: string | null
+          complemento?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          logradouro?: string | null
+          municipio?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          provedor?: string
+          proximo_numero_nfe?: number
+          proximo_numero_nfse?: number
+          razao_social?: string
+          regime_tributario?: string
+          serie_nfe?: string
+          serie_nfse?: string
+          telefone?: string | null
+          token_configurado?: boolean
+          uf?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -199,6 +307,7 @@ export type Database = {
           created_by: string | null
           email: string | null
           id: string
+          inscricao_estadual: string | null
           nome: string
           observacoes: string | null
           prazo_entrega_dias: number
@@ -214,6 +323,7 @@ export type Database = {
           created_by?: string | null
           email?: string | null
           id?: string
+          inscricao_estadual?: string | null
           nome: string
           observacoes?: string | null
           prazo_entrega_dias?: number
@@ -229,6 +339,7 @@ export type Database = {
           created_by?: string | null
           email?: string | null
           id?: string
+          inscricao_estadual?: string | null
           nome?: string
           observacoes?: string | null
           prazo_entrega_dias?: number
@@ -465,6 +576,159 @@ export type Database = {
           xml?: string | null
         }
         Relationships: []
+      }
+      notas_fiscais: {
+        Row: {
+          aliquota_iss: number
+          base_icms: number
+          chave_acesso: string | null
+          cliente_documento: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
+          codigo_servico: string | null
+          consumidor_final: boolean
+          created_at: string
+          created_by: string | null
+          data_emissao: string
+          discriminacao: string | null
+          finalidade: string
+          id: string
+          iss_retido: boolean
+          itens: Json
+          mensagem_sefaz: string | null
+          modalidade_frete: string
+          modelo: string
+          motivo_cancelamento: string | null
+          natureza_operacao: string
+          numero: string | null
+          observacoes: string | null
+          presenca_comprador: string
+          protocolo: string | null
+          referencia: string | null
+          serie: string | null
+          status: string
+          tipo_documento: string
+          updated_at: string
+          url_danfe: string | null
+          url_xml: string | null
+          valor_cofins: number
+          valor_desconto: number
+          valor_frete: number
+          valor_icms: number
+          valor_ipi: number
+          valor_iss: number
+          valor_pis: number
+          valor_produtos: number
+          valor_servicos: number
+          valor_total: number
+          venda_id: string | null
+        }
+        Insert: {
+          aliquota_iss?: number
+          base_icms?: number
+          chave_acesso?: string | null
+          cliente_documento?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          codigo_servico?: string | null
+          consumidor_final?: boolean
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string
+          discriminacao?: string | null
+          finalidade?: string
+          id?: string
+          iss_retido?: boolean
+          itens?: Json
+          mensagem_sefaz?: string | null
+          modalidade_frete?: string
+          modelo?: string
+          motivo_cancelamento?: string | null
+          natureza_operacao?: string
+          numero?: string | null
+          observacoes?: string | null
+          presenca_comprador?: string
+          protocolo?: string | null
+          referencia?: string | null
+          serie?: string | null
+          status?: string
+          tipo_documento?: string
+          updated_at?: string
+          url_danfe?: string | null
+          url_xml?: string | null
+          valor_cofins?: number
+          valor_desconto?: number
+          valor_frete?: number
+          valor_icms?: number
+          valor_ipi?: number
+          valor_iss?: number
+          valor_pis?: number
+          valor_produtos?: number
+          valor_servicos?: number
+          valor_total?: number
+          venda_id?: string | null
+        }
+        Update: {
+          aliquota_iss?: number
+          base_icms?: number
+          chave_acesso?: string | null
+          cliente_documento?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          codigo_servico?: string | null
+          consumidor_final?: boolean
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string
+          discriminacao?: string | null
+          finalidade?: string
+          id?: string
+          iss_retido?: boolean
+          itens?: Json
+          mensagem_sefaz?: string | null
+          modalidade_frete?: string
+          modelo?: string
+          motivo_cancelamento?: string | null
+          natureza_operacao?: string
+          numero?: string | null
+          observacoes?: string | null
+          presenca_comprador?: string
+          protocolo?: string | null
+          referencia?: string | null
+          serie?: string | null
+          status?: string
+          tipo_documento?: string
+          updated_at?: string
+          url_danfe?: string | null
+          url_xml?: string | null
+          valor_cofins?: number
+          valor_desconto?: number
+          valor_frete?: number
+          valor_icms?: number
+          valor_ipi?: number
+          valor_iss?: number
+          valor_pis?: number
+          valor_produtos?: number
+          valor_servicos?: number
+          valor_total?: number
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_fiscais_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       obras: {
         Row: {
@@ -775,10 +1039,17 @@ export type Database = {
       }
       produtos: {
         Row: {
+          aliquota_cofins: number
+          aliquota_icms: number
+          aliquota_ipi: number
+          aliquota_iss: number
+          aliquota_pis: number
           ativo: boolean
           categoria: string | null
+          cest: string | null
           cfop: string | null
           codigo: string | null
+          codigo_servico_municipal: string | null
           created_at: string
           created_by: string | null
           cst: string | null
@@ -792,6 +1063,7 @@ export type Database = {
           localizacao: string | null
           ncm: string | null
           nome: string
+          origem_mercadoria: string
           preco_custo: number
           preco_venda: number
           tipo: string
@@ -799,10 +1071,17 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          aliquota_cofins?: number
+          aliquota_icms?: number
+          aliquota_ipi?: number
+          aliquota_iss?: number
+          aliquota_pis?: number
           ativo?: boolean
           categoria?: string | null
+          cest?: string | null
           cfop?: string | null
           codigo?: string | null
+          codigo_servico_municipal?: string | null
           created_at?: string
           created_by?: string | null
           cst?: string | null
@@ -816,6 +1095,7 @@ export type Database = {
           localizacao?: string | null
           ncm?: string | null
           nome: string
+          origem_mercadoria?: string
           preco_custo?: number
           preco_venda?: number
           tipo?: string
@@ -823,10 +1103,17 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          aliquota_cofins?: number
+          aliquota_icms?: number
+          aliquota_ipi?: number
+          aliquota_iss?: number
+          aliquota_pis?: number
           ativo?: boolean
           categoria?: string | null
+          cest?: string | null
           cfop?: string | null
           codigo?: string | null
+          codigo_servico_municipal?: string | null
           created_at?: string
           created_by?: string | null
           cst?: string | null
@@ -840,6 +1127,7 @@ export type Database = {
           localizacao?: string | null
           ncm?: string | null
           nome?: string
+          origem_mercadoria?: string
           preco_custo?: number
           preco_venda?: number
           tipo?: string

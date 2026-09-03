@@ -21,6 +21,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -85,7 +91,25 @@ const vazio = {
   endereco_obra: "",
   etapa: "Lead" as (typeof ETAPAS_FUNIL)[number],
   observacoes: "",
+  inscricao_estadual: "",
+  indicador_ie: "nao_contribuinte" as "contribuinte" | "isento" | "nao_contribuinte",
+  inscricao_municipal: "",
+  codigo_municipio: "",
+  regime_tributario: "",
 };
+
+const INDICADORES_IE = [
+  { value: "contribuinte", label: "Contribuinte" },
+  { value: "isento", label: "Isento" },
+  { value: "nao_contribuinte", label: "Não contribuinte" },
+] as const;
+
+const REGIMES_TRIBUTARIOS = [
+  "Simples Nacional",
+  "Lucro Presumido",
+  "Lucro Real",
+  "MEI",
+] as const;
 
 function Clientes() {
   const qc = useQueryClient();
@@ -132,6 +156,12 @@ function Clientes() {
       endereco_obra: c.endereco_obra ?? "",
       etapa: (c.etapa as (typeof ETAPAS_FUNIL)[number]) ?? "Lead",
       observacoes: c.observacoes ?? "",
+      inscricao_estadual: c.inscricao_estadual ?? "",
+      indicador_ie:
+        (c.indicador_ie as "contribuinte" | "isento" | "nao_contribuinte") ?? "nao_contribuinte",
+      inscricao_municipal: c.inscricao_municipal ?? "",
+      codigo_municipio: c.codigo_municipio ?? "",
+      regime_tributario: c.regime_tributario ?? "",
     });
     setOpen(true);
   };
@@ -139,7 +169,15 @@ function Clientes() {
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.nome.trim()) throw new Error("Informe o nome do cliente.");
-      const payload = { ...form, nome: form.nome.trim(), codigo: form.codigo || null };
+      const payload = {
+        ...form,
+        nome: form.nome.trim(),
+        codigo: form.codigo || null,
+        inscricao_estadual: form.inscricao_estadual || null,
+        inscricao_municipal: form.inscricao_municipal || null,
+        codigo_municipio: form.codigo_municipio || null,
+        regime_tributario: form.regime_tributario || null,
+      };
       if (editando) {
         const { error } = await supabase.from("clientes").update(payload).eq("id", editando.id);
         if (error) throw error;
@@ -296,6 +334,68 @@ function Clientes() {
                   />
                 </Field>
               </div>
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="fiscal">
+                  <AccordionTrigger>Dados fiscais</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="grid gap-4 pt-1 sm:grid-cols-2">
+                      <Field label="Inscrição estadual">
+                        <Input
+                          value={form.inscricao_estadual}
+                          onChange={(e) => set("inscricao_estadual")(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Indicador de IE">
+                        <Select
+                          value={form.indicador_ie}
+                          onValueChange={(v) => set("indicador_ie")(v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {INDICADORES_IE.map((i) => (
+                              <SelectItem key={i.value} value={i.value}>
+                                {i.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Inscrição municipal">
+                        <Input
+                          value={form.inscricao_municipal}
+                          onChange={(e) => set("inscricao_municipal")(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Código do município (IBGE)">
+                        <Input
+                          value={form.codigo_municipio}
+                          onChange={(e) => set("codigo_municipio")(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Regime tributário" className="sm:col-span-2">
+                        <Select
+                          value={form.regime_tributario || undefined}
+                          onValueChange={set("regime_tributario")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione (opcional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {REGIMES_TRIBUTARIOS.map((r) => (
+                              <SelectItem key={r} value={r}>
+                                {r}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <DialogFooter>
                 <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
                   {editando ? "Salvar alterações" : "Salvar cliente"}

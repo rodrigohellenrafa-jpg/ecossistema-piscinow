@@ -21,6 +21,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -87,7 +93,27 @@ const vazio = {
   cfop: "",
   localizacao: "",
   descricao: "",
+  cest: "",
+  origem_mercadoria: "0",
+  aliquota_icms: "0",
+  aliquota_ipi: "0",
+  aliquota_pis: "0",
+  aliquota_cofins: "0",
+  aliquota_iss: "0",
+  codigo_servico_municipal: "",
 };
+
+const ORIGENS_MERCADORIA = [
+  { value: "0", label: "0 - Nacional" },
+  { value: "1", label: "1 - Estrangeira - Importação direta" },
+  { value: "2", label: "2 - Estrangeira - Adquirida no mercado interno" },
+  { value: "3", label: "3 - Nacional - Conteúdo de importação > 40%" },
+  { value: "4", label: "4 - Nacional - Processos produtivos básicos" },
+  { value: "5", label: "5 - Nacional - Conteúdo de importação <= 40%" },
+  { value: "6", label: "6 - Estrangeira - Importação direta, sem similar nacional" },
+  { value: "7", label: "7 - Estrangeira - Mercado interno, sem similar nacional" },
+  { value: "8", label: "8 - Nacional - Conteúdo de importação > 70%" },
+] as const;
 
 function Produtos() {
   const qc = useQueryClient();
@@ -144,6 +170,14 @@ function Produtos() {
       cfop: p.cfop ?? "",
       localizacao: p.localizacao ?? "",
       descricao: p.descricao ?? "",
+      cest: p.cest ?? "",
+      origem_mercadoria: p.origem_mercadoria ?? "0",
+      aliquota_icms: String(p.aliquota_icms ?? 0),
+      aliquota_ipi: String(p.aliquota_ipi ?? 0),
+      aliquota_pis: String(p.aliquota_pis ?? 0),
+      aliquota_cofins: String(p.aliquota_cofins ?? 0),
+      aliquota_iss: String(p.aliquota_iss ?? 0),
+      codigo_servico_municipal: p.codigo_servico_municipal ?? "",
     });
     setOpen(true);
   };
@@ -169,6 +203,14 @@ function Produtos() {
         cfop: form.cfop || null,
         localizacao: form.localizacao || null,
         descricao: form.descricao || null,
+        cest: form.cest || null,
+        origem_mercadoria: form.origem_mercadoria || "0",
+        aliquota_icms: Number(form.aliquota_icms) || 0,
+        aliquota_ipi: Number(form.aliquota_ipi) || 0,
+        aliquota_pis: Number(form.aliquota_pis) || 0,
+        aliquota_cofins: Number(form.aliquota_cofins) || 0,
+        aliquota_iss: Number(form.aliquota_iss) || 0,
+        codigo_servico_municipal: form.codigo_servico_municipal || null,
       };
       if (editando) {
         const { error } = await supabase.from("produtos").update(payload).eq("id", editando.id);
@@ -357,6 +399,86 @@ function Produtos() {
                   />
                 </Field>
               </div>
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="fiscal">
+                  <AccordionTrigger>Dados fiscais</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="grid gap-4 pt-1 sm:grid-cols-2">
+                      <Field label="CEST">
+                        <Input value={form.cest} onChange={(e) => set("cest")(e.target.value)} />
+                      </Field>
+                      <Field label="Origem da mercadoria">
+                        <Select
+                          value={form.origem_mercadoria}
+                          onValueChange={set("origem_mercadoria")}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ORIGENS_MERCADORIA.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Alíquota ICMS (%)">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={form.aliquota_icms}
+                          onChange={(e) => set("aliquota_icms")(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Alíquota IPI (%)">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={form.aliquota_ipi}
+                          onChange={(e) => set("aliquota_ipi")(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Alíquota PIS (%)">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={form.aliquota_pis}
+                          onChange={(e) => set("aliquota_pis")(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Alíquota COFINS (%)">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={form.aliquota_cofins}
+                          onChange={(e) => set("aliquota_cofins")(e.target.value)}
+                        />
+                      </Field>
+                      {form.tipo === "servico" && (
+                        <>
+                          <Field label="Alíquota ISS (%)">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={form.aliquota_iss}
+                              onChange={(e) => set("aliquota_iss")(e.target.value)}
+                            />
+                          </Field>
+                          <Field label="Código de serviço municipal">
+                            <Input
+                              value={form.codigo_servico_municipal}
+                              onChange={(e) => set("codigo_servico_municipal")(e.target.value)}
+                            />
+                          </Field>
+                        </>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <DialogFooter>
                 <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
                   {editando ? "Salvar alterações" : "Salvar item"}
