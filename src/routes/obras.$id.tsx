@@ -73,7 +73,7 @@ function DetalheObra() {
     mutationFn: async ({ key, status }: { key: EtapaKey; status: string }) => {
       const { error } = await supabase
         .from("obras")
-        .update({ [key]: status })
+        .update({ [key]: status } as Record<string, never>)
         .eq("id", id);
       if (error) throw error;
     },
