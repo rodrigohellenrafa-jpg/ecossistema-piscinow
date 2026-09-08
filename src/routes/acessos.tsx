@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, Plus, Trash2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Copy, Lock, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -10,6 +11,8 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -25,8 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
 import { useRoles, type Perfil } from "@/hooks/use-role";
+import { criarUsuario, listarUsuarios, removerUsuario } from "@/lib/usuarios.functions";
 
 export const Route = createFileRoute("/acessos")({
   head: () => ({
@@ -93,157 +96,135 @@ function Acessos() {
 
 function AcessosAdmin() {
   const qc = useQueryClient();
-  const [novoPapel, setNovoPapel] = useState<Record<string, Perfil>>({});
+  const fetchUsuarios = useServerFn(listarUsuarios);
+  const doCriar = useServerFn(criarUsuario);
+  const doRemover = useServerFn(removerUsuario);
 
-  const { data: roles = [] } = useQuery({
-    queryKey: ["all-user-roles"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("user_roles").select("id, user_id, role");
-      if (error) throw error;
-      return data;
-    },
+  const [email, setEmail] = useState("");
+  const [nome, setNome] = useState("");
+  const [perfil, setPerfil] = useState<Perfil>("usuario");
+  const [senhaGerada, setSenhaGerada] = useState<string | null>(null);
+
+  const { data: usuarios = [], isLoading } = useQuery({
+    queryKey: ["usuarios-sistema"],
+    queryFn: () => fetchUsuarios(),
   });
 
-  const { data: usuarios = [] } = useQuery({
-    queryKey: ["usuarios-importados"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("usuarios_importados")
-        .select("id, nome, email, perfil, ativo")
-        .order("nome");
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const adicionar = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: Perfil }) => {
-      const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Papel adicionado.");
-      qc.invalidateQueries({ queryKey: ["all-user-roles"] });
+  const criar = useMutation({
+    mutationFn: doCriar,
+    onSuccess: (res) => {
+      toast.success("Usuário criado com sucesso.");
+      setSenhaGerada(res.senhaTemporaria);
+      setEmail("");
+      setNome("");
+      setPerfil("usuario");
+      qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const remover = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("user_roles").delete().eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: doRemover,
     onSuccess: () => {
-      toast.success("Papel removido.");
-      qc.invalidateQueries({ queryKey: ["all-user-roles"] });
+      toast.success("Usuário removido.");
+      qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  const usuariosComPapeis = useMemo(() => {
-    const porUserId = new Map<string, typeof roles>();
-    for (const r of roles) {
-      const lista = porUserId.get(r.user_id) ?? [];
-      lista.push(r);
-      porUserId.set(r.user_id, lista);
-    }
-    const userIds = Array.from(porUserId.keys());
-    return userIds.map((userId) => {
-      const papeis = porUserId.get(userId) ?? [];
-      const usuario = usuarios.find((u) => u.id === userId);
-      return { userId, papeis, usuario };
-    });
-  }, [roles, usuarios]);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSenhaGerada(null);
+    criar.mutate({ email, nome, perfil });
+  };
+
+  const copiarSenha = () => {
+    if (!senhaGerada) return;
+    navigator.clipboard.writeText(senhaGerada);
+    toast.success("Senha temporária copiada.");
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Controle de Acesso"
-        subtitle="Gestão de papéis (RBAC) e matriz de permissões por perfil."
+        subtitle="Adicione usuários, gerencie papéis (RBAC) e consulte a matriz de permissões por perfil."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Usuários e papéis</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <UserPlus className="size-5" /> Adicionar novo usuário
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuário</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Papéis atuais</TableHead>
-                <TableHead>Adicionar papel</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usuariosComPapeis.map(({ userId, papeis, usuario }) => (
-                <TableRow key={userId}>
-                  <TableCell>{usuario?.nome ?? userId.slice(0, 8)}</TableCell>
-                  <TableCell>{usuario?.email ?? "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {papeis.map((p) => (
-                        <Badge key={p.id} variant="secondary" className="gap-1">
-                          {LABEL_PERFIL[p.role]}
-                          <button
-                            type="button"
-                            onClick={() => remover.mutate(p.id)}
-                            className="ml-1 text-muted-foreground hover:text-destructive"
-                            aria-label="Remover papel"
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                      {papeis.length === 0 && (
-                        <span className="text-xs text-muted-foreground">Nenhum papel</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={novoPapel[userId] ?? PERFIS[0]}
-                      onValueChange={(v) => setNovoPapel((n) => ({ ...n, [userId]: v as Perfil }))}
-                    >
-                      <SelectTrigger className="w-40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PERFIS.map((p) => (
-                          <SelectItem key={p} value={p}>
-                            {LABEL_PERFIL[p]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => adicionar.mutate({ userId, role: novoPapel[userId] ?? PERFIS[0] })}
-                    >
-                      <Plus className="size-3.5" /> Adicionar
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {usuariosComPapeis.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                    Nenhum usuário com papel atribuído ainda.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome completo</Label>
+                <Input
+                  id="nome"
+                  placeholder="Ex: João da Silva"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="joao@splashpiscinas.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="perfil">Perfil inicial</Label>
+                <Select value={perfil} onValueChange={(v) => setPerfil(v as Perfil)}>
+                  <SelectTrigger id="perfil">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERFIS.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {LABEL_PERFIL[p]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button type="submit" disabled={criar.isPending}>
+                <Plus className="size-4" />
+                {criar.isPending ? "Criando…" : "Criar usuário"}
+              </Button>
+            </div>
+
+            {senhaGerada && (
+              <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4">
+                <p className="text-sm font-medium text-yellow-400">
+                  Senha temporária gerada (mostre uma única vez ao usuário):
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="rounded bg-background px-2 py-1 text-sm">{senhaGerada}</code>
+                  <Button type="button" size="icon" variant="ghost" onClick={copiarSenha}>
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </form>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Usuários importados</CardTitle>
+          <CardTitle>Usuários do sistema</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -251,21 +232,62 @@ function AcessosAdmin() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>E-mail</TableHead>
-                <TableHead>Perfil sugerido</TableHead>
+                <TableHead>Papéis atuais</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {usuarios.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.nome ?? "—"}</TableCell>
-                  <TableCell>{u.email ?? "—"}</TableCell>
-                  <TableCell>{u.perfil ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={u.ativo ? "secondary" : "outline"}>{u.ativo ? "Ativo" : "Inativo"}</Badge>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    Carregando usuários…
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : usuarios.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    Nenhum usuário encontrado.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                usuarios.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>{u.nome}</TableCell>
+                    <TableCell>{u.email}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {u.papeis.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">Nenhum papel</span>
+                        ) : (
+                          u.papeis.map((p) => (
+                            <Badge key={p.id} variant="secondary">
+                              {LABEL_PERFIL[p.role]}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={u.ativo ? "secondary" : "outline"}>
+                        {u.ativo ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => remover.mutate({ userId: u.id })}
+                        disabled={remover.isPending}
+                        aria-label="Remover usuário"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -281,16 +303,24 @@ function AcessosAdmin() {
             descricao="Acesso total a todos os módulos: cadastros, vendas, logística, compras, financeiro, RH e controle de acesso."
           />
           <MatrizItem
+            perfil="Gerente"
+            descricao="Mesmo acesso do administrador, exceto a exclusão de usuários e configurações críticas de integração."
+          />
+          <MatrizItem
             perfil="Vendedor"
             descricao="Clientes, novo pedido, consulta de pedidos, estoque em modo leitura e visualização das próprias comissões."
           />
           <MatrizItem
-            perfil="Logística"
+            perfil="Técnico / Logística"
             descricao="Flight board, ordens de serviço, entradas de estoque e inventário."
           />
           <MatrizItem
             perfil="Financeiro"
             descricao="Fluxo de caixa, contas a pagar/receber, central de compras, DRE e folha de pagamento."
+          />
+          <MatrizItem
+            perfil="Usuário"
+            descricao="Acesso somente leitura aos cadastros e consultas liberadas pelo administrador."
           />
         </CardContent>
       </Card>
