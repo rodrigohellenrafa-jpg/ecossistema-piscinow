@@ -394,26 +394,8 @@ function FiscalConfig() {
               </CardContent>
             </Card>
 
-            <Card className="border-warning/40 bg-warning/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <ShieldCheck className="size-4" /> Token da Focus NFe
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={form.token_configurado} disabled />
-                  Token configurado
-                </label>
-                <p className="flex gap-2 text-xs text-muted-foreground">
-                  <Info className="mt-0.5 size-3.5 shrink-0" />
-                  O token de homologação/produção da Focus NFe é um segredo e ainda não foi
-                  cadastrado. Para habilitá-lo com segurança, informe o token no chat com a equipe
-                  responsável — ele será guardado fora do banco de dados, nunca digitado
-                  diretamente neste formulário.
-                </p>
-              </CardContent>
-            </Card>
+            <TokenFocusCard ambienteAtual={form.ambiente as "homologacao" | "producao"} />
+
 
             <Button onClick={() => salvar.mutate()} disabled={salvar.isPending} className="w-full">
               Salvar configuração
