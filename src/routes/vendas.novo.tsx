@@ -297,6 +297,41 @@ function NovoPedido() {
         if (error) throw error;
       }
 
+      if (tipoAtendimento === "in") {
+        // Venda de balcão: baixa imediata do estoque dos itens vendidos.
+        const movimentos = itens
+          .filter((i) => i.produto_id)
+          .map((i) => ({
+            produto_id: i.produto_id as string,
+            tipo: "saida",
+            quantidade: i.quantidade,
+            origem: "venda_balcao",
+            documento: numero,
+            created_by: userId,
+          }));
+        if (movimentos.length > 0) {
+          const { error } = await supabase.from("estoque_movimentos").insert(movimentos);
+          if (error) throw error;
+        }
+      } else {
+        // Venda com serviço externo: abre a ordem de serviço do pedido.
+        const { error } = await supabase.from("ordens_servico").insert({
+          numero: `OS-${numero}`,
+          venda_id: venda.id,
+          cliente_id: clienteId,
+          cliente_nome: cliente?.nome ?? null,
+          tipo_servico: cascoId ? "Instalação de piscina" : "Serviço externo",
+          descricao: `Serviço externo referente ao pedido ${numero}.`,
+          responsavel: vendedor?.nome ?? null,
+          status: "orcamento",
+          prioridade: "media",
+          valor: custoMaoObra,
+          created_by: userId,
+        });
+        if (error) throw error;
+      }
+
+
       return venda.id as string;
     },
     onSuccess: (id) => {
