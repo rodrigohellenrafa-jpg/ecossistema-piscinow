@@ -511,6 +511,7 @@ function NovoPedido() {
             </CardContent>
           </Card>
 
+          {tipoAtendimento === "out" && (
           <Card>
             <CardHeader>
               <CardTitle>Composição da Piscina (Multipartido)</CardTitle>
