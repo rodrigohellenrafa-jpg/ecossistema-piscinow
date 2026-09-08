@@ -249,21 +249,8 @@ const novaNfseVazia = {
   observacoes: "",
 };
 
-/**
- * Ponto de integração com a Focus NFe.
- * Ainda não implementado: exige o token de homologação/produção cadastrado
- * em configuracao_fiscal.token_configurado. Quando o token for informado,
- * substituir o corpo desta função pela chamada real à API da Focus NFe
- * (POST /v2/nfe ou /v2/nfse conforme o modelo), tratando o retorno
- * assíncrono (status "processando" -> autorizada/rejeitada via webhook ou
- * consulta) e atualizando chave_acesso, protocolo, url_danfe, url_xml e
- * mensagem_sefaz na tabela notas_fiscais.
- */
-async function transmitirNota(_notaId: string): Promise<void> {
-  throw new Error(
-    "Transmissão para a Focus NFe ainda não configurada. Cadastre o token em /fiscal/config.",
-  );
-}
+
+
 
 function Fiscal() {
   const qc = useQueryClient();
