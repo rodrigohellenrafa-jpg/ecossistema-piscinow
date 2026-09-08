@@ -64,7 +64,7 @@ export const listarUsuarios = createServerFn({ method: "GET" })
         id: u.id,
         email: u.email ?? imp?.email ?? "—",
         nome: imp?.nome ?? u.user_metadata?.nome ?? u.email?.split("@")[0] ?? "—",
-        ativo: imp?.ativo ?? !u.banned_at,
+        ativo: imp?.ativo ?? true,
         papeis: papeisPorUser.get(u.id) ?? [],
       };
     });
