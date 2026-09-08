@@ -225,6 +225,8 @@ function NovoPedido() {
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
           status_pedido: "orcamento",
+          tipo_atendimento: tipoAtendimento,
+
           observacoes: observacoes || null,
           valor_total: valorTotal,
           subtotal_produtos: subtotalProdutos,
