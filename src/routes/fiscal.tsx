@@ -1131,8 +1131,11 @@ function Fiscal() {
                         : "Token de homologação da Focus NFe ainda não configurado"
                     }
                     onClick={() => {
-                      toast.info("Salve a nota como rascunho para depois transmiti-la.");
+                      toast.info(
+                        "Salve a nota como rascunho e use o botão Transmitir na lista abaixo.",
+                      );
                     }}
+
                   >
                     Transmitir para SEFAZ (Focus NFe)
                   </Button>
