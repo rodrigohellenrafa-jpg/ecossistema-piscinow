@@ -112,6 +112,18 @@ function DetalhePedido() {
       return data;
     },
   });
+  const { data: ordens = [] } = useQuery({
+    queryKey: ["venda-ordens", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordens_servico")
+        .select("id, numero, tipo_servico, status")
+        .eq("venda_id", id);
+      if (error) throw error;
+      return data;
+    },
+  });
+
 
   const { data: parcelas = [] } = useQuery({
     queryKey: ["venda-parcelas", venda?.numero],
