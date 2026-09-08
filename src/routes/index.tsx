@@ -64,6 +64,26 @@ const inicioMes = () => {
 };
 
 function Dashboard() {
+  const qc = useQueryClient();
+  const sincronizarFn = useServerFn(sincronizarNotas);
+
+  // Sincroniza o status das notas na Focus NFe ao abrir o painel.
+  useEffect(() => {
+    let ativo = true;
+    sincronizarFn()
+      .then((r) => {
+        if (ativo && r.ativo && r.atualizadas > 0) {
+          qc.invalidateQueries({ queryKey: ["dash-notas"] });
+          qc.invalidateQueries({ queryKey: ["notas_fiscais"] });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      ativo = false;
+    };
+  }, [sincronizarFn, qc]);
+
+
   const { data: vendas = [] } = useQuery({
     queryKey: ["dash-vendas"],
     queryFn: async () => {
