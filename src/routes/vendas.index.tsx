@@ -97,11 +97,13 @@ function HistoricoVendas() {
           .toLowerCase()
           .includes(q.toLowerCase());
         const statusOk = status === "todos" || v.status_pedido === status;
+        const tipoOk = tipo === "todos" || v.tipo_atendimento === tipo;
         const inicioOk = !inicio || v.data >= inicio;
         const fimOk = !fim || v.data <= fim;
-        return buscaOk && statusOk && inicioOk && fimOk;
+        return buscaOk && statusOk && tipoOk && inicioOk && fimOk;
       }),
-    [vendas, q, status, inicio, fim],
+    [vendas, q, status, tipo, inicio, fim],
+
   );
 
   const faturamento = lista.reduce((s, v) => s + Number(v.valor_total), 0);
