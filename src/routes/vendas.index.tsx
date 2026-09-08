@@ -167,6 +167,17 @@ function HistoricoVendas() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={tipo} onValueChange={setTipo}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                <SelectItem value="in">IN · Balcão</SelectItem>
+                <SelectItem value="out">OUT · Serviço externo</SelectItem>
+              </SelectContent>
+            </Select>
+
           </div>
         </CardHeader>
         <CardContent>
