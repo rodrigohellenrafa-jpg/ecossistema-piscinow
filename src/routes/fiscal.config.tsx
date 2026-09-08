@@ -413,3 +413,136 @@ function FiscalConfig() {
     </div>
   );
 }
+
+type Credencial = {
+  ambiente: string;
+  valido: boolean;
+  validado_em: string | null;
+  mensagem: string | null;
+};
+
+function TokenFocusCard({ ambienteAtual }: { ambienteAtual: "homologacao" | "producao" }) {
+  const qc = useQueryClient();
+  const [ambiente, setAmbiente] = useState<"homologacao" | "producao">(ambienteAtual);
+  const [token, setToken] = useState("");
+
+  const buscarStatus = useServerFn(statusFocus);
+  const salvar = useServerFn(salvarTokenFocus);
+  const remover = useServerFn(removerTokenFocus);
+
+  useEffect(() => setAmbiente(ambienteAtual), [ambienteAtual]);
+
+  const { data } = useQuery({
+    queryKey: ["focus-status"],
+    queryFn: () => buscarStatus(),
+  });
+  const credenciais = (data?.credenciais ?? []) as Credencial[];
+  const doAmbienteAtivo = credenciais.find((c) => c.ambiente === ambienteAtual);
+
+  const salvarToken = useMutation({
+    mutationFn: async () => salvar({ data: { ambiente, token: token.trim() } }),
+    onSuccess: (r) => {
+      setToken("");
+      qc.invalidateQueries({ queryKey: ["focus-status"] });
+      qc.invalidateQueries({ queryKey: ["configuracao_fiscal"] });
+      if (r.valido) toast.success(r.mensagem);
+      else toast.error(r.mensagem);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removerToken = useMutation({
+    mutationFn: async (amb: "homologacao" | "producao") => remover({ data: { ambiente: amb } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["focus-status"] });
+      qc.invalidateQueries({ queryKey: ["configuracao_fiscal"] });
+      toast.success("Token removido.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className={doAmbienteAtivo?.valido ? "border-primary/40" : "border-warning/40 bg-warning/5"}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheck className="size-4" /> Token da Focus NFe
+        </CardTitle>
+        <CardDescription>
+          O token é guardado apenas no servidor e nunca volta para a tela.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          {(["homologacao", "producao"] as const).map((amb) => {
+            const c = credenciais.find((x) => x.ambiente === amb);
+            return (
+              <div key={amb} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex items-center gap-2">
+                  {c?.valido ? (
+                    <CheckCircle2 className="size-4 text-primary" />
+                  ) : (
+                    <AlertTriangle className="size-4 text-muted-foreground" />
+                  )}
+                  {amb === "producao" ? "Produção" : "Homologação"}
+                </span>
+                <span className="flex items-center gap-2">
+                  <Badge variant={c ? (c.valido ? "default" : "destructive") : "outline"}>
+                    {c ? (c.valido ? "Válido" : "Inválido") : "Não cadastrado"}
+                  </Badge>
+                  {c && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => removerToken.mutate(amb)}
+                      disabled={removerToken.isPending}
+                    >
+                      Remover
+                    </Button>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <Field label="Ambiente do token">
+          <Select value={ambiente} onValueChange={(v) => setAmbiente(v as typeof ambiente)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="homologacao">Homologação</SelectItem>
+              <SelectItem value="producao">Produção</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Token">
+          <Input
+            type="password"
+            autoComplete="off"
+            placeholder="Cole aqui o token da Focus NFe"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+          />
+        </Field>
+        <Button
+          className="w-full"
+          onClick={() => salvarToken.mutate()}
+          disabled={salvarToken.isPending || token.trim().length < 10}
+        >
+          {salvarToken.isPending ? "Validando…" : "Salvar e validar token"}
+        </Button>
+
+        <p className="flex gap-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          A transmissão para a SEFAZ só é liberada quando existe um token válido no mesmo ambiente
+          selecionado acima em “Provedor de emissão”. Hoje: {ambienteAtual === "producao" ? "Produção" : "Homologação"}
+          {doAmbienteAtivo?.valido ? " — transmissão liberada." : " — transmissão bloqueada."}
+        </p>
+        {doAmbienteAtivo?.mensagem && (
+          <p className="text-xs text-muted-foreground">{doAmbienteAtivo.mensagem}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
