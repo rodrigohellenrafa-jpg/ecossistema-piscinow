@@ -357,6 +357,30 @@ function NovoPedido() {
               <CardTitle>Identificação</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-3">
+              <Field label="Tipo de atendimento" className="sm:col-span-3">
+                <Select
+                  value={tipoAtendimento}
+                  onValueChange={(v) => setTipoAtendimento(v as "in" | "out")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in">
+                      IN — Balcão (produtos, baixa direta do estoque)
+                    </SelectItem>
+                    <SelectItem value="out">
+                      OUT — Venda + serviço externo (gera ordem de serviço)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {tipoAtendimento === "in"
+                    ? "Ao salvar, os itens saem do estoque na hora e nenhuma obra é criada."
+                    : "Ao salvar, uma ordem de serviço é aberta para a instalação/obra deste pedido."}
+                </p>
+              </Field>
+
               <Field label="Nº do pedido">
                 <Input value={numero} disabled />
               </Field>
