@@ -135,7 +135,7 @@ function AcessosAdmin() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSenhaGerada(null);
-    criar.mutate({ email, nome, perfil });
+    criar.mutate({ data: { email, nome, perfil } });
   };
 
   const copiarSenha = () => {
