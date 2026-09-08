@@ -203,6 +203,12 @@ function HistoricoVendas() {
                     </Link>
                   </TableCell>
                   <TableCell>{dataBR(v.data)}</TableCell>
+                  <TableCell>
+                    <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
+                      {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
+                    </Badge>
+                  </TableCell>
+
                   <TableCell>{v.cliente_nome ?? "—"}</TableCell>
                   <TableCell>{v.vendedor ?? "—"}</TableCell>
                   <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
