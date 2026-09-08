@@ -65,11 +65,18 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   cancelado: "destructive",
 };
 
+const TIPO_LABEL: Record<string, string> = {
+  in: "IN · Balcão",
+  out: "OUT · Serviço externo",
+};
+
 function HistoricoVendas() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("todos");
+  const [tipo, setTipo] = useState<string>("todos");
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
+
 
   const { data: vendas = [] } = useQuery({
     queryKey: ["vendas"],
