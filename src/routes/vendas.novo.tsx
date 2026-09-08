@@ -635,6 +635,8 @@ function NovoPedido() {
               </div>
             </CardContent>
           </Card>
+          )}
+
 
           <Card>
             <CardHeader>
