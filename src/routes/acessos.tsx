@@ -278,7 +278,7 @@ function AcessosAdmin() {
                         size="icon"
                         variant="ghost"
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => remover.mutate({ userId: u.id })}
+                        onClick={() => remover.mutate({ data: { userId: u.id } })}
                         disabled={remover.isPending}
                         aria-label="Remover usuário"
                       >
