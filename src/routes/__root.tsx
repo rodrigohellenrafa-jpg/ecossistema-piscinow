@@ -114,6 +114,40 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function UserBadge() {
+  const { user, loading } = useAuth();
+  const { roles, loading: rolesLoading, isAdmin } = useRoles();
+
+  if (loading || rolesLoading || !user) {
+    return (
+      <div className="ml-auto flex items-center gap-2">
+        <div className="flex size-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+          —
+        </div>
+      </div>
+    );
+  }
+
+  const nome = user.user_metadata?.nome ?? user.email?.split("@")[0] ?? "Usuário";
+  const iniciais = nome
+    .split(" ")
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("") || nome.slice(0, 2).toUpperCase();
+  const perfil = isAdmin ? "Admin" : roles[0] ?? "Usuário";
+
+  return (
+    <div className="ml-auto flex items-center gap-2">
+      <span className="hidden text-xs text-muted-foreground sm:block">
+        {nome} · {perfil}
+      </span>
+      <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        {iniciais}
+      </div>
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -128,14 +162,7 @@ function RootComponent() {
               <span className="text-sm font-medium text-muted-foreground">
                 Piscinow <span className="text-primary">ERP</span>
               </span>
-              <div className="ml-auto flex items-center gap-2">
-                <span className="hidden text-xs text-muted-foreground sm:block">
-                  Ana Lima · Admin
-                </span>
-                <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                  AL
-                </div>
-              </div>
+              <UserBadge />
             </header>
             <main className="flex-1 p-4 md:p-6">
               {/* Required: nested routes render here. */}
