@@ -186,9 +186,11 @@ function HistoricoVendas() {
               <TableRow>
                 <TableHead>Pedido</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
