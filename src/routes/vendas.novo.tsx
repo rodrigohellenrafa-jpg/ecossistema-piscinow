@@ -335,9 +335,14 @@ function NovoPedido() {
       return venda.id as string;
     },
     onSuccess: (id) => {
-      toast.success("Pedido registrado com sucesso!");
+      toast.success(
+        tipoAtendimento === "in"
+          ? "Pedido de balcão registrado e estoque baixado!"
+          : "Pedido registrado e ordem de serviço aberta!",
+      );
       navigate({ to: "/vendas/$id", params: { id } });
     },
+
     onError: (e: Error) => toast.error(e.message),
   });
 
