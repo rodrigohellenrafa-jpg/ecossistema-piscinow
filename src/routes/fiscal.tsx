@@ -1,8 +1,21 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Download, Eye, Plus, Settings, XCircle } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  AlertTriangle,
+  Copy,
+  Download,
+  Eye,
+  Plus,
+  RefreshCw,
+  Send,
+  Settings,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
+import { sincronizarNotas, transmitirNota } from "@/lib/focus-nfe.functions";
+
 
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
@@ -236,21 +249,8 @@ const novaNfseVazia = {
   observacoes: "",
 };
 
-/**
- * Ponto de integração com a Focus NFe.
- * Ainda não implementado: exige o token de homologação/produção cadastrado
- * em configuracao_fiscal.token_configurado. Quando o token for informado,
- * substituir o corpo desta função pela chamada real à API da Focus NFe
- * (POST /v2/nfe ou /v2/nfse conforme o modelo), tratando o retorno
- * assíncrono (status "processando" -> autorizada/rejeitada via webhook ou
- * consulta) e atualizando chave_acesso, protocolo, url_danfe, url_xml e
- * mensagem_sefaz na tabela notas_fiscais.
- */
-async function transmitirNota(_notaId: string): Promise<void> {
-  throw new Error(
-    "Transmissão para a Focus NFe ainda não configurada. Cadastre o token em /fiscal/config.",
-  );
-}
+
+
 
 function Fiscal() {
   const qc = useQueryClient();
@@ -595,6 +595,35 @@ function Fiscal() {
 
   const tokenConfigurado = !!config?.token_configurado;
 
+  const enviarFn = useServerFn(transmitirNota);
+  const sincronizarFn = useServerFn(sincronizarNotas);
+
+  const transmitir = useMutation({
+    mutationFn: async (id: string) => enviarFn({ data: { id } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["notas_fiscais"] });
+      toast.success(
+        r.status === "autorizada"
+          ? "Nota autorizada pela SEFAZ."
+          : r.status === "rejeitada"
+            ? `Nota rejeitada: ${r.mensagem}`
+            : "Nota enviada — aguardando retorno da SEFAZ.",
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const sincronizar = useMutation({
+    mutationFn: async () => sincronizarFn(),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["notas_fiscais"] });
+      if (!r.ativo) toast.error("Cadastre um token válido da Focus NFe em Configuração fiscal.");
+      else toast.success(`${r.atualizadas} nota(s) atualizada(s) com o retorno da SEFAZ.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -602,6 +631,15 @@ function Fiscal() {
         subtitle="Emita NF-e de produtos e NFS-e de serviços, acompanhe status e cancele quando necessário."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => sincronizar.mutate()}
+              disabled={sincronizar.isPending}
+            >
+              <RefreshCw className={sincronizar.isPending ? "animate-spin" : ""} /> Sincronizar
+              status
+            </Button>
+
             <Button asChild variant="outline">
               <Link to="/fiscal/config">
                 <Settings /> Configuração fiscal
@@ -1093,8 +1131,11 @@ function Fiscal() {
                         : "Token de homologação da Focus NFe ainda não configurado"
                     }
                     onClick={() => {
-                      toast.info("Salve a nota como rascunho para depois transmiti-la.");
+                      toast.info(
+                        "Salve a nota como rascunho e use o botão Transmitir na lista abaixo.",
+                      );
                     }}
+
                   >
                     Transmitir para SEFAZ (Focus NFe)
                   </Button>
@@ -1234,6 +1275,25 @@ function Fiscal() {
                           </Button>
                         )}
                         <Button
+                          size="icon"
+                          variant="ghost"
+                          title={
+                            tokenConfigurado
+                              ? "Transmitir para a SEFAZ"
+                              : "Cadastre o token da Focus NFe em Configuração fiscal"
+                          }
+                          disabled={
+                            !tokenConfigurado ||
+                            transmitir.isPending ||
+                            n.status === "autorizada" ||
+                            n.status === "cancelada"
+                          }
+                          onClick={() => transmitir.mutate(n.id)}
+                        >
+                          <Send />
+                        </Button>
+                        <Button
+
                           size="icon"
                           variant="ghost"
                           title="Cancelar nota"
