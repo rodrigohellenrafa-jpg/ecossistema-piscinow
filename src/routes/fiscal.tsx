@@ -1277,6 +1277,25 @@ function Fiscal() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          title={
+                            tokenConfigurado
+                              ? "Transmitir para a SEFAZ"
+                              : "Cadastre o token da Focus NFe em Configuração fiscal"
+                          }
+                          disabled={
+                            !tokenConfigurado ||
+                            transmitir.isPending ||
+                            n.status === "autorizada" ||
+                            n.status === "cancelada"
+                          }
+                          onClick={() => transmitir.mutate(n.id)}
+                        >
+                          <Send />
+                        </Button>
+                        <Button
+
+                          size="icon"
+                          variant="ghost"
                           title="Cancelar nota"
                           disabled={n.status === "cancelada"}
                           onClick={() => setCancelarId(n.id)}
