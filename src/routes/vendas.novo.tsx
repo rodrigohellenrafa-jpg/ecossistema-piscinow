@@ -127,9 +127,11 @@ function NovoPedido() {
   const numero = useMemo(() => proximoCodigo("VEN", numerosExistentes), [numerosExistentes]);
 
   const [data, setData] = useState(hojeISO());
+  const [tipoAtendimento, setTipoAtendimento] = useState<"in" | "out">("in");
   const [clienteId, setClienteId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
   const [observacoes, setObservacoes] = useState("");
+
 
   const [itens, setItens] = useState<ItemLinha[]>([]);
   const [produtoSel, setProdutoSel] = useState("");
