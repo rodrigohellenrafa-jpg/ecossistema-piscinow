@@ -1030,6 +1030,7 @@ export type Database = {
           tipo_servico: string
           updated_at: string
           valor: number
+          venda_id: string | null
         }
         Insert: {
           cliente_id?: string | null
@@ -1046,6 +1047,7 @@ export type Database = {
           tipo_servico?: string
           updated_at?: string
           valor?: number
+          venda_id?: string | null
         }
         Update: {
           cliente_id?: string | null
@@ -1062,6 +1064,7 @@ export type Database = {
           tipo_servico?: string
           updated_at?: string
           valor?: number
+          venda_id?: string | null
         }
         Relationships: [
           {
@@ -1069,6 +1072,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
         ]
@@ -1379,6 +1389,7 @@ export type Database = {
           status_pagamento: string
           status_pedido: string
           subtotal_produtos: number
+          tipo_atendimento: string
           updated_at: string
           valor_entrada: number
           valor_frete: number
@@ -1406,6 +1417,7 @@ export type Database = {
           status_pagamento?: string
           status_pedido?: string
           subtotal_produtos?: number
+          tipo_atendimento?: string
           updated_at?: string
           valor_entrada?: number
           valor_frete?: number
@@ -1433,6 +1445,7 @@ export type Database = {
           status_pagamento?: string
           status_pedido?: string
           subtotal_produtos?: number
+          tipo_atendimento?: string
           updated_at?: string
           valor_entrada?: number
           valor_frete?: number

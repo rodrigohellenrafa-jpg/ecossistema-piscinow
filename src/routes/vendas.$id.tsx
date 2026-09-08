@@ -112,6 +112,18 @@ function DetalhePedido() {
       return data;
     },
   });
+  const { data: ordens = [] } = useQuery({
+    queryKey: ["venda-ordens", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordens_servico")
+        .select("id, numero, tipo_servico, status")
+        .eq("venda_id", id);
+      if (error) throw error;
+      return data;
+    },
+  });
+
 
   const { data: parcelas = [] } = useQuery({
     queryKey: ["venda-parcelas", venda?.numero],
@@ -251,6 +263,41 @@ function DetalhePedido() {
           </Field>
         </CardContent>
       </Card>
+
+      <Card className="print:hidden">
+        <CardHeader>
+          <CardTitle>
+            {venda.tipo_atendimento === "out"
+              ? "OUT · Venda com serviço externo"
+              : "IN · Venda de balcão"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {venda.tipo_atendimento === "out" ? (
+            ordens.length > 0 ? (
+              ordens.map((o) => (
+                <div key={o.id} className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{o.numero}</Badge>
+                  <span>{o.tipo_servico}</span>
+                  <Badge variant="secondary">{o.status}</Badge>
+                  <Button variant="link" asChild className="px-1">
+                    <Link to="/ordens">Abrir ordens de serviço</Link>
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="text-muted-foreground">
+                Nenhuma ordem de serviço vinculada a este pedido.
+              </p>
+            )
+          ) : (
+            <p className="text-muted-foreground">
+              Pedido de balcão: os itens já saíram do estoque e não geram obra.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
 
       <div className="print:block rounded-xl border border-border bg-card p-6 text-sm">
         <div className="mb-6 flex items-start justify-between border-b border-border pb-4">

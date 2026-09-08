@@ -65,11 +65,18 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   cancelado: "destructive",
 };
 
+const TIPO_LABEL: Record<string, string> = {
+  in: "IN · Balcão",
+  out: "OUT · Serviço externo",
+};
+
 function HistoricoVendas() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("todos");
+  const [tipo, setTipo] = useState<string>("todos");
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
+
 
   const { data: vendas = [] } = useQuery({
     queryKey: ["vendas"],
@@ -90,11 +97,13 @@ function HistoricoVendas() {
           .toLowerCase()
           .includes(q.toLowerCase());
         const statusOk = status === "todos" || v.status_pedido === status;
+        const tipoOk = tipo === "todos" || v.tipo_atendimento === tipo;
         const inicioOk = !inicio || v.data >= inicio;
         const fimOk = !fim || v.data <= fim;
-        return buscaOk && statusOk && inicioOk && fimOk;
+        return buscaOk && statusOk && tipoOk && inicioOk && fimOk;
       }),
-    [vendas, q, status, inicio, fim],
+    [vendas, q, status, tipo, inicio, fim],
+
   );
 
   const faturamento = lista.reduce((s, v) => s + Number(v.valor_total), 0);
@@ -158,6 +167,17 @@ function HistoricoVendas() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={tipo} onValueChange={setTipo}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                <SelectItem value="in">IN · Balcão</SelectItem>
+                <SelectItem value="out">OUT · Serviço externo</SelectItem>
+              </SelectContent>
+            </Select>
+
           </div>
         </CardHeader>
         <CardContent>
@@ -166,9 +186,11 @@ function HistoricoVendas() {
               <TableRow>
                 <TableHead>Pedido</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Vendedor</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -181,6 +203,12 @@ function HistoricoVendas() {
                     </Link>
                   </TableCell>
                   <TableCell>{dataBR(v.data)}</TableCell>
+                  <TableCell>
+                    <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
+                      {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
+                    </Badge>
+                  </TableCell>
+
                   <TableCell>{v.cliente_nome ?? "—"}</TableCell>
                   <TableCell>{v.vendedor ?? "—"}</TableCell>
                   <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
@@ -193,7 +221,7 @@ function HistoricoVendas() {
               ))}
               {lista.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                     Nenhum pedido encontrado.
                   </TableCell>
                 </TableRow>

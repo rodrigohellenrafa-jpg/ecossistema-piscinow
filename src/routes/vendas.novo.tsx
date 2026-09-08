@@ -127,9 +127,11 @@ function NovoPedido() {
   const numero = useMemo(() => proximoCodigo("VEN", numerosExistentes), [numerosExistentes]);
 
   const [data, setData] = useState(hojeISO());
+  const [tipoAtendimento, setTipoAtendimento] = useState<"in" | "out">("in");
   const [clienteId, setClienteId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
   const [observacoes, setObservacoes] = useState("");
+
 
   const [itens, setItens] = useState<ItemLinha[]>([]);
   const [produtoSel, setProdutoSel] = useState("");
@@ -223,6 +225,8 @@ function NovoPedido() {
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
           status_pedido: "orcamento",
+          tipo_atendimento: tipoAtendimento,
+
           observacoes: observacoes || null,
           valor_total: valorTotal,
           subtotal_produtos: subtotalProdutos,
@@ -293,12 +297,52 @@ function NovoPedido() {
         if (error) throw error;
       }
 
+      if (tipoAtendimento === "in") {
+        // Venda de balcão: baixa imediata do estoque dos itens vendidos.
+        const movimentos = itens
+          .filter((i) => i.produto_id)
+          .map((i) => ({
+            produto_id: i.produto_id as string,
+            tipo: "saida",
+            quantidade: i.quantidade,
+            origem: "venda_balcao",
+            documento: numero,
+            created_by: userId,
+          }));
+        if (movimentos.length > 0) {
+          const { error } = await supabase.from("estoque_movimentos").insert(movimentos);
+          if (error) throw error;
+        }
+      } else {
+        // Venda com serviço externo: abre a ordem de serviço do pedido.
+        const { error } = await supabase.from("ordens_servico").insert({
+          numero: `OS-${numero}`,
+          venda_id: venda.id,
+          cliente_id: clienteId,
+          cliente_nome: cliente?.nome ?? null,
+          tipo_servico: cascoId ? "Instalação de piscina" : "Serviço externo",
+          descricao: `Serviço externo referente ao pedido ${numero}.`,
+          responsavel: vendedor?.nome ?? null,
+          status: "orcamento",
+          prioridade: "media",
+          valor: custoMaoObra,
+          created_by: userId,
+        });
+        if (error) throw error;
+      }
+
+
       return venda.id as string;
     },
     onSuccess: (id) => {
-      toast.success("Pedido registrado com sucesso!");
+      toast.success(
+        tipoAtendimento === "in"
+          ? "Pedido de balcão registrado e estoque baixado!"
+          : "Pedido registrado e ordem de serviço aberta!",
+      );
       navigate({ to: "/vendas/$id", params: { id } });
     },
+
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -313,6 +357,30 @@ function NovoPedido() {
               <CardTitle>Identificação</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-3">
+              <Field label="Tipo de atendimento" className="sm:col-span-3">
+                <Select
+                  value={tipoAtendimento}
+                  onValueChange={(v) => setTipoAtendimento(v as "in" | "out")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in">
+                      IN — Balcão (produtos, baixa direta do estoque)
+                    </SelectItem>
+                    <SelectItem value="out">
+                      OUT — Venda + serviço externo (gera ordem de serviço)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {tipoAtendimento === "in"
+                    ? "Ao salvar, os itens saem do estoque na hora e nenhuma obra é criada."
+                    : "Ao salvar, uma ordem de serviço é aberta para a instalação/obra deste pedido."}
+                </p>
+              </Field>
+
               <Field label="Nº do pedido">
                 <Input value={numero} disabled />
               </Field>
@@ -443,6 +511,7 @@ function NovoPedido() {
             </CardContent>
           </Card>
 
+          {tipoAtendimento === "out" && (
           <Card>
             <CardHeader>
               <CardTitle>Composição da Piscina (Multipartido)</CardTitle>
@@ -567,6 +636,8 @@ function NovoPedido() {
               </div>
             </CardContent>
           </Card>
+          )}
+
 
           <Card>
             <CardHeader>
