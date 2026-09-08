@@ -1,8 +1,21 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Download, Eye, Plus, Settings, XCircle } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  AlertTriangle,
+  Copy,
+  Download,
+  Eye,
+  Plus,
+  RefreshCw,
+  Send,
+  Settings,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
+import { sincronizarNotas, transmitirNota } from "@/lib/focus-nfe.functions";
+
 
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
