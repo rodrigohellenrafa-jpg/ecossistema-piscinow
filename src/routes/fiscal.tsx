@@ -631,6 +631,15 @@ function Fiscal() {
         subtitle="Emita NF-e de produtos e NFS-e de serviços, acompanhe status e cancele quando necessário."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => sincronizar.mutate()}
+              disabled={sincronizar.isPending}
+            >
+              <RefreshCw className={sincronizar.isPending ? "animate-spin" : ""} /> Sincronizar
+              status
+            </Button>
+
             <Button asChild variant="outline">
               <Link to="/fiscal/config">
                 <Settings /> Configuração fiscal
