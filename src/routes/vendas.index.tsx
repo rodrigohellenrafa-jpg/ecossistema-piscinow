@@ -221,7 +221,7 @@ function HistoricoVendas() {
               ))}
               {lista.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                     Nenhum pedido encontrado.
                   </TableCell>
                 </TableRow>
