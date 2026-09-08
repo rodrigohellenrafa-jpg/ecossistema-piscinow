@@ -297,6 +297,42 @@ export type Database = {
           },
         ]
       }
+      fiscal_credenciais: {
+        Row: {
+          ambiente: string
+          atualizado_por: string | null
+          created_at: string
+          id: string
+          mensagem: string | null
+          token: string
+          updated_at: string
+          validado_em: string | null
+          valido: boolean
+        }
+        Insert: {
+          ambiente: string
+          atualizado_por?: string | null
+          created_at?: string
+          id?: string
+          mensagem?: string | null
+          token: string
+          updated_at?: string
+          validado_em?: string | null
+          valido?: boolean
+        }
+        Update: {
+          ambiente?: string
+          atualizado_por?: string | null
+          created_at?: string
+          id?: string
+          mensagem?: string | null
+          token?: string
+          updated_at?: string
+          validado_em?: string | null
+          valido?: boolean
+        }
+        Relationships: []
+      }
       fornecedores: {
         Row: {
           ativo: boolean
