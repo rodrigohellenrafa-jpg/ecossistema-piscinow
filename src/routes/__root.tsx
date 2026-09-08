@@ -132,7 +132,7 @@ function UserBadge() {
   const iniciais = nome
     .split(" ")
     .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
+    .map((p: string) => p[0]?.toUpperCase())
     .join("") || nome.slice(0, 2).toUpperCase();
   const perfil = isAdmin ? "Admin" : roles[0] ?? "Usuário";
 
