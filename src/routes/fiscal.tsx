@@ -595,6 +595,35 @@ function Fiscal() {
 
   const tokenConfigurado = !!config?.token_configurado;
 
+  const enviarFn = useServerFn(transmitirNota);
+  const sincronizarFn = useServerFn(sincronizarNotas);
+
+  const transmitir = useMutation({
+    mutationFn: async (id: string) => enviarFn({ data: { id } }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["notas_fiscais"] });
+      toast.success(
+        r.status === "autorizada"
+          ? "Nota autorizada pela SEFAZ."
+          : r.status === "rejeitada"
+            ? `Nota rejeitada: ${r.mensagem}`
+            : "Nota enviada — aguardando retorno da SEFAZ.",
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const sincronizar = useMutation({
+    mutationFn: async () => sincronizarFn(),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["notas_fiscais"] });
+      if (!r.ativo) toast.error("Cadastre um token válido da Focus NFe em Configuração fiscal.");
+      else toast.success(`${r.atualizadas} nota(s) atualizada(s) com o retorno da SEFAZ.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
   return (
     <div className="space-y-6">
       <PageHeader
