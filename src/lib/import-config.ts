@@ -12,6 +12,8 @@ export interface EntidadeImport {
   id: string;
   titulo: string;
   descricao: string;
+  /** Coluna usada para detectar duplicidades (no arquivo e no banco). */
+  chave?: string;
   tabela:
     | "usuarios_importados"
     | "clientes"
@@ -89,6 +91,7 @@ export const ENTIDADES: EntidadeImport[] = [
     titulo: "Usuários / Controle de Acesso",
     descricao: "Aba de Controle de Acesso: nome, e-mail e perfil de cada pessoa da equipe.",
     tabela: "usuarios_importados",
+    chave: "email",
     campos: [
       { coluna: "nome", rotulo: "Nome", tipo: "texto", aliases: ["usuario", "colaborador", "funcionario"], obrigatorio: true },
       { coluna: "email", rotulo: "E-mail", tipo: "texto", aliases: ["e-mail", "login", "gmail"] },
@@ -102,6 +105,7 @@ export const ENTIDADES: EntidadeImport[] = [
     titulo: "Cadastro de Clientes",
     descricao: "Clientes PF/PJ com contato e endereço.",
     tabela: "clientes",
+    chave: "documento",
     campos: [
       { coluna: "nome", rotulo: "Nome", tipo: "texto", aliases: ["cliente", "razao social", "nome fantasia"], obrigatorio: true },
       { coluna: "tipo", rotulo: "Tipo", tipo: "texto", aliases: ["pf pj", "pessoa"] },
@@ -123,6 +127,7 @@ export const ENTIDADES: EntidadeImport[] = [
     titulo: "Cadastro de Produtos (Estoque)",
     descricao: "Catálogo com preços, estoque atual e estoque mínimo.",
     tabela: "produtos",
+    chave: "codigo",
     campos: [
       { coluna: "nome", rotulo: "Nome", tipo: "texto", aliases: ["produto", "descricao", "item"], obrigatorio: true },
       { coluna: "codigo", rotulo: "Código", tipo: "texto", aliases: ["sku", "ref", "referencia"] },
@@ -141,6 +146,7 @@ export const ENTIDADES: EntidadeImport[] = [
     titulo: "Histórico de Vendas",
     descricao: "Pedidos já realizados, com vendedor, valor e forma de pagamento.",
     tabela: "vendas",
+    chave: "numero",
     campos: [
       { coluna: "numero", rotulo: "Número", tipo: "texto", aliases: ["pedido", "n pedido", "id", "os"] },
       { coluna: "cliente_nome", rotulo: "Cliente", tipo: "texto", aliases: ["nome cliente", "comprador"], obrigatorio: true },
@@ -157,6 +163,7 @@ export const ENTIDADES: EntidadeImport[] = [
     titulo: "Histórico Financeiro",
     descricao: "Contas a pagar e a receber com vencimento e baixa.",
     tabela: "contas",
+    chave: "descricao",
     campos: [
       { coluna: "tipo", rotulo: "Tipo", tipo: "texto", aliases: ["pagar receber", "natureza"] },
       { coluna: "descricao", rotulo: "Descrição", tipo: "texto", aliases: ["historico", "titulo", "lancamento"], obrigatorio: true },
