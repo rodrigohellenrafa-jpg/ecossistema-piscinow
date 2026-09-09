@@ -402,14 +402,23 @@ function Ordens() {
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => gerarObra.mutate(o)}
-                      disabled={gerarObra.isPending}
-                    >
-                      <Hammer /> Gerar obra
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => gerarObra.mutate(o)}
+                        disabled={gerarObra.isPending}
+                      >
+                        <Hammer /> Gerar obra
+                      </Button>
+                      <AssinaturaDialog
+                        tabela="ordens_servico"
+                        registroId={o.id}
+                        documentoLabel={`Ordem de serviço ${o.numero ?? ""}`}
+                        clienteNome={o.cliente_nome}
+                        invalidar={[["ordens"], ["ordens-servico"]]}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
