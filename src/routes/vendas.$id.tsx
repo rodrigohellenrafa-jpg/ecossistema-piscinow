@@ -383,6 +383,140 @@ function DetalhePedido() {
       </Card>
 
 
+      <Card className="print:hidden">
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-3">
+            Pagamentos do pedido
+            <Badge variant={statusPag === "pago" ? "default" : "secondary"}>
+              {STATUS_PAGAMENTO_LABEL[statusPag]}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Valor total da venda</p>
+              <p className="font-medium">{brl(totalVenda)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total pago</p>
+              <p className="font-medium">{brl(totalPago)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Saldo devedor</p>
+              <p className="text-lg font-semibold">{brl(saldoAberto)}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <Field label="Data do pagamento">
+              <Input
+                type="date"
+                value={novoPag.data_pagamento}
+                onChange={(e) => setNovoPag({ ...novoPag, data_pagamento: e.target.value })}
+              />
+            </Field>
+            <Field label="Forma de pagamento">
+              <Select
+                value={novoPag.forma_pagamento}
+                onValueChange={(v) => setNovoPag({ ...novoPag, forma_pagamento: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORMAS_PAGAMENTO.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {f}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Cartão / conta (ex.: Cartão A)">
+              <Input
+                value={novoPag.conta_bancaria}
+                onChange={(e) => setNovoPag({ ...novoPag, conta_bancaria: e.target.value })}
+                placeholder="Cartão A"
+              />
+            </Field>
+            <Field label="Valor (R$)">
+              <Input
+                type="number"
+                step="0.01"
+                value={novoPag.valor}
+                onChange={(e) => setNovoPag({ ...novoPag, valor: e.target.value })}
+                placeholder="0,00"
+              />
+            </Field>
+            <Field label="Observações">
+              <Input
+                value={novoPag.observacoes}
+                onChange={(e) => setNovoPag({ ...novoPag, observacoes: e.target.value })}
+                placeholder="Opcional"
+              />
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => adicionarPagamento.mutate()}
+              disabled={adicionarPagamento.isPending}
+            >
+              <Plus /> Adicionar pagamento
+            </Button>
+            {saldoAberto > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setNovoPag({ ...novoPag, valor: saldoAberto.toFixed(2) })}
+              >
+                Usar saldo devedor ({brl(saldoAberto)})
+              </Button>
+            )}
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Forma</TableHead>
+                <TableHead>Cartão / conta</TableHead>
+                <TableHead>Observações</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagamentos.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>{dataBR(p.data_pagamento)}</TableCell>
+                  <TableCell>{p.forma_pagamento}</TableCell>
+                  <TableCell>{p.conta_bancaria ?? "—"}</TableCell>
+                  <TableCell>{p.observacoes ?? "—"}</TableCell>
+                  <TableCell className="text-right">{brl(Number(p.valor))}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removerPagamento.mutate(p.id)}
+                      aria-label="Remover pagamento"
+                    >
+                      <Trash2 />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {pagamentos.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                    Nenhum pagamento registrado. O pedido está em aberto.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       <div className="print:block rounded-xl border border-border bg-card p-6 text-sm">
         <div className="mb-6 flex items-start justify-between border-b border-border pb-4">
           <div>
