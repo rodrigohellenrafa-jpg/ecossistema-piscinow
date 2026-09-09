@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Lock, Plus, Trash2, UserPlus } from "lucide-react";
+import { Copy, Lock, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -11,15 +11,17 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -29,7 +31,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useRoles, type Perfil } from "@/hooks/use-role";
-import { criarUsuario, listarUsuarios, removerUsuario } from "@/lib/usuarios.functions";
+import {
+  criarUsuario,
+  definirPapeis,
+  listarUsuarios,
+  removerUsuario,
+} from "@/lib/usuarios.functions";
+
 
 export const Route = createFileRoute("/acessos")({
   head: () => ({
