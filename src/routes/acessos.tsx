@@ -190,7 +190,7 @@ function AcessosAdmin() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="nome">Nome completo</Label>
                 <Input
@@ -212,22 +212,26 @@ function AcessosAdmin() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="perfil">Perfil inicial</Label>
-                <Select value={perfil} onValueChange={(v) => setPerfil(v as Perfil)}>
-                  <SelectTrigger id="perfil">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PERFIS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {LABEL_PERFIL[p]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Funções (pode marcar mais de uma)</Label>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {PERFIS.map((p) => (
+                  <label
+                    key={p}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 text-sm"
+                  >
+                    <Checkbox
+                      checked={perfis.includes(p)}
+                      onCheckedChange={() => setPerfis((atual) => alternarPerfil(atual, p))}
+                    />
+                    {LABEL_PERFIL[p]}
+                  </label>
+                ))}
               </div>
             </div>
+
 
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={criar.isPending}>
