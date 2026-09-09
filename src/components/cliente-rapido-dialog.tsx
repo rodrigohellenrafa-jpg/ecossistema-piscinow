@@ -24,6 +24,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   onCreated: (clienteId: string) => void | Promise<void>;
+  /** Exibe apenas o ícone "+" ao lado do campo de seleção. */
+  iconOnly?: boolean;
 }
 
 const vazio = {
