@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -54,6 +54,7 @@ export const Route = createFileRoute("/vendas/orcamentos")({
 function Orcamentos() {
   const [q, setQ] = useState("");
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: orcamentos = [] } = useQuery({
     queryKey: ["vendas", "orcamentos"],
@@ -90,10 +91,16 @@ function Orcamentos() {
         .update({ status_pedido: status })
         .eq("id", id);
       if (error) throw error;
+      return { id, status };
     },
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["vendas"] });
-      toast.success(v.status === "aprovado" ? "Orçamento aprovado." : "Orçamento cancelado.");
+      toast.success(
+        v.status === "aprovado"
+          ? "Orçamento convertido em pedido de venda."
+          : "Orçamento cancelado.",
+      );
+      if (v.status === "aprovado") navigate({ to: "/vendas/$id", params: { id: v.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -218,7 +225,7 @@ function Orcamentos() {
                         size="sm"
                         onClick={() => atualizarStatus.mutate({ id: v.id, status: "aprovado" })}
                       >
-                        <Check /> Aprovar
+                        <Check /> Converter em venda
                       </Button>
                       <Button
                         size="sm"
