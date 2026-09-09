@@ -101,6 +101,7 @@ const vazio = {
   aliquota_cofins: "0",
   aliquota_iss: "0",
   codigo_servico_municipal: "",
+  sob_encomenda: "nao",
 };
 
 const ORIGENS_MERCADORIA = [
@@ -178,6 +179,7 @@ function Produtos() {
       aliquota_cofins: String(p.aliquota_cofins ?? 0),
       aliquota_iss: String(p.aliquota_iss ?? 0),
       codigo_servico_municipal: p.codigo_servico_municipal ?? "",
+      sob_encomenda: (p as { sob_encomenda?: boolean }).sob_encomenda ? "sim" : "nao",
     });
     setOpen(true);
   };
@@ -211,7 +213,8 @@ function Produtos() {
         aliquota_cofins: Number(form.aliquota_cofins) || 0,
         aliquota_iss: Number(form.aliquota_iss) || 0,
         codigo_servico_municipal: form.codigo_servico_municipal || null,
-      };
+        sob_encomenda: form.sob_encomenda === "sim",
+      } as never;
       if (editando) {
         const { error } = await supabase.from("produtos").update(payload).eq("id", editando.id);
         if (error) throw error;
