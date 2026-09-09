@@ -72,16 +72,18 @@ export const listarUsuarios = createServerFn({ method: "GET" })
 
 export const criarUsuario = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { email: string; nome: string; perfil: Perfil }) => {
+  .inputValidator((input: { email: string; nome: string; perfil?: Perfil; perfis?: Perfil[] }) => {
     const email = String(input?.email ?? "").trim().toLowerCase();
     const nome = String(input?.nome ?? "").trim();
-    const perfil = String(input?.perfil ?? "").trim() as Perfil;
+    const brutos = input?.perfis?.length ? input.perfis : input?.perfil ? [input.perfil] : [];
+    const perfis = Array.from(new Set(brutos.map((p) => String(p).trim() as Perfil)));
 
     if (!email || !email.includes("@")) throw new Error("Informe um e-mail válido.");
     if (!nome) throw new Error("Informe o nome do usuário.");
-    if (!PERFIS.includes(perfil)) throw new Error("Perfil inválido.");
+    if (perfis.length === 0) throw new Error("Selecione ao menos uma função.");
+    if (perfis.some((p) => !PERFIS.includes(p))) throw new Error("Perfil inválido.");
 
-    return { email, nome, perfil };
+    return { email, nome, perfis };
   })
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
@@ -107,10 +109,9 @@ export const criarUsuario = createServerFn({ method: "POST" })
 
     const userId = created.user.id;
 
-    const { error: roleError } = await db.from("user_roles").insert({
-      user_id: userId,
-      role: data.perfil,
-    });
+    const { error: roleError } = await db
+      .from("user_roles")
+      .insert(data.perfis.map((role) => ({ user_id: userId, role })));
     if (roleError) throw new Error(roleError.message);
 
     const { error: importError } = await db.from("usuarios_importados").upsert(
@@ -118,7 +119,7 @@ export const criarUsuario = createServerFn({ method: "POST" })
         id: userId,
         nome: data.nome,
         email: data.email,
-        perfil: data.perfil,
+        perfil: data.perfis.join(", "),
         ativo: true,
         created_by: context.userId,
       },
@@ -130,10 +131,62 @@ export const criarUsuario = createServerFn({ method: "POST" })
       id: userId,
       email: data.email,
       nome: data.nome,
-      perfil: data.perfil,
+      perfis: data.perfis,
       senhaTemporaria: tempPassword,
     };
   });
+
+export const definirPapeis = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string; perfis: Perfil[] }) => {
+    const userId = String(input?.userId ?? "").trim();
+    const perfis = Array.from(new Set((input?.perfis ?? []).map((p) => String(p).trim() as Perfil)));
+    if (!userId) throw new Error("Usuário inválido.");
+    if (perfis.length === 0) throw new Error("Selecione ao menos uma função.");
+    if (perfis.some((p) => !PERFIS.includes(p))) throw new Error("Perfil inválido.");
+    return { userId, perfis };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as never);
+    const db = await admin();
+
+    if (data.userId === context.userId && !data.perfis.includes("admin")) {
+      throw new Error("Você não pode remover o seu próprio acesso de administrador.");
+    }
+
+    const { data: atuais, error: readError } = await db
+      .from("user_roles")
+      .select("id, role")
+      .eq("user_id", data.userId);
+    if (readError) throw new Error(readError.message);
+
+    const existentes = new Set((atuais ?? []).map((r: { role: Perfil }) => r.role));
+    const remover = (atuais ?? []).filter((r: { role: Perfil }) => !data.perfis.includes(r.role));
+    const inserir = data.perfis.filter((p) => !existentes.has(p));
+
+    if (remover.length > 0) {
+      const { error } = await db
+        .from("user_roles")
+        .delete()
+        .in("id", remover.map((r: { id: string }) => r.id));
+      if (error) throw new Error(error.message);
+    }
+
+    if (inserir.length > 0) {
+      const { error } = await db
+        .from("user_roles")
+        .insert(inserir.map((role) => ({ user_id: data.userId, role })));
+      if (error) throw new Error(error.message);
+    }
+
+    await db
+      .from("usuarios_importados")
+      .update({ perfil: data.perfis.join(", ") })
+      .eq("id", data.userId);
+
+    return { ok: true, perfis: data.perfis };
+  });
+
 
 export const removerUsuario = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
