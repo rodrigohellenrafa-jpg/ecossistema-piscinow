@@ -20,6 +20,7 @@ import {
   PiggyBank,
   BadgeDollarSign,
   ShieldCheck,
+  CalendarDays,
 } from "lucide-react";
 
 import {
