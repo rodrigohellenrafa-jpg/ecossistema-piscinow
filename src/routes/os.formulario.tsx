@@ -255,7 +255,7 @@ function FormularioOS() {
                     Piscina
                   </text>
 
-                  {/* Inputs sobre as cotas */}
+                  {/* Inputs sobre as cotas (superior e inferior) */}
                   <foreignObject x="130" y="8" width="80" height="24">
                     <input
                       type="text"
@@ -270,21 +270,27 @@ function FormularioOS() {
                       placeholder="m"
                     />
                   </foreignObject>
-                  <foreignObject x="8" y="90" width="24" height="80">
-                    <input
-                      type="text"
-                      className="h-full w-full -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
-                      placeholder="m"
-                    />
-                  </foreignObject>
-                  <foreignObject x="308" y="90" width="24" height="80">
-                    <input
-                      type="text"
-                      className="h-full w-full -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
-                      placeholder="m"
-                    />
-                  </foreignObject>
                 </svg>
+
+                {/* Inputs de largura ao lado do SVG */}
+                <div className="mt-2 flex w-full max-w-md justify-between px-8 text-xs text-slate-700">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-semibold">Largura esq.</span>
+                    <input
+                      type="text"
+                      className="w-20 border-b border-slate-400 bg-transparent text-center outline-none"
+                      placeholder="m"
+                    />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-semibold">Largura dir.</span>
+                    <input
+                      type="text"
+                      className="w-20 border-b border-slate-400 bg-transparent text-center outline-none"
+                      placeholder="m"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
