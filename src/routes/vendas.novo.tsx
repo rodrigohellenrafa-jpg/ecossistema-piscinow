@@ -544,8 +544,8 @@ function NovoPedido() {
                     <TableHead>Descrição</TableHead>
                     <TableHead className="w-20">Qtd</TableHead>
                     <TableHead className="w-28">Vlr. Unit.</TableHead>
-                    <TableHead className="w-20">Desc. %</TableHead>
-                    <TableHead className="w-28 text-right">Subtotal</TableHead>
+                    <TableHead className="w-28">Desc. (R$)</TableHead>
+                    <TableHead className="w-32 text-right">Total</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
