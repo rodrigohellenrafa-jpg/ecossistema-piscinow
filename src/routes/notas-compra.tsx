@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Plus, Trash2, Upload } from "lucide-react";
+import { ExternalLink, PackagePlus, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -130,12 +130,211 @@ function lerXmlNfe(texto: string) {
   };
 }
 
+export type ItemXml = {
+  codigo: string;
+  ean: string;
+  descricao: string;
+  unidade: string;
+  quantidade: number;
+  valor_unitario: number;
+  ncm: string;
+  cfop: string;
+};
+
+/** Lê os itens (produtos) de um XML de NF-e. */
+function lerItensXml(texto: string): ItemXml[] {
+  const doc = new DOMParser().parseFromString(texto, "application/xml");
+  if (doc.querySelector("parsererror")) return [];
+  const dets = Array.from(doc.getElementsByTagName("det"));
+  return dets.map((det) => {
+    const t = (tag: string) => det.getElementsByTagName(tag)[0]?.textContent?.trim() ?? "";
+    return {
+      codigo: t("cProd"),
+      ean: t("cEAN") && t("cEAN") !== "SEM GTIN" ? t("cEAN") : "",
+      descricao: t("xProd"),
+      unidade: t("uCom") || "UN",
+      quantidade: Number(t("qCom") || 0),
+      valor_unitario: Number(t("vUnCom") || 0),
+      ncm: t("NCM"),
+      cfop: t("CFOP"),
+    };
+  });
+}
+
+type ProdutoSimples = { id: string; codigo: string | null; nome: string };
+
+function LancarEstoque({
+  nota,
+  onPronto,
+}: {
+  nota: { id: string; fornecedor: string; numero: string | null; xml: string | null };
+  onPronto: () => void;
+}) {
+  const itens = useMemo(() => (nota.xml ? lerItensXml(nota.xml) : []), [nota.xml]);
+  const [destinos, setDestinos] = useState<Record<number, string>>({});
+  const [salvando, setSalvando] = useState(false);
+
+  const { data: produtos = [] } = useQuery({
+    queryKey: ["produtos", "lista-simples"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("id, codigo, nome")
+        .order("nome");
+      if (error) throw error;
+      return data as ProdutoSimples[];
+    },
+  });
+
+  const sugestao = (item: ItemXml) => {
+    const porCodigo = produtos.find(
+      (p) => p.codigo && item.codigo && p.codigo.toLowerCase() === item.codigo.toLowerCase(),
+    );
+    if (porCodigo) return porCodigo.id;
+    const porNome = produtos.find(
+      (p) => p.nome.trim().toLowerCase() === item.descricao.trim().toLowerCase(),
+    );
+    return porNome ? porNome.id : "novo";
+  };
+
+  const valor = (idx: number, item: ItemXml) => destinos[idx] ?? sugestao(item);
+
+  const confirmar = async () => {
+    if (itens.length === 0) return;
+    setSalvando(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id ?? null;
+      const documento = `NF ${nota.numero ?? ""} - ${nota.fornecedor}`.trim();
+      const movimentos: Record<string, unknown>[] = [];
+
+      for (const [idx, item] of itens.entries()) {
+        const alvo = valor(idx, item);
+        if (alvo === "ignorar" || item.quantidade <= 0) continue;
+
+        let produtoId = alvo;
+        if (alvo === "novo") {
+          const { data: criado, error } = await supabase
+            .from("produtos")
+            .insert({
+              codigo: item.codigo || null,
+              nome: item.descricao || "Produto sem descrição",
+              unidade: item.unidade || "UN",
+              tipo: "produto",
+              preco_custo: item.valor_unitario,
+              preco_venda: 0,
+              estoque_atual: 0,
+              ncm: item.ncm || null,
+              cfop: item.cfop || null,
+              created_by: userId,
+            } as never)
+            .select("id")
+            .single();
+          if (error) throw error;
+          produtoId = criado.id;
+        }
+
+        movimentos.push({
+          produto_id: produtoId,
+          tipo: "entrada",
+          quantidade: item.quantidade,
+          origem: "Compra",
+          documento,
+          observacoes: `Entrada pela nota de compra ${nota.numero ?? nota.id}`,
+          created_by: userId,
+        });
+      }
+
+      if (movimentos.length === 0) throw new Error("Nenhum item selecionado para lançar");
+
+      const { error: erroMov } = await supabase
+        .from("estoque_movimentos")
+        .insert(movimentos as never);
+      if (erroMov) throw erroMov;
+
+      const { error: erroNota } = await supabase
+        .from("notas_compra")
+        .update({ status: "lancada" })
+        .eq("id", nota.id);
+      if (erroNota) throw erroNota;
+
+      toast.success(`${movimentos.length} item(ns) somados ao estoque`);
+      onPronto();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível lançar no estoque");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (itens.length === 0) {
+    return (
+      <p className="py-6 text-sm text-muted-foreground">
+        Esta nota não tem XML com itens. Lance a entrada manualmente em Estoque → Entradas e Saídas.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Item da nota</TableHead>
+              <TableHead className="text-right">Qtd.</TableHead>
+              <TableHead>Vai entrar em</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {itens.map((item, idx) => (
+              <TableRow key={`${item.codigo}-${idx}`}>
+                <TableCell className="font-medium">
+                  {item.descricao}
+                  <span className="block text-xs text-muted-foreground">
+                    {item.codigo} · {item.unidade} · {brl(item.valor_unitario)}
+                  </span>
+                </TableCell>
+                <TableCell className="text-right">{item.quantidade}</TableCell>
+                <TableCell className="min-w-56">
+                  <Select
+                    value={valor(idx, item)}
+                    onValueChange={(v) => setDestinos((d) => ({ ...d, [idx]: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="novo">Cadastrar novo produto</SelectItem>
+                      <SelectItem value="ignorar">Não lançar</SelectItem>
+                      {produtos.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.codigo ? `${p.codigo} — ` : ""}
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <Button onClick={() => void confirmar()} disabled={salvando}>
+        Somar ao estoque
+      </Button>
+    </div>
+  );
+}
+
 function NotasCompra() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
   const [xml, setXml] = useState<string | null>(null);
   const [arquivo, setArquivo] = useState<string | null>(null);
+  const [estoqueNota, setEstoqueNota] = useState<string | null>(null);
 
   async function importarXml(file: File) {
     try {
@@ -458,6 +657,15 @@ function NotasCompra() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          title="Lançar itens no estoque"
+                          disabled={!n.xml}
+                          onClick={() => setEstoqueNota(n.id)}
+                        >
+                          <PackagePlus className={n.status === "lancada" ? "" : "text-primary"} />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           title="Consultar na SEFAZ"
                           disabled={!n.chave_acesso}
                           onClick={() => abrirSefaz(n.chave_acesso)}
@@ -481,6 +689,32 @@ function NotasCompra() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!estoqueNota} onOpenChange={(v) => !v && setEstoqueNota(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Lançar itens da nota no estoque</DialogTitle>
+            <DialogDescription>
+              Confira para qual produto cada item da nota vai entrar e confirme.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const nota = data.find((n) => n.id === estoqueNota);
+            if (!nota) return null;
+            return (
+              <LancarEstoque
+                nota={nota}
+                onPronto={() => {
+                  setEstoqueNota(null);
+                  qc.invalidateQueries({ queryKey: ["notas_compra"] });
+                  qc.invalidateQueries({ queryKey: ["produtos"] });
+                  qc.invalidateQueries({ queryKey: ["estoque_movimentos"] });
+                }}
+              />
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
