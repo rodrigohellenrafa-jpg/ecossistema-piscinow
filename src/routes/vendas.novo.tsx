@@ -97,8 +97,10 @@ function NovoPedido() {
     },
   });
 
+  const { user } = useAuth();
+
   const { data: vendedores = [] } = useQuery({
-    queryKey: ["vendedores-select"],
+    queryKey: ["vendedores-select", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("usuarios_importados")
@@ -106,8 +108,26 @@ function NovoPedido() {
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
-      return data;
+      const lista = (data ?? []) as { id: string; nome: string | null; email: string | null }[];
+
+      // Garante que o usuário logado sempre apareça como vendedor,
+      // mesmo que ainda não conste na lista de usuários importados.
+      if (user?.id && user.email) {
+        const existe =
+          lista.some((v) => v.id === user.id) ||
+          lista.some((v) => v.email?.toLowerCase() === user.email!.toLowerCase());
+        if (!existe) {
+          lista.push({
+            id: user.id,
+            nome: (user.user_metadata?.nome as string | undefined) ?? user.email.split("@")[0],
+            email: user.email,
+          });
+          lista.sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? ""));
+        }
+      }
+      return lista;
     },
+    enabled: !!user,
   });
 
   const { data: produtos = [], refetch: refetchProdutos } = useQuery({
