@@ -1,8 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Printer, ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/os/formulario")({
   head: () => ({
@@ -28,14 +38,66 @@ export const Route = createFileRoute("/os/formulario")({
   ),
 });
 
-const ITENS = [
-  { cod: "A", label: "Item A" },
-  { cod: "B", label: "Item B" },
-  { cod: "C", label: "Item C" },
-  { cod: "D", label: "Item D" },
-];
+const TOTAL_LINHAS = 20;
+
+const LINHAS_VAZIAS = Array.from({ length: TOTAL_LINHAS }, () => "");
 
 function FormularioOS() {
+  const [obraId, setObraId] = useState<string>("");
+  const [cliente, setCliente] = useState("");
+  const [profissional, setProfissional] = useState("");
+  const [linhas, setLinhas] = useState<string[]>(LINHAS_VAZIAS);
+
+  const { data: obras = [] } = useQuery({
+    queryKey: ["obras-formulario"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("obras")
+        .select("id, numero, cliente_nome, responsavel, venda_id")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data as Array<{
+        id: string;
+        numero: string | null;
+        cliente_nome: string | null;
+        responsavel: string | null;
+        venda_id: string | null;
+      }>;
+    },
+  });
+
+  const obra = obras.find((o) => o.id === obraId);
+
+  const { data: itensVenda = [] } = useQuery({
+    queryKey: ["formulario-itens", obra?.venda_id],
+    enabled: Boolean(obra?.venda_id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_itens")
+        .select("descricao, quantidade")
+        .eq("venda_id", obra!.venda_id!);
+      if (error) throw error;
+      return data as Array<{ descricao: string; quantidade: number }>;
+    },
+  });
+
+  useEffect(() => {
+    if (!obra) return;
+    setCliente(obra.cliente_nome ?? "");
+    setProfissional(obra.responsavel ?? "");
+  }, [obra]);
+
+  useEffect(() => {
+    if (!obra?.venda_id) return;
+    const preenchidas = itensVenda.map(
+      (i) => `${Number(i.quantidade) % 1 === 0 ? Number(i.quantidade) : Number(i.quantidade).toFixed(2)}x ${i.descricao}`,
+    );
+    setLinhas(
+      Array.from({ length: Math.max(TOTAL_LINHAS, preenchidas.length) }, (_, i) => preenchidas[i] ?? ""),
+    );
+  }, [itensVenda, obra?.venda_id]);
+
   return (
     <div className="space-y-4">
       {/* Controles — ocultos na impressão */}
@@ -43,10 +105,22 @@ function FormularioOS() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Formulário de OS</h1>
           <p className="text-sm text-muted-foreground">
-            Preencha e imprima o formulário de Ordem de Serviço.
+            Selecione a obra para trazer os itens do pedido e imprima o formulário.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={obraId} onValueChange={setObraId}>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Selecionar obra / pedido" />
+            </SelectTrigger>
+            <SelectContent>
+              {obras.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {(o.numero ?? "Obra") + " — " + (o.cliente_nome ?? "sem cliente")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" asChild>
             <Link to="/ordens">
               <ArrowLeft /> Voltar às OS
@@ -82,6 +156,8 @@ function FormularioOS() {
               </label>
               <input
                 type="text"
+                value={cliente}
+                onChange={(e) => setCliente(e.target.value)}
                 className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
                 placeholder=""
               />
@@ -92,6 +168,8 @@ function FormularioOS() {
               </label>
               <input
                 type="text"
+                value={profissional}
+                onChange={(e) => setProfissional(e.target.value)}
                 className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
                 placeholder=""
               />
@@ -147,18 +225,25 @@ function FormularioOS() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ITENS.map((item) => (
-                    <tr key={item.cod}>
-                      <td className="border border-slate-900 px-2 py-2 text-center font-medium">
-                        {item.label}
+                  {linhas.map((valor, index) => (
+                    <tr key={index}>
+                      <td className="border border-slate-900 px-1 py-0">
+                        <input
+                          type="text"
+                          value={valor}
+                          onChange={(e) =>
+                            setLinhas((atual) =>
+                              atual.map((v, i) => (i === index ? e.target.value : v)),
+                            )
+                          }
+                          className="h-5 w-full bg-transparent text-[11px] leading-none text-slate-900 outline-none"
+                        />
                       </td>
-                      <td className="border border-slate-900 px-2 py-2 text-center">
-                        <span className="inline-flex h-5 w-5 items-center justify-center border border-slate-900 bg-slate-100 text-sm font-bold">
-                          ✓
-                        </span>
+                      <td className="w-12 border border-slate-900 px-1 py-0 text-center">
+                        <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
                       </td>
-                      <td className="border border-slate-900 px-2 py-2 text-center">
-                        <span className="inline-block h-5 w-5 border border-slate-900" />
+                      <td className="w-12 border border-slate-900 px-1 py-0 text-center">
+                        <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
                       </td>
                     </tr>
                   ))}
