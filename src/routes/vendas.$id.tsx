@@ -59,11 +59,27 @@ const STATUS_LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+const STATUS_PAGAMENTO_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  parcial: "Parcialmente pago",
+  pago: "Pago / Liquidado",
+};
+
+const hoje = () => new Date().toISOString().slice(0, 10);
+
 function DetalhePedido() {
   const { id } = useParams({ from: "/vendas/$id" });
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [aliquotaIcms, setAliquotaIcms] = useState(18);
   const [pdfLink, setPdfLink] = useState("");
+  const [novoPag, setNovoPag] = useState({
+    data_pagamento: hoje(),
+    forma_pagamento: "Pix",
+    conta_bancaria: "",
+    valor: "",
+    observacoes: "",
+  });
 
   const { data: venda } = useQuery({
     queryKey: ["venda", id],
