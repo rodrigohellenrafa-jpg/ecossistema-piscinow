@@ -19,7 +19,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Accordion,
   AccordionContent,
@@ -396,6 +398,22 @@ function Produtos() {
                       />
                     </Field>
                   </>
+                )}
+                {form.tipo === "produto" && (
+                  <div className="flex items-start gap-2 rounded-md border border-border p-3 sm:col-span-2">
+                    <Checkbox
+                      id="produto-sob-encomenda"
+                      checked={form.sob_encomenda === "sim"}
+                      onCheckedChange={(v) => set("sob_encomenda")(v === true ? "sim" : "nao")}
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="produto-sob-encomenda">Vendido sob encomenda</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Item que não fica em estoque. Não aparece como falta e a venda é concluída
+                        normalmente, gerando pedido ao fornecedor.
+                      </p>
+                    </div>
+                  </div>
                 )}
                 <Field label="Descrição" className="sm:col-span-2">
                   <Textarea
