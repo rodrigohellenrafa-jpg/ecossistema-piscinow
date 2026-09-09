@@ -327,8 +327,14 @@ function DetalhePedido() {
             clienteDocumento={cliente?.documento ?? null}
             invalidar={[["venda", id]]}
           />
-          <Button onClick={() => window.print()}>
-            <Printer /> Imprimir / Exportar PDF
+          <DocumentosVenda
+            venda={venda}
+            cliente={cliente ?? null}
+            itens={itens}
+            condicoes={condicoes as never}
+          />
+          <Button variant="ghost" onClick={() => window.print()}>
+            <Printer /> Espelho fiscal
           </Button>
         </div>
       </div>
