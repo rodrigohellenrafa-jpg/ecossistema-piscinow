@@ -250,8 +250,17 @@ function NovoPedido() {
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
       const cliente = clientes.find((c) => c.id === clienteId);
-      const vendedor = vendedores.find((v) => v.id === vendedorId);
-      const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const vendedor =
+        vendedores.find((v) => v.id === vendedorId) ??
+        vendedores.find((v) => v.id === user?.id) ??
+        (user?.email
+          ? {
+              id: user.id,
+              nome: (user.user_metadata?.nome as string | undefined) ?? user.email.split("@")[0],
+              email: user.email,
+            }
+          : undefined);
+      const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id ?? null;
 
       const { data: venda, error: erroVenda } = await supabase
         .from("vendas")
