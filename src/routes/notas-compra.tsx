@@ -96,10 +96,66 @@ const vazio = {
   observacoes: "",
 };
 
+/** Lê os dados principais de um XML de NF-e (procNFe ou NFe). */
+function lerXmlNfe(texto: string) {
+  const doc = new DOMParser().parseFromString(texto, "application/xml");
+  if (doc.querySelector("parsererror")) throw new Error("Arquivo XML inválido");
+
+  const txt = (tag: string, escopo: Element | Document = doc) => {
+    const el = escopo.getElementsByTagName(tag)[0];
+    return el?.textContent?.trim() ?? "";
+  };
+
+  const infNFe = doc.getElementsByTagName("infNFe")[0];
+  if (!infNFe) throw new Error("Este XML não parece ser uma NF-e");
+
+  const emit = infNFe.getElementsByTagName("emit")[0];
+  const ide = infNFe.getElementsByTagName("ide")[0];
+  const icmsTot = infNFe.getElementsByTagName("ICMSTot")[0];
+
+  const chave = soDigitos(infNFe.getAttribute("Id") ?? txt("chNFe"));
+  const emissao = (ide ? txt("dhEmi", ide) || txt("dEmi", ide) : "").slice(0, 10);
+
+  return {
+    chave_acesso: chave,
+    numero: ide ? txt("nNF", ide) : "",
+    serie: ide ? txt("serie", ide) : "",
+    natureza_operacao: ide ? txt("natOp", ide) : "",
+    fornecedor: emit ? txt("xNome", emit) : "",
+    fornecedor_cnpj: emit ? txt("CNPJ", emit) : "",
+    data_emissao: /^\d{4}-\d{2}-\d{2}$/.test(emissao) ? emissao : "",
+    valor_produtos: icmsTot ? txt("vProd", icmsTot) : "",
+    valor_frete: icmsTot ? txt("vFrete", icmsTot) : "",
+    valor_total: icmsTot ? txt("vNF", icmsTot) : "",
+  };
+}
+
 function NotasCompra() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
+  const [xml, setXml] = useState<string | null>(null);
+  const [arquivo, setArquivo] = useState<string | null>(null);
+
+  async function importarXml(file: File) {
+    try {
+      const texto = await file.text();
+      const dados = lerXmlNfe(texto);
+      setXml(texto);
+      setArquivo(file.name);
+      setForm((f) => ({
+        ...f,
+        ...dados,
+        valor_produtos: dados.valor_produtos || f.valor_produtos,
+        valor_frete: dados.valor_frete || f.valor_frete,
+        valor_total: dados.valor_total || f.valor_total,
+        status: "conferida",
+      }));
+      toast.success("XML lido — confira os dados e salve.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível ler o XML");
+    }
+  }
 
   const set = (campo: keyof typeof vazio, valor: string) =>
     setForm((f) => ({ ...f, [campo]: valor }));
