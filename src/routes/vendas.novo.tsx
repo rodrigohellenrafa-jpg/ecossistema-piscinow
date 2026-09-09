@@ -191,6 +191,8 @@ function NovoPedido() {
         preco_unitario: num(p.preco_venda),
         desconto_perc: 0,
         custo_unitario: num(p.preco_custo),
+        sob_encomenda: Boolean((p as { sob_encomenda?: boolean }).sob_encomenda),
+        estoque_atual: num(p.estoque_atual),
       },
     ]);
     setProdutoSel("");
