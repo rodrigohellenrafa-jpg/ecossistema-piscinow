@@ -410,25 +410,59 @@ function NovoPedido() {
         userId,
       };
 
-      // 1) Financeiro: parcelas provisionadas em contas a receber.
-      await provisionarFinanceiro(ctx, {
-        valorEntrada: 0,
-        saldoDevedor,
-        parcelas: parcelasQtd,
-        valorParcela,
-      });
+      // 1) Condições de pagamento do pedido (uma linha por forma usada).
+      if (condicoes.length > 0) {
+        const { error: erroCond } = await supabase.from("venda_condicoes").insert(
+          condicoes.map((c, idx) => ({
+            venda_id: venda.id,
+            ordem: idx + 1,
+            forma_pagamento: c.forma_pagamento,
+            valor: c.valor,
+            parcelas: Math.max(1, c.parcelas),
+            acrescimo: acrescimoCondicao(c),
+            valor_cobrado: cobradoCondicao(c),
+            valor_parcela: c.valor_parcela,
+            data_prevista: c.data_prevista || data,
+            pago: c.pago,
+            bandeira: c.bandeira || null,
+            observacoes: c.observacoes || null,
+            created_by: userId,
+          })) as never,
+        );
+        if (erroCond) throw erroCond;
+      }
 
-      // 1b) Entrada paga na hora vira uma transação de pagamento da venda,
-      // que recalcula sozinha o saldo/status e entra no fluxo de caixa.
-      if (valorEntrada > 0) {
-        const { error: erroPag } = await supabase.from("venda_pagamentos").insert({
-          venda_id: venda.id,
-          data_pagamento: data,
-          forma_pagamento: formaPagamento || "Dinheiro",
-          valor: valorEntrada,
-          observacoes: "Entrada no fechamento do pedido",
-          created_by: userId,
-        } as never);
+      // 1b) Condições a receber viram parcelas em Contas a Receber (com juros).
+      for (const c of condicoes.filter((x) => !x.pago && x.valor > 0)) {
+        await provisionarFinanceiro(
+          { ...ctx, data: c.data_prevista || data },
+          {
+            valorEntrada: 0,
+            saldoDevedor: cobradoCondicao(c),
+            parcelas: Math.max(1, c.parcelas),
+            valorParcela: c.valor_parcela,
+          },
+        );
+      }
+
+      // 1c) Condições já pagas viram transações da venda: recalculam saldo,
+      // status do pedido e entram no fluxo de caixa.
+      const pagas = condicoes.filter((c) => c.pago && c.valor > 0);
+      if (pagas.length > 0) {
+        const { error: erroPag } = await supabase.from("venda_pagamentos").insert(
+          pagas.map((c) => ({
+            venda_id: venda.id,
+            data_pagamento: c.data_prevista || data,
+            forma_pagamento: c.forma_pagamento || "Dinheiro",
+            valor: c.valor,
+            conta_bancaria: c.bandeira || null,
+            observacoes:
+              c.parcelas > 1
+                ? `${c.parcelas}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
+                : c.observacoes || "Pagamento no fechamento do pedido",
+            created_by: userId,
+          })) as never,
+        );
         if (erroPag) throw erroPag;
       }
 
