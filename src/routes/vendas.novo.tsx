@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
 import { provisionarFinanceiro, rotearEstoque } from "@/lib/venda-automacao";
@@ -96,12 +97,13 @@ function NovoPedido() {
     },
   });
 
-  const { data: funcionarios = [] } = useQuery({
-    queryKey: ["funcionarios-select"],
+  const { data: vendedores = [] } = useQuery({
+    queryKey: ["vendedores-select"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("funcionarios")
-        .select("id, nome")
+        .from("usuarios_importados")
+        .select("id, nome, email")
+        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data;
