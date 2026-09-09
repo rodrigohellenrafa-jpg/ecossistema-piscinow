@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Hammer, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
