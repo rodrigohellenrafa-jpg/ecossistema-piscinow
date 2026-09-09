@@ -156,6 +156,68 @@ function DetalhePedido() {
     },
   });
 
+  const { data: pagamentos = [] } = useQuery({
+    queryKey: ["venda-pagamentos", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_pagamentos")
+        .select("*")
+        .eq("venda_id", id)
+        .order("data_pagamento");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const invalidarFinanceiro = () => {
+    qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
+    qc.invalidateQueries({ queryKey: ["venda", id] });
+    qc.invalidateQueries({ queryKey: ["vendas"] });
+    qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+    qc.invalidateQueries({ queryKey: ["lancamentos"] });
+  };
+
+  const adicionarPagamento = useMutation({
+    mutationFn: async () => {
+      const valor = Number(String(novoPag.valor).replace(",", "."));
+      if (!valor || valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const { error } = await supabase.from("venda_pagamentos").insert({
+        venda_id: id,
+        data_pagamento: novoPag.data_pagamento,
+        forma_pagamento: novoPag.forma_pagamento,
+        conta_bancaria: novoPag.conta_bancaria || null,
+        valor,
+        observacoes: novoPag.observacoes || null,
+        created_by: user?.id ?? null,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pagamento registrado!");
+      setNovoPag({
+        data_pagamento: hoje(),
+        forma_pagamento: "Pix",
+        conta_bancaria: "",
+        valor: "",
+        observacoes: "",
+      });
+      invalidarFinanceiro();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removerPagamento = useMutation({
+    mutationFn: async (pagamentoId: string) => {
+      const { error } = await supabase.from("venda_pagamentos").delete().eq("id", pagamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pagamento removido.");
+      invalidarFinanceiro();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const atualizarStatus = useMutation({
     mutationFn: async (status: string) => {
       const { error } = await supabase.from("vendas").update({ status_pedido: status }).eq("id", id);
