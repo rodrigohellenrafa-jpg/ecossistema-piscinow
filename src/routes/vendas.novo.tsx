@@ -184,6 +184,7 @@ function NovoPedido() {
 
 
   const [itens, setItens] = useState<ItemLinha[]>([]);
+  const [descontoInputs, setDescontoInputs] = useState<Record<string, string>>({});
   const [produtoSel, setProdutoSel] = useState("");
 
   const [cascoId, setCascoId] = useState("");
