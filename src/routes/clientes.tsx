@@ -370,8 +370,20 @@ function Clientes() {
                 <Field label="Telefone">
                   <Input value={form.telefone} onChange={(e) => set("telefone")(e.target.value)} />
                 </Field>
-                <Field label="CEP">
-                  <Input value={form.cep} onChange={(e) => set("cep")(e.target.value)} />
+                <Field label={buscandoCep ? "CEP (buscando endereço...)" : "CEP"}>
+                  <Input
+                    value={form.cep}
+                    placeholder="00000-000"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      set("cep")(v);
+                      if (v.replace(/\D/g, "").length === 8) void preencherPorCep(v);
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value.replace(/\D/g, "").length === 8)
+                        void preencherPorCep(e.target.value);
+                    }}
+                  />
                 </Field>
                 <Field label="Logradouro">
                   <Input
