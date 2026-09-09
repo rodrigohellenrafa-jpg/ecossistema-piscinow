@@ -214,15 +214,18 @@ function Produtos() {
         aliquota_iss: Number(form.aliquota_iss) || 0,
         codigo_servico_municipal: form.codigo_servico_municipal || null,
         sob_encomenda: form.sob_encomenda === "sim",
-      } as never;
+      };
       if (editando) {
-        const { error } = await supabase.from("produtos").update(payload).eq("id", editando.id);
+        const { error } = await supabase
+          .from("produtos")
+          .update(payload as never)
+          .eq("id", editando.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("produtos").insert({
           ...payload,
           created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
-        });
+        } as never);
         if (error) throw error;
       }
     },
