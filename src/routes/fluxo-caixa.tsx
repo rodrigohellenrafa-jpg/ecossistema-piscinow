@@ -206,17 +206,29 @@ function FluxoCaixa() {
         title="Fluxo de Caixa"
         subtitle="Entradas e saídas consolidadas de contas a pagar, contas a receber e lançamentos financeiros."
         actions={
-          <Select value={horizonte} onValueChange={setHorizonte}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Projeção 7 dias</SelectItem>
-              <SelectItem value="30">Projeção 30 dias</SelectItem>
-              <SelectItem value="90">Projeção 90 dias</SelectItem>
-              <SelectItem value="180">Projeção 180 dias</SelectItem>
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={horizonte} onValueChange={setHorizonte}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Projeção 7 dias</SelectItem>
+                <SelectItem value="30">Projeção 30 dias</SelectItem>
+                <SelectItem value="90">Projeção 90 dias</SelectItem>
+                <SelectItem value="180">Projeção 180 dias</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button asChild variant="outline">
+              <Link to="/contas">
+                <Plus /> Conta a pagar/receber
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/financeiro">
+                <Plus /> Novo lançamento
+              </Link>
+            </Button>
+          </>
         }
       />
 
