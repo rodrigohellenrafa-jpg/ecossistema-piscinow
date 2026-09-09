@@ -98,7 +98,7 @@ function FluxoCaixa() {
   const movimentos = useMemo<Movimento[]>(() => {
     const lista: Movimento[] = [];
 
-    for (const c of contas as Record<string, string | number | null>[]) {
+    for (const c of contas as unknown as Record<string, string | number | null>[]) {
       const pago = c.status === "pago";
       const data = String(pago ? (c.data_pagamento ?? c.vencimento) : c.vencimento).slice(0, 10);
       const valor = Number(c.valor ?? 0);
@@ -114,7 +114,7 @@ function FluxoCaixa() {
       });
     }
 
-    for (const l of lancamentos as Record<string, string | number | null>[]) {
+    for (const l of lancamentos as unknown as Record<string, string | number | null>[]) {
       const pago = l.status === "Pago";
       const data = String(
         (pago ? l.data_pagamento : null) ?? l.vencimento ?? l.data_competencia,
