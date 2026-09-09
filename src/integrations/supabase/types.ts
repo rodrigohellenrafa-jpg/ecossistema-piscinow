@@ -1382,6 +1382,7 @@ export type Database = {
           created_at: string
           custo_unitario: number
           desconto_perc: number
+          desconto_valor: number
           descricao: string
           id: string
           preco_unitario: number
@@ -1395,6 +1396,7 @@ export type Database = {
           created_at?: string
           custo_unitario?: number
           desconto_perc?: number
+          desconto_valor?: number
           descricao: string
           id?: string
           preco_unitario?: number
@@ -1408,6 +1410,7 @@ export type Database = {
           created_at?: string
           custo_unitario?: number
           desconto_perc?: number
+          desconto_valor?: number
           descricao?: string
           id?: string
           preco_unitario?: number
