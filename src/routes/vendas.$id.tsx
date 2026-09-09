@@ -275,6 +275,11 @@ function DetalhePedido() {
   const baseIcmsSt = 0;
   const valorIcmsSt = 0;
 
+  const totalPago = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+  const totalVenda = Number(venda?.valor_total ?? 0);
+  const saldoAberto = Math.max(totalVenda - totalPago, 0);
+  const statusPag = totalPago <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
+
   if (!venda) {
     return <p className="text-muted-foreground">Carregando pedido...</p>;
   }
