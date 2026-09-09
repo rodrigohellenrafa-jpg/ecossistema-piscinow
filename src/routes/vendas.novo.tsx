@@ -230,7 +230,7 @@ function NovoPedido() {
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
       const cliente = clientes.find((c) => c.id === clienteId);
-      const vendedor = funcionarios.find((f) => f.id === vendedorId);
+      const vendedor = vendedores.find((v) => v.id === vendedorId);
       const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
 
       const { data: venda, error: erroVenda } = await supabase
@@ -426,9 +426,9 @@ function NovoPedido() {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {funcionarios.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.nome}
+                    {vendedores.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
