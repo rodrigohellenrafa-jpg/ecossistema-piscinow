@@ -88,7 +88,8 @@ const groups: {
     label: "Financeiro",
     area: "financeiro",
     items: [
-      { title: "Fluxo de Caixa", url: "/financeiro", icon: Wallet },
+      { title: "Fluxo de Caixa", url: "/fluxo-caixa", icon: Wallet },
+      { title: "Lançamentos Financeiros", url: "/financeiro", icon: BadgeDollarSign },
       { title: "Contas a Pagar/Receber", url: "/contas", icon: Receipt },
       { title: "Relatório de Contas", url: "/relatorio-contas", icon: BarChart3 },
       { title: "DRE", url: "/dre", icon: PiggyBank },
