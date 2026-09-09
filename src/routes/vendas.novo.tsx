@@ -575,26 +575,27 @@ function NovoPedido() {
                 </Select>
               </Field>
               <Field label="Cliente" className="sm:col-span-3">
-                <div className="mb-2 flex justify-end">
+                <div className="flex items-center gap-2">
+                  <Select value={clienteId} onValueChange={setClienteId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecione o cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <ClienteRapidoDialog
+                    iconOnly
                     onCreated={async (id) => {
                       await refetchClientes();
                       setClienteId(id);
                     }}
                   />
                 </div>
-                <Select value={clienteId} onValueChange={setClienteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </Field>
             </CardContent>
           </Card>
