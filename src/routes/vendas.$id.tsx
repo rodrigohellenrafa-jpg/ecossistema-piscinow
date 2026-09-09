@@ -170,6 +170,19 @@ function DetalhePedido() {
     },
   });
 
+  const { data: condicoes = [] } = useQuery({
+    queryKey: ["venda-condicoes", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_condicoes")
+        .select("*")
+        .eq("venda_id", id)
+        .order("ordem");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const invalidarFinanceiro = () => {
     qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
     qc.invalidateQueries({ queryKey: ["venda", id] });
