@@ -110,8 +110,11 @@ function AcessosAdmin() {
 
   const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
-  const [perfil, setPerfil] = useState<Perfil>("usuario");
+  const [perfis, setPerfis] = useState<Perfil[]>(["usuario"]);
   const [senhaGerada, setSenhaGerada] = useState<string | null>(null);
+  const [editando, setEditando] = useState<{ id: string; nome: string; perfis: Perfil[] } | null>(
+    null,
+  );
 
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ["usuarios-sistema"],
@@ -125,7 +128,7 @@ function AcessosAdmin() {
       setSenhaGerada(res.senhaTemporaria);
       setEmail("");
       setNome("");
-      setPerfil("usuario");
+      setPerfis(["usuario"]);
       qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -140,11 +143,29 @@ function AcessosAdmin() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const salvarPapeis = useMutation({
+    mutationFn: doDefinirPapeis,
+    onSuccess: () => {
+      toast.success("Funções atualizadas.");
+      setEditando(null);
+      qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const alternarPerfil = (lista: Perfil[], p: Perfil) =>
+    lista.includes(p) ? lista.filter((x) => x !== p) : [...lista, p];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (perfis.length === 0) {
+      toast.error("Selecione ao menos uma função.");
+      return;
+    }
     setSenhaGerada(null);
-    criar.mutate({ data: { email, nome, perfil } });
+    criar.mutate({ data: { email, nome, perfis } });
   };
+
 
   const copiarSenha = () => {
     if (!senhaGerada) return;
