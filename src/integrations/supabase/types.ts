@@ -1377,6 +1377,71 @@ export type Database = {
         }
         Relationships: []
       }
+      venda_condicoes: {
+        Row: {
+          acrescimo: number
+          bandeira: string | null
+          created_at: string
+          created_by: string | null
+          data_prevista: string | null
+          forma_pagamento: string
+          id: string
+          observacoes: string | null
+          ordem: number
+          pago: boolean
+          parcelas: number
+          updated_at: string
+          valor: number
+          valor_cobrado: number
+          valor_parcela: number
+          venda_id: string
+        }
+        Insert: {
+          acrescimo?: number
+          bandeira?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_prevista?: string | null
+          forma_pagamento: string
+          id?: string
+          observacoes?: string | null
+          ordem?: number
+          pago?: boolean
+          parcelas?: number
+          updated_at?: string
+          valor?: number
+          valor_cobrado?: number
+          valor_parcela?: number
+          venda_id: string
+        }
+        Update: {
+          acrescimo?: number
+          bandeira?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_prevista?: string | null
+          forma_pagamento?: string
+          id?: string
+          observacoes?: string | null
+          ordem?: number
+          pago?: boolean
+          parcelas?: number
+          updated_at?: string
+          valor?: number
+          valor_cobrado?: number
+          valor_parcela?: number
+          venda_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_condicoes_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venda_itens: {
         Row: {
           created_at: string

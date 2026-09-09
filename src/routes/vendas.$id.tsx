@@ -170,6 +170,19 @@ function DetalhePedido() {
     },
   });
 
+  const { data: condicoes = [] } = useQuery({
+    queryKey: ["venda-condicoes", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_condicoes")
+        .select("*")
+        .eq("venda_id", id)
+        .order("ordem");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const invalidarFinanceiro = () => {
     qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
     qc.invalidateQueries({ queryKey: ["venda", id] });
@@ -387,6 +400,54 @@ function DetalhePedido() {
             <p className="text-muted-foreground">
               Pedido de balcão: os itens já saíram do estoque e não geram obra.
             </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Condições de pagamento combinadas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {condicoes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma condição detalhada foi registrada neste pedido.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Forma</TableHead>
+                  <TableHead>Cartão / conta</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Parcelas</TableHead>
+                  <TableHead className="text-right">Abate do pedido</TableHead>
+                  <TableHead className="text-right">Juros</TableHead>
+                  <TableHead className="text-right">Cliente paga</TableHead>
+                  <TableHead>Situação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {condicoes.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>{c.forma_pagamento}</TableCell>
+                    <TableCell>{c.bandeira ?? "—"}</TableCell>
+                    <TableCell>{dataBR(c.data_prevista)}</TableCell>
+                    <TableCell>
+                      {c.parcelas}x de {brl(c.valor_parcela)}
+                    </TableCell>
+                    <TableCell className="text-right">{brl(c.valor)}</TableCell>
+                    <TableCell className="text-right">{brl(c.acrescimo)}</TableCell>
+                    <TableCell className="text-right font-medium">{brl(c.valor_cobrado)}</TableCell>
+                    <TableCell>
+                      <Badge variant={c.pago ? "default" : "secondary"}>
+                        {c.pago ? "Pago" : "A receber"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

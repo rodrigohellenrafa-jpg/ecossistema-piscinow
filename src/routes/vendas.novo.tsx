@@ -92,7 +92,30 @@ const parseMoedaInput = (valor: string): number => {
     .replace(/,/g, ".");
   const n = Number(limpo);
   return Number.isFinite(n) && n >= 0 ? n : 0;
-};
+  };
+
+/** Uma forma de pagamento aplicada ao pedido (pode haver várias no mesmo pedido). */
+interface CondicaoLinha {
+  key: string;
+  forma_pagamento: string;
+  /** Valor que essa condição abate do total do pedido. */
+  valor: number;
+  parcelas: number;
+  /** Valor de cada parcela cobrada do cliente (já com juros da maquininha). */
+  valor_parcela: number;
+  data_prevista: string;
+  pago: boolean;
+  bandeira: string;
+  observacoes: string;
+}
+
+/** Total que o cliente desembolsa nessa condição (parcelas x valor da parcela). */
+const cobradoCondicao = (c: CondicaoLinha) =>
+  Math.max(1, c.parcelas) * c.valor_parcela;
+
+/** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
+const acrescimoCondicao = (c: CondicaoLinha) =>
+  Math.max(0, cobradoCondicao(c) - c.valor);
 
 function NovoPedido() {
   const navigate = useNavigate();
@@ -195,9 +218,7 @@ function NovoPedido() {
   const [impostosKit, setImpostosKit] = useState(0);
   const [precoVendaKit, setPrecoVendaKit] = useState(0);
 
-  const [formaPagamento, setFormaPagamento] = useState<string>(FORMAS_PAGAMENTO[0]);
-  const [valorEntrada, setValorEntrada] = useState(0);
-  const [parcelasQtd, setParcelasQtd] = useState(1);
+  const [condicoes, setCondicoes] = useState<CondicaoLinha[]>([]);
 
   const subtotalProdutos = useMemo(
     () => itens.reduce((s, i) => s + totalItem(i), 0),
@@ -218,8 +239,46 @@ function NovoPedido() {
 
   const custoTotalGeral = custoTotalItens + custoTotalKit;
   const valorTotal = subtotalProdutos + precoVendaKit;
+
+  // Condições de pagamento: cada linha abate um valor do pedido e pode ter
+  // parcelas com juros da maquininha (o cliente paga mais do que abate).
+  const totalAplicado = condicoes.reduce((s, c) => s + c.valor, 0);
+  const totalCobradoCliente = condicoes.reduce((s, c) => s + cobradoCondicao(c), 0);
+  const totalJuros = Math.max(0, totalCobradoCliente - totalAplicado);
+  const faltaAlocar = valorTotal - totalAplicado;
+  const valorEntrada = condicoes.filter((c) => c.pago).reduce((s, c) => s + c.valor, 0);
   const saldoDevedor = Math.max(valorTotal - valorEntrada, 0);
-  const valorParcela = parcelasQtd > 0 ? saldoDevedor / parcelasQtd : 0;
+  const pendentes = condicoes.filter((c) => !c.pago);
+  const parcelasQtd = Math.max(1, pendentes.reduce((s, c) => s + Math.max(1, c.parcelas), 0));
+  const valorParcela = pendentes.length > 0 ? pendentes[0].valor_parcela : saldoDevedor;
+  const formaPagamento =
+    condicoes.length > 0
+      ? Array.from(new Set(condicoes.map((c) => c.forma_pagamento))).join(" + ")
+      : FORMAS_PAGAMENTO[0];
+
+  const adicionarCondicao = () => {
+    const restante = Math.max(0, Number((valorTotal - totalAplicado).toFixed(2)));
+    setCondicoes((prev) => [
+      ...prev,
+      {
+        key: novaKey(),
+        forma_pagamento: FORMAS_PAGAMENTO[0],
+        valor: restante,
+        parcelas: 1,
+        valor_parcela: restante,
+        data_prevista: data,
+        pago: false,
+        bandeira: "",
+        observacoes: "",
+      },
+    ]);
+  };
+
+  const atualizarCondicao = (key: string, patch: Partial<CondicaoLinha>) =>
+    setCondicoes((prev) => prev.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+
+  const removerCondicao = (key: string) =>
+    setCondicoes((prev) => prev.filter((c) => c.key !== key));
 
   const adicionarItem = () => {
     const p = produtos.find((x) => x.id === produtoSel);
@@ -351,25 +410,59 @@ function NovoPedido() {
         userId,
       };
 
-      // 1) Financeiro: parcelas provisionadas em contas a receber.
-      await provisionarFinanceiro(ctx, {
-        valorEntrada: 0,
-        saldoDevedor,
-        parcelas: parcelasQtd,
-        valorParcela,
-      });
+      // 1) Condições de pagamento do pedido (uma linha por forma usada).
+      if (condicoes.length > 0) {
+        const { error: erroCond } = await supabase.from("venda_condicoes").insert(
+          condicoes.map((c, idx) => ({
+            venda_id: venda.id,
+            ordem: idx + 1,
+            forma_pagamento: c.forma_pagamento,
+            valor: c.valor,
+            parcelas: Math.max(1, c.parcelas),
+            acrescimo: acrescimoCondicao(c),
+            valor_cobrado: cobradoCondicao(c),
+            valor_parcela: c.valor_parcela,
+            data_prevista: c.data_prevista || data,
+            pago: c.pago,
+            bandeira: c.bandeira || null,
+            observacoes: c.observacoes || null,
+            created_by: userId,
+          })) as never,
+        );
+        if (erroCond) throw erroCond;
+      }
 
-      // 1b) Entrada paga na hora vira uma transação de pagamento da venda,
-      // que recalcula sozinha o saldo/status e entra no fluxo de caixa.
-      if (valorEntrada > 0) {
-        const { error: erroPag } = await supabase.from("venda_pagamentos").insert({
-          venda_id: venda.id,
-          data_pagamento: data,
-          forma_pagamento: formaPagamento || "Dinheiro",
-          valor: valorEntrada,
-          observacoes: "Entrada no fechamento do pedido",
-          created_by: userId,
-        } as never);
+      // 1b) Condições a receber viram parcelas em Contas a Receber (com juros).
+      for (const c of condicoes.filter((x) => !x.pago && x.valor > 0)) {
+        await provisionarFinanceiro(
+          { ...ctx, data: c.data_prevista || data },
+          {
+            valorEntrada: 0,
+            saldoDevedor: cobradoCondicao(c),
+            parcelas: Math.max(1, c.parcelas),
+            valorParcela: c.valor_parcela,
+          },
+        );
+      }
+
+      // 1c) Condições já pagas viram transações da venda: recalculam saldo,
+      // status do pedido e entram no fluxo de caixa.
+      const pagas = condicoes.filter((c) => c.pago && c.valor > 0);
+      if (pagas.length > 0) {
+        const { error: erroPag } = await supabase.from("venda_pagamentos").insert(
+          pagas.map((c) => ({
+            venda_id: venda.id,
+            data_pagamento: c.data_prevista || data,
+            forma_pagamento: c.forma_pagamento || "Dinheiro",
+            valor: c.valor,
+            conta_bancaria: c.bandeira || null,
+            observacoes:
+              c.parcelas > 1
+                ? `${c.parcelas}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
+                : c.observacoes || "Pagamento no fechamento do pedido",
+            created_by: userId,
+          })) as never,
+        );
         if (erroPag) throw erroPag;
       }
 
@@ -773,48 +866,235 @@ function NovoPedido() {
 
 
           <Card>
-            <CardHeader>
-              <CardTitle>Condições comerciais</CardTitle>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>Condições de pagamento</CardTitle>
+              <Button variant="outline" size="sm" onClick={adicionarCondicao}>
+                <Plus /> Adicionar condição
+              </Button>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-4">
-              <Field label="Forma de pagamento">
-                <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FORMAS_PAGAMENTO.map((f) => (
-                      <SelectItem key={f} value={f}>
-                        {f}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Valor de entrada">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valorEntrada}
-                  onChange={(e) => setValorEntrada(num(e.target.value))}
-                />
-              </Field>
-              <Field label="Saldo devedor">
-                <Input value={brl(saldoDevedor)} disabled />
-              </Field>
-              <Field label="Qtd. de parcelas">
-                <Input
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={parcelasQtd}
-                  onChange={(e) => setParcelasQtd(Math.min(24, Math.max(1, num(e.target.value) || 1)))}
-                />
-              </Field>
-              <Field label="Valor por parcela">
-                <Input value={brl(valorParcela)} disabled />
-              </Field>
-              <Field label="Observações" className="sm:col-span-4">
+            <CardContent className="space-y-4">
+              {condicoes.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma condição informada. Adicione uma ou mais formas de pagamento — por
+                  exemplo 50% no cartão em 24x com juros da maquininha e o restante depois.
+                </p>
+              )}
+
+              {condicoes.map((c, idx) => (
+                <div key={c.key} className="rounded-lg border border-border p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-sm font-medium">Condição {idx + 1}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removerCondicao(c.key)}
+                      aria-label="Remover condição"
+                    >
+                      <Trash2 className="text-destructive" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="Forma de pagamento">
+                      <Select
+                        value={c.forma_pagamento}
+                        onValueChange={(v) => atualizarCondicao(c.key, { forma_pagamento: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FORMAS_PAGAMENTO.map((f) => (
+                            <SelectItem key={f} value={f}>
+                              {f}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field label="Cartão / conta (opcional)">
+                      <Input
+                        className="text-white"
+                        placeholder="Ex.: Visa maquininha"
+                        value={c.bandeira}
+                        onChange={(e) => atualizarCondicao(c.key, { bandeira: e.target.value })}
+                      />
+                    </Field>
+
+                    <Field label="Data">
+                      <Input
+                        type="date"
+                        className="text-white"
+                        value={c.data_prevista}
+                        onChange={(e) =>
+                          atualizarCondicao(c.key, { data_prevista: e.target.value })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Valor abatido do pedido (R$)">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="text-white"
+                        value={c.valor ? String(c.valor) : ""}
+                        placeholder="0,00"
+                        onChange={(e) => {
+                          const valor = parseMoedaInput(e.target.value);
+                          const parcelas = Math.max(1, c.parcelas);
+                          // Sem juros informados, a parcela acompanha o valor abatido.
+                          const semJuros = Math.abs(cobradoCondicao(c) - c.valor) < 0.01;
+                          atualizarCondicao(c.key, {
+                            valor,
+                            ...(semJuros ? { valor_parcela: valor / parcelas } : {}),
+                          });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="mt-1 text-xs text-primary underline"
+                        onClick={() => {
+                          const metade = Number((valorTotal / 2).toFixed(2));
+                          atualizarCondicao(c.key, {
+                            valor: metade,
+                            valor_parcela: metade / Math.max(1, c.parcelas),
+                          });
+                        }}
+                      >
+                        usar 50% do pedido
+                      </button>
+                    </Field>
+
+                    <Field label="Parcelas">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={48}
+                        className="text-white"
+                        value={c.parcelas}
+                        onChange={(e) => {
+                          const parcelas = Math.min(48, Math.max(1, num(e.target.value) || 1));
+                          const cobradoAtual = cobradoCondicao(c);
+                          atualizarCondicao(c.key, {
+                            parcelas,
+                            valor_parcela: cobradoAtual / parcelas,
+                          });
+                        }}
+                      />
+                    </Field>
+
+                    <Field label="Valor de cada parcela (R$)">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="text-white"
+                        placeholder="0,00"
+                        value={c.valor_parcela ? c.valor_parcela.toFixed(2) : ""}
+                        onChange={(e) =>
+                          atualizarCondicao(c.key, {
+                            valor_parcela: parseMoedaInput(e.target.value),
+                          })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Total cobrado do cliente (R$)">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="text-white"
+                        placeholder="0,00"
+                        value={cobradoCondicao(c) ? cobradoCondicao(c).toFixed(2) : ""}
+                        onChange={(e) => {
+                          const cobrado = parseMoedaInput(e.target.value);
+                          atualizarCondicao(c.key, {
+                            valor_parcela: cobrado / Math.max(1, c.parcelas),
+                          });
+                        }}
+                      />
+                    </Field>
+
+                    <Field label="Juros / acréscimo da maquininha">
+                      <Input value={brl(acrescimoCondicao(c))} disabled />
+                    </Field>
+
+                    <Field label="Situação">
+                      <Select
+                        value={c.pago ? "pago" : "pendente"}
+                        onValueChange={(v) => atualizarCondicao(c.key, { pago: v === "pago" })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pago">Já pago pelo cliente</SelectItem>
+                          <SelectItem value="pendente">A receber</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field label="Observações da condição" className="sm:col-span-3">
+                      <Input
+                        className="text-white"
+                        placeholder="Ex.: 50% no cartão em 24x, restante em outro cartão"
+                        value={c.observacoes}
+                        onChange={(e) => atualizarCondicao(c.key, { observacoes: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {Math.max(1, c.parcelas)}x de {brl(c.valor_parcela)} = {brl(cobradoCondicao(c))}{" "}
+                    cobrados · abate {brl(c.valor)} do pedido
+                  </p>
+                </div>
+              ))}
+
+              <div className="grid gap-3 border-t border-border pt-3 text-sm sm:grid-cols-4">
+                <div>
+                  <p className="text-muted-foreground">Total do pedido</p>
+                  <p className="font-semibold">{brl(valorTotal)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Alocado nas condições</p>
+                  <p className="font-semibold">{brl(totalAplicado)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Falta alocar</p>
+                  <p
+                    className={`font-semibold ${
+                      Math.abs(faltaAlocar) < 0.01
+                        ? "text-success"
+                        : faltaAlocar > 0
+                          ? "text-warning"
+                          : "text-destructive"
+                    }`}
+                  >
+                    {brl(faltaAlocar)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Cliente paga (com juros)</p>
+                  <p className="font-semibold">{brl(totalCobradoCliente)}</p>
+                  {totalJuros > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      juros embutidos: {brl(totalJuros)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Já recebido (condições marcadas como pagas)">
+                  <Input value={brl(valorEntrada)} disabled />
+                </Field>
+                <Field label="Saldo devedor">
+                  <Input value={brl(saldoDevedor)} disabled />
+                </Field>
+              </div>
+
+              <Field label="Observações do pedido">
                 <Textarea
                   rows={3}
                   value={observacoes}
