@@ -1,8 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Printer, ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/os/formulario")({
   head: () => ({
