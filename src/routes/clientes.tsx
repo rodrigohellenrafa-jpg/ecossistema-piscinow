@@ -211,6 +211,8 @@ function Clientes() {
   const abrirNovo = () => {
     setEditando(null);
     setForm({ ...vazio, codigo: proximoCodigo("CLI", data.map((c) => c.codigo)) });
+    setMostrarInstalacao(false);
+    setCepObra("");
     setOpen(true);
   };
 
