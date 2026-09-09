@@ -64,9 +64,10 @@ export const Route = createFileRoute("/ordens-compra")({
   ),
 });
 
-const STATUS = ["pendente", "enviada", "recebida", "cancelada"] as const;
+const STATUS = ["sob_encomenda", "pendente", "enviada", "recebida", "cancelada"] as const;
 
 const statusLabel: Record<string, string> = {
+  sob_encomenda: "Sob encomenda",
   pendente: "Pendente",
   enviada: "Enviada",
   recebida: "Recebida",
