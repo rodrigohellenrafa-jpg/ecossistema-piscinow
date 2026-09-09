@@ -471,6 +471,12 @@ function NovoPedido() {
                 <Button onClick={adicionarItem}>
                   <Plus /> Adicionar
                 </Button>
+                <ProdutoRapidoDialog
+                  onCreated={async (id) => {
+                    await refetchProdutos();
+                    setProdutoSel(id);
+                  }}
+                />
               </div>
 
               <Table>
@@ -489,7 +495,22 @@ function NovoPedido() {
                   {itens.map((i) => (
                     <TableRow key={i.key}>
                       <TableCell className="text-xs text-muted-foreground">{i.sku || "—"}</TableCell>
-                      <TableCell>{i.descricao}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{i.descricao}</span>
+                          {i.sob_encomenda ? (
+                            <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
+                              Sob encomenda
+                            </span>
+                          ) : (
+                            i.estoque_atual < i.quantidade && (
+                              <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                                Sem saldo · será encomendado
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Input
                           type="number"
