@@ -107,6 +107,8 @@ function AcessosAdmin() {
   const fetchUsuarios = useServerFn(listarUsuarios);
   const doCriar = useServerFn(criarUsuario);
   const doRemover = useServerFn(removerUsuario);
+  const doDefinirPapeis = useServerFn(definirPapeis);
+
 
   const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
