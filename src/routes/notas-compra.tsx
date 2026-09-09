@@ -689,6 +689,32 @@ function NotasCompra() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!estoqueNota} onOpenChange={(v) => !v && setEstoqueNota(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Lançar itens da nota no estoque</DialogTitle>
+            <DialogDescription>
+              Confira para qual produto cada item da nota vai entrar e confirme.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const nota = data.find((n) => n.id === estoqueNota);
+            if (!nota) return null;
+            return (
+              <LancarEstoque
+                nota={nota}
+                onPronto={() => {
+                  setEstoqueNota(null);
+                  qc.invalidateQueries({ queryKey: ["notas_compra"] });
+                  qc.invalidateQueries({ queryKey: ["produtos"] });
+                  qc.invalidateQueries({ queryKey: ["estoque_movimentos"] });
+                }}
+              />
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
