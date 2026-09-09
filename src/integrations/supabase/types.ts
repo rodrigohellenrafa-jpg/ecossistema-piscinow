@@ -1125,6 +1125,12 @@ export type Database = {
       }
       ordens_servico: {
         Row: {
+          assinatura_codigo: string | null
+          assinatura_documento: string | null
+          assinatura_em: string | null
+          assinatura_imagem: string | null
+          assinatura_metodo: string
+          assinatura_nome: string | null
           cliente_id: string | null
           cliente_nome: string | null
           created_at: string
@@ -1142,6 +1148,12 @@ export type Database = {
           venda_id: string | null
         }
         Insert: {
+          assinatura_codigo?: string | null
+          assinatura_documento?: string | null
+          assinatura_em?: string | null
+          assinatura_imagem?: string | null
+          assinatura_metodo?: string
+          assinatura_nome?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
@@ -1159,6 +1171,12 @@ export type Database = {
           venda_id?: string | null
         }
         Update: {
+          assinatura_codigo?: string | null
+          assinatura_documento?: string | null
+          assinatura_em?: string | null
+          assinatura_imagem?: string | null
+          assinatura_metodo?: string
+          assinatura_nome?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
@@ -1529,12 +1547,19 @@ export type Database = {
       }
       vendas: {
         Row: {
+          assinatura_codigo: string | null
+          assinatura_documento: string | null
+          assinatura_em: string | null
+          assinatura_imagem: string | null
+          assinatura_metodo: string
+          assinatura_nome: string | null
           cliente_id: string | null
           cliente_nome: string | null
           created_at: string
           created_by: string | null
           custo_total: number
           data: string
+          etiqueta: string | null
           forma_pagamento: string | null
           id: string
           numero: string | null
@@ -1557,12 +1582,19 @@ export type Database = {
           vendedor_id: string | null
         }
         Insert: {
+          assinatura_codigo?: string | null
+          assinatura_documento?: string | null
+          assinatura_em?: string | null
+          assinatura_imagem?: string | null
+          assinatura_metodo?: string
+          assinatura_nome?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
           created_by?: string | null
           custo_total?: number
           data?: string
+          etiqueta?: string | null
           forma_pagamento?: string | null
           id?: string
           numero?: string | null
@@ -1585,12 +1617,19 @@ export type Database = {
           vendedor_id?: string | null
         }
         Update: {
+          assinatura_codigo?: string | null
+          assinatura_documento?: string | null
+          assinatura_em?: string | null
+          assinatura_imagem?: string | null
+          assinatura_metodo?: string
+          assinatura_nome?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
           created_by?: string | null
           custo_total?: number
           data?: string
+          etiqueta?: string | null
           forma_pagamento?: string | null
           id?: string
           numero?: string | null
