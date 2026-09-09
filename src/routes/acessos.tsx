@@ -312,6 +312,21 @@ function AcessosAdmin() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() =>
+                          setEditando({
+                            id: u.id,
+                            nome: u.nome,
+                            perfis: u.papeis.map((p) => p.role as Perfil),
+                          })
+                        }
+                        aria-label="Editar funções"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() => remover.mutate({ data: { userId: u.id } })}
                         disabled={remover.isPending}
@@ -320,6 +335,7 @@ function AcessosAdmin() {
                         <Trash2 className="size-4" />
                       </Button>
                     </TableCell>
+
                   </TableRow>
                 ))
               )}
