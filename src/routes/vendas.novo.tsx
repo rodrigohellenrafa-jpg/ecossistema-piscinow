@@ -589,20 +589,35 @@ function NovoPedido() {
                       </TableCell>
                       <TableCell>
                         <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="any"
-                          className="w-20 text-white"
-                          value={i.desconto_perc}
-                          onChange={(e) =>
-                            atualizarItem(i.key, {
-                              desconto_perc: Math.min(100, Math.max(0, num(e.target.value))),
-                            })
-                          }
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          className="w-28 text-white"
+                          value={descontoInputs[i.key] ?? (i.desconto_valor ? i.desconto_valor.toString() : "")}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setDescontoInputs((prev) => ({ ...prev, [i.key]: raw }));
+                            const valor = parseMoedaInput(raw);
+                            const max = subtotalBrutoItem(i);
+                            atualizarItem(i.key, { desconto_valor: Math.min(valor, max) });
+                          }}
+                          onBlur={(e) => {
+                            const valor = parseMoedaInput(e.target.value);
+                            const max = subtotalBrutoItem(i);
+                            const ajustado = Math.min(valor, max);
+                            setDescontoInputs((prev) => ({ ...prev, [i.key]: ajustado ? ajustado.toFixed(2) : "" }));
+                            atualizarItem(i.key, { desconto_valor: ajustado });
+                          }}
                         />
                       </TableCell>
-                      <TableCell className="text-right font-medium">{brl(totalItem(i))}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="font-medium">{brl(totalItem(i))}</div>
+                        {i.desconto_valor > 0 && (
+                          <div className="text-xs text-destructive">
+                            -{brl(i.desconto_valor)} desc.
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Button size="icon" variant="ghost" onClick={() => removerItem(i.key)}>
                           <Trash2 className="size-4" />
