@@ -29,6 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
+import { provisionarFinanceiro, rotearEstoque } from "@/lib/venda-automacao";
 
 export const Route = createFileRoute("/vendas/novo")({
   head: () => ({
