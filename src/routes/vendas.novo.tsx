@@ -308,17 +308,21 @@ function NovoPedido() {
 
       if (itens.length > 0) {
         const { error } = await supabase.from("venda_itens").insert(
-          itens.map((i) => ({
-            venda_id: venda.id,
-            produto_id: i.produto_id,
-            sku: i.sku || null,
-            descricao: i.descricao,
-            quantidade: i.quantidade,
-            preco_unitario: i.preco_unitario,
-            desconto_perc: i.desconto_perc,
-            total: totalItem(i),
-            custo_unitario: i.custo_unitario,
-          })),
+          itens.map((i) => {
+            const bruto = subtotalBrutoItem(i);
+            return {
+              venda_id: venda.id,
+              produto_id: i.produto_id,
+              sku: i.sku || null,
+              descricao: i.descricao,
+              quantidade: i.quantidade,
+              preco_unitario: i.preco_unitario,
+              desconto_valor: i.desconto_valor,
+              desconto_perc: bruto > 0 ? Number(((i.desconto_valor / bruto) * 100).toFixed(2)) : 0,
+              total: totalItem(i),
+              custo_unitario: i.custo_unitario,
+            };
+          }),
         );
         if (error) throw error;
       }
