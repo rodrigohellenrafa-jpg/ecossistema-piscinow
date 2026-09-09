@@ -26,7 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, STATUS_PEDIDO } from "@/lib/erp";
+import { brl, dataBR, FORMAS_PAGAMENTO, STATUS_PEDIDO } from "@/lib/erp";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/vendas/$id")({
   head: () => ({
