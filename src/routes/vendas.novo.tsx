@@ -285,13 +285,27 @@ function NovoPedido() {
         userId,
       };
 
-      // 1) Financeiro: entrada baixada + parcelas provisionadas no fluxo de caixa.
+      // 1) Financeiro: parcelas provisionadas em contas a receber.
       await provisionarFinanceiro(ctx, {
-        valorEntrada,
+        valorEntrada: 0,
         saldoDevedor,
         parcelas: parcelasQtd,
         valorParcela,
       });
+
+      // 1b) Entrada paga na hora vira uma transação de pagamento da venda,
+      // que recalcula sozinha o saldo/status e entra no fluxo de caixa.
+      if (valorEntrada > 0) {
+        const { error: erroPag } = await supabase.from("venda_pagamentos").insert({
+          venda_id: venda.id,
+          data_pagamento: data,
+          forma_pagamento: formaPagamento || "Dinheiro",
+          valor: valorEntrada,
+          observacoes: "Entrada no fechamento do pedido",
+          created_by: userId,
+        } as never);
+        if (erroPag) throw erroPag;
+      }
 
       // 2) Estoque: baixa o que tem saldo, encomenda automaticamente o que falta.
       const roteamento = await rotearEstoque(
