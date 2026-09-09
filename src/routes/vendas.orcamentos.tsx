@@ -90,10 +90,16 @@ function Orcamentos() {
         .update({ status_pedido: status })
         .eq("id", id);
       if (error) throw error;
+      return { id, status };
     },
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["vendas"] });
-      toast.success(v.status === "aprovado" ? "Orçamento aprovado." : "Orçamento cancelado.");
+      toast.success(
+        v.status === "aprovado"
+          ? "Orçamento convertido em pedido de venda."
+          : "Orçamento cancelado.",
+      );
+      if (v.status === "aprovado") navigate({ to: "/vendas/$id", params: { id: v.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
