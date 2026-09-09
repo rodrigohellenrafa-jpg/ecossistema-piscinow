@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -96,10 +96,66 @@ const vazio = {
   observacoes: "",
 };
 
+/** Lê os dados principais de um XML de NF-e (procNFe ou NFe). */
+function lerXmlNfe(texto: string) {
+  const doc = new DOMParser().parseFromString(texto, "application/xml");
+  if (doc.querySelector("parsererror")) throw new Error("Arquivo XML inválido");
+
+  const txt = (tag: string, escopo: Element | Document = doc) => {
+    const el = escopo.getElementsByTagName(tag)[0];
+    return el?.textContent?.trim() ?? "";
+  };
+
+  const infNFe = doc.getElementsByTagName("infNFe")[0];
+  if (!infNFe) throw new Error("Este XML não parece ser uma NF-e");
+
+  const emit = infNFe.getElementsByTagName("emit")[0];
+  const ide = infNFe.getElementsByTagName("ide")[0];
+  const icmsTot = infNFe.getElementsByTagName("ICMSTot")[0];
+
+  const chave = soDigitos(infNFe.getAttribute("Id") ?? txt("chNFe"));
+  const emissao = (ide ? txt("dhEmi", ide) || txt("dEmi", ide) : "").slice(0, 10);
+
+  return {
+    chave_acesso: chave,
+    numero: ide ? txt("nNF", ide) : "",
+    serie: ide ? txt("serie", ide) : "",
+    natureza_operacao: ide ? txt("natOp", ide) : "",
+    fornecedor: emit ? txt("xNome", emit) : "",
+    fornecedor_cnpj: emit ? txt("CNPJ", emit) : "",
+    data_emissao: /^\d{4}-\d{2}-\d{2}$/.test(emissao) ? emissao : "",
+    valor_produtos: icmsTot ? txt("vProd", icmsTot) : "",
+    valor_frete: icmsTot ? txt("vFrete", icmsTot) : "",
+    valor_total: icmsTot ? txt("vNF", icmsTot) : "",
+  };
+}
+
 function NotasCompra() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
+  const [xml, setXml] = useState<string | null>(null);
+  const [arquivo, setArquivo] = useState<string | null>(null);
+
+  async function importarXml(file: File) {
+    try {
+      const texto = await file.text();
+      const dados = lerXmlNfe(texto);
+      setXml(texto);
+      setArquivo(file.name);
+      setForm((f) => ({
+        ...f,
+        ...dados,
+        valor_produtos: dados.valor_produtos || f.valor_produtos,
+        valor_frete: dados.valor_frete || f.valor_frete,
+        valor_total: dados.valor_total || f.valor_total,
+        status: "conferida",
+      }));
+      toast.success("XML lido — confira os dados e salve.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível ler o XML");
+    }
+  }
 
   const set = (campo: keyof typeof vazio, valor: string) =>
     setForm((f) => ({ ...f, [campo]: valor }));
@@ -144,6 +200,7 @@ function NotasCompra() {
         valor_total: Number(form.valor_total) || 0,
         status: form.status,
         observacoes: form.observacoes || null,
+        xml,
         created_by: auth.user?.id ?? null,
       });
       if (error) throw error;
@@ -152,6 +209,8 @@ function NotasCompra() {
       toast.success("Nota de compra lançada");
       qc.invalidateQueries({ queryKey: ["notas_compra"] });
       setForm(vazio);
+      setXml(null);
+      setArquivo(null);
       setOpen(false);
     },
     onError: (e: Error) =>
@@ -206,6 +265,27 @@ function NotasCompra() {
                   Informe a chave de acesso de 44 dígitos para poder consultar a nota na SEFAZ.
                 </DialogDescription>
               </DialogHeader>
+
+              <div className="rounded-lg border border-dashed p-3">
+                <label className="flex flex-wrap items-center gap-3 text-sm">
+                  <span className="inline-flex items-center gap-2 rounded-md border px-3 py-2 font-medium">
+                    <Upload className="size-4" /> Enviar XML da nota
+                  </span>
+                  <input
+                    type="file"
+                    accept=".xml,text/xml,application/xml"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void importarXml(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <span className="text-muted-foreground">
+                    {arquivo ?? "Preenche fornecedor, chave, datas e valores automaticamente."}
+                  </span>
+                </label>
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Chave de acesso (44 dígitos)" className="sm:col-span-2">
