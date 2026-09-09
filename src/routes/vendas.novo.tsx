@@ -29,6 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
+import { provisionarFinanceiro, rotearEstoque } from "@/lib/venda-automacao";
 
 export const Route = createFileRoute("/vendas/novo")({
   head: () => ({
@@ -276,45 +277,37 @@ function NovoPedido() {
         if (error) throw error;
       }
 
-      if (parcelasQtd > 0 && saldoDevedor > 0) {
-        const base = new Date(`${data}T12:00:00`);
-        const parcelasInsert = Array.from({ length: parcelasQtd }, (_, idx) => {
-          const venc = new Date(base);
-          venc.setMonth(venc.getMonth() + idx + 1);
-          return {
-            tipo: "receber",
-            descricao: `Pedido ${numero} - Parcela ${idx + 1}/${parcelasQtd}`,
-            valor: valorParcela,
-            vencimento: venc.toISOString().slice(0, 10),
-            status: "pendente",
-            cliente_id: clienteId,
-            categoria: "Vendas",
-            parceiro: cliente?.nome ?? null,
-            created_by: userId,
-          };
-        });
-        const { error } = await supabase.from("contas").insert(parcelasInsert);
-        if (error) throw error;
-      }
+      const ctx = {
+        numero,
+        data,
+        clienteId,
+        clienteNome: cliente?.nome ?? null,
+        userId,
+      };
 
-      if (tipoAtendimento === "in") {
-        // Venda de balcão: baixa imediata do estoque dos itens vendidos.
-        const movimentos = itens
-          .filter((i) => i.produto_id)
-          .map((i) => ({
-            produto_id: i.produto_id as string,
-            tipo: "saida",
-            quantidade: i.quantidade,
-            origem: "venda_balcao",
-            documento: numero,
-            created_by: userId,
-          }));
-        if (movimentos.length > 0) {
-          const { error } = await supabase.from("estoque_movimentos").insert(movimentos);
-          if (error) throw error;
-        }
-      } else {
-        // Venda com serviço externo: abre a ordem de serviço do pedido.
+      // 1) Financeiro: entrada baixada + parcelas provisionadas no fluxo de caixa.
+      await provisionarFinanceiro(ctx, {
+        valorEntrada,
+        saldoDevedor,
+        parcelas: parcelasQtd,
+        valorParcela,
+      });
+
+      // 2) Estoque: baixa o que tem saldo, encomenda automaticamente o que falta.
+      const roteamento = await rotearEstoque(
+        ctx,
+        itens.map((i) => ({
+          produto_id: i.produto_id,
+          sku: i.sku,
+          descricao: i.descricao,
+          quantidade: i.quantidade,
+          preco_unitario: i.preco_unitario,
+          custo_unitario: i.custo_unitario,
+        })),
+      );
+
+      // 3) Serviço externo (OUT): abre a ordem de serviço do pedido.
+      if (tipoAtendimento === "out") {
         const { error } = await supabase.from("ordens_servico").insert({
           numero: `OS-${numero}`,
           venda_id: venda.id,
@@ -331,15 +324,22 @@ function NovoPedido() {
         if (error) throw error;
       }
 
-
-      return venda.id as string;
+      return { id: venda.id as string, roteamento };
     },
-    onSuccess: (id) => {
+    onSuccess: ({ id, roteamento }) => {
       toast.success(
         tipoAtendimento === "in"
-          ? "Pedido de balcão registrado e estoque baixado!"
-          : "Pedido registrado e ordem de serviço aberta!",
+          ? "Pedido de balcão registrado e financeiro lançado!"
+          : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
       );
+      if (roteamento.baixados > 0) {
+        toast.success(`Estoque baixado em ${roteamento.baixados} item(ns).`);
+      }
+      if (roteamento.ordensCriadas.length > 0) {
+        toast.warning(
+          `Itens sem saldo: ordem(ns) de compra ${roteamento.ordensCriadas.join(", ")} gerada(s) sob encomenda.`,
+        );
+      }
       navigate({ to: "/vendas/$id", params: { id } });
     },
 
