@@ -656,6 +656,15 @@ function NotasCompra() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          title="Lançar itens no estoque"
+                          disabled={!n.xml}
+                          onClick={() => setEstoqueNota(n.id)}
+                        >
+                          <PackagePlus className={n.status === "lancada" ? "" : "text-primary"} />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           title="Consultar na SEFAZ"
                           disabled={!n.chave_acesso}
                           onClick={() => abrirSefaz(n.chave_acesso)}
