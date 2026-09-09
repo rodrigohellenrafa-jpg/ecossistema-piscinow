@@ -218,58 +218,66 @@ function FormularioOS() {
               </h3>
 
               <div className="flex flex-1 flex-col items-center justify-center">
-                {/* Comprimento (topo) */}
-                <div className="mb-1 flex w-64 items-center justify-between text-xs font-bold text-slate-800">
-                  <span>←</span>
-                  <input
-                    type="text"
-                    className="w-24 border-b border-slate-400 bg-transparent text-center outline-none"
-                    placeholder="m"
-                  />
-                  <span>→</span>
-                </div>
+                <svg
+                  viewBox="0 0 340 220"
+                  className="h-52 w-full max-w-md"
+                  aria-label="Esquema de medidas da piscina"
+                >
+                  {/* Cota superior — comprimento */}
+                  <line x1="60" y1="20" x2="280" y2="20" stroke="#0f172a" strokeWidth="1" />
+                  <polygon points="55,20 60,16 60,24" fill="#0f172a" />
+                  <polygon points="285,20 280,16 280,24" fill="#0f172a" />
 
-                {/* Área do retângulo + largura */}
-                <div className="flex items-center">
-                  {/* Largura esquerda */}
-                  <div className="mr-2 flex h-40 flex-col items-center justify-between text-xs font-bold text-slate-800">
-                    <span>↑</span>
-                    <input
-                      type="text"
-                      className="w-16 -rotate-90 border-b border-slate-400 bg-transparent text-center outline-none"
-                      placeholder="m"
-                    />
-                    <span>↓</span>
-                  </div>
+                  {/* Cota inferior — comprimento */}
+                  <line x1="60" y1="180" x2="280" y2="180" stroke="#0f172a" strokeWidth="1" />
+                  <polygon points="55,180 60,176 60,184" fill="#0f172a" />
+                  <polygon points="285,180 280,176 280,184" fill="#0f172a" />
+
+                  {/* Cota esquerda — largura */}
+                  <line x1="40" y1="40" x2="40" y2="160" stroke="#0f172a" strokeWidth="1" />
+                  <polygon points="40,35 36,40 44,40" fill="#0f172a" />
+                  <polygon points="40,165 36,160 44,160" fill="#0f172a" />
+
+                  {/* Cota direita — largura */}
+                  <line x1="300" y1="40" x2="300" y2="160" stroke="#0f172a" strokeWidth="1" />
+                  <polygon points="300,35 296,40 304,40" fill="#0f172a" />
+                  <polygon points="300,165 296,160 304,160" fill="#0f172a" />
 
                   {/* Retângulo da piscina */}
-                  <div className="relative h-40 w-64 border-2 border-slate-900 bg-slate-50">
-                    <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                      PISCINA
-                    </span>
-                  </div>
+                  <rect x="60" y="40" width="220" height="140" fill="#f8fafc" stroke="#0f172a" strokeWidth="2" />
+                  <text
+                    x="170"
+                    y="110"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="fill-slate-400 text-[10px] font-bold uppercase"
+                  >
+                    Piscina
+                  </text>
+                </svg>
 
-                  {/* Largura direita */}
-                  <div className="ml-2 flex h-40 flex-col items-center justify-between text-xs font-bold text-slate-800">
-                    <span>↑</span>
-                    <input
-                      type="text"
-                      className="w-16 -rotate-90 border-b border-slate-400 bg-transparent text-center outline-none"
-                      placeholder="m"
-                    />
-                    <span>↓</span>
-                  </div>
-                </div>
-
-                {/* Comprimento (base) */}
-                <div className="mt-1 flex w-64 items-center justify-between text-xs font-bold text-slate-800">
-                  <span>←</span>
+                {/* Campos de medida sobre as cotas */}
+                <div className="relative mt-2 w-full max-w-[340px]">
                   <input
                     type="text"
-                    className="w-24 border-b border-slate-400 bg-transparent text-center outline-none"
+                    className="absolute -top-[190px] left-1/2 w-24 -translate-x-1/2 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
                     placeholder="m"
                   />
-                  <span>→</span>
+                  <input
+                    type="text"
+                    className="absolute -top-[100px] -left-2 w-16 -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
+                    placeholder="m"
+                  />
+                  <input
+                    type="text"
+                    className="absolute -top-[100px] -right-2 w-16 -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
+                    placeholder="m"
+                  />
+                  <input
+                    type="text"
+                    className="absolute -top-[18px] left-1/2 w-24 -translate-x-1/2 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
+                    placeholder="m"
+                  />
                 </div>
               </div>
             </div>
