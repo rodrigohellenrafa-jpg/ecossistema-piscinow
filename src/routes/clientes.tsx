@@ -413,12 +413,69 @@ function Clientes() {
                     onChange={(e) => set("estado")(e.target.value.toUpperCase())}
                   />
                 </Field>
-                <Field label="Endereço da obra" className="sm:col-span-2">
-                  <Input
-                    value={form.endereco_obra}
-                    onChange={(e) => set("endereco_obra")(e.target.value)}
-                  />
-                </Field>
+                <div className="sm:col-span-2 space-y-3 rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Endereço de instalação</p>
+                      <p className="text-xs text-muted-foreground">
+                        Use apenas se a instalação for em endereço diferente do cadastro.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={mostrarInstalacao ? "secondary" : "outline"}
+                      aria-label={
+                        mostrarInstalacao
+                          ? "Remover endereço de instalação"
+                          : "Adicionar endereço de instalação"
+                      }
+                      onClick={() => {
+                        if (mostrarInstalacao) {
+                          setMostrarInstalacao(false);
+                          setCepObra("");
+                          set("endereco_obra")("");
+                        } else {
+                          setMostrarInstalacao(true);
+                        }
+                      }}
+                    >
+                      {mostrarInstalacao ? (
+                        <Minus className="size-4" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {mostrarInstalacao && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field
+                        label={buscandoCepObra ? "CEP da instalação (buscando...)" : "CEP da instalação"}
+                      >
+                        <Input
+                          value={cepObra}
+                          placeholder="00000-000"
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCepObra(v);
+                            if (v.replace(/\D/g, "").length === 8) void preencherObraPorCep(v);
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value.replace(/\D/g, "").length === 8)
+                              void preencherObraPorCep(e.target.value);
+                          }}
+                        />
+                      </Field>
+                      <Field label="Endereço da instalação">
+                        <Input
+                          value={form.endereco_obra}
+                          placeholder="Rua, número, bairro, cidade"
+                          onChange={(e) => set("endereco_obra")(e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
                 <Field label="Observações" className="sm:col-span-2">
                   <Textarea
                     rows={3}
