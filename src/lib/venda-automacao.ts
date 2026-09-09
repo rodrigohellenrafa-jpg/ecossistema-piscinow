@@ -149,14 +149,9 @@ export async function rotearEstoque(
   ]);
   const existentes = (numerosOC ?? []).map((o) => o.numero);
 
-  let seq = 0;
   for (const [fornecedorId, lista] of porFornecedor) {
-    const numeroOC = proximoCodigo("OC", [
-      ...existentes,
-      ...Array.from({ length: seq }, (_, i) => `OC-${String(i)}`),
-    ]);
-    seq++;
-    const numeroFinal = `${numeroOC}-${seq}`.replace(/-1$/, "");
+    const numeroFinal = proximoCodigo("OC", existentes);
+    existentes.push(numeroFinal);
     const fornecedor = (fornecedores ?? []).find((f) => f.id === fornecedorId);
 
     const linhas = lista.map((f) => {
