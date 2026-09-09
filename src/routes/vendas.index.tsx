@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Plus, Search, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -24,27 +25,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, margem, STATUS_PEDIDO } from "@/lib/erp";
+import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
 export const Route = createFileRoute("/vendas/")({
   head: () => ({
     meta: [
-      { title: "Histórico de Vendas | Piscinow ERP" },
+      { title: "Vendas | Piscinow ERP" },
       {
         name: "description",
-        content: "Consulte pedidos, faturamento, ticket médio e margem das vendas Piscinow.",
+        content: "Gerencie pedidos, orçamentos, faturamento e margem das vendas Piscinow.",
       },
-      { property: "og:title", content: "Histórico de Vendas | Piscinow ERP" },
+      { property: "og:title", content: "Vendas | Piscinow ERP" },
       {
         property: "og:description",
-        content: "Acompanhe todos os pedidos, filtre por período, cliente e status.",
+        content: "Acompanhe pedidos e orçamentos, filtre por período, cliente e status.",
       },
     ],
   }),
   component: () => (
     <RequireAuth>
-      <HistoricoVendas />
+      <Vendas />
     </RequireAuth>
   ),
 });
@@ -70,13 +72,14 @@ const TIPO_LABEL: Record<string, string> = {
   out: "OUT · Serviço externo",
 };
 
-function HistoricoVendas() {
+function Vendas() {
+  const [aba, setAba] = useState<string>("pedidos");
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("todos");
   const [tipo, setTipo] = useState<string>("todos");
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
-
+  const qc = useQueryClient();
 
   const { data: vendas = [] } = useQuery({
     queryKey: ["vendas"],
@@ -90,9 +93,24 @@ function HistoricoVendas() {
     },
   });
 
-  const lista = useMemo(
+  const atualizarStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase
+        .from("vendas")
+        .update({ status_pedido: status })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success(v.status === "aprovado" ? "Orçamento aprovado." : "Orçamento cancelado.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const pedidos = useMemo(
     () =>
-      vendas.filter((v) => {
+      vendas.filter((v) => v.status_pedido !== "orcamento").filter((v) => {
         const buscaOk = `${v.numero ?? ""} ${v.cliente_nome ?? ""} ${v.vendedor ?? ""}`
           .toLowerCase()
           .includes(q.toLowerCase());
@@ -103,22 +121,37 @@ function HistoricoVendas() {
         return buscaOk && statusOk && tipoOk && inicioOk && fimOk;
       }),
     [vendas, q, status, tipo, inicio, fim],
-
   );
 
-  const faturamento = lista.reduce((s, v) => s + Number(v.valor_total), 0);
-  const ticketMedio = lista.length ? faturamento / lista.length : 0;
-  const custoTotal = lista.reduce((s, v) => s + Number(v.custo_total), 0);
+  const orcamentos = useMemo(
+    () =>
+      vendas
+        .filter((v) => v.status_pedido === "orcamento")
+        .filter((v) =>
+          `${v.numero ?? ""} ${v.cliente_nome ?? ""} ${v.vendedor ?? ""}`
+            .toLowerCase()
+            .includes(q.toLowerCase()),
+        ),
+    [vendas, q],
+  );
+
+  const faturamento = pedidos.reduce((s, v) => s + Number(v.valor_total), 0);
+  const ticketMedio = pedidos.length ? faturamento / pedidos.length : 0;
+  const custoTotal = pedidos.reduce((s, v) => s + Number(v.custo_total), 0);
   const margemMedia = margem(faturamento, custoTotal);
-  const emAberto = lista.filter((v) =>
-    ["orcamento", "aprovado", "em_producao"].includes(v.status_pedido),
+  const emAberto = pedidos.filter((v) =>
+    ["aprovado", "em_producao"].includes(v.status_pedido),
   ).length;
+
+  const totalOrcado = orcamentos.reduce((s, v) => s + Number(v.valor_total), 0);
+  const ticketOrcamento = orcamentos.length ? totalOrcado / orcamentos.length : 0;
+  const antigos = orcamentos.filter((v) => (diasAte(v.data) ?? 0) <= -15).length;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Histórico & Consulta"
-        subtitle="Todos os pedidos registrados no sistema."
+        title="Vendas"
+        subtitle="Gerencie pedidos e orçamentos em um só lugar."
         actions={
           <Button asChild>
             <Link to="/vendas/novo">
@@ -128,108 +161,217 @@ function HistoricoVendas() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Faturamento" value={brl(faturamento)} />
-        <Kpi label="Ticket médio" value={brl(ticketMedio)} />
-        <Kpi
-          label="Margem média"
-          value={`${(margemMedia * 100).toFixed(1)}%`}
-          tone={margemMedia >= 0.25 ? "positive" : margemMedia < 0.1 ? "negative" : "warning"}
-        />
-        <Kpi label="Pedidos em aberto" value={String(emAberto)} />
-      </div>
+      <Tabs value={aba} onValueChange={setAba} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
+          <TabsTrigger value="orcamentos">
+            Orçamentos
+            {orcamentos.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {orcamentos.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader className="gap-3">
-          <CardTitle>Pedidos</CardTitle>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Buscar por pedido, cliente ou vendedor"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-            </div>
-            <Input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="w-40" />
-            <Input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="w-40" />
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os status</SelectItem>
-                {STATUS_PEDIDO.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STATUS_LABEL[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={tipo} onValueChange={setTipo}>
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os tipos</SelectItem>
-                <SelectItem value="in">IN · Balcão</SelectItem>
-                <SelectItem value="out">OUT · Serviço externo</SelectItem>
-              </SelectContent>
-            </Select>
-
+        <TabsContent value="pedidos" className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Kpi label="Faturamento" value={brl(faturamento)} />
+            <Kpi label="Ticket médio" value={brl(ticketMedio)} />
+            <Kpi
+              label="Margem média"
+              value={`${(margemMedia * 100).toFixed(1)}%`}
+              tone={margemMedia >= 0.25 ? "positive" : margemMedia < 0.1 ? "negative" : "warning"}
+            />
+            <Kpi label="Pedidos em aberto" value={String(emAberto)} />
           </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Pedido</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Vendedor</TableHead>
-                <TableHead className="text-right">Total</TableHead>
 
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lista.map((v) => (
-                <TableRow key={v.id}>
-                  <TableCell className="font-medium">
-                    <Link to="/vendas/$id" params={{ id: v.id }} className="text-primary hover:underline">
-                      {v.numero}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{dataBR(v.data)}</TableCell>
-                  <TableCell>
-                    <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
-                      {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
-                    </Badge>
-                  </TableCell>
+          <Card>
+            <CardHeader className="gap-3">
+              <CardTitle>Histórico de Pedidos</CardTitle>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="relative max-w-sm flex-1">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Buscar por pedido, cliente ou vendedor"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                  />
+                </div>
+                <Input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="w-40" />
+                <Input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="w-40" />
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    {STATUS_PEDIDO.filter((s) => s !== "orcamento").map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {STATUS_LABEL[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={tipo} onValueChange={setTipo}>
+                  <SelectTrigger className="w-56">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os tipos</SelectItem>
+                    <SelectItem value="in">IN · Balcão</SelectItem>
+                    <SelectItem value="out">OUT · Serviço externo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pedido</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pedidos.map((v) => (
+                    <TableRow key={v.id}>
+                      <TableCell className="font-medium">
+                        <Link to="/vendas/$id" params={{ id: v.id }} className="text-primary hover:underline">
+                          {v.numero}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{dataBR(v.data)}</TableCell>
+                      <TableCell>
+                        <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
+                          {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{v.cliente_nome ?? "—"}</TableCell>
+                      <TableCell>{v.vendedor ?? "—"}</TableCell>
+                      <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANT[v.status_pedido] ?? "secondary"}>
+                          {STATUS_LABEL[v.status_pedido] ?? v.status_pedido}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {pedidos.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                        Nenhum pedido encontrado.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                  <TableCell>{v.cliente_nome ?? "—"}</TableCell>
-                  <TableCell>{v.vendedor ?? "—"}</TableCell>
-                  <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[v.status_pedido] ?? "secondary"}>
-                      {STATUS_LABEL[v.status_pedido] ?? v.status_pedido}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {lista.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                    Nenhum pedido encontrado.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        <TabsContent value="orcamentos" className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Kpi label="Orçamentos abertos" value={String(orcamentos.length)} />
+            <Kpi label="Valor em negociação" value={brl(totalOrcado)} />
+            <Kpi label="Ticket médio" value={brl(ticketOrcamento)} />
+            <Kpi
+              label="Parados há 15+ dias"
+              value={String(antigos)}
+              tone={antigos > 0 ? "warning" : "default"}
+            />
+          </div>
+
+          <Card>
+            <CardHeader className="gap-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle>Propostas em aberto</CardTitle>
+                <Button variant="outline" asChild>
+                  <Link to="/vendas/orcamentos">Abrir tela exclusiva</Link>
+                </Button>
+              </div>
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Buscar por número, cliente ou vendedor"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Orçamento</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orcamentos.map((v) => (
+                    <TableRow key={v.id}>
+                      <TableCell className="font-medium">
+                        <Link
+                          to="/vendas/$id"
+                          params={{ id: v.id }}
+                          className="text-primary hover:underline"
+                        >
+                          {v.numero}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{dataBR(v.data)}</TableCell>
+                      <TableCell>
+                        <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
+                          {v.tipo_atendimento === "out" ? "OUT · Serviço externo" : "IN · Balcão"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{v.cliente_nome ?? "—"}</TableCell>
+                      <TableCell>{v.vendedor ?? "—"}</TableCell>
+                      <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => atualizarStatus.mutate({ id: v.id, status: "aprovado" })}
+                          >
+                            <Check /> Aprovar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => atualizarStatus.mutate({ id: v.id, status: "cancelado" })}
+                          >
+                            <X /> Recusar
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {orcamentos.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                        Nenhum orçamento em aberto.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
