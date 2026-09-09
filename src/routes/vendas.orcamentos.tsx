@@ -18,8 +18,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, diasAte } from "@/lib/erp";
+import { brl, dataBR, diasAte, ETIQUETAS_ORCAMENTO, etiquetaInfo } from "@/lib/erp";
 
 export const Route = createFileRoute("/vendas/orcamentos")({
   head: () => ({
@@ -59,6 +66,21 @@ function Orcamentos() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const atualizarEtiqueta = useMutation({
+    mutationFn: async ({ id, etiqueta }: { id: string; etiqueta: string }) => {
+      const { error } = await supabase
+        .from("vendas")
+        .update({ etiqueta: etiqueta === "sem" ? null : etiqueta } as never)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success("Etiqueta atualizada.");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const atualizarStatus = useMutation({
@@ -137,6 +159,7 @@ function Orcamentos() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Vendedor</TableHead>
+                <TableHead>Etiqueta</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -161,6 +184,33 @@ function Orcamentos() {
                   </TableCell>
                   <TableCell>{v.cliente_nome ?? "—"}</TableCell>
                   <TableCell>{v.vendedor ?? "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {etiquetaInfo(v.etiqueta) && (
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${etiquetaInfo(v.etiqueta)!.cor}`}
+                        >
+                          {etiquetaInfo(v.etiqueta)!.label}
+                        </span>
+                      )}
+                      <Select
+                        value={v.etiqueta ?? "sem"}
+                        onValueChange={(etiqueta) => atualizarEtiqueta.mutate({ id: v.id, etiqueta })}
+                      >
+                        <SelectTrigger className="h-8 w-36 text-xs">
+                          <SelectValue placeholder="Classificar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sem">Sem etiqueta</SelectItem>
+                          {ETIQUETAS_ORCAMENTO.map((e) => (
+                            <SelectItem key={e.valor} value={e.valor}>
+                              {e.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -183,7 +233,7 @@ function Orcamentos() {
               ))}
               {lista.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                     Nenhum orçamento em aberto.
                   </TableCell>
                 </TableRow>

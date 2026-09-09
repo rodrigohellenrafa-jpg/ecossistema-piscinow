@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useMestre } from "@/hooks/use-mestre";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Perfil = "admin" | "gerente" | "vendedor" | "financeiro" | "tecnico" | "usuario";
@@ -18,6 +19,7 @@ export const ACESSO: Record<string, Perfil[]> = {
 
 export function useRoles() {
   const { user, loading } = useAuth();
+  const { mestre } = useMestre();
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ["user-roles", user?.id],
@@ -33,13 +35,16 @@ export function useRoles() {
   });
 
   // Sem papel atribuído o usuário opera como administrador (setup inicial).
-  const efetivos: Perfil[] = roles.length ? roles : ["admin"];
+  const base: Perfil[] = roles.length ? roles : ["admin"];
+  // Modo mestre destravado neste aparelho: enxerga e opera tudo.
+  const efetivos: Perfil[] = mestre ? ["admin", ...base.filter((r) => r !== "admin")] : base;
 
   return {
     roles: efetivos,
+    mestre,
     loading: loading || isLoading,
-    isAdmin: efetivos.includes("admin"),
+    isAdmin: mestre || efetivos.includes("admin"),
     pode: (area: keyof typeof ACESSO) =>
-      efetivos.some((r) => ACESSO[area]?.includes(r)),
+      mestre || efetivos.some((r) => ACESSO[area]?.includes(r)),
   };
 }

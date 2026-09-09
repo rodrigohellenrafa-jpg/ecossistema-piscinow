@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Hammer, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -402,14 +403,23 @@ function Ordens() {
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => gerarObra.mutate(o)}
-                      disabled={gerarObra.isPending}
-                    >
-                      <Hammer /> Gerar obra
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => gerarObra.mutate(o)}
+                        disabled={gerarObra.isPending}
+                      >
+                        <Hammer /> Gerar obra
+                      </Button>
+                      <AssinaturaDialog
+                        tabela="ordens_servico"
+                        registroId={o.id}
+                        documentoLabel={`Ordem de serviço ${o.numero ?? ""}`}
+                        clienteNome={o.cliente_nome}
+                        invalidar={[["ordens"], ["ordens-servico"]]}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

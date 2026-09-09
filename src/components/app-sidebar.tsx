@@ -21,6 +21,7 @@ import {
   BadgeDollarSign,
   ShieldCheck,
   CalendarDays,
+  MessageCircle,
 } from "lucide-react";
 
 import {
@@ -65,6 +66,7 @@ const groups: {
       { title: "Novo Pedido (PDV)", url: "/vendas/novo", icon: ShoppingCart },
       { title: "Orçamentos", url: "/vendas/orcamentos", icon: FileText },
       { title: "Histórico de Pedidos", url: "/vendas", icon: ClipboardList },
+      { title: "Reativação de Clientes", url: "/reativacao", icon: MessageCircle },
     ],
   },
   {

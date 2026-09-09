@@ -1,0 +1,26 @@
+{
+  "name": "Piscinow ERP",
+  "short_name": "Piscinow",
+  "description": "ERP da Piscinow: vendas, obras, estoque, financeiro e agenda da equipe.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1524",
+  "theme_color": "#0b1524",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icone-piscinow-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icone-piscinow.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
