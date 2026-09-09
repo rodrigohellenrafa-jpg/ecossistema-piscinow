@@ -221,18 +221,25 @@ function FormularioOS() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ITENS.map((item) => (
-                    <tr key={item.cod}>
-                      <td className="border border-slate-900 px-2 py-2 text-center font-medium">
-                        {item.label}
+                  {linhas.map((valor, index) => (
+                    <tr key={index}>
+                      <td className="border border-slate-900 px-1 py-0">
+                        <input
+                          type="text"
+                          value={valor}
+                          onChange={(e) =>
+                            setLinhas((atual) =>
+                              atual.map((v, i) => (i === index ? e.target.value : v)),
+                            )
+                          }
+                          className="h-5 w-full bg-transparent text-[11px] leading-none text-slate-900 outline-none"
+                        />
                       </td>
-                      <td className="border border-slate-900 px-2 py-2 text-center">
-                        <span className="inline-flex h-5 w-5 items-center justify-center border border-slate-900 bg-slate-100 text-sm font-bold">
-                          ✓
-                        </span>
+                      <td className="w-12 border border-slate-900 px-1 py-0 text-center">
+                        <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
                       </td>
-                      <td className="border border-slate-900 px-2 py-2 text-center">
-                        <span className="inline-block h-5 w-5 border border-slate-900" />
+                      <td className="w-12 border border-slate-900 px-1 py-0 text-center">
+                        <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
                       </td>
                     </tr>
                   ))}
