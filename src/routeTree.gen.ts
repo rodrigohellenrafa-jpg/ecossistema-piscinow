@@ -19,6 +19,7 @@ import { Route as ImportacaoRouteImport } from './routes/importacao'
 import { Route as HoleriteRouteImport } from './routes/holerite'
 import { Route as FuncionariosRouteImport } from './routes/funcionarios'
 import { Route as FornecedoresRouteImport } from './routes/fornecedores'
+import { Route as FluxoCaixaRouteImport } from './routes/fluxo-caixa'
 import { Route as FiscalRouteImport } from './routes/fiscal'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as DreRouteImport } from './routes/dre'
@@ -84,6 +85,11 @@ const FuncionariosRoute = FuncionariosRouteImport.update({
 const FornecedoresRoute = FornecedoresRouteImport.update({
   id: '/fornecedores',
   path: '/fornecedores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FluxoCaixaRoute = FluxoCaixaRouteImport.update({
+  id: '/fluxo-caixa',
+  path: '/fluxo-caixa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FiscalRoute = FiscalRouteImport.update({
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
   '/fiscal': typeof FiscalRouteWithChildren
+  '/fluxo-caixa': typeof FluxoCaixaRoute
   '/fornecedores': typeof FornecedoresRoute
   '/funcionarios': typeof FuncionariosRoute
   '/holerite': typeof HoleriteRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
   '/fiscal': typeof FiscalRouteWithChildren
+  '/fluxo-caixa': typeof FluxoCaixaRoute
   '/fornecedores': typeof FornecedoresRoute
   '/funcionarios': typeof FuncionariosRoute
   '/holerite': typeof HoleriteRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
   '/fiscal': typeof FiscalRouteWithChildren
+  '/fluxo-caixa': typeof FluxoCaixaRoute
   '/fornecedores': typeof FornecedoresRoute
   '/funcionarios': typeof FuncionariosRoute
   '/holerite': typeof HoleriteRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
     | '/dre'
     | '/financeiro'
     | '/fiscal'
+    | '/fluxo-caixa'
     | '/fornecedores'
     | '/funcionarios'
     | '/holerite'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/dre'
     | '/financeiro'
     | '/fiscal'
+    | '/fluxo-caixa'
     | '/fornecedores'
     | '/funcionarios'
     | '/holerite'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/dre'
     | '/financeiro'
     | '/fiscal'
+    | '/fluxo-caixa'
     | '/fornecedores'
     | '/funcionarios'
     | '/holerite'
@@ -349,6 +361,7 @@ export interface RootRouteChildren {
   DreRoute: typeof DreRoute
   FinanceiroRoute: typeof FinanceiroRoute
   FiscalRoute: typeof FiscalRouteWithChildren
+  FluxoCaixaRoute: typeof FluxoCaixaRoute
   FornecedoresRoute: typeof FornecedoresRoute
   FuncionariosRoute: typeof FuncionariosRoute
   HoleriteRoute: typeof HoleriteRoute
@@ -437,6 +450,13 @@ declare module '@tanstack/react-router' {
       path: '/fornecedores'
       fullPath: '/fornecedores'
       preLoaderRoute: typeof FornecedoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fluxo-caixa': {
+      id: '/fluxo-caixa'
+      path: '/fluxo-caixa'
+      fullPath: '/fluxo-caixa'
+      preLoaderRoute: typeof FluxoCaixaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fiscal': {
@@ -575,6 +595,7 @@ const rootRouteChildren: RootRouteChildren = {
   DreRoute: DreRoute,
   FinanceiroRoute: FinanceiroRoute,
   FiscalRoute: FiscalRouteWithChildren,
+  FluxoCaixaRoute: FluxoCaixaRoute,
   FornecedoresRoute: FornecedoresRoute,
   FuncionariosRoute: FuncionariosRoute,
   HoleriteRoute: HoleriteRoute,
