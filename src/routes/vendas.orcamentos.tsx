@@ -1,0 +1,197 @@
+import { useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, Plus, Search, X } from "lucide-react";
+import { toast } from "sonner";
+
+import { Kpi, PageHeader } from "@/components/page-header";
+import { RequireAuth } from "@/components/require-auth";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { brl, dataBR, diasAte } from "@/lib/erp";
+
+export const Route = createFileRoute("/vendas/orcamentos")({
+  head: () => ({
+    meta: [
+      { title: "Orçamentos | Piscinow ERP" },
+      {
+        name: "description",
+        content:
+          "Acompanhe os orçamentos em aberto, valores propostos e converta em pedidos aprovados.",
+      },
+      { property: "og:title", content: "Orçamentos | Piscinow ERP" },
+      {
+        property: "og:description",
+        content: "Lista de orçamentos da Piscinow com valores, cliente e conversão em pedido.",
+      },
+    ],
+  }),
+  component: () => (
+    <RequireAuth>
+      <Orcamentos />
+    </RequireAuth>
+  ),
+});
+
+function Orcamentos() {
+  const [q, setQ] = useState("");
+  const qc = useQueryClient();
+
+  const { data: orcamentos = [] } = useQuery({
+    queryKey: ["vendas", "orcamentos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("*")
+        .eq("status_pedido", "orcamento")
+        .order("data", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const atualizarStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase
+        .from("vendas")
+        .update({ status_pedido: status })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success(v.status === "aprovado" ? "Orçamento aprovado." : "Orçamento cancelado.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const lista = useMemo(
+    () =>
+      orcamentos.filter((v) =>
+        `${v.numero ?? ""} ${v.cliente_nome ?? ""} ${v.vendedor ?? ""}`
+          .toLowerCase()
+          .includes(q.toLowerCase()),
+      ),
+    [orcamentos, q],
+  );
+
+  const total = lista.reduce((s, v) => s + Number(v.valor_total), 0);
+  const ticket = lista.length ? total / lista.length : 0;
+  const antigos = lista.filter((v) => (diasAte(v.data) ?? 0) <= -15).length;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Orçamentos"
+        subtitle="Propostas em aberto aguardando aprovação do cliente."
+        actions={
+          <Button asChild>
+            <Link to="/vendas/novo">
+              <Plus /> Novo orçamento
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Orçamentos abertos" value={String(lista.length)} />
+        <Kpi label="Valor em negociação" value={brl(total)} />
+        <Kpi label="Ticket médio" value={brl(ticket)} />
+        <Kpi
+          label="Parados há 15+ dias"
+          value={String(antigos)}
+          tone={antigos > 0 ? "warning" : "default"}
+        />
+      </div>
+
+      <Card>
+        <CardHeader className="gap-3">
+          <CardTitle>Propostas</CardTitle>
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Buscar por número, cliente ou vendedor"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Orçamento</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Vendedor</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lista.map((v) => (
+                <TableRow key={v.id}>
+                  <TableCell className="font-medium">
+                    <Link
+                      to="/vendas/$id"
+                      params={{ id: v.id }}
+                      className="text-primary hover:underline"
+                    >
+                      {v.numero}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{dataBR(v.data)}</TableCell>
+                  <TableCell>
+                    <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
+                      {v.tipo_atendimento === "out" ? "OUT · Serviço externo" : "IN · Balcão"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{v.cliente_nome ?? "—"}</TableCell>
+                  <TableCell>{v.vendedor ?? "—"}</TableCell>
+                  <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => atualizarStatus.mutate({ id: v.id, status: "aprovado" })}
+                      >
+                        <Check /> Aprovar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => atualizarStatus.mutate({ id: v.id, status: "cancelado" })}
+                      >
+                        <X /> Recusar
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {lista.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    Nenhum orçamento em aberto.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
