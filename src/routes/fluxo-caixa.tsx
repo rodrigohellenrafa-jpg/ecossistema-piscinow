@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -18,6 +18,7 @@ import {
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -206,17 +207,29 @@ function FluxoCaixa() {
         title="Fluxo de Caixa"
         subtitle="Entradas e saídas consolidadas de contas a pagar, contas a receber e lançamentos financeiros."
         actions={
-          <Select value={horizonte} onValueChange={setHorizonte}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Projeção 7 dias</SelectItem>
-              <SelectItem value="30">Projeção 30 dias</SelectItem>
-              <SelectItem value="90">Projeção 90 dias</SelectItem>
-              <SelectItem value="180">Projeção 180 dias</SelectItem>
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={horizonte} onValueChange={setHorizonte}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Projeção 7 dias</SelectItem>
+                <SelectItem value="30">Projeção 30 dias</SelectItem>
+                <SelectItem value="90">Projeção 90 dias</SelectItem>
+                <SelectItem value="180">Projeção 180 dias</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button asChild variant="outline">
+              <Link to="/contas">
+                <Plus /> Conta a pagar/receber
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/financeiro">
+                <Plus /> Novo lançamento
+              </Link>
+            </Button>
+          </>
         }
       />
 
