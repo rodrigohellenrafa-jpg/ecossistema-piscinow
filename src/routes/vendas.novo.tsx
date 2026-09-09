@@ -64,7 +64,7 @@ interface ItemLinha {
   descricao: string;
   quantidade: number;
   preco_unitario: number;
-  desconto_perc: number;
+  desconto_valor: number;
   custo_unitario: number;
   sob_encomenda: boolean;
   estoque_atual: number;
@@ -79,8 +79,20 @@ interface AcessorioLinha {
 
 const novaKey = () => Math.random().toString(36).slice(2);
 
+const subtotalBrutoItem = (i: ItemLinha) => i.quantidade * i.preco_unitario;
+
 const totalItem = (i: ItemLinha) =>
-  i.quantidade * i.preco_unitario * (1 - i.desconto_perc / 100);
+  Math.max(0, subtotalBrutoItem(i) - i.desconto_valor);
+
+/** Converte texto digitado como moeda brasileira (R$ 1.500,00 ou 1500,00) em número. */
+const parseMoedaInput = (valor: string): number => {
+  const limpo = valor
+    .replace(/[R$\s]/g, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".");
+  const n = Number(limpo);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
 
 function NovoPedido() {
   const navigate = useNavigate();
