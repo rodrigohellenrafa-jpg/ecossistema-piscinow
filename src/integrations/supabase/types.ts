@@ -1239,6 +1239,7 @@ export type Database = {
           origem_mercadoria: string
           preco_custo: number
           preco_venda: number
+          sob_encomenda: boolean
           tipo: string
           unidade: string
           updated_at: string
@@ -1271,6 +1272,7 @@ export type Database = {
           origem_mercadoria?: string
           preco_custo?: number
           preco_venda?: number
+          sob_encomenda?: boolean
           tipo?: string
           unidade?: string
           updated_at?: string
@@ -1303,6 +1305,7 @@ export type Database = {
           origem_mercadoria?: string
           preco_custo?: number
           preco_venda?: number
+          sob_encomenda?: boolean
           tipo?: string
           unidade?: string
           updated_at?: string

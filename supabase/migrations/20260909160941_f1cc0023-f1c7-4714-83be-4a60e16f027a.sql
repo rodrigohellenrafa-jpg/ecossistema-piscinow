@@ -1,0 +1,1 @@
+ALTER TABLE public.produtos ADD COLUMN IF NOT EXISTS sob_encomenda boolean NOT NULL DEFAULT false;
