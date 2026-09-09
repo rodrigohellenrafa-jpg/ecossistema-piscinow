@@ -92,7 +92,30 @@ const parseMoedaInput = (valor: string): number => {
     .replace(/,/g, ".");
   const n = Number(limpo);
   return Number.isFinite(n) && n >= 0 ? n : 0;
-};
+  };
+
+/** Uma forma de pagamento aplicada ao pedido (pode haver várias no mesmo pedido). */
+interface CondicaoLinha {
+  key: string;
+  forma_pagamento: string;
+  /** Valor que essa condição abate do total do pedido. */
+  valor: number;
+  parcelas: number;
+  /** Valor de cada parcela cobrada do cliente (já com juros da maquininha). */
+  valor_parcela: number;
+  data_prevista: string;
+  pago: boolean;
+  bandeira: string;
+  observacoes: string;
+}
+
+/** Total que o cliente desembolsa nessa condição (parcelas x valor da parcela). */
+const cobradoCondicao = (c: CondicaoLinha) =>
+  Math.max(1, c.parcelas) * c.valor_parcela;
+
+/** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
+const acrescimoCondicao = (c: CondicaoLinha) =>
+  Math.max(0, cobradoCondicao(c) - c.valor);
 
 function NovoPedido() {
   const navigate = useNavigate();
@@ -195,9 +218,7 @@ function NovoPedido() {
   const [impostosKit, setImpostosKit] = useState(0);
   const [precoVendaKit, setPrecoVendaKit] = useState(0);
 
-  const [formaPagamento, setFormaPagamento] = useState<string>(FORMAS_PAGAMENTO[0]);
-  const [valorEntrada, setValorEntrada] = useState(0);
-  const [parcelasQtd, setParcelasQtd] = useState(1);
+  const [condicoes, setCondicoes] = useState<CondicaoLinha[]>([]);
 
   const subtotalProdutos = useMemo(
     () => itens.reduce((s, i) => s + totalItem(i), 0),
@@ -218,8 +239,46 @@ function NovoPedido() {
 
   const custoTotalGeral = custoTotalItens + custoTotalKit;
   const valorTotal = subtotalProdutos + precoVendaKit;
+
+  // Condições de pagamento: cada linha abate um valor do pedido e pode ter
+  // parcelas com juros da maquininha (o cliente paga mais do que abate).
+  const totalAplicado = condicoes.reduce((s, c) => s + c.valor, 0);
+  const totalCobradoCliente = condicoes.reduce((s, c) => s + cobradoCondicao(c), 0);
+  const totalJuros = Math.max(0, totalCobradoCliente - totalAplicado);
+  const faltaAlocar = valorTotal - totalAplicado;
+  const valorEntrada = condicoes.filter((c) => c.pago).reduce((s, c) => s + c.valor, 0);
   const saldoDevedor = Math.max(valorTotal - valorEntrada, 0);
-  const valorParcela = parcelasQtd > 0 ? saldoDevedor / parcelasQtd : 0;
+  const pendentes = condicoes.filter((c) => !c.pago);
+  const parcelasQtd = Math.max(1, pendentes.reduce((s, c) => s + Math.max(1, c.parcelas), 0));
+  const valorParcela = pendentes.length > 0 ? pendentes[0].valor_parcela : saldoDevedor;
+  const formaPagamento =
+    condicoes.length > 0
+      ? Array.from(new Set(condicoes.map((c) => c.forma_pagamento))).join(" + ")
+      : FORMAS_PAGAMENTO[0];
+
+  const adicionarCondicao = () => {
+    const restante = Math.max(0, Number((valorTotal - totalAplicado).toFixed(2)));
+    setCondicoes((prev) => [
+      ...prev,
+      {
+        key: novaKey(),
+        forma_pagamento: FORMAS_PAGAMENTO[0],
+        valor: restante,
+        parcelas: 1,
+        valor_parcela: restante,
+        data_prevista: data,
+        pago: false,
+        bandeira: "",
+        observacoes: "",
+      },
+    ]);
+  };
+
+  const atualizarCondicao = (key: string, patch: Partial<CondicaoLinha>) =>
+    setCondicoes((prev) => prev.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+
+  const removerCondicao = (key: string) =>
+    setCondicoes((prev) => prev.filter((c) => c.key !== key));
 
   const adicionarItem = () => {
     const p = produtos.find((x) => x.id === produtoSel);
