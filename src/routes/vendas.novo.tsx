@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ClienteRapidoDialog } from "@/components/cliente-rapido-dialog";
 import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -80,7 +81,7 @@ const totalItem = (i: ItemLinha) =>
 function NovoPedido() {
   const navigate = useNavigate();
 
-  const { data: clientes = [] } = useQuery({
+  const { data: clientes = [], refetch: refetchClientes } = useQuery({
     queryKey: ["clientes-select"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -416,6 +417,14 @@ function NovoPedido() {
                 </Select>
               </Field>
               <Field label="Cliente" className="sm:col-span-3">
+                <div className="mb-2 flex justify-end">
+                  <ClienteRapidoDialog
+                    onCreated={async (id) => {
+                      await refetchClientes();
+                      setClienteId(id);
+                    }}
+                  />
+                </div>
                 <Select value={clienteId} onValueChange={setClienteId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o cliente" />
