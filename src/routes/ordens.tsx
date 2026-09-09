@@ -327,6 +327,7 @@ function Ordens() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
