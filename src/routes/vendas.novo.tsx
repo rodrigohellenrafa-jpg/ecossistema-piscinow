@@ -241,7 +241,8 @@ function NovoPedido() {
           cliente_id: clienteId,
           cliente_nome: cliente?.nome ?? null,
           vendedor: vendedor?.nome ?? null,
-          vendedor_id: vendedorId || null,
+          // O vendedor vem dos usuários do sistema (auth), não do cadastro de funcionários.
+          vendedor_id: null,
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
           status_pedido: "orcamento",
