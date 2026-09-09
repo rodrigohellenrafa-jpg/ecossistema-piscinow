@@ -334,6 +334,7 @@ function NotasCompra() {
   const [form, setForm] = useState(vazio);
   const [xml, setXml] = useState<string | null>(null);
   const [arquivo, setArquivo] = useState<string | null>(null);
+  const [estoqueNota, setEstoqueNota] = useState<string | null>(null);
 
   async function importarXml(file: File) {
     try {
