@@ -38,14 +38,66 @@ export const Route = createFileRoute("/os/formulario")({
   ),
 });
 
-const ITENS = [
-  { cod: "A", label: "Item A" },
-  { cod: "B", label: "Item B" },
-  { cod: "C", label: "Item C" },
-  { cod: "D", label: "Item D" },
-];
+const TOTAL_LINHAS = 20;
+
+const LINHAS_VAZIAS = Array.from({ length: TOTAL_LINHAS }, () => "");
 
 function FormularioOS() {
+  const [obraId, setObraId] = useState<string>("");
+  const [cliente, setCliente] = useState("");
+  const [profissional, setProfissional] = useState("");
+  const [linhas, setLinhas] = useState<string[]>(LINHAS_VAZIAS);
+
+  const { data: obras = [] } = useQuery({
+    queryKey: ["obras-formulario"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("obras")
+        .select("id, numero, cliente_nome, responsavel, venda_id")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data as Array<{
+        id: string;
+        numero: string | null;
+        cliente_nome: string | null;
+        responsavel: string | null;
+        venda_id: string | null;
+      }>;
+    },
+  });
+
+  const obra = obras.find((o) => o.id === obraId);
+
+  const { data: itensVenda = [] } = useQuery({
+    queryKey: ["formulario-itens", obra?.venda_id],
+    enabled: Boolean(obra?.venda_id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_itens")
+        .select("descricao, quantidade")
+        .eq("venda_id", obra!.venda_id!);
+      if (error) throw error;
+      return data as Array<{ descricao: string; quantidade: number }>;
+    },
+  });
+
+  useEffect(() => {
+    if (!obra) return;
+    setCliente(obra.cliente_nome ?? "");
+    setProfissional(obra.responsavel ?? "");
+  }, [obra]);
+
+  useEffect(() => {
+    if (!obra?.venda_id) return;
+    const preenchidas = itensVenda.map(
+      (i) => `${Number(i.quantidade) % 1 === 0 ? Number(i.quantidade) : Number(i.quantidade).toFixed(2)}x ${i.descricao}`,
+    );
+    setLinhas(
+      Array.from({ length: Math.max(TOTAL_LINHAS, preenchidas.length) }, (_, i) => preenchidas[i] ?? ""),
+    );
+  }, [itensVenda, obra?.venda_id]);
+
   return (
     <div className="space-y-4">
       {/* Controles — ocultos na impressão */}
@@ -53,10 +105,22 @@ function FormularioOS() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Formulário de OS</h1>
           <p className="text-sm text-muted-foreground">
-            Preencha e imprima o formulário de Ordem de Serviço.
+            Selecione a obra para trazer os itens do pedido e imprima o formulário.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={obraId} onValueChange={setObraId}>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Selecionar obra / pedido" />
+            </SelectTrigger>
+            <SelectContent>
+              {obras.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {(o.numero ?? "Obra") + " — " + (o.cliente_nome ?? "sem cliente")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" asChild>
             <Link to="/ordens">
               <ArrowLeft /> Voltar às OS
