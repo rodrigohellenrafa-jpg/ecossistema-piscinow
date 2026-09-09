@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
@@ -29,6 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
 import { provisionarFinanceiro, rotearEstoque } from "@/lib/venda-automacao";
@@ -96,12 +97,13 @@ function NovoPedido() {
     },
   });
 
-  const { data: funcionarios = [] } = useQuery({
-    queryKey: ["funcionarios-select"],
+  const { data: vendedores = [] } = useQuery({
+    queryKey: ["vendedores-select"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("funcionarios")
-        .select("id, nome")
+        .from("usuarios_importados")
+        .select("id, nome, email")
+        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data;
@@ -133,10 +135,19 @@ function NovoPedido() {
 
   const numero = useMemo(() => proximoCodigo("VEN", numerosExistentes), [numerosExistentes]);
 
+  const { user } = useAuth();
+
   const [data, setData] = useState(hojeISO());
   const [tipoAtendimento, setTipoAtendimento] = useState<"in" | "out">("in");
   const [clienteId, setClienteId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
+
+  // Pré-seleciona o usuário logado como vendedor do pedido.
+  useEffect(() => {
+    if (!vendedorId && user?.id && vendedores.some((v) => v.id === user.id)) {
+      setVendedorId(user.id);
+    }
+  }, [user?.id, vendedores, vendedorId]);
   const [observacoes, setObservacoes] = useState("");
 
 
@@ -219,7 +230,7 @@ function NovoPedido() {
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
       const cliente = clientes.find((c) => c.id === clienteId);
-      const vendedor = funcionarios.find((f) => f.id === vendedorId);
+      const vendedor = vendedores.find((v) => v.id === vendedorId);
       const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
 
       const { data: venda, error: erroVenda } = await supabase
@@ -230,7 +241,8 @@ function NovoPedido() {
           cliente_id: clienteId,
           cliente_nome: cliente?.nome ?? null,
           vendedor: vendedor?.nome ?? null,
-          vendedor_id: vendedorId || null,
+          // O vendedor vem dos usuários do sistema (auth), não do cadastro de funcionários.
+          vendedor_id: null,
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
           status_pedido: "orcamento",
@@ -415,9 +427,9 @@ function NovoPedido() {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {funcionarios.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.nome}
+                    {vendedores.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
