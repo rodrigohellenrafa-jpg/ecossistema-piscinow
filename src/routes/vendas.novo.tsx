@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ClienteRapidoDialog } from "@/components/cliente-rapido-dialog";
+import { ProdutoRapidoDialog } from "@/components/produto-rapido-dialog";
 import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -64,6 +65,8 @@ interface ItemLinha {
   preco_unitario: number;
   desconto_perc: number;
   custo_unitario: number;
+  sob_encomenda: boolean;
+  estoque_atual: number;
 }
 
 interface AcessorioLinha {
@@ -105,12 +108,14 @@ function NovoPedido() {
     },
   });
 
-  const { data: produtos = [] } = useQuery({
+  const { data: produtos = [], refetch: refetchProdutos } = useQuery({
     queryKey: ["produtos-select"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, unidade, preco_venda, preco_custo")
+        .select(
+          "id, codigo, nome, categoria, unidade, preco_venda, preco_custo, estoque_atual, sob_encomenda",
+        )
         .order("nome");
       if (error) throw error;
       return data;
@@ -186,6 +191,8 @@ function NovoPedido() {
         preco_unitario: num(p.preco_venda),
         desconto_perc: 0,
         custo_unitario: num(p.preco_custo),
+        sob_encomenda: Boolean((p as { sob_encomenda?: boolean }).sob_encomenda),
+        estoque_atual: num(p.estoque_atual),
       },
     ]);
     setProdutoSel("");
@@ -464,6 +471,12 @@ function NovoPedido() {
                 <Button onClick={adicionarItem}>
                   <Plus /> Adicionar
                 </Button>
+                <ProdutoRapidoDialog
+                  onCreated={async (id) => {
+                    await refetchProdutos();
+                    setProdutoSel(id);
+                  }}
+                />
               </div>
 
               <Table>
@@ -482,7 +495,22 @@ function NovoPedido() {
                   {itens.map((i) => (
                     <TableRow key={i.key}>
                       <TableCell className="text-xs text-muted-foreground">{i.sku || "—"}</TableCell>
-                      <TableCell>{i.descricao}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{i.descricao}</span>
+                          {i.sob_encomenda ? (
+                            <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
+                              Sob encomenda
+                            </span>
+                          ) : (
+                            i.estoque_atual < i.quantidade && (
+                              <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                                Sem saldo · será encomendado
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Input
                           type="number"

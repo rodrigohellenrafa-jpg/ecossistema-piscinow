@@ -19,7 +19,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Accordion,
   AccordionContent,
@@ -101,6 +103,7 @@ const vazio = {
   aliquota_cofins: "0",
   aliquota_iss: "0",
   codigo_servico_municipal: "",
+  sob_encomenda: "nao",
 };
 
 const ORIGENS_MERCADORIA = [
@@ -178,6 +181,7 @@ function Produtos() {
       aliquota_cofins: String(p.aliquota_cofins ?? 0),
       aliquota_iss: String(p.aliquota_iss ?? 0),
       codigo_servico_municipal: p.codigo_servico_municipal ?? "",
+      sob_encomenda: (p as { sob_encomenda?: boolean }).sob_encomenda ? "sim" : "nao",
     });
     setOpen(true);
   };
@@ -211,15 +215,19 @@ function Produtos() {
         aliquota_cofins: Number(form.aliquota_cofins) || 0,
         aliquota_iss: Number(form.aliquota_iss) || 0,
         codigo_servico_municipal: form.codigo_servico_municipal || null,
+        sob_encomenda: form.sob_encomenda === "sim",
       };
       if (editando) {
-        const { error } = await supabase.from("produtos").update(payload).eq("id", editando.id);
+        const { error } = await supabase
+          .from("produtos")
+          .update(payload as never)
+          .eq("id", editando.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("produtos").insert({
           ...payload,
           created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
-        });
+        } as never);
         if (error) throw error;
       }
     },
@@ -391,6 +399,22 @@ function Produtos() {
                     </Field>
                   </>
                 )}
+                {form.tipo === "produto" && (
+                  <div className="flex items-start gap-2 rounded-md border border-border p-3 sm:col-span-2">
+                    <Checkbox
+                      id="produto-sob-encomenda"
+                      checked={form.sob_encomenda === "sim"}
+                      onCheckedChange={(v) => set("sob_encomenda")(v === true ? "sim" : "nao")}
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="produto-sob-encomenda">Vendido sob encomenda</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Item que não fica em estoque. Não aparece como falta e a venda é concluída
+                        normalmente, gerando pedido ao fornecedor.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <Field label="Descrição" className="sm:col-span-2">
                   <Textarea
                     rows={3}
@@ -533,8 +557,11 @@ function Produtos() {
             </TableHeader>
             <TableBody>
               {lista.map((p) => {
+                const encomenda = Boolean((p as { sob_encomenda?: boolean }).sob_encomenda);
                 const baixo =
-                  p.tipo === "produto" && Number(p.estoque_atual) <= Number(p.estoque_minimo);
+                  p.tipo === "produto" &&
+                  !encomenda &&
+                  Number(p.estoque_atual) <= Number(p.estoque_minimo);
                 const custoTotal =
                   Number(p.custo_fabricacao) + Number(p.custo_logistico) || Number(p.preco_custo);
                 const m = margem(Number(p.preco_venda), custoTotal);
@@ -547,7 +574,14 @@ function Produtos() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{p.tipo}</Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="secondary">{p.tipo}</Badge>
+                        {encomenda && (
+                          <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
+                            Sob encomenda
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{nomeFornecedor(p.fornecedor_id)}</TableCell>
                     <TableCell className="text-right">{brl(Number(p.preco_custo))}</TableCell>
@@ -556,6 +590,8 @@ function Produtos() {
                     <TableCell className="text-right">
                       {p.tipo === "servico" ? (
                         "—"
+                      ) : encomenda ? (
+                        <span className="text-muted-foreground">Sob encomenda</span>
                       ) : (
                         <span
                           className={
