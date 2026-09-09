@@ -200,6 +200,7 @@ function NotasCompra() {
         valor_total: Number(form.valor_total) || 0,
         status: form.status,
         observacoes: form.observacoes || null,
+        xml,
         created_by: auth.user?.id ?? null,
       });
       if (error) throw error;
@@ -208,6 +209,8 @@ function NotasCompra() {
       toast.success("Nota de compra lançada");
       qc.invalidateQueries({ queryKey: ["notas_compra"] });
       setForm(vazio);
+      setXml(null);
+      setArquivo(null);
       setOpen(false);
     },
     onError: (e: Error) =>
