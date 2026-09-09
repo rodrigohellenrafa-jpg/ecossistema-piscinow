@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Minus, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -111,6 +111,41 @@ const REGIMES_TRIBUTARIOS = [
   "MEI",
 ] as const;
 
+type EnderecoCep = {
+  logradouro: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  ibge: string;
+};
+
+async function buscarCep(cep: string): Promise<EnderecoCep | null> {
+  const limpo = cep.replace(/\D/g, "");
+  if (limpo.length !== 8) return null;
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${limpo}/json/`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      erro?: boolean | string;
+      logradouro?: string;
+      bairro?: string;
+      localidade?: string;
+      uf?: string;
+      ibge?: string;
+    };
+    if (json.erro) return null;
+    return {
+      logradouro: json.logradouro ?? "",
+      bairro: json.bairro ?? "",
+      cidade: json.localidade ?? "",
+      estado: json.uf ?? "",
+      ibge: json.ibge ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 function Clientes() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -118,6 +153,48 @@ function Clientes() {
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<Cliente | null>(null);
   const [form, setForm] = useState(vazio);
+  const [mostrarInstalacao, setMostrarInstalacao] = useState(false);
+  const [cepObra, setCepObra] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [buscandoCepObra, setBuscandoCepObra] = useState(false);
+
+  async function preencherPorCep(cep: string) {
+    setBuscandoCep(true);
+    const endereco = await buscarCep(cep);
+    setBuscandoCep(false);
+    if (!endereco) {
+      toast.error("CEP não encontrado.");
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      logradouro: endereco.logradouro || f.logradouro,
+      bairro: endereco.bairro || f.bairro,
+      cidade: endereco.cidade || f.cidade,
+      estado: endereco.estado || f.estado,
+      codigo_municipio: endereco.ibge || f.codigo_municipio,
+    }));
+    toast.success("Endereço preenchido pelo CEP.");
+  }
+
+  async function preencherObraPorCep(cep: string) {
+    setBuscandoCepObra(true);
+    const endereco = await buscarCep(cep);
+    setBuscandoCepObra(false);
+    if (!endereco) {
+      toast.error("CEP da instalação não encontrado.");
+      return;
+    }
+    const composto = [
+      endereco.logradouro,
+      endereco.bairro,
+      [endereco.cidade, endereco.estado].filter(Boolean).join("/"),
+    ]
+      .filter(Boolean)
+      .join(" - ");
+    setForm((f) => ({ ...f, endereco_obra: composto }));
+    toast.success("Endereço de instalação preenchido.");
+  }
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["clientes"],
@@ -134,6 +211,8 @@ function Clientes() {
   const abrirNovo = () => {
     setEditando(null);
     setForm({ ...vazio, codigo: proximoCodigo("CLI", data.map((c) => c.codigo)) });
+    setMostrarInstalacao(false);
+    setCepObra("");
     setOpen(true);
   };
 
@@ -163,6 +242,8 @@ function Clientes() {
       codigo_municipio: c.codigo_municipio ?? "",
       regime_tributario: c.regime_tributario ?? "",
     });
+    setMostrarInstalacao(Boolean(c.endereco_obra));
+    setCepObra("");
     setOpen(true);
   };
 
@@ -289,8 +370,20 @@ function Clientes() {
                 <Field label="Telefone">
                   <Input value={form.telefone} onChange={(e) => set("telefone")(e.target.value)} />
                 </Field>
-                <Field label="CEP">
-                  <Input value={form.cep} onChange={(e) => set("cep")(e.target.value)} />
+                <Field label={buscandoCep ? "CEP (buscando endereço...)" : "CEP"}>
+                  <Input
+                    value={form.cep}
+                    placeholder="00000-000"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      set("cep")(v);
+                      if (v.replace(/\D/g, "").length === 8) void preencherPorCep(v);
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value.replace(/\D/g, "").length === 8)
+                        void preencherPorCep(e.target.value);
+                    }}
+                  />
                 </Field>
                 <Field label="Logradouro">
                   <Input
@@ -320,12 +413,69 @@ function Clientes() {
                     onChange={(e) => set("estado")(e.target.value.toUpperCase())}
                   />
                 </Field>
-                <Field label="Endereço da obra" className="sm:col-span-2">
-                  <Input
-                    value={form.endereco_obra}
-                    onChange={(e) => set("endereco_obra")(e.target.value)}
-                  />
-                </Field>
+                <div className="sm:col-span-2 space-y-3 rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Endereço de instalação</p>
+                      <p className="text-xs text-muted-foreground">
+                        Use apenas se a instalação for em endereço diferente do cadastro.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={mostrarInstalacao ? "secondary" : "outline"}
+                      aria-label={
+                        mostrarInstalacao
+                          ? "Remover endereço de instalação"
+                          : "Adicionar endereço de instalação"
+                      }
+                      onClick={() => {
+                        if (mostrarInstalacao) {
+                          setMostrarInstalacao(false);
+                          setCepObra("");
+                          set("endereco_obra")("");
+                        } else {
+                          setMostrarInstalacao(true);
+                        }
+                      }}
+                    >
+                      {mostrarInstalacao ? (
+                        <Minus className="size-4" />
+                      ) : (
+                        <Plus className="size-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {mostrarInstalacao && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field
+                        label={buscandoCepObra ? "CEP da instalação (buscando...)" : "CEP da instalação"}
+                      >
+                        <Input
+                          value={cepObra}
+                          placeholder="00000-000"
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCepObra(v);
+                            if (v.replace(/\D/g, "").length === 8) void preencherObraPorCep(v);
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value.replace(/\D/g, "").length === 8)
+                              void preencherObraPorCep(e.target.value);
+                          }}
+                        />
+                      </Field>
+                      <Field label="Endereço da instalação">
+                        <Input
+                          value={form.endereco_obra}
+                          placeholder="Rua, número, bairro, cidade"
+                          onChange={(e) => set("endereco_obra")(e.target.value)}
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
                 <Field label="Observações" className="sm:col-span-2">
                   <Textarea
                     rows={3}
