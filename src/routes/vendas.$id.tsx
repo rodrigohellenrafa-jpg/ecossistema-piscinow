@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
+import { DocumentosVenda } from "@/components/documentos-venda";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
