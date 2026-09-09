@@ -266,6 +266,27 @@ function NotasCompra() {
                 </DialogDescription>
               </DialogHeader>
 
+              <div className="rounded-lg border border-dashed p-3">
+                <label className="flex flex-wrap items-center gap-3 text-sm">
+                  <span className="inline-flex items-center gap-2 rounded-md border px-3 py-2 font-medium">
+                    <Upload className="size-4" /> Enviar XML da nota
+                  </span>
+                  <input
+                    type="file"
+                    accept=".xml,text/xml,application/xml"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void importarXml(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <span className="text-muted-foreground">
+                    {arquivo ?? "Preenche fornecedor, chave, datas e valores automaticamente."}
+                  </span>
+                </label>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Chave de acesso (44 dígitos)" className="sm:col-span-2">
                   <Input
