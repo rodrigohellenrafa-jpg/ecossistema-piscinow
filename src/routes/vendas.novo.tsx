@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ClienteRapidoDialog } from "@/components/cliente-rapido-dialog";
+import { ProdutoRapidoDialog } from "@/components/produto-rapido-dialog";
 import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -64,6 +65,8 @@ interface ItemLinha {
   preco_unitario: number;
   desconto_perc: number;
   custo_unitario: number;
+  sob_encomenda: boolean;
+  estoque_atual: number;
 }
 
 interface AcessorioLinha {
@@ -105,12 +108,14 @@ function NovoPedido() {
     },
   });
 
-  const { data: produtos = [] } = useQuery({
+  const { data: produtos = [], refetch: refetchProdutos } = useQuery({
     queryKey: ["produtos-select"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, unidade, preco_venda, preco_custo")
+        .select(
+          "id, codigo, nome, categoria, unidade, preco_venda, preco_custo, estoque_atual, sob_encomenda",
+        )
         .order("nome");
       if (error) throw error;
       return data;
