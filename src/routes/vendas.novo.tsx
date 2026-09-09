@@ -64,7 +64,7 @@ interface ItemLinha {
   descricao: string;
   quantidade: number;
   preco_unitario: number;
-  desconto_perc: number;
+  desconto_valor: number;
   custo_unitario: number;
   sob_encomenda: boolean;
   estoque_atual: number;
@@ -79,8 +79,20 @@ interface AcessorioLinha {
 
 const novaKey = () => Math.random().toString(36).slice(2);
 
+const subtotalBrutoItem = (i: ItemLinha) => i.quantidade * i.preco_unitario;
+
 const totalItem = (i: ItemLinha) =>
-  i.quantidade * i.preco_unitario * (1 - i.desconto_perc / 100);
+  Math.max(0, subtotalBrutoItem(i) - i.desconto_valor);
+
+/** Converte texto digitado como moeda brasileira (R$ 1.500,00 ou 1500,00) em número. */
+const parseMoedaInput = (valor: string): number => {
+  const limpo = valor
+    .replace(/[R$\s]/g, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".");
+  const n = Number(limpo);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
 
 function NovoPedido() {
   const navigate = useNavigate();
@@ -172,6 +184,7 @@ function NovoPedido() {
 
 
   const [itens, setItens] = useState<ItemLinha[]>([]);
+  const [descontoInputs, setDescontoInputs] = useState<Record<string, string>>({});
   const [produtoSel, setProdutoSel] = useState("");
 
   const [cascoId, setCascoId] = useState("");
@@ -220,7 +233,7 @@ function NovoPedido() {
         descricao: p.nome,
         quantidade: 1,
         preco_unitario: num(p.preco_venda),
-        desconto_perc: 0,
+        desconto_valor: 0,
         custo_unitario: num(p.preco_custo),
         sob_encomenda: Boolean((p as { sob_encomenda?: boolean }).sob_encomenda),
         estoque_atual: num(p.estoque_atual),
@@ -296,17 +309,21 @@ function NovoPedido() {
 
       if (itens.length > 0) {
         const { error } = await supabase.from("venda_itens").insert(
-          itens.map((i) => ({
-            venda_id: venda.id,
-            produto_id: i.produto_id,
-            sku: i.sku || null,
-            descricao: i.descricao,
-            quantidade: i.quantidade,
-            preco_unitario: i.preco_unitario,
-            desconto_perc: i.desconto_perc,
-            total: totalItem(i),
-            custo_unitario: i.custo_unitario,
-          })),
+          itens.map((i) => {
+            const bruto = subtotalBrutoItem(i);
+            return {
+              venda_id: venda.id,
+              produto_id: i.produto_id,
+              sku: i.sku || null,
+              descricao: i.descricao,
+              quantidade: i.quantidade,
+              preco_unitario: i.preco_unitario,
+              desconto_valor: i.desconto_valor,
+              desconto_perc: bruto > 0 ? Number(((i.desconto_valor / bruto) * 100).toFixed(2)) : 0,
+              total: totalItem(i),
+              custo_unitario: i.custo_unitario,
+            };
+          }),
         );
         if (error) throw error;
       }
@@ -527,8 +544,8 @@ function NovoPedido() {
                     <TableHead>Descrição</TableHead>
                     <TableHead className="w-20">Qtd</TableHead>
                     <TableHead className="w-28">Vlr. Unit.</TableHead>
-                    <TableHead className="w-20">Desc. %</TableHead>
-                    <TableHead className="w-28 text-right">Subtotal</TableHead>
+                    <TableHead className="w-28">Desc. (R$)</TableHead>
+                    <TableHead className="w-32 text-right">Total</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -572,20 +589,35 @@ function NovoPedido() {
                       </TableCell>
                       <TableCell>
                         <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="any"
-                          className="w-20 text-white"
-                          value={i.desconto_perc}
-                          onChange={(e) =>
-                            atualizarItem(i.key, {
-                              desconto_perc: Math.min(100, Math.max(0, num(e.target.value))),
-                            })
-                          }
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          className="w-28 text-white"
+                          value={descontoInputs[i.key] ?? (i.desconto_valor ? i.desconto_valor.toString() : "")}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setDescontoInputs((prev) => ({ ...prev, [i.key]: raw }));
+                            const valor = parseMoedaInput(raw);
+                            const max = subtotalBrutoItem(i);
+                            atualizarItem(i.key, { desconto_valor: Math.min(valor, max) });
+                          }}
+                          onBlur={(e) => {
+                            const valor = parseMoedaInput(e.target.value);
+                            const max = subtotalBrutoItem(i);
+                            const ajustado = Math.min(valor, max);
+                            setDescontoInputs((prev) => ({ ...prev, [i.key]: ajustado ? ajustado.toFixed(2) : "" }));
+                            atualizarItem(i.key, { desconto_valor: ajustado });
+                          }}
                         />
                       </TableCell>
-                      <TableCell className="text-right font-medium">{brl(totalItem(i))}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="font-medium">{brl(totalItem(i))}</div>
+                        {i.desconto_valor > 0 && (
+                          <div className="text-xs text-destructive">
+                            -{brl(i.desconto_valor)} desc.
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Button size="icon" variant="ghost" onClick={() => removerItem(i.key)}>
                           <Trash2 className="size-4" />
