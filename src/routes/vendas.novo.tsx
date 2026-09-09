@@ -575,26 +575,27 @@ function NovoPedido() {
                 </Select>
               </Field>
               <Field label="Cliente" className="sm:col-span-3">
-                <div className="mb-2 flex justify-end">
+                <div className="flex items-center gap-2">
+                  <Select value={clienteId} onValueChange={setClienteId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecione o cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <ClienteRapidoDialog
+                    iconOnly
                     onCreated={async (id) => {
                       await refetchClientes();
                       setClienteId(id);
                     }}
                   />
                 </div>
-                <Select value={clienteId} onValueChange={setClienteId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </Field>
             </CardContent>
           </Card>
@@ -606,28 +607,31 @@ function NovoPedido() {
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-end gap-2">
                 <Field label="Produto" className="min-w-64 flex-1">
-                  <Select value={produtoSel} onValueChange={setProdutoSel}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Buscar produto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {produtos.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.codigo ? `${p.codigo} - ${p.nome}` : p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Select value={produtoSel} onValueChange={setProdutoSel}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Buscar produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {produtos.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.codigo ? `${p.codigo} - ${p.nome}` : p.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <ProdutoRapidoDialog
+                      iconOnly
+                      onCreated={async (id) => {
+                        await refetchProdutos();
+                        setProdutoSel(id);
+                      }}
+                    />
+                  </div>
                 </Field>
                 <Button onClick={adicionarItem}>
                   <Plus /> Adicionar
                 </Button>
-                <ProdutoRapidoDialog
-                  onCreated={async (id) => {
-                    await refetchProdutos();
-                    setProdutoSel(id);
-                  }}
-                />
               </div>
 
               <Table>

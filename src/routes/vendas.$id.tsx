@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
+import { DocumentosVenda } from "@/components/documentos-venda";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -327,8 +328,14 @@ function DetalhePedido() {
             clienteDocumento={cliente?.documento ?? null}
             invalidar={[["venda", id]]}
           />
-          <Button onClick={() => window.print()}>
-            <Printer /> Imprimir / Exportar PDF
+          <DocumentosVenda
+            venda={venda}
+            cliente={cliente ?? null}
+            itens={itens}
+            condicoes={condicoes as never}
+          />
+          <Button variant="ghost" onClick={() => window.print()}>
+            <Printer /> Espelho fiscal
           </Button>
         </div>
       </div>

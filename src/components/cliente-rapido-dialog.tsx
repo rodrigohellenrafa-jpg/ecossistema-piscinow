@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -24,6 +24,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   onCreated: (clienteId: string) => void | Promise<void>;
+  /** Exibe apenas o ícone "+" ao lado do campo de seleção. */
+  iconOnly?: boolean;
 }
 
 const vazio = {
@@ -37,7 +39,7 @@ const vazio = {
   endereco_obra: "",
 };
 
-export function ClienteRapidoDialog({ onCreated }: Props) {
+export function ClienteRapidoDialog({ onCreated, iconOnly = false }: Props) {
   const [open, setOpen] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState(vazio);
@@ -85,10 +87,16 @@ export function ClienteRapidoDialog({ onCreated }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <UserPlus className="mr-2 h-4 w-4" />
-          Cadastro rápido
-        </Button>
+        {iconOnly ? (
+          <Button type="button" variant="outline" size="icon" aria-label="Cadastro rápido de cliente">
+            <Plus className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" size="sm">
+            <UserPlus className="mr-2 h-4 w-4" />
+            Cadastro rápido
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>

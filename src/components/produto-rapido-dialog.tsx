@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PackagePlus } from "lucide-react";
+import { PackagePlus, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -27,6 +27,8 @@ import { CATEGORIAS_PRODUTO } from "@/lib/erp";
 
 interface Props {
   onCreated: (produtoId: string) => void | Promise<void>;
+  /** Exibe apenas o ícone "+" ao lado do campo de seleção. */
+  iconOnly?: boolean;
 }
 
 const vazio = {
@@ -40,7 +42,7 @@ const vazio = {
   estoque_atual: "0",
 };
 
-export function ProdutoRapidoDialog({ onCreated }: Props) {
+export function ProdutoRapidoDialog({ onCreated, iconOnly = false }: Props) {
   const [open, setOpen] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sobEncomenda, setSobEncomenda] = useState(false);
@@ -90,10 +92,16 @@ export function ProdutoRapidoDialog({ onCreated }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <PackagePlus className="mr-2 h-4 w-4" />
-          Cadastro rápido de produto
-        </Button>
+        {iconOnly ? (
+          <Button type="button" variant="outline" size="icon" aria-label="Cadastro rápido de produto">
+            <Plus className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" size="sm">
+            <PackagePlus className="mr-2 h-4 w-4" />
+            Cadastro rápido de produto
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
