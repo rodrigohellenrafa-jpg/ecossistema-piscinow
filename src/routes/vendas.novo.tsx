@@ -832,48 +832,235 @@ function NovoPedido() {
 
 
           <Card>
-            <CardHeader>
-              <CardTitle>Condições comerciais</CardTitle>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>Condições de pagamento</CardTitle>
+              <Button variant="outline" size="sm" onClick={adicionarCondicao}>
+                <Plus /> Adicionar condição
+              </Button>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-4">
-              <Field label="Forma de pagamento">
-                <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FORMAS_PAGAMENTO.map((f) => (
-                      <SelectItem key={f} value={f}>
-                        {f}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Valor de entrada">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={valorEntrada}
-                  onChange={(e) => setValorEntrada(num(e.target.value))}
-                />
-              </Field>
-              <Field label="Saldo devedor">
-                <Input value={brl(saldoDevedor)} disabled />
-              </Field>
-              <Field label="Qtd. de parcelas">
-                <Input
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={parcelasQtd}
-                  onChange={(e) => setParcelasQtd(Math.min(24, Math.max(1, num(e.target.value) || 1)))}
-                />
-              </Field>
-              <Field label="Valor por parcela">
-                <Input value={brl(valorParcela)} disabled />
-              </Field>
-              <Field label="Observações" className="sm:col-span-4">
+            <CardContent className="space-y-4">
+              {condicoes.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma condição informada. Adicione uma ou mais formas de pagamento — por
+                  exemplo 50% no cartão em 24x com juros da maquininha e o restante depois.
+                </p>
+              )}
+
+              {condicoes.map((c, idx) => (
+                <div key={c.key} className="rounded-lg border border-border p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-sm font-medium">Condição {idx + 1}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removerCondicao(c.key)}
+                      aria-label="Remover condição"
+                    >
+                      <Trash2 className="text-destructive" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label="Forma de pagamento">
+                      <Select
+                        value={c.forma_pagamento}
+                        onValueChange={(v) => atualizarCondicao(c.key, { forma_pagamento: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FORMAS_PAGAMENTO.map((f) => (
+                            <SelectItem key={f} value={f}>
+                              {f}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field label="Cartão / conta (opcional)">
+                      <Input
+                        className="text-white"
+                        placeholder="Ex.: Visa maquininha"
+                        value={c.bandeira}
+                        onChange={(e) => atualizarCondicao(c.key, { bandeira: e.target.value })}
+                      />
+                    </Field>
+
+                    <Field label="Data">
+                      <Input
+                        type="date"
+                        className="text-white"
+                        value={c.data_prevista}
+                        onChange={(e) =>
+                          atualizarCondicao(c.key, { data_prevista: e.target.value })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Valor abatido do pedido (R$)">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="text-white"
+                        value={c.valor ? String(c.valor) : ""}
+                        placeholder="0,00"
+                        onChange={(e) => {
+                          const valor = parseMoedaInput(e.target.value);
+                          const parcelas = Math.max(1, c.parcelas);
+                          // Sem juros informados, a parcela acompanha o valor abatido.
+                          const semJuros = Math.abs(cobradoCondicao(c) - c.valor) < 0.01;
+                          atualizarCondicao(c.key, {
+                            valor,
+                            ...(semJuros ? { valor_parcela: valor / parcelas } : {}),
+                          });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="mt-1 text-xs text-primary underline"
+                        onClick={() => {
+                          const metade = Number((valorTotal / 2).toFixed(2));
+                          atualizarCondicao(c.key, {
+                            valor: metade,
+                            valor_parcela: metade / Math.max(1, c.parcelas),
+                          });
+                        }}
+                      >
+                        usar 50% do pedido
+                      </button>
+                    </Field>
+
+                    <Field label="Parcelas">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={48}
+                        className="text-white"
+                        value={c.parcelas}
+                        onChange={(e) => {
+                          const parcelas = Math.min(48, Math.max(1, num(e.target.value) || 1));
+                          const cobradoAtual = cobradoCondicao(c);
+                          atualizarCondicao(c.key, {
+                            parcelas,
+                            valor_parcela: cobradoAtual / parcelas,
+                          });
+                        }}
+                      />
+                    </Field>
+
+                    <Field label="Valor de cada parcela (R$)">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="text-white"
+                        placeholder="0,00"
+                        value={c.valor_parcela ? c.valor_parcela.toFixed(2) : ""}
+                        onChange={(e) =>
+                          atualizarCondicao(c.key, {
+                            valor_parcela: parseMoedaInput(e.target.value),
+                          })
+                        }
+                      />
+                    </Field>
+
+                    <Field label="Total cobrado do cliente (R$)">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="text-white"
+                        placeholder="0,00"
+                        value={cobradoCondicao(c) ? cobradoCondicao(c).toFixed(2) : ""}
+                        onChange={(e) => {
+                          const cobrado = parseMoedaInput(e.target.value);
+                          atualizarCondicao(c.key, {
+                            valor_parcela: cobrado / Math.max(1, c.parcelas),
+                          });
+                        }}
+                      />
+                    </Field>
+
+                    <Field label="Juros / acréscimo da maquininha">
+                      <Input value={brl(acrescimoCondicao(c))} disabled />
+                    </Field>
+
+                    <Field label="Situação">
+                      <Select
+                        value={c.pago ? "pago" : "pendente"}
+                        onValueChange={(v) => atualizarCondicao(c.key, { pago: v === "pago" })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pago">Já pago pelo cliente</SelectItem>
+                          <SelectItem value="pendente">A receber</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field label="Observações da condição" className="sm:col-span-3">
+                      <Input
+                        className="text-white"
+                        placeholder="Ex.: 50% no cartão em 24x, restante em outro cartão"
+                        value={c.observacoes}
+                        onChange={(e) => atualizarCondicao(c.key, { observacoes: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {Math.max(1, c.parcelas)}x de {brl(c.valor_parcela)} = {brl(cobradoCondicao(c))}{" "}
+                    cobrados · abate {brl(c.valor)} do pedido
+                  </p>
+                </div>
+              ))}
+
+              <div className="grid gap-3 border-t border-border pt-3 text-sm sm:grid-cols-4">
+                <div>
+                  <p className="text-muted-foreground">Total do pedido</p>
+                  <p className="font-semibold">{brl(valorTotal)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Alocado nas condições</p>
+                  <p className="font-semibold">{brl(totalAplicado)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Falta alocar</p>
+                  <p
+                    className={`font-semibold ${
+                      Math.abs(faltaAlocar) < 0.01
+                        ? "text-success"
+                        : faltaAlocar > 0
+                          ? "text-warning"
+                          : "text-destructive"
+                    }`}
+                  >
+                    {brl(faltaAlocar)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Cliente paga (com juros)</p>
+                  <p className="font-semibold">{brl(totalCobradoCliente)}</p>
+                  {totalJuros > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      juros embutidos: {brl(totalJuros)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Já recebido (condições marcadas como pagas)">
+                  <Input value={brl(valorEntrada)} disabled />
+                </Field>
+                <Field label="Saldo devedor">
+                  <Input value={brl(saldoDevedor)} disabled />
+                </Field>
+              </div>
+
+              <Field label="Observações do pedido">
                 <Textarea
                   rows={3}
                   value={observacoes}
