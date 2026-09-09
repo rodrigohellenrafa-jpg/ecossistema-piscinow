@@ -254,31 +254,37 @@ function FormularioOS() {
                   >
                     Piscina
                   </text>
-                </svg>
 
-                {/* Campos de medida sobre as cotas */}
-                <div className="relative mt-2 w-full max-w-[340px]">
-                  <input
-                    type="text"
-                    className="absolute -top-[190px] left-1/2 w-24 -translate-x-1/2 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
-                    placeholder="m"
-                  />
-                  <input
-                    type="text"
-                    className="absolute -top-[100px] -left-2 w-16 -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
-                    placeholder="m"
-                  />
-                  <input
-                    type="text"
-                    className="absolute -top-[100px] -right-2 w-16 -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
-                    placeholder="m"
-                  />
-                  <input
-                    type="text"
-                    className="absolute -top-[18px] left-1/2 w-24 -translate-x-1/2 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
-                    placeholder="m"
-                  />
-                </div>
+                  {/* Inputs sobre as cotas */}
+                  <foreignObject x="130" y="8" width="80" height="24">
+                    <input
+                      type="text"
+                      className="h-full w-full border-b border-slate-400 bg-transparent text-center text-xs outline-none"
+                      placeholder="m"
+                    />
+                  </foreignObject>
+                  <foreignObject x="130" y="188" width="80" height="24">
+                    <input
+                      type="text"
+                      className="h-full w-full border-b border-slate-400 bg-transparent text-center text-xs outline-none"
+                      placeholder="m"
+                    />
+                  </foreignObject>
+                  <foreignObject x="8" y="90" width="24" height="80">
+                    <input
+                      type="text"
+                      className="h-full w-full -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
+                      placeholder="m"
+                    />
+                  </foreignObject>
+                  <foreignObject x="308" y="90" width="24" height="80">
+                    <input
+                      type="text"
+                      className="h-full w-full -rotate-90 border-b border-slate-400 bg-transparent text-center text-xs outline-none"
+                      placeholder="m"
+                    />
+                  </foreignObject>
+                </svg>
               </div>
             </div>
           </div>
