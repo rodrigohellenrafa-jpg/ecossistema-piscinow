@@ -37,6 +37,7 @@ import { Route as ObrasIdRouteImport } from './routes/obras.$id'
 import { Route as FiscalConfigRouteImport } from './routes/fiscal.config'
 import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventario'
 import { Route as EstoqueEntradasRouteImport } from './routes/estoque.entradas'
+import { Route as ApiPublicAgendaTokenRouteImport } from './routes/api/public/agenda.$token'
 
 const RelatorioContasRoute = RelatorioContasRouteImport.update({
   id: '/relatorio-contas',
@@ -178,6 +179,11 @@ const EstoqueEntradasRoute = EstoqueEntradasRouteImport.update({
   path: '/estoque/entradas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAgendaTokenRoute = ApiPublicAgendaTokenRouteImport.update({
+  id: '/api/public/agenda/$token',
+  path: '/api/public/agenda/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -208,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/orcamentos': typeof VendasOrcamentosRoute
   '/vendas/': typeof VendasIndexRoute
+  '/api/public/agenda/$token': typeof ApiPublicAgendaTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/orcamentos': typeof VendasOrcamentosRoute
   '/vendas': typeof VendasIndexRoute
+  '/api/public/agenda/$token': typeof ApiPublicAgendaTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -269,6 +277,7 @@ export interface FileRoutesById {
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/orcamentos': typeof VendasOrcamentosRoute
   '/vendas/': typeof VendasIndexRoute
+  '/api/public/agenda/$token': typeof ApiPublicAgendaTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -301,6 +310,7 @@ export interface FileRouteTypes {
     | '/vendas/novo'
     | '/vendas/orcamentos'
     | '/vendas/'
+    | '/api/public/agenda/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/vendas/novo'
     | '/vendas/orcamentos'
     | '/vendas'
+    | '/api/public/agenda/$token'
   id:
     | '__root__'
     | '/'
@@ -361,6 +372,7 @@ export interface FileRouteTypes {
     | '/vendas/novo'
     | '/vendas/orcamentos'
     | '/vendas/'
+    | '/api/public/agenda/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -391,6 +403,7 @@ export interface RootRouteChildren {
   VendasNovoRoute: typeof VendasNovoRoute
   VendasOrcamentosRoute: typeof VendasOrcamentosRoute
   VendasIndexRoute: typeof VendasIndexRoute
+  ApiPublicAgendaTokenRoute: typeof ApiPublicAgendaTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -591,6 +604,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EstoqueEntradasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/agenda/$token': {
+      id: '/api/public/agenda/$token'
+      path: '/api/public/agenda/$token'
+      fullPath: '/api/public/agenda/$token'
+      preLoaderRoute: typeof ApiPublicAgendaTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -633,6 +653,7 @@ const rootRouteChildren: RootRouteChildren = {
   VendasNovoRoute: VendasNovoRoute,
   VendasOrcamentosRoute: VendasOrcamentosRoute,
   VendasIndexRoute: VendasIndexRoute,
+  ApiPublicAgendaTokenRoute: ApiPublicAgendaTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
