@@ -590,6 +590,8 @@ function Produtos() {
                     <TableCell className="text-right">
                       {p.tipo === "servico" ? (
                         "—"
+                      ) : encomenda ? (
+                        <span className="text-muted-foreground">Sob encomenda</span>
                       ) : (
                         <span
                           className={
