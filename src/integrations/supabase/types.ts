@@ -1371,6 +1371,53 @@ export type Database = {
           },
         ]
       }
+      venda_pagamentos: {
+        Row: {
+          conta_bancaria: string | null
+          created_at: string
+          created_by: string | null
+          data_pagamento: string
+          forma_pagamento: string
+          id: string
+          observacoes: string | null
+          updated_at: string
+          valor: number
+          venda_id: string
+        }
+        Insert: {
+          conta_bancaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string
+          forma_pagamento: string
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+          valor: number
+          venda_id: string
+        }
+        Update: {
+          conta_bancaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string
+          forma_pagamento?: string
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+          valor?: number
+          venda_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_pagamentos_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendas: {
         Row: {
           cliente_id: string | null

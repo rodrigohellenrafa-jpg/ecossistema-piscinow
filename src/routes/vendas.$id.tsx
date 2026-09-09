@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -26,7 +26,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, STATUS_PEDIDO } from "@/lib/erp";
+import { brl, dataBR, FORMAS_PAGAMENTO, STATUS_PEDIDO } from "@/lib/erp";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/vendas/$id")({
   head: () => ({
@@ -58,11 +59,27 @@ const STATUS_LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+const STATUS_PAGAMENTO_LABEL: Record<string, string> = {
+  pendente: "Pendente",
+  parcial: "Parcialmente pago",
+  pago: "Pago / Liquidado",
+};
+
+const hoje = () => new Date().toISOString().slice(0, 10);
+
 function DetalhePedido() {
   const { id } = useParams({ from: "/vendas/$id" });
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [aliquotaIcms, setAliquotaIcms] = useState(18);
   const [pdfLink, setPdfLink] = useState("");
+  const [novoPag, setNovoPag] = useState({
+    data_pagamento: hoje(),
+    forma_pagamento: "Pix",
+    conta_bancaria: "",
+    valor: "",
+    observacoes: "",
+  });
 
   const { data: venda } = useQuery({
     queryKey: ["venda", id],
@@ -139,6 +156,68 @@ function DetalhePedido() {
     },
   });
 
+  const { data: pagamentos = [] } = useQuery({
+    queryKey: ["venda-pagamentos", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_pagamentos")
+        .select("*")
+        .eq("venda_id", id)
+        .order("data_pagamento");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const invalidarFinanceiro = () => {
+    qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
+    qc.invalidateQueries({ queryKey: ["venda", id] });
+    qc.invalidateQueries({ queryKey: ["vendas"] });
+    qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+    qc.invalidateQueries({ queryKey: ["lancamentos"] });
+  };
+
+  const adicionarPagamento = useMutation({
+    mutationFn: async () => {
+      const valor = Number(String(novoPag.valor).replace(",", "."));
+      if (!valor || valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const { error } = await supabase.from("venda_pagamentos").insert({
+        venda_id: id,
+        data_pagamento: novoPag.data_pagamento,
+        forma_pagamento: novoPag.forma_pagamento,
+        conta_bancaria: novoPag.conta_bancaria || null,
+        valor,
+        observacoes: novoPag.observacoes || null,
+        created_by: user?.id ?? null,
+      } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pagamento registrado!");
+      setNovoPag({
+        data_pagamento: hoje(),
+        forma_pagamento: "Pix",
+        conta_bancaria: "",
+        valor: "",
+        observacoes: "",
+      });
+      invalidarFinanceiro();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removerPagamento = useMutation({
+    mutationFn: async (pagamentoId: string) => {
+      const { error } = await supabase.from("venda_pagamentos").delete().eq("id", pagamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pagamento removido.");
+      invalidarFinanceiro();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const atualizarStatus = useMutation({
     mutationFn: async (status: string) => {
       const { error } = await supabase.from("vendas").update({ status_pedido: status }).eq("id", id);
@@ -195,6 +274,11 @@ function DetalhePedido() {
   const valorIcms = baseIcms * (aliquotaIcms / 100);
   const baseIcmsSt = 0;
   const valorIcmsSt = 0;
+
+  const totalPago = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+  const totalVenda = Number(venda?.valor_total ?? 0);
+  const saldoAberto = Math.max(totalVenda - totalPago, 0);
+  const statusPag = totalPago <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
 
   if (!venda) {
     return <p className="text-muted-foreground">Carregando pedido...</p>;
@@ -298,6 +382,140 @@ function DetalhePedido() {
         </CardContent>
       </Card>
 
+
+      <Card className="print:hidden">
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-3">
+            Pagamentos do pedido
+            <Badge variant={statusPag === "pago" ? "default" : "secondary"}>
+              {STATUS_PAGAMENTO_LABEL[statusPag]}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Valor total da venda</p>
+              <p className="font-medium">{brl(totalVenda)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total pago</p>
+              <p className="font-medium">{brl(totalPago)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Saldo devedor</p>
+              <p className="text-lg font-semibold">{brl(saldoAberto)}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <Field label="Data do pagamento">
+              <Input
+                type="date"
+                value={novoPag.data_pagamento}
+                onChange={(e) => setNovoPag({ ...novoPag, data_pagamento: e.target.value })}
+              />
+            </Field>
+            <Field label="Forma de pagamento">
+              <Select
+                value={novoPag.forma_pagamento}
+                onValueChange={(v) => setNovoPag({ ...novoPag, forma_pagamento: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FORMAS_PAGAMENTO.map((f) => (
+                    <SelectItem key={f} value={f}>
+                      {f}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Cartão / conta (ex.: Cartão A)">
+              <Input
+                value={novoPag.conta_bancaria}
+                onChange={(e) => setNovoPag({ ...novoPag, conta_bancaria: e.target.value })}
+                placeholder="Cartão A"
+              />
+            </Field>
+            <Field label="Valor (R$)">
+              <Input
+                type="number"
+                step="0.01"
+                value={novoPag.valor}
+                onChange={(e) => setNovoPag({ ...novoPag, valor: e.target.value })}
+                placeholder="0,00"
+              />
+            </Field>
+            <Field label="Observações">
+              <Input
+                value={novoPag.observacoes}
+                onChange={(e) => setNovoPag({ ...novoPag, observacoes: e.target.value })}
+                placeholder="Opcional"
+              />
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => adicionarPagamento.mutate()}
+              disabled={adicionarPagamento.isPending}
+            >
+              <Plus /> Adicionar pagamento
+            </Button>
+            {saldoAberto > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setNovoPag({ ...novoPag, valor: saldoAberto.toFixed(2) })}
+              >
+                Usar saldo devedor ({brl(saldoAberto)})
+              </Button>
+            )}
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Forma</TableHead>
+                <TableHead>Cartão / conta</TableHead>
+                <TableHead>Observações</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagamentos.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>{dataBR(p.data_pagamento)}</TableCell>
+                  <TableCell>{p.forma_pagamento}</TableCell>
+                  <TableCell>{p.conta_bancaria ?? "—"}</TableCell>
+                  <TableCell>{p.observacoes ?? "—"}</TableCell>
+                  <TableCell className="text-right">{brl(Number(p.valor))}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removerPagamento.mutate(p.id)}
+                      aria-label="Remover pagamento"
+                    >
+                      <Trash2 />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {pagamentos.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                    Nenhum pagamento registrado. O pedido está em aberto.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <div className="print:block rounded-xl border border-border bg-card p-6 text-sm">
         <div className="mb-6 flex items-start justify-between border-b border-border pb-4">
