@@ -574,7 +574,14 @@ function Produtos() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{p.tipo}</Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge variant="secondary">{p.tipo}</Badge>
+                        {encomenda && (
+                          <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
+                            Sob encomenda
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{nomeFornecedor(p.fornecedor_id)}</TableCell>
                     <TableCell className="text-right">{brl(Number(p.preco_custo))}</TableCell>
