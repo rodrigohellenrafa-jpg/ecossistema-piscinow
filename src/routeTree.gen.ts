@@ -35,6 +35,7 @@ import { Route as VendasIndexRouteImport } from './routes/vendas.index'
 import { Route as VendasOrcamentosRouteImport } from './routes/vendas.orcamentos'
 import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
 import { Route as VendasIdRouteImport } from './routes/vendas.$id'
+import { Route as OsFormularioRouteImport } from './routes/os.formulario'
 import { Route as ObrasIdRouteImport } from './routes/obras.$id'
 import { Route as FiscalConfigRouteImport } from './routes/fiscal.config'
 import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventario'
@@ -171,6 +172,11 @@ const VendasIdRoute = VendasIdRouteImport.update({
   path: '/vendas/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OsFormularioRoute = OsFormularioRouteImport.update({
+  id: '/os/formulario',
+  path: '/os/formulario',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ObrasIdRoute = ObrasIdRouteImport.update({
   id: '/obras/$id',
   path: '/obras/$id',
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/estoque/inventario': typeof EstoqueInventarioRoute
   '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
+  '/os/formulario': typeof OsFormularioRoute
   '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/orcamentos': typeof VendasOrcamentosRoute
@@ -257,6 +264,7 @@ export interface FileRoutesByTo {
   '/estoque/inventario': typeof EstoqueInventarioRoute
   '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
+  '/os/formulario': typeof OsFormularioRoute
   '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/orcamentos': typeof VendasOrcamentosRoute
@@ -291,6 +299,7 @@ export interface FileRoutesById {
   '/estoque/inventario': typeof EstoqueInventarioRoute
   '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
+  '/os/formulario': typeof OsFormularioRoute
   '/vendas/$id': typeof VendasIdRoute
   '/vendas/novo': typeof VendasNovoRoute
   '/vendas/orcamentos': typeof VendasOrcamentosRoute
@@ -326,6 +335,7 @@ export interface FileRouteTypes {
     | '/estoque/inventario'
     | '/fiscal/config'
     | '/obras/$id'
+    | '/os/formulario'
     | '/vendas/$id'
     | '/vendas/novo'
     | '/vendas/orcamentos'
@@ -359,6 +369,7 @@ export interface FileRouteTypes {
     | '/estoque/inventario'
     | '/fiscal/config'
     | '/obras/$id'
+    | '/os/formulario'
     | '/vendas/$id'
     | '/vendas/novo'
     | '/vendas/orcamentos'
@@ -392,6 +403,7 @@ export interface FileRouteTypes {
     | '/estoque/inventario'
     | '/fiscal/config'
     | '/obras/$id'
+    | '/os/formulario'
     | '/vendas/$id'
     | '/vendas/novo'
     | '/vendas/orcamentos'
@@ -425,6 +437,7 @@ export interface RootRouteChildren {
   EstoqueEntradasRoute: typeof EstoqueEntradasRoute
   EstoqueInventarioRoute: typeof EstoqueInventarioRoute
   ObrasIdRoute: typeof ObrasIdRoute
+  OsFormularioRoute: typeof OsFormularioRoute
   VendasIdRoute: typeof VendasIdRoute
   VendasNovoRoute: typeof VendasNovoRoute
   VendasOrcamentosRoute: typeof VendasOrcamentosRoute
@@ -616,6 +629,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VendasIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/os/formulario': {
+      id: '/os/formulario'
+      path: '/os/formulario'
+      fullPath: '/os/formulario'
+      preLoaderRoute: typeof OsFormularioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/obras/$id': {
       id: '/obras/$id'
       path: '/obras/$id'
@@ -691,6 +711,7 @@ const rootRouteChildren: RootRouteChildren = {
   EstoqueEntradasRoute: EstoqueEntradasRoute,
   EstoqueInventarioRoute: EstoqueInventarioRoute,
   ObrasIdRoute: ObrasIdRoute,
+  OsFormularioRoute: OsFormularioRoute,
   VendasIdRoute: VendasIdRoute,
   VendasNovoRoute: VendasNovoRoute,
   VendasOrcamentosRoute: VendasOrcamentosRoute,

@@ -277,3 +277,48 @@
   height: 60px;
   margin-bottom: -32px;
 }
+
+/* ---- Fonte cursiva para títulos de OS ---- */
+.font-cursive {
+  font-family: "Caveat", "Brush Script MT", cursive;
+}
+
+/* ---- Formulário de Ordem de Serviço (impressão A4) ---- */
+@media print {
+  /* Esconde todo o conteúdo da página, exceto o formulário de OS */
+  body * {
+    visibility: hidden;
+  }
+
+  body .os-form-wrapper,
+  body .os-form-wrapper * {
+    visibility: visible;
+  }
+
+  .os-form-wrapper {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    display: block !important;
+    width: 210mm !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    background: #fff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    z-index: 9999 !important;
+  }
+
+  .os-form-wrapper input {
+    border: none !important;
+    border-bottom: 1px solid #0f172a !important;
+    background: transparent !important;
+    color: #0f172a !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+}
