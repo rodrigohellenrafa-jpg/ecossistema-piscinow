@@ -171,6 +171,7 @@ function RootComponent() {
                 Piscinow <span className="text-primary">ERP</span>
               </span>
               <UserBadge />
+              <SenhaMestra />
             </header>
             <main className="flex-1 p-4 md:p-6">
               {/* Required: nested routes render here. */}
