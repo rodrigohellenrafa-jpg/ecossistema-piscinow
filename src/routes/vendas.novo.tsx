@@ -325,12 +325,20 @@ function NovoPedido() {
 
       return { id: venda.id as string, roteamento };
     },
-    onSuccess: (id) => {
+    onSuccess: ({ id, roteamento }) => {
       toast.success(
         tipoAtendimento === "in"
-          ? "Pedido de balcão registrado e estoque baixado!"
-          : "Pedido registrado e ordem de serviço aberta!",
+          ? "Pedido de balcão registrado e financeiro lançado!"
+          : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
       );
+      if (roteamento.baixados > 0) {
+        toast.success(`Estoque baixado em ${roteamento.baixados} item(ns).`);
+      }
+      if (roteamento.ordensCriadas.length > 0) {
+        toast.warning(
+          `Itens sem saldo: ordem(ns) de compra ${roteamento.ordensCriadas.join(", ")} gerada(s) sob encomenda.`,
+        );
+      }
       navigate({ to: "/vendas/$id", params: { id } });
     },
 
