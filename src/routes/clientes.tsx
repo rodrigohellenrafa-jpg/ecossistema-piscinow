@@ -242,6 +242,8 @@ function Clientes() {
       codigo_municipio: c.codigo_municipio ?? "",
       regime_tributario: c.regime_tributario ?? "",
     });
+    setMostrarInstalacao(Boolean(c.endereco_obra));
+    setCepObra("");
     setOpen(true);
   };
 
