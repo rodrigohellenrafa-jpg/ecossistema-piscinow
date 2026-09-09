@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Lock, Plus, Trash2, UserPlus } from "lucide-react";
+import { Copy, Lock, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -11,15 +11,17 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -29,7 +31,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useRoles, type Perfil } from "@/hooks/use-role";
-import { criarUsuario, listarUsuarios, removerUsuario } from "@/lib/usuarios.functions";
+import {
+  criarUsuario,
+  definirPapeis,
+  listarUsuarios,
+  removerUsuario,
+} from "@/lib/usuarios.functions";
+
 
 export const Route = createFileRoute("/acessos")({
   head: () => ({
@@ -99,11 +107,16 @@ function AcessosAdmin() {
   const fetchUsuarios = useServerFn(listarUsuarios);
   const doCriar = useServerFn(criarUsuario);
   const doRemover = useServerFn(removerUsuario);
+  const doDefinirPapeis = useServerFn(definirPapeis);
+
 
   const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
-  const [perfil, setPerfil] = useState<Perfil>("usuario");
+  const [perfis, setPerfis] = useState<Perfil[]>(["usuario"]);
   const [senhaGerada, setSenhaGerada] = useState<string | null>(null);
+  const [editando, setEditando] = useState<{ id: string; nome: string; perfis: Perfil[] } | null>(
+    null,
+  );
 
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ["usuarios-sistema"],
@@ -117,7 +130,7 @@ function AcessosAdmin() {
       setSenhaGerada(res.senhaTemporaria);
       setEmail("");
       setNome("");
-      setPerfil("usuario");
+      setPerfis(["usuario"]);
       qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -132,11 +145,29 @@ function AcessosAdmin() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const salvarPapeis = useMutation({
+    mutationFn: doDefinirPapeis,
+    onSuccess: () => {
+      toast.success("Funções atualizadas.");
+      setEditando(null);
+      qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const alternarPerfil = (lista: Perfil[], p: Perfil) =>
+    lista.includes(p) ? lista.filter((x) => x !== p) : [...lista, p];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (perfis.length === 0) {
+      toast.error("Selecione ao menos uma função.");
+      return;
+    }
     setSenhaGerada(null);
-    criar.mutate({ data: { email, nome, perfil } });
+    criar.mutate({ data: { email, nome, perfis } });
   };
+
 
   const copiarSenha = () => {
     if (!senhaGerada) return;
@@ -159,7 +190,7 @@ function AcessosAdmin() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="nome">Nome completo</Label>
                 <Input
@@ -181,22 +212,26 @@ function AcessosAdmin() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="perfil">Perfil inicial</Label>
-                <Select value={perfil} onValueChange={(v) => setPerfil(v as Perfil)}>
-                  <SelectTrigger id="perfil">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PERFIS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {LABEL_PERFIL[p]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Funções (pode marcar mais de uma)</Label>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {PERFIS.map((p) => (
+                  <label
+                    key={p}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 text-sm"
+                  >
+                    <Checkbox
+                      checked={perfis.includes(p)}
+                      onCheckedChange={() => setPerfis((atual) => alternarPerfil(atual, p))}
+                    />
+                    {LABEL_PERFIL[p]}
+                  </label>
+                ))}
               </div>
             </div>
+
 
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={criar.isPending}>
@@ -277,6 +312,21 @@ function AcessosAdmin() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() =>
+                          setEditando({
+                            id: u.id,
+                            nome: u.nome,
+                            perfis: u.papeis.map((p) => p.role as Perfil),
+                          })
+                        }
+                        aria-label="Editar funções"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() => remover.mutate({ data: { userId: u.id } })}
                         disabled={remover.isPending}
@@ -285,6 +335,7 @@ function AcessosAdmin() {
                         <Trash2 className="size-4" />
                       </Button>
                     </TableCell>
+
                   </TableRow>
                 ))
               )}
@@ -324,7 +375,53 @@ function AcessosAdmin() {
           />
         </CardContent>
       </Card>
+
+      <Dialog open={editando !== null} onOpenChange={(open) => !open && setEditando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar funções</DialogTitle>
+            <DialogDescription>
+              {editando?.nome} — marque todas as funções que este usuário deve ter.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PERFIS.map((p) => (
+              <label
+                key={p}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 text-sm"
+              >
+                <Checkbox
+                  checked={editando?.perfis.includes(p) ?? false}
+                  onCheckedChange={() =>
+                    setEditando((atual) =>
+                      atual ? { ...atual, perfis: alternarPerfil(atual.perfis, p) } : atual,
+                    )
+                  }
+                />
+                {LABEL_PERFIL[p]}
+              </label>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditando(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={salvarPapeis.isPending || (editando?.perfis.length ?? 0) === 0}
+              onClick={() =>
+                editando &&
+                salvarPapeis.mutate({ data: { userId: editando.id, perfis: editando.perfis } })
+              }
+            >
+              {salvarPapeis.isPending ? "Salvando…" : "Salvar funções"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 
