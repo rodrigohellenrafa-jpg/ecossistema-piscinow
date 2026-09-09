@@ -97,8 +97,10 @@ function NovoPedido() {
     },
   });
 
+  const { user } = useAuth();
+
   const { data: vendedores = [] } = useQuery({
-    queryKey: ["vendedores-select"],
+    queryKey: ["vendedores-select", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("usuarios_importados")
@@ -106,8 +108,26 @@ function NovoPedido() {
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
-      return data;
+      const lista = (data ?? []) as { id: string; nome: string | null; email: string | null }[];
+
+      // Garante que o usuário logado sempre apareça como vendedor,
+      // mesmo que ainda não conste na lista de usuários importados.
+      if (user?.id && user.email) {
+        const existe =
+          lista.some((v) => v.id === user.id) ||
+          lista.some((v) => v.email?.toLowerCase() === user.email!.toLowerCase());
+        if (!existe) {
+          lista.push({
+            id: user.id,
+            nome: (user.user_metadata?.nome as string | undefined) ?? user.email.split("@")[0],
+            email: user.email,
+          });
+          lista.sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? ""));
+        }
+      }
+      return lista;
     },
+    enabled: !!user,
   });
 
   const { data: produtos = [], refetch: refetchProdutos } = useQuery({
@@ -135,19 +155,19 @@ function NovoPedido() {
 
   const numero = useMemo(() => proximoCodigo("VEN", numerosExistentes), [numerosExistentes]);
 
-  const { user } = useAuth();
-
   const [data, setData] = useState(hojeISO());
   const [tipoAtendimento, setTipoAtendimento] = useState<"in" | "out">("in");
   const [clienteId, setClienteId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
 
-  // Pré-seleciona o usuário logado como vendedor do pedido.
+  // Pré-seleciona o usuário logado como vendedor do pedido (por id ou e-mail).
   useEffect(() => {
-    if (!vendedorId && user?.id && vendedores.some((v) => v.id === user.id)) {
-      setVendedorId(user.id);
-    }
-  }, [user?.id, vendedores, vendedorId]);
+    if (vendedorId || !user?.id) return;
+    const atual =
+      vendedores.find((v) => v.id === user.id) ??
+      vendedores.find((v) => v.email?.toLowerCase() === user.email?.toLowerCase());
+    if (atual) setVendedorId(atual.id);
+  }, [user, vendedores, vendedorId]);
   const [observacoes, setObservacoes] = useState("");
 
 
@@ -230,8 +250,17 @@ function NovoPedido() {
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
       const cliente = clientes.find((c) => c.id === clienteId);
-      const vendedor = vendedores.find((v) => v.id === vendedorId);
-      const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const vendedor =
+        vendedores.find((v) => v.id === vendedorId) ??
+        vendedores.find((v) => v.id === user?.id) ??
+        (user?.email
+          ? {
+              id: user.id,
+              nome: (user.user_metadata?.nome as string | undefined) ?? user.email.split("@")[0],
+              email: user.email,
+            }
+          : undefined);
+      const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id ?? null;
 
       const { data: venda, error: erroVenda } = await supabase
         .from("vendas")
