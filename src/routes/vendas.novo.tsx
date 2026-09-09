@@ -556,6 +556,7 @@ function NovoPedido() {
                         <Input
                           type="number"
                           min={1}
+                          className="text-white"
                           value={i.quantidade}
                           onChange={(e) => atualizarItem(i.key, { quantidade: num(e.target.value) || 1 })}
                         />
@@ -564,6 +565,7 @@ function NovoPedido() {
                         <Input
                           type="number"
                           step="0.01"
+                          className="text-white"
                           value={i.preco_unitario}
                           onChange={(e) => atualizarItem(i.key, { preco_unitario: num(e.target.value) })}
                         />
@@ -572,6 +574,7 @@ function NovoPedido() {
                         <Input
                           type="number"
                           step="0.1"
+                          className="text-white"
                           value={i.desconto_perc}
                           onChange={(e) => atualizarItem(i.key, { desconto_perc: num(e.target.value) })}
                         />
