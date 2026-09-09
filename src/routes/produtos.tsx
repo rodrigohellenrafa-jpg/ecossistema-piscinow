@@ -557,8 +557,11 @@ function Produtos() {
             </TableHeader>
             <TableBody>
               {lista.map((p) => {
+                const encomenda = Boolean((p as { sob_encomenda?: boolean }).sob_encomenda);
                 const baixo =
-                  p.tipo === "produto" && Number(p.estoque_atual) <= Number(p.estoque_minimo);
+                  p.tipo === "produto" &&
+                  !encomenda &&
+                  Number(p.estoque_atual) <= Number(p.estoque_minimo);
                 const custoTotal =
                   Number(p.custo_fabricacao) + Number(p.custo_logistico) || Number(p.preco_custo);
                 const m = margem(Number(p.preco_venda), custoTotal);
