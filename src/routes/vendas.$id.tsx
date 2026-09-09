@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -305,6 +306,14 @@ function DetalhePedido() {
               ))}
             </SelectContent>
           </Select>
+          <AssinaturaDialog
+            tabela="vendas"
+            registroId={id}
+            documentoLabel={`Pedido ${venda.numero ?? ""}`}
+            clienteNome={venda.cliente_nome}
+            clienteDocumento={cliente?.documento ?? null}
+            invalidar={[["venda", id]]}
+          />
           <Button onClick={() => window.print()}>
             <Printer /> Imprimir / Exportar PDF
           </Button>
@@ -669,6 +678,35 @@ function DetalhePedido() {
             <p className="text-muted-foreground">{venda.observacoes}</p>
           </div>
         )}
+
+        <div className="mt-8 border-t border-border pt-6">
+          <p className="mb-2 font-semibold">Aceite do cliente</p>
+          {venda.assinatura_nome ? (
+            <div className="space-y-1">
+              {venda.assinatura_imagem && (
+                <img
+                  src={venda.assinatura_imagem}
+                  alt={`Assinatura de ${venda.assinatura_nome}`}
+                  loading="lazy"
+                  className="h-24 rounded-md bg-white p-1"
+                />
+              )}
+              <p className="font-medium">{venda.assinatura_nome}</p>
+              <p className="text-muted-foreground">
+                {venda.assinatura_documento ?? "documento não informado"} ·{" "}
+                {venda.assinatura_metodo === "govbr" ? "Assinado via gov.br" : "Assinado na tela"}
+              </p>
+              <p className="text-muted-foreground">
+                {venda.assinatura_em ? new Date(venda.assinatura_em).toLocaleString("pt-BR") : "—"} ·
+                Código de conferência: {venda.assinatura_codigo ?? "—"}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-10 w-72 border-t border-foreground/50 pt-1 text-xs text-muted-foreground">
+              Assinatura do cliente
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
