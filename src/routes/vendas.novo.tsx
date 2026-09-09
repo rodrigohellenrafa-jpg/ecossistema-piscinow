@@ -573,10 +573,16 @@ function NovoPedido() {
                       <TableCell>
                         <Input
                           type="number"
-                          step="0.1"
-                          className="text-white"
+                          min={0}
+                          max={100}
+                          step="any"
+                          className="w-20 text-white"
                           value={i.desconto_perc}
-                          onChange={(e) => atualizarItem(i.key, { desconto_perc: num(e.target.value) })}
+                          onChange={(e) =>
+                            atualizarItem(i.key, {
+                              desconto_perc: Math.min(100, Math.max(0, num(e.target.value))),
+                            })
+                          }
                         />
                       </TableCell>
                       <TableCell className="text-right font-medium">{brl(totalItem(i))}</TableCell>
