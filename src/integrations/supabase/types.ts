@@ -14,6 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
+      agenda_assinaturas: {
+        Row: {
+          created_at: string
+          id: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agenda_eventos: {
+        Row: {
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          dia_inteiro: boolean
+          fim: string | null
+          id: string
+          inicio: string
+          local: string | null
+          obra_id: string | null
+          ordem_id: string | null
+          responsavel_id: string | null
+          responsavel_nome: string | null
+          status: string
+          tipo: string
+          titulo: string
+          updated_at: string
+          venda_id: string | null
+        }
+        Insert: {
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          dia_inteiro?: boolean
+          fim?: string | null
+          id?: string
+          inicio: string
+          local?: string | null
+          obra_id?: string | null
+          ordem_id?: string | null
+          responsavel_id?: string | null
+          responsavel_nome?: string | null
+          status?: string
+          tipo?: string
+          titulo: string
+          updated_at?: string
+          venda_id?: string | null
+        }
+        Update: {
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          dia_inteiro?: boolean
+          fim?: string | null
+          id?: string
+          inicio?: string
+          local?: string | null
+          obra_id?: string | null
+          ordem_id?: string | null
+          responsavel_id?: string | null
+          responsavel_nome?: string | null
+          status?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_eventos_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_eventos_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_eventos_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           ativo: boolean
