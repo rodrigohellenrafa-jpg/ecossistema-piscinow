@@ -111,6 +111,41 @@ const REGIMES_TRIBUTARIOS = [
   "MEI",
 ] as const;
 
+type EnderecoCep = {
+  logradouro: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  ibge: string;
+};
+
+async function buscarCep(cep: string): Promise<EnderecoCep | null> {
+  const limpo = cep.replace(/\D/g, "");
+  if (limpo.length !== 8) return null;
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${limpo}/json/`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      erro?: boolean | string;
+      logradouro?: string;
+      bairro?: string;
+      localidade?: string;
+      uf?: string;
+      ibge?: string;
+    };
+    if (json.erro) return null;
+    return {
+      logradouro: json.logradouro ?? "",
+      bairro: json.bairro ?? "",
+      cidade: json.localidade ?? "",
+      estado: json.uf ?? "",
+      ibge: json.ibge ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 function Clientes() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -118,6 +153,48 @@ function Clientes() {
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<Cliente | null>(null);
   const [form, setForm] = useState(vazio);
+  const [mostrarInstalacao, setMostrarInstalacao] = useState(false);
+  const [cepObra, setCepObra] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [buscandoCepObra, setBuscandoCepObra] = useState(false);
+
+  async function preencherPorCep(cep: string) {
+    setBuscandoCep(true);
+    const endereco = await buscarCep(cep);
+    setBuscandoCep(false);
+    if (!endereco) {
+      toast.error("CEP não encontrado.");
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      logradouro: endereco.logradouro || f.logradouro,
+      bairro: endereco.bairro || f.bairro,
+      cidade: endereco.cidade || f.cidade,
+      estado: endereco.estado || f.estado,
+      codigo_municipio: endereco.ibge || f.codigo_municipio,
+    }));
+    toast.success("Endereço preenchido pelo CEP.");
+  }
+
+  async function preencherObraPorCep(cep: string) {
+    setBuscandoCepObra(true);
+    const endereco = await buscarCep(cep);
+    setBuscandoCepObra(false);
+    if (!endereco) {
+      toast.error("CEP da instalação não encontrado.");
+      return;
+    }
+    const composto = [
+      endereco.logradouro,
+      endereco.bairro,
+      [endereco.cidade, endereco.estado].filter(Boolean).join("/"),
+    ]
+      .filter(Boolean)
+      .join(" - ");
+    setForm((f) => ({ ...f, endereco_obra: composto }));
+    toast.success("Endereço de instalação preenchido.");
+  }
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["clientes"],
