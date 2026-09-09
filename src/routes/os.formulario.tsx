@@ -156,6 +156,8 @@ function FormularioOS() {
               </label>
               <input
                 type="text"
+                value={cliente}
+                onChange={(e) => setCliente(e.target.value)}
                 className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
                 placeholder=""
               />
@@ -166,6 +168,8 @@ function FormularioOS() {
               </label>
               <input
                 type="text"
+                value={profissional}
+                onChange={(e) => setProfissional(e.target.value)}
                 className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
                 placeholder=""
               />
