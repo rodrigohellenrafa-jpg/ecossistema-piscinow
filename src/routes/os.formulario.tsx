@@ -39,14 +39,17 @@ export const Route = createFileRoute("/os/formulario")({
 });
 
 const TOTAL_LINHAS = 20;
+const TOTAL_LINHAS_APOIO = 12;
 
 const LINHAS_VAZIAS = Array.from({ length: TOTAL_LINHAS }, () => "");
+const LINHAS_APOIO_VAZIAS = Array.from({ length: TOTAL_LINHAS_APOIO }, () => "");
 
 function FormularioOS() {
   const [obraId, setObraId] = useState<string>("");
   const [cliente, setCliente] = useState("");
   const [profissional, setProfissional] = useState("");
   const [linhas, setLinhas] = useState<string[]>(LINHAS_VAZIAS);
+  const [linhasApoio, setLinhasApoio] = useState<string[]>(LINHAS_APOIO_VAZIAS);
 
   const { data: obras = [] } = useQuery({
     queryKey: ["obras-formulario"],
