@@ -18,8 +18,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, diasAte } from "@/lib/erp";
+import { brl, dataBR, diasAte, ETIQUETAS_ORCAMENTO, etiquetaInfo } from "@/lib/erp";
 
 export const Route = createFileRoute("/vendas/orcamentos")({
   head: () => ({
