@@ -375,7 +375,53 @@ function AcessosAdmin() {
           />
         </CardContent>
       </Card>
+
+      <Dialog open={editando !== null} onOpenChange={(open) => !open && setEditando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar funções</DialogTitle>
+            <DialogDescription>
+              {editando?.nome} — marque todas as funções que este usuário deve ter.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PERFIS.map((p) => (
+              <label
+                key={p}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 text-sm"
+              >
+                <Checkbox
+                  checked={editando?.perfis.includes(p) ?? false}
+                  onCheckedChange={() =>
+                    setEditando((atual) =>
+                      atual ? { ...atual, perfis: alternarPerfil(atual.perfis, p) } : atual,
+                    )
+                  }
+                />
+                {LABEL_PERFIL[p]}
+              </label>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditando(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={salvarPapeis.isPending || (editando?.perfis.length ?? 0) === 0}
+              onClick={() =>
+                editando &&
+                salvarPapeis.mutate({ data: { userId: editando.id, perfis: editando.perfis } })
+              }
+            >
+              {salvarPapeis.isPending ? "Salvando…" : "Salvar funções"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
 
