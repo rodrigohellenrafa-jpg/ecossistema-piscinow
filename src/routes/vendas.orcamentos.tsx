@@ -225,7 +225,7 @@ function Orcamentos() {
                         size="sm"
                         onClick={() => atualizarStatus.mutate({ id: v.id, status: "aprovado" })}
                       >
-                        <Check /> Aprovar
+                        <Check /> Converter em venda
                       </Button>
                       <Button
                         size="sm"
