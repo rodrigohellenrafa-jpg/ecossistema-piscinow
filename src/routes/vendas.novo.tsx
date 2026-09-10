@@ -429,9 +429,10 @@ function NovoPedido() {
         key: novaKey(),
         forma_pagamento: FORMAS_PAGAMENTO[0],
         valor: restante,
-        parcelas: 1,
+        parcelas: "",
         valor_parcela: restante,
         data_prevista: data,
+
         pago: false,
         bandeira: "",
         observacoes: "",
