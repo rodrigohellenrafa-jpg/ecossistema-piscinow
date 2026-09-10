@@ -64,6 +64,7 @@ interface ItemLinha {
   descricao: string;
   quantidade: number;
   preco_unitario: number;
+  desconto_pct: number;
   desconto_valor: number;
   custo_unitario: number;
   sob_encomenda: boolean;
@@ -81,8 +82,15 @@ const novaKey = () => Math.random().toString(36).slice(2);
 
 const subtotalBrutoItem = (i: ItemLinha) => i.quantidade * i.preco_unitario;
 
+/** Desconto total do item: percentual sobre o bruto + valor fixo, limitado ao bruto. */
+const descontoTotalItem = (i: ItemLinha) => {
+  const bruto = subtotalBrutoItem(i);
+  const descPct = (Math.min(Math.max(i.desconto_pct, 0), 100) / 100) * bruto;
+  return Math.min(bruto, descPct + Math.max(i.desconto_valor, 0));
+};
+
 const totalItem = (i: ItemLinha) =>
-  Math.max(0, subtotalBrutoItem(i) - i.desconto_valor);
+  Math.max(0, subtotalBrutoItem(i) - descontoTotalItem(i));
 
 /** Converte texto digitado como moeda brasileira (R$ 1.500,00 ou 1500,00) em número. */
 const parseMoedaInput = (valor: string): number => {
@@ -256,6 +264,7 @@ function NovoPedido() {
 
   const [itens, setItens] = useState<ItemLinha[]>([]);
   const [descontoInputs, setDescontoInputs] = useState<Record<string, string>>({});
+  const [descontoPctInputs, setDescontoPctInputs] = useState<Record<string, string>>({});
   const [produtoSel, setProdutoSel] = useState("");
 
   const [cascoId, setCascoId] = useState("");
@@ -285,6 +294,8 @@ function NovoPedido() {
         if (Array.isArray(d.itens)) setItens(d.itens as ItemLinha[]);
         if (d.descontoInputs && typeof d.descontoInputs === "object")
           setDescontoInputs(d.descontoInputs as Record<string, string>);
+        if (d.descontoPctInputs && typeof d.descontoPctInputs === "object")
+          setDescontoPctInputs(d.descontoPctInputs as Record<string, string>);
         if (typeof d.cascoId === "string") setCascoId(d.cascoId);
         if (typeof d.filtroId === "string") setFiltroId(d.filtroId);
         if (Array.isArray(d.acessorios)) setAcessorios(d.acessorios as AcessorioLinha[]);
@@ -318,6 +329,7 @@ function NovoPedido() {
           observacoes,
           itens,
           descontoInputs,
+          descontoPctInputs,
           cascoId,
           filtroId,
           acessorios,
@@ -340,6 +352,7 @@ function NovoPedido() {
     observacoes,
     itens,
     descontoInputs,
+    descontoPctInputs,
     cascoId,
     filtroId,
     acessorios,
@@ -358,6 +371,7 @@ function NovoPedido() {
     setObservacoes("");
     setItens([]);
     setDescontoInputs({});
+    setDescontoPctInputs({});
     setCascoId("");
     setFiltroId("");
     setAcessorios([]);
@@ -442,6 +456,7 @@ function NovoPedido() {
         descricao: p.nome,
         quantidade: 1,
         preco_unitario: num(p.preco_venda),
+        desconto_pct: 0,
         desconto_valor: 0,
         custo_unitario: num(p.preco_custo),
         sob_encomenda: Boolean((p as { sob_encomenda?: boolean }).sob_encomenda),
@@ -527,8 +542,8 @@ function NovoPedido() {
               descricao: i.descricao,
               quantidade: i.quantidade,
               preco_unitario: i.preco_unitario,
-              desconto_valor: i.desconto_valor,
-              desconto_perc: bruto > 0 ? Number(((i.desconto_valor / bruto) * 100).toFixed(2)) : 0,
+              desconto_valor: Number(descontoTotalItem(i).toFixed(2)),
+              desconto_perc: bruto > 0 ? Number(((descontoTotalItem(i) / bruto) * 100).toFixed(2)) : 0,
               total: totalItem(i),
               custo_unitario: i.custo_unitario,
             };
@@ -837,6 +852,7 @@ function NovoPedido() {
                     <TableHead>Descrição</TableHead>
                     <TableHead className="w-20">Qtd</TableHead>
                     <TableHead className="w-28">Vlr. Unit.</TableHead>
+                    <TableHead className="w-24">Desc. (%)</TableHead>
                     <TableHead className="w-28">Desc. (R$)</TableHead>
                     <TableHead className="w-32 text-right">Total</TableHead>
                     <TableHead className="w-10" />
@@ -887,6 +903,26 @@ function NovoPedido() {
                           type="text"
                           inputMode="decimal"
                           placeholder="0,00"
+                          className="w-24 text-white"
+                          value={descontoPctInputs[i.key] ?? (i.desconto_pct ? i.desconto_pct.toString() : "")}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setDescontoPctInputs((prev) => ({ ...prev, [i.key]: raw }));
+                            const pct = Math.min(parseMoedaInput(raw), 100);
+                            atualizarItem(i.key, { desconto_pct: pct });
+                          }}
+                          onBlur={(e) => {
+                            const pct = Math.min(parseMoedaInput(e.target.value), 100);
+                            setDescontoPctInputs((prev) => ({ ...prev, [i.key]: pct ? pct.toFixed(2) : "" }));
+                            atualizarItem(i.key, { desconto_pct: pct });
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0,00"
                           className="w-28 text-white"
                           value={descontoInputs[i.key] ?? (i.desconto_valor ? i.desconto_valor.toString() : "")}
                           onChange={(e) => {
@@ -907,9 +943,9 @@ function NovoPedido() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         <div className="font-medium">{brl(totalItem(i))}</div>
-                        {i.desconto_valor > 0 && (
+                        {descontoTotalItem(i) > 0 && (
                           <div className="text-xs text-destructive">
-                            -{brl(i.desconto_valor)} desc.
+                            -{brl(descontoTotalItem(i))} desc.
                           </div>
                         )}
                       </TableCell>
@@ -922,7 +958,7 @@ function NovoPedido() {
                   ))}
                   {itens.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                         Nenhum item adicionado.
                       </TableCell>
                     </TableRow>
