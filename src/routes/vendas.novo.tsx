@@ -613,6 +613,18 @@ function NovoPedido() {
           : undefined);
       const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id ?? null;
 
+      // O rascunho salvo como orçamento não concluído dá lugar ao pedido final.
+      if (rascunhoVendaId) {
+        await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
+        await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
+        setRascunhoVendaId(null);
+        try {
+          localStorage.removeItem(RASCUNHO_VENDA_KEY);
+        } catch {
+          /* armazenamento indisponível */
+        }
+      }
+
       const { data: venda, error: erroVenda } = await supabase
         .from("vendas")
         .insert({
@@ -828,6 +840,7 @@ function NovoPedido() {
       }
       try {
         localStorage.removeItem(RASCUNHO_KEY);
+        localStorage.removeItem(RASCUNHO_VENDA_KEY);
       } catch {
         /* armazenamento indisponível */
       }
@@ -1297,10 +1310,11 @@ function NovoPedido() {
                         value={c.valor}
                         onChange={(valor) => {
                           const parcelas = parcelasNum(c.parcelas);
-                          const semJuros = Math.abs(cobradoCondicao(c) - c.valor) < 0.01;
+                          // A parcela sempre carrega o juros: (valor + juros) / parcelas.
+                          const juros = acrescimoCondicao(c);
                           atualizarCondicao(c.key, {
                             valor,
-                            ...(semJuros ? { valor_parcela: valor / parcelas } : {}),
+                            valor_parcela: (valor + juros) / parcelas,
                           });
                         }}
                       />
