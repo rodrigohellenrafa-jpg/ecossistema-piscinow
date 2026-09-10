@@ -852,6 +852,7 @@ function NovoPedido() {
                     <TableHead>Descrição</TableHead>
                     <TableHead className="w-20">Qtd</TableHead>
                     <TableHead className="w-28">Vlr. Unit.</TableHead>
+                    <TableHead className="w-24">Desc. (%)</TableHead>
                     <TableHead className="w-28">Desc. (R$)</TableHead>
                     <TableHead className="w-32 text-right">Total</TableHead>
                     <TableHead className="w-10" />
@@ -895,6 +896,26 @@ function NovoPedido() {
                           className="text-white"
                           value={i.preco_unitario}
                           onChange={(e) => atualizarItem(i.key, { preco_unitario: num(e.target.value) })}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0,00"
+                          className="w-24 text-white"
+                          value={descontoPctInputs[i.key] ?? (i.desconto_pct ? i.desconto_pct.toString() : "")}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setDescontoPctInputs((prev) => ({ ...prev, [i.key]: raw }));
+                            const pct = Math.min(parseMoedaInput(raw), 100);
+                            atualizarItem(i.key, { desconto_pct: pct });
+                          }}
+                          onBlur={(e) => {
+                            const pct = Math.min(parseMoedaInput(e.target.value), 100);
+                            setDescontoPctInputs((prev) => ({ ...prev, [i.key]: pct ? pct.toFixed(2) : "" }));
+                            atualizarItem(i.key, { desconto_pct: pct });
+                          }}
                         />
                       </TableCell>
                       <TableCell>
