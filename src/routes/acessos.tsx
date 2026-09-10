@@ -463,6 +463,46 @@ function AcessosAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={trocandoSenha !== null}
+        onOpenChange={(open) => !open && setTrocandoSenha(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Definir senha</DialogTitle>
+            <DialogDescription>
+              {trocandoSenha?.nome} — informe a senha pessoal deste usuário (mínimo 6 caracteres).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="senha-troca">Nova senha</Label>
+            <Input
+              id="senha-troca"
+              type="text"
+              autoComplete="new-password"
+              value={novaSenha}
+              onChange={(e) => setNovaSenha(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrocandoSenha(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={trocarSenha.isPending || novaSenha.trim().length < 6}
+              onClick={() =>
+                trocandoSenha &&
+                trocarSenha.mutate({ data: { userId: trocandoSenha.id, senha: novaSenha.trim() } })
+              }
+            >
+              {trocarSenha.isPending ? "Salvando…" : "Salvar senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
 
   );
