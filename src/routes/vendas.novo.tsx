@@ -542,8 +542,8 @@ function NovoPedido() {
               descricao: i.descricao,
               quantidade: i.quantidade,
               preco_unitario: i.preco_unitario,
-              desconto_valor: i.desconto_valor,
-              desconto_perc: bruto > 0 ? Number(((i.desconto_valor / bruto) * 100).toFixed(2)) : 0,
+              desconto_valor: Number(descontoTotalItem(i).toFixed(2)),
+              desconto_perc: bruto > 0 ? Number(((descontoTotalItem(i) / bruto) * 100).toFixed(2)) : 0,
               total: totalItem(i),
               custo_unitario: i.custo_unitario,
             };
