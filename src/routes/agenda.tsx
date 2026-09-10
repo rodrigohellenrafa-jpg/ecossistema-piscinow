@@ -125,6 +125,7 @@ function Agenda() {
   const trocarToken = useServerFn(regenerarTokenAgenda);
   const listarGoogle = useServerFn(listarAgendasGoogle);
   const sincronizarGoogle = useServerFn(sincronizarAgendaGoogle);
+  const enviarGoogle = useServerFn(enviarAgendaParaGoogle);
   const [agendaGoogle, setAgendaGoogle] = useState("primary");
 
   const { data: agendasGoogle = [] } = useQuery({
