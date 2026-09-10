@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarDays, Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarDays, Copy, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -32,7 +32,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { meuTokenAgenda, regenerarTokenAgenda } from "@/lib/agenda.functions";
-import { listarAgendasGoogle, sincronizarAgendaGoogle } from "@/lib/google-agenda.functions";
+import {
+  enviarAgendaParaGoogle,
+  listarAgendasGoogle,
+  sincronizarAgendaGoogle,
+} from "@/lib/google-agenda.functions";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({
@@ -121,6 +125,7 @@ function Agenda() {
   const trocarToken = useServerFn(regenerarTokenAgenda);
   const listarGoogle = useServerFn(listarAgendasGoogle);
   const sincronizarGoogle = useServerFn(sincronizarAgendaGoogle);
+  const enviarGoogle = useServerFn(enviarAgendaParaGoogle);
   const [agendaGoogle, setAgendaGoogle] = useState("primary");
 
   const { data: agendasGoogle = [] } = useQuery({
@@ -133,6 +138,15 @@ function Agenda() {
     mutationFn: () => sincronizarGoogle({ data: { calendarId: agendaGoogle } }),
     onSuccess: (r) => {
       toast.success(`${r.importados} compromisso(s) do Google trazidos para a agenda.`);
+      qc.invalidateQueries({ queryKey: ["agenda-eventos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const enviar = useMutation({
+    mutationFn: () => enviarGoogle({ data: { calendarId: agendaGoogle } }),
+    onSuccess: (r) => {
+      toast.success(`${r.enviados} compromisso(s) do sistema enviados para o Google.`);
       qc.invalidateQueries({ queryKey: ["agenda-eventos"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -505,13 +519,14 @@ function Agenda() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <CalendarDays className="size-4" /> Trazer os compromissos do Google
+            <CalendarDays className="size-4" /> Google Agenda (nos dois sentidos)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Puxa os compromissos da conta do Google conectada (Campinas Jardim do Trevo) para a
-            agenda da equipe. Pode repetir quando quiser: nada é duplicado, apenas atualizado.
+            "Trazer do Google" puxa os compromissos da conta conectada (Campinas Jardim do Trevo).
+            "Enviar para o Google" leva tudo que é criado aqui — compromissos, obras do Flight
+            Board e ordens de serviço. Pode repetir quando quiser: nada é duplicado, só atualizado.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select value={agendaGoogle} onValueChange={setAgendaGoogle}>
@@ -529,8 +544,15 @@ function Agenda() {
                   ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => sincronizar.mutate()} disabled={sincronizar.isPending}>
-              <RefreshCw /> {sincronizar.isPending ? "Sincronizando…" : "Sincronizar agora"}
+            <Button
+              variant="secondary"
+              onClick={() => sincronizar.mutate()}
+              disabled={sincronizar.isPending}
+            >
+              <RefreshCw /> {sincronizar.isPending ? "Trazendo…" : "Trazer do Google"}
+            </Button>
+            <Button onClick={() => enviar.mutate()} disabled={enviar.isPending}>
+              <Upload /> {enviar.isPending ? "Enviando…" : "Enviar para o Google"}
             </Button>
           </div>
         </CardContent>
