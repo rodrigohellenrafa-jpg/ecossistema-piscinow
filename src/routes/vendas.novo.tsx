@@ -154,7 +154,8 @@ interface CondicaoLinha {
   forma_pagamento: string;
   /** Valor que essa condição abate do total do pedido. */
   valor: number;
-  parcelas: number;
+  /** Quantidade de parcelas (em branco ou zero enquanto não preenchido). */
+  parcelas: number | string;
   /** Valor de cada parcela cobrada do cliente (já com juros da maquininha). */
   valor_parcela: number;
   data_prevista: string;
@@ -162,6 +163,7 @@ interface CondicaoLinha {
   bandeira: string;
   observacoes: string;
 }
+
 
 /** Total que o cliente desembolsa nessa condição (parcelas x valor da parcela). */
 const cobradoCondicao = (c: CondicaoLinha) =>
