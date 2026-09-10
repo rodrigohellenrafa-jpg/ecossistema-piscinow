@@ -143,6 +143,15 @@ function Agenda() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const enviar = useMutation({
+    mutationFn: () => enviarGoogle({ data: { calendarId: agendaGoogle } }),
+    onSuccess: (r) => {
+      toast.success(`${r.enviados} compromisso(s) do sistema enviados para o Google.`);
+      qc.invalidateQueries({ queryKey: ["agenda-eventos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const { data: assinatura } = useQuery({
     queryKey: ["agenda-token"],
     queryFn: () => pegarToken(),
