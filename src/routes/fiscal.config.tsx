@@ -28,6 +28,7 @@ import {
 
 
 export const Route = createFileRoute("/fiscal/config")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Configuração Fiscal | Piscinow ERP" },

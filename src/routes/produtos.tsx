@@ -49,6 +49,7 @@ import { brl, CATEGORIAS_PRODUTO, margem, pct } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/produtos")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Produtos e Serviços | Piscinow ERP" },

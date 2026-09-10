@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
 import { Route as ReativacaoRouteImport } from './routes/reativacao'
 import { Route as ProdutosRouteImport } from './routes/produtos'
@@ -42,6 +43,11 @@ import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventar
 import { Route as EstoqueEntradasRouteImport } from './routes/estoque.entradas'
 import { Route as ApiPublicAgendaTokenRouteImport } from './routes/api/public/agenda.$token'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RelatorioContasRoute = RelatorioContasRouteImport.update({
   id: '/relatorio-contas',
   path: '/relatorio-contas',
@@ -226,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
   '/fiscal/config': typeof FiscalConfigRoute
@@ -260,6 +267,7 @@ export interface FileRoutesByTo {
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
   '/fiscal/config': typeof FiscalConfigRoute
@@ -295,6 +303,7 @@ export interface FileRoutesById {
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
   '/fiscal/config': typeof FiscalConfigRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
+    | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
     | '/fiscal/config'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
+    | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
     | '/fiscal/config'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
+    | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
     | '/fiscal/config'
@@ -434,6 +446,7 @@ export interface RootRouteChildren {
   ProdutosRoute: typeof ProdutosRoute
   ReativacaoRoute: typeof ReativacaoRoute
   RelatorioContasRoute: typeof RelatorioContasRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   EstoqueEntradasRoute: typeof EstoqueEntradasRoute
   EstoqueInventarioRoute: typeof EstoqueInventarioRoute
   ObrasIdRoute: typeof ObrasIdRoute
@@ -447,6 +460,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/relatorio-contas': {
       id: '/relatorio-contas'
       path: '/relatorio-contas'
@@ -708,6 +728,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProdutosRoute: ProdutosRoute,
   ReativacaoRoute: ReativacaoRoute,
   RelatorioContasRoute: RelatorioContasRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   EstoqueEntradasRoute: EstoqueEntradasRoute,
   EstoqueInventarioRoute: EstoqueInventarioRoute,
   ObrasIdRoute: ObrasIdRoute,

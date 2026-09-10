@@ -42,6 +42,7 @@ import {
 
 
 export const Route = createFileRoute("/acessos")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Controle de Acesso | Piscinow ERP" },

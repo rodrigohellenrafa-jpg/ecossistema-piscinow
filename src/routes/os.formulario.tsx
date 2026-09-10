@@ -15,6 +15,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/os/formulario")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Formulário de OS | Piscinow ERP" },

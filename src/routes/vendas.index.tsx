@@ -40,6 +40,7 @@ import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
 export const Route = createFileRoute("/vendas/")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Vendas | Piscinow ERP" },

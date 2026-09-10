@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { addDiasUteis, hojeISO, proximoCodigo } from "@/lib/erp";
 
 export const Route = createFileRoute("/ordens")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Ordens de Serviço | Piscinow ERP" },

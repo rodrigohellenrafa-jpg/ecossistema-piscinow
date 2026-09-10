@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, diasAte, ETAPAS_OBRA, margem, mesLabel, pct } from "@/lib/erp";
 
 export const Route = createFileRoute("/")({
+  staticData: { sitemap: true },
   head: () => ({
     meta: [
       { title: "Painel Executivo | Piscinow ERP" },

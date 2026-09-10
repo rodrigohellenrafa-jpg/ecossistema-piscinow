@@ -4,7 +4,7 @@ import { Waves } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
 export const Route = createFileRoute("/auth")({
+  staticData: { sitemap: true },
   head: () => ({
     meta: [
       { title: "Entrar | Piscinow ERP" },
@@ -70,7 +71,9 @@ function AuthPage() {
           <div className="mx-auto flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Waves className="size-5" />
           </div>
-          <CardTitle>Piscinow ERP</CardTitle>
+          <h1 className="text-lg font-semibold leading-none tracking-tight">
+            Entrar no Piscinow ERP
+          </h1>
           <CardDescription>Acesso da equipe</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

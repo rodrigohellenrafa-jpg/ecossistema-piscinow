@@ -39,6 +39,7 @@ import {
 } from "@/lib/erp";
 
 export const Route = createFileRoute("/logistica")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Flight Board | Piscinow ERP" },

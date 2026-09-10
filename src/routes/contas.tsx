@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/contas")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Contas a Pagar e Receber | Piscinow ERP" },

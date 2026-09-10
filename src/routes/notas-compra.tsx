@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/notas-compra")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Notas de Compra | Piscinow ERP" },

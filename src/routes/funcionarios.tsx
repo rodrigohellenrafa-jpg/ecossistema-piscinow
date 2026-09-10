@@ -42,6 +42,7 @@ import { brl, proximoCodigo } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/funcionarios")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Funcionários | Piscinow ERP" },

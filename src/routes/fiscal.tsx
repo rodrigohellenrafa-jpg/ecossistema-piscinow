@@ -55,6 +55,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO } from "@/lib/erp";
 
 export const Route = createFileRoute("/fiscal")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Emissão de Notas Fiscais | Piscinow ERP" },

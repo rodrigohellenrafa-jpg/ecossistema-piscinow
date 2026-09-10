@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, mesLabel, pct } from "@/lib/erp";
 
 export const Route = createFileRoute("/dre")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "DRE | Piscinow ERP" },
