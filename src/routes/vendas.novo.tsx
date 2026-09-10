@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExpandableCard } from "@/components/expandable-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -734,10 +735,10 @@ function NovoPedido() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardHeader>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="space-y-4 xl:col-span-2">
+          <ExpandableCard>
+            <CardHeader className="pr-12">
               <CardTitle>Identificação</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-3">
@@ -809,10 +810,10 @@ function NovoPedido() {
                 </div>
               </Field>
             </CardContent>
-          </Card>
+          </ExpandableCard>
 
-          <Card className="overflow-hidden border-border">
-            <CardHeader className="border-b border-border p-5">
+          <ExpandableCard className="overflow-hidden border-border">
+            <CardHeader className="border-b border-border p-5 pr-12">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="h-8 w-1.5 rounded-full bg-primary" />
@@ -980,11 +981,11 @@ function NovoPedido() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </ExpandableCard>
 
           {tipoAtendimento === "out" && (
-          <Card>
-            <CardHeader>
+          <ExpandableCard>
+            <CardHeader className="pr-12">
               <CardTitle>Composição da Piscina (Multipartido)</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1084,12 +1085,12 @@ function NovoPedido() {
                 </Field>
               </div>
             </CardContent>
-          </Card>
+          </ExpandableCard>
           )}
 
 
-          <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
+          <ExpandableCard>
+            <CardHeader className="flex-row items-center justify-between space-y-0 pr-12">
               <CardTitle>Condições de pagamento</CardTitle>
               <Button variant="outline" size="sm" onClick={adicionarCondicao}>
                 <Plus /> Adicionar condição
@@ -1325,7 +1326,7 @@ function NovoPedido() {
                 />
               </Field>
             </CardContent>
-          </Card>
+          </ExpandableCard>
 
           <div className="flex justify-end">
             <Button size="lg" onClick={() => salvar.mutate()} disabled={salvar.isPending}>
