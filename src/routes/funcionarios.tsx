@@ -134,6 +134,9 @@ function Funcionarios() {
       nome: f.nome,
       cargo: f.cargo ?? "",
       perfil: f.perfil,
+      perfis: ((f as { perfis?: Perfil[] }).perfis?.length
+        ? (f as { perfis?: Perfil[] }).perfis!
+        : [f.perfil]) as Perfil[],
       email: f.email ?? "",
       telefone: f.telefone ?? "",
       data_admissao: f.data_admissao ?? "",
