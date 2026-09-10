@@ -230,6 +230,17 @@ function AcessosAdmin() {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="senha-nova">Senha pessoal</Label>
+                <Input
+                  id="senha-nova"
+                  type="text"
+                  autoComplete="new-password"
+                  placeholder="Mínimo 6 caracteres (deixe vazio para gerar automática)"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -261,7 +272,9 @@ function AcessosAdmin() {
             {senhaGerada && (
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4">
                 <p className="text-sm font-medium text-yellow-400">
-                  Senha temporária gerada (mostre uma única vez ao usuário):
+                  {senhaDefinida
+                    ? "Senha cadastrada para este usuário:"
+                    : "Senha temporária gerada (mostre uma única vez ao usuário):"}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="rounded bg-background px-2 py-1 text-sm">{senhaGerada}</code>
