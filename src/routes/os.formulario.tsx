@@ -152,22 +152,28 @@ function FormularioOS() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Formulário de OS</h1>
           <p className="text-sm text-muted-foreground">
-            Selecione a obra para trazer os itens do pedido e imprima o formulário.
+            Selecione a obra ou o pedido de venda para trazer os itens e imprima o formulário.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={obraId} onValueChange={setObraId}>
-            <SelectTrigger className="w-64">
+          <Select value={selecao} onValueChange={setSelecao}>
+            <SelectTrigger className="w-72">
               <SelectValue placeholder="Selecionar obra / pedido" />
             </SelectTrigger>
             <SelectContent>
               {obras.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
-                  {(o.numero ?? "Obra") + " — " + (o.cliente_nome ?? "sem cliente")}
+                <SelectItem key={o.id} value={`obra:${o.id}`}>
+                  Obra {(o.numero ?? "—") + " — " + (o.cliente_nome ?? "sem cliente")}
+                </SelectItem>
+              ))}
+              {vendas.map((v) => (
+                <SelectItem key={v.id} value={`venda:${v.id}`}>
+                  Pedido {(v.numero ?? "—") + " — " + (v.cliente_nome ?? "sem cliente")}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
           <Button variant="outline" asChild>
             <Link to="/ordens">
               <ArrowLeft /> Voltar às OS
