@@ -875,19 +875,8 @@ function NovoPedido() {
                           {i.sku || "—"}
                         </TableCell>
                         <TableCell className="max-w-0 px-6 py-4">
-                          <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
-                            <span className="truncate text-sm font-medium">{i.descricao}</span>
-                            {i.sob_encomenda ? (
-                              <span className="shrink-0 rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
-                                Sob encomenda
-                              </span>
-                            ) : (
-                              i.estoque_atual < i.quantidade && (
-                                <span className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
-                                  Sem saldo · será encomendado
-                                </span>
-                              )
-                            )}
+                          <div className="truncate text-sm font-medium" title={i.descricao}>
+                            {i.descricao}
                           </div>
                         </TableCell>
                         <TableCell className="px-6 py-4 text-center">
@@ -945,20 +934,51 @@ function NovoPedido() {
                           )}
                         </TableCell>
                         <TableCell className="px-6 py-4 text-center">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removerItem(i.key)}
-                            className="size-8 rounded-full border border-border text-muted-foreground hover:border-destructive hover:text-destructive group-hover:bg-muted/50"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
+                          {i.sob_encomenda ? (
+                            <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/15 px-2.5 py-1 text-[11px] font-medium text-sky-500">
+                              Encomendado
+                            </span>
+                          ) : i.estoque_atual < i.quantidade ? (
+                            <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-1 text-[11px] font-medium text-amber-500">
+                              Encomendado
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-medium text-emerald-500">
+                              Em estoque
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                const produto = produtos.find((p) => p.id === i.produto_id);
+                                if (produto) {
+                                  setProdutoSel(i.produto_id ?? "");
+                                }
+                                toast.info(`Edição do item: ${i.descricao}. Alterações podem ser feitas diretamente nos campos da linha.`);
+                              }}
+                              className="size-8 rounded-full border border-border text-muted-foreground hover:border-primary hover:text-primary group-hover:bg-muted/50"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removerItem(i.key)}
+                              className="size-8 rounded-full border border-border text-muted-foreground hover:border-destructive hover:text-destructive group-hover:bg-muted/50"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
                     {itens.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                        <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                           Nenhum item adicionado.
                         </TableCell>
                       </TableRow>
