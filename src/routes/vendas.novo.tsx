@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -147,6 +147,7 @@ function MoedaInput({
 }
 
 const RASCUNHO_KEY = "piscinow:pdv-rascunho";
+const RASCUNHO_VENDA_KEY = "piscinow:pdv-rascunho-venda";
 
 /** Uma forma de pagamento aplicada ao pedido (pode haver várias no mesmo pedido). */
 interface CondicaoLinha {
@@ -183,6 +184,14 @@ const acrescimoCondicao = (c: CondicaoLinha) =>
 
 function NovoPedido() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [rascunhoVendaId, setRascunhoVendaId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(RASCUNHO_VENDA_KEY);
+    } catch {
+      return null;
+    }
+  });
 
   const { data: clientes = [], refetch: refetchClientes } = useQuery({
     queryKey: ["clientes-select"],
@@ -371,8 +380,15 @@ function NovoPedido() {
     condicoes,
   ]);
 
-  const descartarRascunho = () => {
+  const descartarRascunho = async () => {
     localStorage.removeItem(RASCUNHO_KEY);
+    localStorage.removeItem(RASCUNHO_VENDA_KEY);
+    if (rascunhoVendaId) {
+      await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
+      await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
+      setRascunhoVendaId(null);
+      queryClient.invalidateQueries({ queryKey: ["vendas"] });
+    }
     setData(hojeISO());
     setTipoAtendimento("in");
     setClienteId("");
@@ -427,6 +443,95 @@ function NovoPedido() {
     condicoes.length > 0
       ? Array.from(new Set(condicoes.map((c) => c.forma_pagamento))).join(" + ")
       : FORMAS_PAGAMENTO[0];
+
+  // ----- Rascunho salvo no banco como orçamento não concluído -----
+  useEffect(() => {
+    if (!rascunhoPronto) return;
+    if (!clienteId && itens.length === 0) return;
+    const timer = setTimeout(async () => {
+      try {
+        const cliente = clientes.find((c) => c.id === clienteId);
+        const cabecalho = {
+          numero,
+          data,
+          cliente_id: clienteId || null,
+          cliente_nome: cliente?.nome ?? null,
+          forma_pagamento: formaPagamento,
+          status_pagamento: "pendente",
+          status_pedido: "orcamento",
+          tipo_atendimento: tipoAtendimento,
+          etiqueta: "Rascunho não concluído",
+          observacoes: observacoes || null,
+          valor_total: valorTotal,
+          subtotal_produtos: subtotalProdutos,
+          valor_frete: custoFrete,
+          valor_mao_obra: custoMaoObra,
+          valor_impostos: impostosKit,
+          custo_total: custoTotalGeral,
+          valor_entrada: valorEntrada,
+          saldo_devedor: saldoDevedor,
+          parcelas: parcelasQtd,
+          valor_parcela: valorParcela,
+          created_by: user?.id ?? null,
+        };
+
+        let id = rascunhoVendaId;
+        if (id) {
+          const { error } = await supabase.from("vendas").update(cabecalho).eq("id", id);
+          if (error) throw error;
+        } else {
+          const { data: nova, error } = await supabase
+            .from("vendas")
+            .insert(cabecalho)
+            .select("id")
+            .single();
+          if (error) throw error;
+          id = nova.id as string;
+          setRascunhoVendaId(id);
+          localStorage.setItem(RASCUNHO_VENDA_KEY, id);
+        }
+
+        await supabase.from("venda_itens").delete().eq("venda_id", id);
+        if (itens.length > 0) {
+          await supabase.from("venda_itens").insert(
+            itens.map((i) => {
+              const bruto = subtotalBrutoItem(i);
+              return {
+                venda_id: id,
+                produto_id: i.produto_id,
+                sku: i.sku || null,
+                descricao: i.descricao,
+                quantidade: i.quantidade,
+                preco_unitario: i.preco_unitario,
+                desconto_valor: Number(descontoTotalItem(i).toFixed(2)),
+                desconto_perc:
+                  bruto > 0 ? Number(((descontoTotalItem(i) / bruto) * 100).toFixed(2)) : 0,
+                total: totalItem(i),
+                custo_unitario: i.custo_unitario,
+              };
+            }),
+          );
+        }
+        queryClient.invalidateQueries({ queryKey: ["vendas", "orcamentos"] });
+      } catch {
+        /* rascunho no banco é best-effort */
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    rascunhoPronto,
+    clienteId,
+    itens,
+    condicoes,
+    observacoes,
+    data,
+    tipoAtendimento,
+    valorTotal,
+    precoVendaKit,
+  ]);
+
+
 
   const adicionarCondicao = () => {
     const restante = Math.max(0, Number((valorTotal - totalAplicado).toFixed(2)));
@@ -507,6 +612,18 @@ function NovoPedido() {
             }
           : undefined);
       const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id ?? null;
+
+      // O rascunho salvo como orçamento não concluído dá lugar ao pedido final.
+      if (rascunhoVendaId) {
+        await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
+        await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
+        setRascunhoVendaId(null);
+        try {
+          localStorage.removeItem(RASCUNHO_VENDA_KEY);
+        } catch {
+          /* armazenamento indisponível */
+        }
+      }
 
       const { data: venda, error: erroVenda } = await supabase
         .from("vendas")
@@ -723,6 +840,7 @@ function NovoPedido() {
       }
       try {
         localStorage.removeItem(RASCUNHO_KEY);
+        localStorage.removeItem(RASCUNHO_VENDA_KEY);
       } catch {
         /* armazenamento indisponível */
       }
@@ -1192,10 +1310,11 @@ function NovoPedido() {
                         value={c.valor}
                         onChange={(valor) => {
                           const parcelas = parcelasNum(c.parcelas);
-                          const semJuros = Math.abs(cobradoCondicao(c) - c.valor) < 0.01;
+                          // A parcela sempre carrega o juros: (valor + juros) / parcelas.
+                          const juros = acrescimoCondicao(c);
                           atualizarCondicao(c.key, {
                             valor,
-                            ...(semJuros ? { valor_parcela: valor / parcelas } : {}),
+                            valor_parcela: (valor + juros) / parcelas,
                           });
                         }}
                       />
