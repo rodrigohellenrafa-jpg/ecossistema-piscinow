@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Lock, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { Copy, KeyRound, Lock, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -35,6 +35,7 @@ import {
   criarUsuario,
   definirPapeis,
   listarUsuarios,
+  redefinirSenha,
   removerUsuario,
 } from "@/lib/usuarios.functions";
 
@@ -108,15 +109,20 @@ function AcessosAdmin() {
   const doCriar = useServerFn(criarUsuario);
   const doRemover = useServerFn(removerUsuario);
   const doDefinirPapeis = useServerFn(definirPapeis);
+  const doRedefinirSenha = useServerFn(redefinirSenha);
 
 
   const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
+  const [senha, setSenha] = useState("");
   const [perfis, setPerfis] = useState<Perfil[]>(["usuario"]);
   const [senhaGerada, setSenhaGerada] = useState<string | null>(null);
+  const [senhaDefinida, setSenhaDefinida] = useState(false);
   const [editando, setEditando] = useState<{ id: string; nome: string; perfis: Perfil[] } | null>(
     null,
   );
+  const [trocandoSenha, setTrocandoSenha] = useState<{ id: string; nome: string } | null>(null);
+  const [novaSenha, setNovaSenha] = useState("");
 
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ["usuarios-sistema"],
@@ -128,8 +134,10 @@ function AcessosAdmin() {
     onSuccess: (res) => {
       toast.success("Usuário criado com sucesso.");
       setSenhaGerada(res.senhaTemporaria);
+      setSenhaDefinida(Boolean(senha.trim()));
       setEmail("");
       setNome("");
+      setSenha("");
       setPerfis(["usuario"]);
       qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
     },
@@ -155,6 +163,16 @@ function AcessosAdmin() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const trocarSenha = useMutation({
+    mutationFn: doRedefinirSenha,
+    onSuccess: () => {
+      toast.success("Senha atualizada.");
+      setTrocandoSenha(null);
+      setNovaSenha("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const alternarPerfil = (lista: Perfil[], p: Perfil) =>
     lista.includes(p) ? lista.filter((x) => x !== p) : [...lista, p];
 
@@ -165,7 +183,7 @@ function AcessosAdmin() {
       return;
     }
     setSenhaGerada(null);
-    criar.mutate({ data: { email, nome, perfis } });
+    criar.mutate({ data: { email, nome, perfis, senha: senha.trim() } });
   };
 
 
@@ -212,6 +230,17 @@ function AcessosAdmin() {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="senha-nova">Senha pessoal</Label>
+                <Input
+                  id="senha-nova"
+                  type="text"
+                  autoComplete="new-password"
+                  placeholder="Mínimo 6 caracteres (deixe vazio para gerar automática)"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -243,7 +272,9 @@ function AcessosAdmin() {
             {senhaGerada && (
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4">
                 <p className="text-sm font-medium text-yellow-400">
-                  Senha temporária gerada (mostre uma única vez ao usuário):
+                  {senhaDefinida
+                    ? "Senha cadastrada para este usuário:"
+                    : "Senha temporária gerada (mostre uma única vez ao usuário):"}
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <code className="rounded bg-background px-2 py-1 text-sm">{senhaGerada}</code>
@@ -323,6 +354,18 @@ function AcessosAdmin() {
                         aria-label="Editar funções"
                       >
                         <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setNovaSenha("");
+                          setTrocandoSenha({ id: u.id, nome: u.nome });
+                        }}
+                        aria-label="Definir senha"
+                      >
+                        <KeyRound className="size-4" />
                       </Button>
                       <Button
                         size="icon"
@@ -416,6 +459,46 @@ function AcessosAdmin() {
               }
             >
               {salvarPapeis.isPending ? "Salvando…" : "Salvar funções"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={trocandoSenha !== null}
+        onOpenChange={(open) => !open && setTrocandoSenha(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Definir senha</DialogTitle>
+            <DialogDescription>
+              {trocandoSenha?.nome} — informe a senha pessoal deste usuário (mínimo 6 caracteres).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="senha-troca">Nova senha</Label>
+            <Input
+              id="senha-troca"
+              type="text"
+              autoComplete="new-password"
+              value={novaSenha}
+              onChange={(e) => setNovaSenha(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrocandoSenha(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={trocarSenha.isPending || novaSenha.trim().length < 6}
+              onClick={() =>
+                trocandoSenha &&
+                trocarSenha.mutate({ data: { userId: trocandoSenha.id, senha: novaSenha.trim() } })
+              }
+            >
+              {trocarSenha.isPending ? "Salvando…" : "Salvar senha"}
             </Button>
           </DialogFooter>
         </DialogContent>
