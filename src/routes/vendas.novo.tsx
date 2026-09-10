@@ -811,166 +811,173 @@ function NovoPedido() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Itens do pedido</CardTitle>
+          <Card className="overflow-hidden border-border">
+            <CardHeader className="border-b border-border p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-2 rounded-full bg-primary" />
+                  <CardTitle className="text-xl tracking-tight">Itens do Pedido</CardTitle>
+                </div>
+
+                <div className="flex flex-1 items-center gap-3 md:max-w-2xl">
+                  <Field label="Produto" className="flex-1">
+                    <div className="relative flex items-center gap-2">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Select value={produtoSel} onValueChange={setProdutoSel}>
+                        <SelectTrigger className="flex-1 bg-muted/50 pl-10">
+                          <SelectValue placeholder="Buscar produto por SKU ou nome..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {produtos.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.codigo ? `${p.codigo} - ${p.nome}` : p.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <ProdutoRapidoDialog
+                        iconOnly
+                        onCreated={async (id) => {
+                          await refetchProdutos();
+                          setProdutoSel(id);
+                        }}
+                      />
+                    </div>
+                  </Field>
+                  <Button onClick={adicionarItem} className="gap-2 bg-primary px-6 font-bold text-primary-foreground hover:bg-primary/90">
+                    <Plus className="size-5" />
+                    <span>Adicionar</span>
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-end gap-2">
-                <Field label="Produto" className="min-w-64 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Select value={produtoSel} onValueChange={setProdutoSel}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Buscar produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {produtos.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.codigo ? `${p.codigo} - ${p.nome}` : p.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <ProdutoRapidoDialog
-                      iconOnly
-                      onCreated={async (id) => {
-                        await refetchProdutos();
-                        setProdutoSel(id);
-                      }}
-                    />
-                  </div>
-                </Field>
-                <Button onClick={adicionarItem}>
-                  <Plus /> Adicionar
-                </Button>
+            <CardContent className="space-y-0 p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="px-6 py-3 text-[11px] uppercase tracking-wider text-muted-foreground">SKU</TableHead>
+                      <TableHead className="px-6 py-3 text-[11px] uppercase tracking-wider text-muted-foreground">Descrição</TableHead>
+                      <TableHead className="w-20 px-6 py-3 text-center text-[11px] uppercase tracking-wider text-muted-foreground">Qtd</TableHead>
+                      <TableHead className="w-28 px-6 py-3 text-right text-[11px] uppercase tracking-wider text-muted-foreground">Vlr. Unit.</TableHead>
+                      <TableHead className="w-24 px-6 py-3 text-center text-[11px] uppercase tracking-wider text-muted-foreground">Desc. (%)</TableHead>
+                      <TableHead className="w-28 px-6 py-3 text-right text-[11px] uppercase tracking-wider text-muted-foreground">Desc. (R$)</TableHead>
+                      <TableHead className="w-32 px-6 py-3 text-right text-[11px] uppercase tracking-wider text-muted-foreground">Total</TableHead>
+                      <TableHead className="w-16 px-6 py-3 text-center text-[11px] uppercase tracking-wider text-muted-foreground">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-border/50">
+                    {itens.map((i) => (
+                      <TableRow key={i.key} className="group transition-colors hover:bg-muted/20">
+                        <TableCell className="whitespace-nowrap px-6 py-4 text-xs font-mono text-muted-foreground">
+                          {i.sku || "—"}
+                        </TableCell>
+                        <TableCell className="max-w-0 px-6 py-4">
+                          <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
+                            <span className="truncate text-sm font-medium">{i.descricao}</span>
+                            {i.sob_encomenda ? (
+                              <span className="shrink-0 rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
+                                Sob encomenda
+                              </span>
+                            ) : (
+                              i.estoque_atual < i.quantidade && (
+                                <span className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
+                                  Sem saldo · será encomendado
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-6 py-4 text-center">
+                          <Input
+                            type="number"
+                            min={1}
+                            className="h-8 w-16 border-border bg-muted/50 text-center text-white"
+                            value={i.quantidade}
+                            onChange={(e) => atualizarItem(i.key, { quantidade: num(e.target.value) || 1 })}
+                          />
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <MoedaInput
+                            value={i.preco_unitario}
+                            onChange={(n) => atualizarItem(i.key, { preco_unitario: n })}
+                            className="h-8 w-28 border-border bg-muted/50 text-right text-white"
+                          />
+                        </TableCell>
+                        <TableCell className="px-6 py-4 text-center">
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0,00"
+                            className="h-8 w-20 border-border bg-muted/50 text-center text-white"
+                            value={descontoPctInputs[i.key] ?? (i.desconto_pct ? i.desconto_pct.toString() : "")}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setDescontoPctInputs((prev) => ({ ...prev, [i.key]: raw }));
+                              const pct = Math.min(parseMoedaInput(raw), 100);
+                              atualizarItem(i.key, { desconto_pct: pct });
+                            }}
+                            onBlur={(e) => {
+                              const pct = Math.min(parseMoedaInput(e.target.value), 100);
+                              setDescontoPctInputs((prev) => ({ ...prev, [i.key]: pct ? pct.toFixed(2) : "" }));
+                              atualizarItem(i.key, { desconto_pct: pct });
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <MoedaInput
+                            value={i.desconto_valor}
+                            onChange={(n) => {
+                              const max = subtotalBrutoItem(i);
+                              atualizarItem(i.key, { desconto_valor: Math.min(n, max) });
+                            }}
+                            className="h-8 w-24 border-border bg-muted/50 text-right text-white"
+                          />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap px-6 py-4 text-right">
+                          <div className="font-bold text-primary">{brl(totalItem(i))}</div>
+                          {descontoTotalItem(i) > 0 && (
+                            <div className="text-xs text-destructive">
+                              -{brl(descontoTotalItem(i))} desc.
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-6 py-4 text-center">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removerItem(i.key)}
+                            className="size-8 rounded-full border border-border text-muted-foreground hover:border-destructive hover:text-destructive group-hover:bg-muted/50"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {itens.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                          Nenhum item adicionado.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead className="w-20">Qtd</TableHead>
-                    <TableHead className="w-28">Vlr. Unit.</TableHead>
-                    <TableHead className="w-24">Desc. (%)</TableHead>
-                    <TableHead className="w-28">Desc. (R$)</TableHead>
-                    <TableHead className="w-32 text-right">Total</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {itens.map((i) => (
-                    <TableRow key={i.key}>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {i.sku || "—"}
-                      </TableCell>
-                      <TableCell className="max-w-0">
-                        <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
-                          <span className="truncate">{i.descricao}</span>
-                          {i.sob_encomenda ? (
-                            <span className="shrink-0 rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
-                              Sob encomenda
-                            </span>
-                          ) : (
-                            i.estoque_atual < i.quantidade && (
-                              <span className="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-500">
-                                Sem saldo · será encomendado
-                              </span>
-                            )
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={1}
-                          className="text-white"
-                          value={i.quantidade}
-                          onChange={(e) => atualizarItem(i.key, { quantidade: num(e.target.value) || 1 })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          className="text-white"
-                          value={i.preco_unitario}
-                          onChange={(e) => atualizarItem(i.key, { preco_unitario: num(e.target.value) })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="0,00"
-                          className="w-24 text-white"
-                          value={descontoPctInputs[i.key] ?? (i.desconto_pct ? i.desconto_pct.toString() : "")}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setDescontoPctInputs((prev) => ({ ...prev, [i.key]: raw }));
-                            const pct = Math.min(parseMoedaInput(raw), 100);
-                            atualizarItem(i.key, { desconto_pct: pct });
-                          }}
-                          onBlur={(e) => {
-                            const pct = Math.min(parseMoedaInput(e.target.value), 100);
-                            setDescontoPctInputs((prev) => ({ ...prev, [i.key]: pct ? pct.toFixed(2) : "" }));
-                            atualizarItem(i.key, { desconto_pct: pct });
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="0,00"
-                          className="w-28 text-white"
-                          value={descontoInputs[i.key] ?? (i.desconto_valor ? i.desconto_valor.toString() : "")}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setDescontoInputs((prev) => ({ ...prev, [i.key]: raw }));
-                            const valor = parseMoedaInput(raw);
-                            const max = subtotalBrutoItem(i);
-                            atualizarItem(i.key, { desconto_valor: Math.min(valor, max) });
-                          }}
-                          onBlur={(e) => {
-                            const valor = parseMoedaInput(e.target.value);
-                            const max = subtotalBrutoItem(i);
-                            const ajustado = Math.min(valor, max);
-                            setDescontoInputs((prev) => ({ ...prev, [i.key]: ajustado ? ajustado.toFixed(2) : "" }));
-                            atualizarItem(i.key, { desconto_valor: ajustado });
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right">
-                        <div className="font-medium">{brl(totalItem(i))}</div>
-                        {descontoTotalItem(i) > 0 && (
-                          <div className="text-xs text-destructive">
-                            -{brl(descontoTotalItem(i))} desc.
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => removerItem(i.key)}>
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {itens.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                        Nenhum item adicionado.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-
-              <div className="flex justify-end text-sm">
-                <p>
-                  Subtotal de produtos:{" "}
-                  <span className="font-semibold">{brl(subtotalProdutos)}</span>
-                </p>
+              <div className="flex justify-end gap-8 border-t border-border bg-muted/20 p-6">
+                <div className="text-right">
+                  <p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground">Subtotal</p>
+                  <p className="text-xl font-medium text-foreground">{brl(itens.reduce((s, i) => s + subtotalBrutoItem(i), 0))}</p>
+                </div>
+                <div className="text-right">
+                  <p className="mb-1 text-xs uppercase tracking-widest text-primary">Descontos</p>
+                  <p className="text-xl font-medium text-primary">- {brl(itens.reduce((s, i) => s + descontoTotalItem(i), 0))}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 px-6 py-3 text-right">
+                  <p className="mb-1 text-xs uppercase tracking-widest text-muted-foreground">Subtotal de produtos</p>
+                  <p className="text-2xl font-bold tracking-tight text-foreground">{brl(subtotalProdutos)}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
