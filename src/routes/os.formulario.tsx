@@ -153,7 +153,7 @@ function FormularioOS() {
           </div>
 
           {/* Linha 2 — Cliente / Profissional */}
-          <div className="grid grid-cols-2 border-b border-slate-900">
+          <div className="os-campo grid grid-cols-2 border-b border-slate-900">
             <div className="border-r border-slate-900 p-3">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Nome do Cliente
@@ -181,7 +181,7 @@ function FormularioOS() {
           </div>
 
           {/* Linha 3 — Início / Término */}
-          <div className="grid grid-cols-2 border-b border-slate-900">
+          <div className="os-campo grid grid-cols-2 border-b border-slate-900">
             <div className="border-r border-slate-900 p-3">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Início
@@ -203,6 +203,7 @@ function FormularioOS() {
               />
             </div>
           </div>
+
 
           {/* Divisória central */}
           <div className="border-b border-slate-900 bg-slate-100 py-2 text-center text-sm font-bold uppercase tracking-widest text-slate-800">
@@ -347,7 +348,7 @@ function FormularioOS() {
                   <h3 className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
                     Principais Medidas
                   </h3>
-                  <div className="flex flex-1 flex-col items-center justify-center">
+                  <div className="os-campo flex flex-1 flex-col items-center justify-center">
                     <svg
                       viewBox="0 0 180 160"
                       className="h-36 w-full"
