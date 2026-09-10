@@ -8,6 +8,7 @@ import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -85,6 +86,7 @@ const vazio = {
   nome: "",
   cargo: "",
   perfil: "usuario" as Perfil,
+  perfis: ["usuario"] as Perfil[],
   email: "",
   telefone: "",
   data_admissao: "",
@@ -132,6 +134,9 @@ function Funcionarios() {
       nome: f.nome,
       cargo: f.cargo ?? "",
       perfil: f.perfil,
+      perfis: ((f as { perfis?: Perfil[] }).perfis?.length
+        ? (f as { perfis?: Perfil[] }).perfis!
+        : [f.perfil]) as Perfil[],
       email: f.email ?? "",
       telefone: f.telefone ?? "",
       data_admissao: f.data_admissao ?? "",
@@ -152,11 +157,13 @@ function Funcionarios() {
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.nome.trim()) throw new Error("Informe o nome do colaborador.");
+      if (form.perfis.length === 0) throw new Error("Selecione ao menos uma função.");
       const payload = {
         codigo: form.codigo || null,
         nome: form.nome.trim(),
         cargo: form.cargo || "",
-        perfil: form.perfil,
+        perfil: form.perfis[0],
+        perfis: form.perfis,
         email: form.email || null,
         telefone: form.telefone || null,
         data_admissao: form.data_admissao || null,
@@ -251,20 +258,37 @@ function Funcionarios() {
                 <Field label="Cargo">
                   <Input value={form.cargo} onChange={(e) => set("cargo")(e.target.value)} />
                 </Field>
-                <Field label="Perfil de acesso">
-                  <Select value={form.perfil} onValueChange={(v) => set("perfil")(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERFIS.map((p) => (
-                        <SelectItem key={p.value} value={p.value}>
-                          {p.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Funções de acesso">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {PERFIS.map((p) => {
+                        const marcado = form.perfis.includes(p.value);
+                        return (
+                          <label
+                            key={p.value}
+                            className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
+                          >
+                            <Checkbox
+                              checked={marcado}
+                              onCheckedChange={(v) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  perfis: v
+                                    ? [...f.perfis, p.value]
+                                    : f.perfis.filter((x) => x !== p.value),
+                                }))
+                              }
+                            />
+                            {p.label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Selecione uma ou mais funções. A primeira selecionada é a função principal.
+                    </p>
+                  </Field>
+                </div>
                 <Field label="E-mail">
                   <Input
                     type="email"
@@ -411,7 +435,13 @@ function Funcionarios() {
                   <TableCell className="font-medium">{f.nome}</TableCell>
                   <TableCell>{f.cargo || "—"}</TableCell>
                   <TableCell>
-                    <Badge>{PERFIL_LABEL[f.perfil] ?? f.perfil}</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {(((f as { perfis?: Perfil[] }).perfis?.length
+                        ? (f as { perfis?: Perfil[] }).perfis!
+                        : [f.perfil]) as Perfil[]).map((p) => (
+                        <Badge key={p}>{PERFIL_LABEL[p] ?? p}</Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">{brl(totalProventos(f))}</TableCell>
                   <TableCell>
