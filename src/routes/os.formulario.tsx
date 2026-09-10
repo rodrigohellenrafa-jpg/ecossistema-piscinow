@@ -352,120 +352,122 @@ function FormularioOS() {
               </div>
             </div>
 
-            {/* Coluna direita — Nível e Medidas lado a lado */}
+            {/* Coluna direita — Principais Medidas e Nivelamento lado a lado */}
             <div className="flex flex-col p-3">
               <div className="grid flex-1 grid-cols-2">
-                {/* Gráfico de Nível */}
+                {/* Principais Medidas — planta baixa */}
                 <div className="flex flex-col border-r border-slate-900 p-2">
-                  <h3 className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
-                    Nível
-                  </h3>
-                  <div className="flex flex-1 items-center justify-center">
-                    <svg
-                      viewBox="0 0 140 120"
-                      className="h-28 w-full"
-                      aria-label="Perfil de profundidade da piscina"
-                    >
-                      {/* Linha do nível/terreno */}
-                      <line x1="0" y1="25" x2="140" y2="25" stroke="#0f172a" strokeWidth="1" />
-                      {/* Perfil da piscina (degraus + rampa) */}
-                      <polyline
-                        points="10,25 40,25 40,45 65,45 65,65 85,65 85,85 130,85 130,110"
-                        fill="none"
-                        stroke="#0f172a"
-                        strokeWidth="2"
-                      />
-                      {/* Fundo */}
-                      <line x1="10" y1="25" x2="10" y2="110" stroke="#0f172a" strokeWidth="2" />
-                      <line x1="10" y1="110" x2="130" y2="110" stroke="#0f172a" strokeWidth="2" />
-                      {/* Linhas de cota de profundidade */}
-                      <line x1="42" y1="25" x2="42" y2="45" stroke="#0f172a" strokeWidth="1" strokeDasharray="3,2" />
-                      <line x1="67" y1="25" x2="67" y2="65" stroke="#0f172a" strokeWidth="1" strokeDasharray="3,2" />
-                      <line x1="87" y1="25" x2="87" y2="85" stroke="#0f172a" strokeWidth="1" strokeDasharray="3,2" />
-                      {/* Setas de profundidade */}
-                      <polygon points="42,50 39,45 45,45" fill="#0f172a" />
-                      <polygon points="67,70 64,65 70,65" fill="#0f172a" />
-                      <polygon points="87,90 84,85 90,85" fill="#0f172a" />
-                    </svg>
-                  </div>
-                  <div className="mt-1 text-right text-xs font-medium text-slate-700">
-                    REF: <span className="inline-block w-16 border-b border-slate-900" />
-                  </div>
-                </div>
-
-                {/* Principais Medidas */}
-                <div className="flex flex-col p-2">
                   <h3 className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
                     Principais Medidas
                   </h3>
-                  <div className="os-campo flex flex-1 flex-col items-center justify-center">
+                  <div className="os-campo flex flex-1 items-center justify-center">
                     <svg
-                      viewBox="0 0 180 160"
-                      className="h-36 w-full"
-                      aria-label="Esquema de medidas da piscina"
+                      viewBox="0 0 180 150"
+                      className="h-40 w-full"
+                      aria-label="Planta baixa da piscina com cotas"
                     >
                       {/* Cota superior — comprimento */}
-                      <line x1="30" y1="15" x2="150" y2="15" stroke="#0f172a" strokeWidth="1" />
-                      <polygon points="25,15 30,11 30,19" fill="#0f172a" />
-                      <polygon points="155,15 150,11 150,19" fill="#0f172a" />
+                      <line x1="35" y1="18" x2="145" y2="18" stroke="#0f172a" strokeWidth="1" />
+                      <polygon points="30,18 35,14 35,22" fill="#0f172a" />
+                      <polygon points="150,18 145,14 145,22" fill="#0f172a" />
 
                       {/* Cota esquerda — largura */}
-                      <line x1="15" y1="30" x2="15" y2="120" stroke="#0f172a" strokeWidth="1" />
-                      <polygon points="15,25 11,30 19,30" fill="#0f172a" />
-                      <polygon points="15,125 11,120 19,120" fill="#0f172a" />
+                      <line x1="18" y1="40" x2="18" y2="130" stroke="#0f172a" strokeWidth="1" />
+                      <polygon points="18,35 14,40 22,40" fill="#0f172a" />
+                      <polygon points="18,135 14,130 22,130" fill="#0f172a" />
 
-                      {/* Retângulo da piscina */}
-                      <rect x="30" y="30" width="120" height="90" fill="#f8fafc" stroke="#0f172a" strokeWidth="2" />
-                      <text
-                        x="90"
-                        y="75"
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        className="fill-slate-400 text-[8px] font-bold uppercase"
-                      >
-                        Piscina
-                      </text>
+                      {/* Retângulo em planta baixa (centro) */}
+                      <rect x="35" y="40" width="110" height="90" fill="#ffffff" stroke="#0f172a" strokeWidth="2" />
 
-                      {/* Inputs sobre as cotas */}
-                      <foreignObject x="70" y="4" width="40" height="20">
+                      {/* Campos sobre as cotas */}
+                      <foreignObject x="70" y="2" width="44" height="16">
                         <input
                           type="text"
                           className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[10px] outline-none"
-                          placeholder="m"
+                          placeholder="compr. (m)"
                         />
                       </foreignObject>
-                      <foreignObject x="0" y="70" width="28" height="20">
+                      <foreignObject x="26" y="132" width="52" height="16">
                         <input
                           type="text"
                           className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[10px] outline-none"
-                          placeholder="m"
+                          placeholder="larg. (m)"
+                        />
+                      </foreignObject>
+                      <foreignObject x="60" y="76" width="60" height="18">
+                        <input
+                          type="text"
+                          className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[10px] outline-none"
+                          placeholder="obs. medida"
                         />
                       </foreignObject>
                     </svg>
+                  </div>
+                </div>
 
-                    {/* Inputs de largura abaixo do SVG */}
-                    <div className="mt-1 flex w-full justify-between px-2 text-[10px] text-slate-700">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="font-semibold">Larg. esq.</span>
+                {/* Nivelamento — corte transversal */}
+                <div className="flex flex-col p-2">
+                  <h3 className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
+                    Nivelamento
+                  </h3>
+                  <div className="flex flex-1 items-center justify-center">
+                    <svg
+                      viewBox="0 0 180 150"
+                      className="h-40 w-full"
+                      aria-label="Corte transversal da piscina com referência de nível"
+                    >
+                      {/* Terreno */}
+                      <line x1="5" y1="45" x2="175" y2="45" stroke="#0f172a" strokeWidth="1" />
+
+                      {/* Cubo retangular (corte transversal da piscina) */}
+                      <rect x="30" y="45" width="110" height="70" fill="#ffffff" stroke="#0f172a" strokeWidth="2" />
+                      {/* Perspectiva do cubo */}
+                      <polyline points="30,45 48,30 158,30 140,45" fill="none" stroke="#0f172a" strokeWidth="1.2" />
+                      <line x1="158" y1="30" x2="158" y2="100" stroke="#0f172a" strokeWidth="1.2" />
+                      <line x1="140" y1="115" x2="158" y2="100" stroke="#0f172a" strokeWidth="1.2" />
+
+                      {/* Símbolo de nível com traço maior para a referência */}
+                      <line x1="30" y1="58" x2="150" y2="58" stroke="#0f172a" strokeWidth="1" strokeDasharray="4,3" />
+                      <polygon points="86,58 80,50 92,50" fill="none" stroke="#0f172a" strokeWidth="1.2" />
+                      <line x1="60" y1="50" x2="150" y2="50" stroke="#0f172a" strokeWidth="1.5" />
+
+                      {/* Cota de profundidade */}
+                      <line x1="20" y1="45" x2="20" y2="115" stroke="#0f172a" strokeWidth="1" />
+                      <polygon points="20,42 16,48 24,48" fill="#0f172a" />
+                      <polygon points="20,118 16,112 24,112" fill="#0f172a" />
+
+                      <foreignObject x="62" y="32" width="88" height="18">
                         <input
                           type="text"
-                          className="w-12 border-b border-slate-400 bg-transparent text-center outline-none"
-                          placeholder="m"
+                          className="h-full w-full bg-transparent text-center text-[10px] outline-none"
+                          placeholder="REF. de nível"
                         />
-                      </div>
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="font-semibold">Larg. dir.</span>
+                      </foreignObject>
+                      <foreignObject x="0" y="120" width="60" height="18">
                         <input
                           type="text"
-                          className="w-12 border-b border-slate-400 bg-transparent text-center outline-none"
-                          placeholder="m"
+                          className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[10px] outline-none"
+                          placeholder="prof. (m)"
                         />
-                      </div>
-                    </div>
+                      </foreignObject>
+                    </svg>
+                  </div>
+
+                  {/* Rodapé do quadrante — tipo de borda */}
+                  <div className="mt-1 flex items-center justify-between border-t border-slate-400 pt-1 text-[10px] text-slate-800">
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
+                      Borda normal
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
+                      Borda rebaixada
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
           </div>
         </div>
 
