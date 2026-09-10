@@ -119,6 +119,24 @@ function Agenda() {
 
   const pegarToken = useServerFn(meuTokenAgenda);
   const trocarToken = useServerFn(regenerarTokenAgenda);
+  const listarGoogle = useServerFn(listarAgendasGoogle);
+  const sincronizarGoogle = useServerFn(sincronizarAgendaGoogle);
+  const [agendaGoogle, setAgendaGoogle] = useState("primary");
+
+  const { data: agendasGoogle = [] } = useQuery({
+    queryKey: ["google-agendas"],
+    queryFn: () => listarGoogle(),
+    retry: false,
+  });
+
+  const sincronizar = useMutation({
+    mutationFn: () => sincronizarGoogle({ data: { calendarId: agendaGoogle } }),
+    onSuccess: (r) => {
+      toast.success(`${r.importados} compromisso(s) do Google trazidos para a agenda.`);
+      qc.invalidateQueries({ queryKey: ["agenda-eventos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const { data: assinatura } = useQuery({
     queryKey: ["agenda-token"],
