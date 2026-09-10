@@ -905,7 +905,7 @@ function NovoPedido() {
                           }}
                         />
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="whitespace-nowrap text-right">
                         <div className="font-medium">{brl(totalItem(i))}</div>
                         {i.desconto_valor > 0 && (
                           <div className="text-xs text-destructive">
