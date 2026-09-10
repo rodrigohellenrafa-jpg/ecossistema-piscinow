@@ -211,3 +211,22 @@ export const removerUsuario = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+export const redefinirSenha = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string; senha: string }) => {
+    const userId = String(input?.userId ?? "").trim();
+    const senha = String(input?.senha ?? "").trim();
+    if (!userId) throw new Error("Usuário inválido.");
+    if (senha.length < 6) throw new Error("A senha deve ter ao menos 6 caracteres.");
+    return { userId, senha };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as never);
+    const db = await admin();
+
+    const { error } = await db.auth.admin.updateUserById(data.userId, { password: data.senha });
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
