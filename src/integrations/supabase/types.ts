@@ -46,6 +46,8 @@ export type Database = {
           descricao: string | null
           dia_inteiro: boolean
           fim: string | null
+          google_calendar_id: string | null
+          google_event_id: string | null
           id: string
           inicio: string
           local: string | null
@@ -66,6 +68,8 @@ export type Database = {
           descricao?: string | null
           dia_inteiro?: boolean
           fim?: string | null
+          google_calendar_id?: string | null
+          google_event_id?: string | null
           id?: string
           inicio: string
           local?: string | null
@@ -86,6 +90,8 @@ export type Database = {
           descricao?: string | null
           dia_inteiro?: boolean
           fim?: string | null
+          google_calendar_id?: string | null
+          google_event_id?: string | null
           id?: string
           inicio?: string
           local?: string | null
