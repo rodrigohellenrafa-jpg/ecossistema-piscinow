@@ -232,6 +232,19 @@ function FlightBoard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const excluir = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("obras").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Obra excluída.");
+      setExcluirId(null);
+      qc.invalidateQueries({ queryKey: ["obras"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
