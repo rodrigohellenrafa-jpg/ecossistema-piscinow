@@ -364,6 +364,21 @@
     border-bottom: 1px solid #0f172a !important;
   }
 
+  /* Compacta o formulário para caber em uma única folha A4 */
+  .os-form-wrapper {
+    zoom: 0.76;
+  }
+
+  .os-form-wrapper h2 {
+    margin-bottom: 6px !important;
+  }
+
+  .os-form-wrapper td,
+  .os-form-wrapper th {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
   /* Evita quebras no meio das tabelas e blocos */
   .os-form-wrapper table,
   .os-form-wrapper tr,
@@ -372,6 +387,7 @@
     page-break-inside: avoid;
     break-inside: avoid;
   }
+
 
   @page {
     size: A4 portrait;
