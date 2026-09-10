@@ -338,6 +338,22 @@ function LancarEstoque({
                   </span>
                 </TableCell>
                 <TableCell className="text-right">{item.quantidade}</TableCell>
+                <TableCell className="text-right">
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    className="ml-auto h-8 w-20 text-right"
+                    value={fator(idx, item)}
+                    onChange={(e) => setFatores((f) => ({ ...f, [idx]: e.target.value }))}
+                    disabled={valor(idx, item) === "ignorar"}
+                  />
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {valor(idx, item) === "ignorar"
+                    ? "—"
+                    : `${item.quantidade * fatorNum(idx, item)} ${unidadeDestino(idx, item)}`}
+                </TableCell>
                 <TableCell className="min-w-56">
                   <Select
                     value={valor(idx, item)}
