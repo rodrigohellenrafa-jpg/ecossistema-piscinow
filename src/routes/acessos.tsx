@@ -109,15 +109,20 @@ function AcessosAdmin() {
   const doCriar = useServerFn(criarUsuario);
   const doRemover = useServerFn(removerUsuario);
   const doDefinirPapeis = useServerFn(definirPapeis);
+  const doRedefinirSenha = useServerFn(redefinirSenha);
 
 
   const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
+  const [senha, setSenha] = useState("");
   const [perfis, setPerfis] = useState<Perfil[]>(["usuario"]);
   const [senhaGerada, setSenhaGerada] = useState<string | null>(null);
+  const [senhaDefinida, setSenhaDefinida] = useState(false);
   const [editando, setEditando] = useState<{ id: string; nome: string; perfis: Perfil[] } | null>(
     null,
   );
+  const [trocandoSenha, setTrocandoSenha] = useState<{ id: string; nome: string } | null>(null);
+  const [novaSenha, setNovaSenha] = useState("");
 
   const { data: usuarios = [], isLoading } = useQuery({
     queryKey: ["usuarios-sistema"],
