@@ -209,10 +209,9 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
               <thead>
                 <tr>
                   <th>Condição de pagamento</th>
-                  <th style={{ width: "16%" }}>Data</th>
-                  <th style={{ width: "14%" }}>Parcelas</th>
-                  <th style={{ width: "16%" }}>Valor parcela</th>
-                  <th style={{ width: "16%" }}>Total cobrado</th>
+                  <th style={{ width: "18%" }}>Data</th>
+                  <th style={{ width: "16%" }}>Parcelas</th>
+                  <th style={{ width: "20%" }}>Valor parcela</th>
                 </tr>
               </thead>
               <tbody>
@@ -225,7 +224,6 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
                     <td className="doc-center">{c.data_prevista ? dataBR(c.data_prevista) : "—"}</td>
                     <td className="doc-center">{c.parcelas}x</td>
                     <td className="doc-right-cell">{brl(c.valor_parcela)}</td>
-                    <td className="doc-right-cell">{brl(c.valor_cobrado)}</td>
                   </tr>
                 ))}
               </tbody>
