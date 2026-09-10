@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownCircle, ArrowUpCircle, Boxes, Printer } from "lucide-react";
+import { Printer } from "lucide-react";
 
 import { PageHeader, Kpi } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -151,7 +151,7 @@ function RelatorioEstoque() {
     <div className="space-y-6">
       <PageHeader
         title="Relatório de Estoque"
-        description="Entradas, saídas e saldo por produto no período selecionado."
+        subtitle="Entradas, saídas e saldo por produto no período selecionado."
         actions={
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="mr-2 size-4" /> Imprimir / PDF
@@ -163,18 +163,15 @@ function RelatorioEstoque() {
         <Kpi
           label="Entradas no período"
           value={totais.entradas.toLocaleString("pt-BR")}
-          icon={ArrowDownCircle}
         />
         <Kpi
           label="Saídas no período"
           value={totais.saidas.toLocaleString("pt-BR")}
-          icon={ArrowUpCircle}
         />
         <Kpi label="Valor em estoque" value={brl(totais.valor)} icon={Boxes} />
         <Kpi
           label="Abaixo do mínimo"
           value={String(totais.abaixoMinimo)}
-          icon={Boxes}
           to="/compras"
         />
       </div>
