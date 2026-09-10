@@ -157,11 +157,13 @@ function Funcionarios() {
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.nome.trim()) throw new Error("Informe o nome do colaborador.");
+      if (form.perfis.length === 0) throw new Error("Selecione ao menos uma função.");
       const payload = {
         codigo: form.codigo || null,
         nome: form.nome.trim(),
         cargo: form.cargo || "",
-        perfil: form.perfil,
+        perfil: form.perfis[0],
+        perfis: form.perfis,
         email: form.email || null,
         telefone: form.telefone || null,
         data_admissao: form.data_admissao || null,
