@@ -427,6 +427,39 @@ function Vendas() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={alvo !== null} onOpenChange={(o) => !o && setAlvo(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir pedido {alvo?.numero ?? ""}</DialogTitle>
+            <DialogDescription>
+              Esta ação não pode ser desfeita. Digite a senha mestra para confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="password"
+            value={senha}
+            autoComplete="off"
+            placeholder="Senha mestra"
+            onChange={(e) => setSenha(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void confirmarExclusao();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAlvo(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={excluindo || !senha}
+              onClick={() => void confirmarExclusao()}
+            >
+              Excluir pedido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
