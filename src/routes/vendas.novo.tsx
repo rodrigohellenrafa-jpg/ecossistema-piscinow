@@ -94,6 +94,51 @@ const parseMoedaInput = (valor: string): number => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
   };
 
+/** Formata número no padrão brasileiro sem o símbolo (1500,00). */
+const formatMoedaInput = (n: number) =>
+  n ? n.toFixed(2).replace(".", ",") : "";
+
+/** Campo monetário que aceita vírgula/ponto e formata ao sair do campo. */
+function MoedaInput({
+  value,
+  onChange,
+  className = "",
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  className?: string;
+}) {
+  const [texto, setTexto] = useState(formatMoedaInput(value));
+
+  useEffect(() => {
+    if (Math.abs(parseMoedaInput(texto) - value) > 0.005) {
+      setTexto(formatMoedaInput(value));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      placeholder="0,00"
+      className={`text-white ${className}`}
+      value={texto}
+      onChange={(e) => {
+        setTexto(e.target.value);
+        onChange(parseMoedaInput(e.target.value));
+      }}
+      onBlur={() => {
+        const n = parseMoedaInput(texto);
+        setTexto(formatMoedaInput(n));
+        onChange(n);
+      }}
+    />
+  );
+}
+
+const RASCUNHO_KEY = "piscinow:pdv-rascunho";
+
 /** Uma forma de pagamento aplicada ao pedido (pode haver várias no mesmo pedido). */
 interface CondicaoLinha {
   key: string;
@@ -222,6 +267,108 @@ function NovoPedido() {
   const [precoVendaKit, setPrecoVendaKit] = useState(0);
 
   const [condicoes, setCondicoes] = useState<CondicaoLinha[]>([]);
+
+  // ----- Rascunho automático: mantém o pedido em andamento ao trocar de tela -----
+  const [rascunhoPronto, setRascunhoPronto] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RASCUNHO_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof d.data === "string") setData(d.data);
+        if (d.tipoAtendimento === "in" || d.tipoAtendimento === "out")
+          setTipoAtendimento(d.tipoAtendimento);
+        if (typeof d.clienteId === "string") setClienteId(d.clienteId);
+        if (typeof d.vendedorId === "string") setVendedorId(d.vendedorId);
+        if (typeof d.observacoes === "string") setObservacoes(d.observacoes);
+        if (Array.isArray(d.itens)) setItens(d.itens as ItemLinha[]);
+        if (d.descontoInputs && typeof d.descontoInputs === "object")
+          setDescontoInputs(d.descontoInputs as Record<string, string>);
+        if (typeof d.cascoId === "string") setCascoId(d.cascoId);
+        if (typeof d.filtroId === "string") setFiltroId(d.filtroId);
+        if (Array.isArray(d.acessorios)) setAcessorios(d.acessorios as AcessorioLinha[]);
+        if (typeof d.custoFrete === "number") setCustoFrete(d.custoFrete);
+        if (typeof d.custoMaoObra === "number") setCustoMaoObra(d.custoMaoObra);
+        if (typeof d.impostosKit === "number") setImpostosKit(d.impostosKit);
+        if (typeof d.precoVendaKit === "number") setPrecoVendaKit(d.precoVendaKit);
+        if (Array.isArray(d.condicoes)) setCondicoes(d.condicoes as CondicaoLinha[]);
+        const temConteudo =
+          (Array.isArray(d.itens) && d.itens.length > 0) ||
+          Boolean(d.clienteId) ||
+          Boolean(d.cascoId);
+        if (temConteudo) toast.info("Rascunho do pedido restaurado.");
+      }
+    } catch {
+      /* rascunho inválido é ignorado */
+    }
+    setRascunhoPronto(true);
+  }, []);
+
+  useEffect(() => {
+    if (!rascunhoPronto) return;
+    try {
+      localStorage.setItem(
+        RASCUNHO_KEY,
+        JSON.stringify({
+          data,
+          tipoAtendimento,
+          clienteId,
+          vendedorId,
+          observacoes,
+          itens,
+          descontoInputs,
+          cascoId,
+          filtroId,
+          acessorios,
+          custoFrete,
+          custoMaoObra,
+          impostosKit,
+          precoVendaKit,
+          condicoes,
+        }),
+      );
+    } catch {
+      /* armazenamento indisponível */
+    }
+  }, [
+    rascunhoPronto,
+    data,
+    tipoAtendimento,
+    clienteId,
+    vendedorId,
+    observacoes,
+    itens,
+    descontoInputs,
+    cascoId,
+    filtroId,
+    acessorios,
+    custoFrete,
+    custoMaoObra,
+    impostosKit,
+    precoVendaKit,
+    condicoes,
+  ]);
+
+  const descartarRascunho = () => {
+    localStorage.removeItem(RASCUNHO_KEY);
+    setData(hojeISO());
+    setTipoAtendimento("in");
+    setClienteId("");
+    setObservacoes("");
+    setItens([]);
+    setDescontoInputs({});
+    setCascoId("");
+    setFiltroId("");
+    setAcessorios([]);
+    setCustoFrete(0);
+    setCustoMaoObra(0);
+    setImpostosKit(0);
+    setPrecoVendaKit(0);
+    setCondicoes([]);
+    toast.success("Rascunho descartado.");
+  };
+
 
   const subtotalProdutos = useMemo(
     () => itens.reduce((s, i) => s + totalItem(i), 0),
@@ -549,6 +696,11 @@ function NovoPedido() {
           `Itens sem saldo: ordem(ns) de compra ${roteamento.ordensCriadas.join(", ")} gerada(s) sob encomenda.`,
         );
       }
+      try {
+        localStorage.removeItem(RASCUNHO_KEY);
+      } catch {
+        /* armazenamento indisponível */
+      }
       navigate({ to: "/vendas/$id", params: { id } });
     },
 
@@ -557,7 +709,15 @@ function NovoPedido() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Novo Pedido (PDV)" subtitle={`Pedido ${numero}`} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PageHeader title="Novo Pedido (PDV)" subtitle={`Pedido ${numero}`} />
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">Rascunho salvo automaticamente</span>
+          <Button variant="outline" size="sm" onClick={descartarRascunho}>
+            Descartar rascunho
+          </Button>
+        </div>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -852,11 +1012,9 @@ function NovoPedido() {
                       </Select>
                     </Field>
                     <Field label="Valor" className="w-32">
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <MoedaInput
                         value={a.valor}
-                        onChange={(e) => atualizarAcessorio(a.key, { valor: num(e.target.value) })}
+                        onChange={(v) => atualizarAcessorio(a.key, { valor: v })}
                       />
                     </Field>
                     <Button size="icon" variant="ghost" onClick={() => removerAcessorio(a.key)}>
@@ -868,36 +1026,16 @@ function NovoPedido() {
 
               <div className="grid gap-4 sm:grid-cols-4">
                 <Field label="Custo de frete">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={custoFrete}
-                    onChange={(e) => setCustoFrete(num(e.target.value))}
-                  />
+                  <MoedaInput value={custoFrete} onChange={setCustoFrete} />
                 </Field>
                 <Field label="Custo de mão de obra">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={custoMaoObra}
-                    onChange={(e) => setCustoMaoObra(num(e.target.value))}
-                  />
+                  <MoedaInput value={custoMaoObra} onChange={setCustoMaoObra} />
                 </Field>
                 <Field label="Impostos">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={impostosKit}
-                    onChange={(e) => setImpostosKit(num(e.target.value))}
-                  />
+                  <MoedaInput value={impostosKit} onChange={setImpostosKit} />
                 </Field>
                 <Field label="Preço de venda do kit">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={precoVendaKit}
-                    onChange={(e) => setPrecoVendaKit(num(e.target.value))}
-                  />
+                  <MoedaInput value={precoVendaKit} onChange={setPrecoVendaKit} />
                 </Field>
               </div>
             </CardContent>
