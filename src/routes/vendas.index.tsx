@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, Search, X } from "lucide-react";
+import { Check, Plus, Search, Trash2, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { Kpi, PageHeader } from "@/components/page-header";
@@ -26,7 +27,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
 export const Route = createFileRoute("/vendas/")({
@@ -80,6 +90,36 @@ function Vendas() {
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
   const qc = useQueryClient();
+  const validarMestra = useServerFn(validarSenhaMestra);
+  const [alvo, setAlvo] = useState<{ id: string; numero: string | null } | null>(null);
+  const [senha, setSenha] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
+
+  async function confirmarExclusao() {
+    if (!alvo) return;
+    setExcluindo(true);
+    try {
+      const r = await validarMestra({ data: { senha } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      const { error } = await supabase.from("vendas").delete().eq("id", alvo.id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success(`Pedido ${alvo.numero ?? ""} excluído.`);
+      setAlvo(null);
+      setSenha("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir o pedido.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
 
   const { data: vendas = [] } = useQuery({
     queryKey: ["vendas"],
@@ -237,6 +277,7 @@ function Vendas() {
                     <TableHead>Vendedor</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -261,11 +302,25 @@ function Vendas() {
                           {STATUS_LABEL[v.status_pedido] ?? v.status_pedido}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label={`Excluir pedido ${v.numero ?? ""}`}
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setSenha("");
+                            setAlvo({ id: v.id, numero: v.numero });
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {pedidos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                         Nenhum pedido encontrado.
                       </TableCell>
                     </TableRow>
@@ -372,6 +427,39 @@ function Vendas() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={alvo !== null} onOpenChange={(o) => !o && setAlvo(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir pedido {alvo?.numero ?? ""}</DialogTitle>
+            <DialogDescription>
+              Esta ação não pode ser desfeita. Digite a senha mestra para confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="password"
+            value={senha}
+            autoComplete="off"
+            placeholder="Senha mestra"
+            onChange={(e) => setSenha(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void confirmarExclusao();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAlvo(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={excluindo || !senha}
+              onClick={() => void confirmarExclusao()}
+            >
+              Excluir pedido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
