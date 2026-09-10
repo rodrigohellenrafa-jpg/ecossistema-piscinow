@@ -358,6 +358,18 @@ function AcessosAdmin() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setNovaSenha("");
+                          setTrocandoSenha({ id: u.id, nome: u.nome });
+                        }}
+                        aria-label="Definir senha"
+                      >
+                        <KeyRound className="size-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() => remover.mutate({ data: { userId: u.id } })}
                         disabled={remover.isPending}
