@@ -897,11 +897,9 @@ function NovoPedido() {
                       </Select>
                     </Field>
                     <Field label="Valor" className="w-32">
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <MoedaInput
                         value={a.valor}
-                        onChange={(e) => atualizarAcessorio(a.key, { valor: num(e.target.value) })}
+                        onChange={(v) => atualizarAcessorio(a.key, { valor: v })}
                       />
                     </Field>
                     <Button size="icon" variant="ghost" onClick={() => removerAcessorio(a.key)}>
@@ -913,36 +911,16 @@ function NovoPedido() {
 
               <div className="grid gap-4 sm:grid-cols-4">
                 <Field label="Custo de frete">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={custoFrete}
-                    onChange={(e) => setCustoFrete(num(e.target.value))}
-                  />
+                  <MoedaInput value={custoFrete} onChange={setCustoFrete} />
                 </Field>
                 <Field label="Custo de mão de obra">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={custoMaoObra}
-                    onChange={(e) => setCustoMaoObra(num(e.target.value))}
-                  />
+                  <MoedaInput value={custoMaoObra} onChange={setCustoMaoObra} />
                 </Field>
                 <Field label="Impostos">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={impostosKit}
-                    onChange={(e) => setImpostosKit(num(e.target.value))}
-                  />
+                  <MoedaInput value={impostosKit} onChange={setImpostosKit} />
                 </Field>
                 <Field label="Preço de venda do kit">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={precoVendaKit}
-                    onChange={(e) => setPrecoVendaKit(num(e.target.value))}
-                  />
+                  <MoedaInput value={precoVendaKit} onChange={setPrecoVendaKit} />
                 </Field>
               </div>
             </CardContent>
