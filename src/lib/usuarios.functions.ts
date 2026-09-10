@@ -62,10 +62,19 @@ export const listarUsuarios = createServerFn({ method: "GET" })
     }
 
     const importadosPorId = new Map((importados ?? []).map((u) => [u.id, u]));
-    const colaboradorPorEmail = new Map(
-      (colaboradores ?? [])
-        .filter((f: { email: string | null }) => !!f.email)
-        .map((f: { email: string | null }) => [f.email!.trim().toLowerCase(), f]),
+    type Colab = {
+      id: string;
+      nome: string;
+      email: string | null;
+      cargo: string | null;
+      perfil: Perfil;
+      perfis: Perfil[] | null;
+      ativo: boolean;
+    };
+    const colaboradorPorEmail = new Map<string, Colab>(
+      ((colaboradores ?? []) as Colab[])
+        .filter((f) => !!f.email)
+        .map((f) => [f.email!.trim().toLowerCase(), f] as const),
     );
 
     return (users ?? []).map((u) => {
