@@ -502,6 +502,40 @@ function Agenda() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarDays className="size-4" /> Trazer os compromissos do Google
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Puxa os compromissos da conta do Google conectada (Campinas Jardim do Trevo) para a
+            agenda da equipe. Pode repetir quando quiser: nada é duplicado, apenas atualizado.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Select value={agendaGoogle} onValueChange={setAgendaGoogle}>
+              <SelectTrigger className="sm:w-96">
+                <SelectValue placeholder="Agenda do Google" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="primary">Agenda principal da conta</SelectItem>
+                {agendasGoogle
+                  .filter((a) => !a.principal)
+                  .map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.nome}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => sincronizar.mutate()} disabled={sincronizar.isPending}>
+              <RefreshCw /> {sincronizar.isPending ? "Sincronizando…" : "Sincronizar agora"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-wrap items-center gap-2">
         <Select value={periodo} onValueChange={setPeriodo}>
           <SelectTrigger className="w-44">
