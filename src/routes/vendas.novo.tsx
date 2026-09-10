@@ -855,7 +855,7 @@ function NovoPedido() {
             <CardContent className="space-y-0 p-0">
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
+                    <TableHeader>
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableHead className="px-6 py-3 text-[11px] uppercase tracking-wider text-muted-foreground">SKU</TableHead>
                       <TableHead className="px-6 py-3 text-[11px] uppercase tracking-wider text-muted-foreground">Descrição</TableHead>
@@ -864,7 +864,8 @@ function NovoPedido() {
                       <TableHead className="w-24 px-6 py-3 text-center text-[11px] uppercase tracking-wider text-muted-foreground">Desc. (%)</TableHead>
                       <TableHead className="w-28 px-6 py-3 text-right text-[11px] uppercase tracking-wider text-muted-foreground">Desc. (R$)</TableHead>
                       <TableHead className="w-32 px-6 py-3 text-right text-[11px] uppercase tracking-wider text-muted-foreground">Total</TableHead>
-                      <TableHead className="w-16 px-6 py-3 text-center text-[11px] uppercase tracking-wider text-muted-foreground">Ações</TableHead>
+                      <TableHead className="w-36 px-6 py-3 text-center text-[11px] uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                      <TableHead className="w-24 px-6 py-3 text-center text-[11px] uppercase tracking-wider text-muted-foreground">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border/50">
