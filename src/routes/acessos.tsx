@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { useRoles, type Perfil } from "@/hooks/use-role";
 import {
+  atualizarNomeUsuario,
   criarUsuario,
   definirPapeis,
   listarUsuarios,
@@ -110,6 +111,7 @@ function AcessosAdmin() {
   const doRemover = useServerFn(removerUsuario);
   const doDefinirPapeis = useServerFn(definirPapeis);
   const doRedefinirSenha = useServerFn(redefinirSenha);
+  const doAtualizarNome = useServerFn(atualizarNomeUsuario);
 
 
   const [email, setEmail] = useState("");
@@ -159,6 +161,16 @@ function AcessosAdmin() {
       toast.success("Funções atualizadas.");
       setEditando(null);
       qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarNome = useMutation({
+    mutationFn: doAtualizarNome,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
+      qc.invalidateQueries({ queryKey: ["funcionarios"] });
+      qc.invalidateQueries({ queryKey: ["vendedores-select"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -298,6 +310,7 @@ function AcessosAdmin() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>E-mail</TableHead>
+                <TableHead>Funções do colaborador</TableHead>
                 <TableHead>Papéis atuais</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -306,21 +319,44 @@ function AcessosAdmin() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                     Carregando usuários…
                   </TableCell>
                 </TableRow>
               ) : usuarios.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                     Nenhum usuário encontrado.
                   </TableCell>
                 </TableRow>
               ) : (
                 usuarios.map((u) => (
                   <TableRow key={u.id}>
-                    <TableCell>{u.nome}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{u.nome}</div>
+                      {u.cargo && (
+                        <div className="text-xs text-muted-foreground">{u.cargo}</div>
+                      )}
+                      <div className="font-mono text-[10px] text-muted-foreground/60">
+                        ID {u.id}
+                      </div>
+                    </TableCell>
                     <TableCell>{u.email}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {u.funcoesColaborador.length === 0 ? (
+                          <span className="text-xs text-muted-foreground">
+                            Sem ficha de colaborador
+                          </span>
+                        ) : (
+                          u.funcoesColaborador.map((f) => (
+                            <Badge key={f} variant="outline">
+                              {LABEL_PERFIL[f]}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {u.papeis.length === 0 ? (
@@ -422,11 +458,22 @@ function AcessosAdmin() {
       <Dialog open={editando !== null} onOpenChange={(open) => !open && setEditando(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar funções</DialogTitle>
+            <DialogTitle>Editar usuário</DialogTitle>
             <DialogDescription>
-              {editando?.nome} — marque todas as funções que este usuário deve ter.
+              Ajuste o nome que aparece no sistema e marque todas as funções deste usuário.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="nome-edicao">Nome do colaborador</Label>
+            <Input
+              id="nome-edicao"
+              value={editando?.nome ?? ""}
+              onChange={(e) =>
+                setEditando((atual) => (atual ? { ...atual, nome: e.target.value } : atual))
+              }
+            />
+          </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
             {PERFIS.map((p) => (
@@ -452,13 +499,20 @@ function AcessosAdmin() {
               Cancelar
             </Button>
             <Button
-              disabled={salvarPapeis.isPending || (editando?.perfis.length ?? 0) === 0}
-              onClick={() =>
-                editando &&
-                salvarPapeis.mutate({ data: { userId: editando.id, perfis: editando.perfis } })
+              disabled={
+                salvarPapeis.isPending ||
+                salvarNome.isPending ||
+                (editando?.perfis.length ?? 0) === 0
               }
+              onClick={async () => {
+                if (!editando) return;
+                await salvarNome.mutateAsync({
+                  data: { userId: editando.id, nome: editando.nome },
+                });
+                salvarPapeis.mutate({ data: { userId: editando.id, perfis: editando.perfis } });
+              }}
             >
-              {salvarPapeis.isPending ? "Salvando…" : "Salvar funções"}
+              {salvarPapeis.isPending || salvarNome.isPending ? "Salvando…" : "Salvar alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>

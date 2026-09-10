@@ -208,29 +208,42 @@ function NovoPedido() {
   const { data: vendedores = [] } = useQuery({
     queryKey: ["vendedores-select", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("usuarios_importados")
-        .select("id, nome, email")
-        .eq("ativo", true)
-        .order("nome");
-      if (error) throw error;
-      const lista = (data ?? []) as { id: string; nome: string | null; email: string | null }[];
+      // A lista de vendedores vem do cadastro de Colaboradores (Cadastros → Colaboradores).
+      const [colab, importados] = await Promise.all([
+        supabase.from("funcionarios").select("id, nome, email").eq("ativo", true).order("nome"),
+        supabase.from("usuarios_importados").select("id, nome, email").eq("ativo", true),
+      ]);
+      if (colab.error) throw colab.error;
 
-      // Garante que o usuário logado sempre apareça como vendedor,
-      // mesmo que ainda não conste na lista de usuários importados.
-      if (user?.id && user.email) {
-        const existe =
-          lista.some((v) => v.id === user.id) ||
-          lista.some((v) => v.email?.toLowerCase() === user.email!.toLowerCase());
-        if (!existe) {
-          lista.push({
-            id: user.id,
-            nome: (user.user_metadata?.nome as string | undefined) ?? user.email.split("@")[0],
-            email: user.email,
-          });
-          lista.sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? ""));
-        }
+      type V = { id: string; nome: string; email: string | null };
+      const lista: V[] = (colab.data ?? []).map((f) => ({
+        id: f.id,
+        nome: f.nome,
+        email: f.email,
+      }));
+      const temEmail = (e?: string | null) =>
+        !!e && lista.some((v) => v.email?.toLowerCase() === e.toLowerCase());
+
+      // Usuários do sistema que ainda não têm ficha de colaborador entram pelo nome cadastrado.
+      for (const u of importados.data ?? []) {
+        if (temEmail(u.email)) continue;
+        lista.push({
+          id: u.id,
+          nome: u.nome ?? u.email?.split("@")[0] ?? "Sem nome",
+          email: u.email,
+        });
       }
+
+      // Garante que o usuário logado sempre apareça como vendedor.
+      if (user?.id && user.email && !temEmail(user.email) && !lista.some((v) => v.id === user.id)) {
+        lista.push({
+          id: user.id,
+          nome: (user.user_metadata?.nome as string | undefined) ?? user.email.split("@")[0],
+          email: user.email,
+        });
+      }
+
+      lista.sort((a, b) => a.nome.localeCompare(b.nome));
       return lista;
     },
     enabled: !!user,
