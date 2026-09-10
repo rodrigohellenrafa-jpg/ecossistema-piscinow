@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -9,7 +9,6 @@ import { PageHeader, Kpi } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -112,6 +111,7 @@ function FlightBoard() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
+  const [excluirId, setExcluirId] = useState<string | null>(null);
 
   const { data: obras = [] } = useQuery({
     queryKey: ["obras"],
@@ -227,6 +227,19 @@ function FlightBoard() {
       toast.success("Obra criada no Flight Board!");
       setForm(vazio);
       setOpen(false);
+      qc.invalidateQueries({ queryKey: ["obras"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const excluir = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("obras").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Obra excluída.");
+      setExcluirId(null);
       qc.invalidateQueries({ queryKey: ["obras"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -356,44 +369,96 @@ function FlightBoard() {
               const atrasada = d !== null && d < 0 && obra.status_geral !== "Concluído";
               const proximo = d !== null && d >= 0 && d <= 3 && obra.status_geral !== "Concluído";
               const concluidas = progresso(obra);
+              const statusTone = atrasada
+                ? "text-destructive"
+                : proximo
+                  ? "text-warning"
+                  : obra.status_geral === "Concluído"
+                    ? "text-success"
+                    : "text-primary";
               return (
-                <Card key={obra.id} className="gap-2 py-3">
-                  <CardHeader className="px-3">
-                    <CardTitle className="flex items-center justify-between text-sm">
-                      <Link to="/obras/$id" params={{ id: obra.id }} className="hover:underline">
+                <div
+                  key={obra.id}
+                  className="group overflow-hidden rounded-sm border border-border bg-card shadow-sm transition-all hover:border-primary/50 hover:shadow-md"
+                >
+                  {/* Header / Top Bar */}
+                  <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Obra</span>
+                      <Link
+                        to="/obras/$id"
+                        params={{ id: obra.id }}
+                        className="text-sm font-bold text-primary hover:underline"
+                      >
                         {obra.numero ?? "—"}
                       </Link>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          atrasada
-                            ? "bg-destructive/20 text-destructive"
-                            : proximo
-                              ? "bg-warning/20 text-warning"
-                              : "bg-muted text-muted-foreground"
-                        }`}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                        <Link to="/obras/$id" params={{ id: obra.id }}>
+                          <Pencil className="size-3.5" />
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => setExcluirId(obra.id)}
                       >
-                        {dataBR(obra.data_limite)}
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 px-3">
-                    <p className="text-sm font-medium">{obra.cliente_nome ?? "—"}</p>
-                    <p className="text-xs text-muted-foreground">{obra.tipo_servico}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Prazo: {obra.prazo_dias} dias úteis · {obra.responsavel ?? "sem responsável"}
-                    </p>
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Destination / Client */}
+                  <div className="px-3 py-3">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Cliente</div>
+                    <div className="truncate text-base font-semibold tracking-tight">
+                      {obra.cliente_nome ?? "—"}
+                    </div>
+                  </div>
+
+                  {/* Mid Section */}
+                  <div className="grid grid-cols-2 border-y border-border">
+                    <div className="border-r border-border px-3 py-2.5">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Prazo</div>
+                      <div className="text-sm font-semibold">{obra.prazo_dias} dias úteis</div>
+                    </div>
+                    <div className="px-3 py-2.5">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Data limite</div>
+                      <div className={`text-sm font-semibold ${statusTone}`}>{dataBR(obra.data_limite)}</div>
+                    </div>
+                  </div>
+
+                  {/* Service & Codes */}
+                  <div className="space-y-2 px-3 py-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{obra.tipo_servico}</span>
+                      <span className="text-muted-foreground">{obra.responsavel ?? "sem responsável"}</span>
+                    </div>
                     <div className="flex flex-wrap gap-1">
                       {obra.os_instalacao && <Badge variant="outline">{obra.os_instalacao}</Badge>}
                       {obra.os_logistica && <Badge variant="outline">{obra.os_logistica}</Badge>}
                       {obra.os_acabamento && <Badge variant="outline">{obra.os_acabamento}</Badge>}
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>Checklist</span>
-                        <span>{concluidas}/10</span>
-                      </div>
-                      <Progress value={(concluidas / 10) * 100} />
+                  </div>
+
+                  {/* Status Footer */}
+                  <div className="flex items-center justify-between border-t border-border bg-muted/20 px-3 py-2.5">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Status</span>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${statusTone}`}>
+                        {obra.status_geral}
+                      </span>
                     </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-[10px] text-muted-foreground">Checklist {concluidas}/10</span>
+                      <Progress className="h-1.5 w-24" value={(concluidas / 10) * 100} />
+                    </div>
+                  </div>
+
+                  {/* Status changer */}
+                  <div className="border-t border-border px-3 py-2">
                     <Select
                       value={obra.status_geral}
                       onValueChange={(status) => mudarStatus.mutate({ id: obra.id, status })}
@@ -409,13 +474,36 @@ function FlightBoard() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
         ))}
       </div>
+
+      <Dialog open={!!excluirId} onOpenChange={(v) => !v && setExcluirId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir obra</DialogTitle>
+            <DialogDescription>
+              Deseja realmente excluir esta obra? A ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => excluirId && excluir.mutate(excluirId)}
+              disabled={excluir.isPending}
+            >
+              <Trash2 className="size-4" /> Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
