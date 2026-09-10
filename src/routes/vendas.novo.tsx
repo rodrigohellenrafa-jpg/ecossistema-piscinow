@@ -943,9 +943,9 @@ function NovoPedido() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right">
                         <div className="font-medium">{brl(totalItem(i))}</div>
-                        {i.desconto_valor > 0 && (
+                        {descontoTotalItem(i) > 0 && (
                           <div className="text-xs text-destructive">
-                            -{brl(i.desconto_valor)} desc.
+                            -{brl(descontoTotalItem(i))} desc.
                           </div>
                         )}
                       </TableCell>
@@ -958,7 +958,7 @@ function NovoPedido() {
                   ))}
                   {itens.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                         Nenhum item adicionado.
                       </TableCell>
                     </TableRow>
