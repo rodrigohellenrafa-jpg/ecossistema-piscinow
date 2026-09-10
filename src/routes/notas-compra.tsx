@@ -161,7 +161,13 @@ function lerItensXml(texto: string): ItemXml[] {
   });
 }
 
-type ProdutoSimples = { id: string; codigo: string | null; nome: string };
+type ProdutoSimples = {
+  id: string;
+  codigo: string | null;
+  nome: string;
+  unidade: string;
+  unidades_por_compra: number | null;
+};
 
 function LancarEstoque({
   nota,
@@ -172,6 +178,7 @@ function LancarEstoque({
 }) {
   const itens = useMemo(() => (nota.xml ? lerItensXml(nota.xml) : []), [nota.xml]);
   const [destinos, setDestinos] = useState<Record<number, string>>({});
+  const [fatores, setFatores] = useState<Record<number, string>>({});
   const [salvando, setSalvando] = useState(false);
 
   const { data: produtos = [] } = useQuery({
@@ -179,7 +186,7 @@ function LancarEstoque({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome")
+        .select("id, codigo, nome, unidade, unidades_por_compra")
         .order("nome");
       if (error) throw error;
       return data as ProdutoSimples[];
@@ -199,6 +206,24 @@ function LancarEstoque({
 
   const valor = (idx: number, item: ItemXml) => destinos[idx] ?? sugestao(item);
 
+  /** Quantas unidades de venda vêm em cada volume da nota do fornecedor. */
+  const fator = (idx: number, item: ItemXml) => {
+    if (fatores[idx] !== undefined) return fatores[idx];
+    const alvo = valor(idx, item);
+    const p = produtos.find((x) => x.id === alvo);
+    return String(p?.unidades_por_compra ?? 1);
+  };
+
+  const fatorNum = (idx: number, item: ItemXml) => {
+    const n = Number(String(fator(idx, item)).replace(",", "."));
+    return n > 0 ? n : 1;
+  };
+
+  const unidadeDestino = (idx: number, item: ItemXml) => {
+    const p = produtos.find((x) => x.id === valor(idx, item));
+    return p?.unidade ?? item.unidade ?? "UN";
+  };
+
   const confirmar = async () => {
     if (itens.length === 0) return;
     setSalvando(true);
@@ -212,6 +237,9 @@ function LancarEstoque({
         const alvo = valor(idx, item);
         if (alvo === "ignorar" || item.quantidade <= 0) continue;
 
+        const f = fatorNum(idx, item);
+        const quantidadeUnidades = item.quantidade * f;
+
         let produtoId = alvo;
         if (alvo === "novo") {
           const { data: criado, error } = await supabase
@@ -219,11 +247,12 @@ function LancarEstoque({
             .insert({
               codigo: item.codigo || null,
               nome: item.descricao || "Produto sem descrição",
-              unidade: item.unidade || "UN",
+              unidade: "UN",
               tipo: "produto",
-              preco_custo: item.valor_unitario,
+              preco_custo: item.valor_unitario / f,
               preco_venda: 0,
               estoque_atual: 0,
+              unidades_por_compra: f,
               ncm: item.ncm || null,
               cfop: item.cfop || null,
               created_by: userId,
@@ -232,15 +261,26 @@ function LancarEstoque({
             .single();
           if (error) throw error;
           produtoId = criado.id;
+        } else {
+          const atual = produtos.find((p) => p.id === alvo);
+          if (atual && Number(atual.unidades_por_compra ?? 1) !== f) {
+            await supabase
+              .from("produtos")
+              .update({ unidades_por_compra: f } as never)
+              .eq("id", alvo);
+          }
         }
 
         movimentos.push({
           produto_id: produtoId,
           tipo: "entrada",
-          quantidade: item.quantidade,
+          quantidade: quantidadeUnidades,
           origem: "Compra",
           documento,
-          observacoes: `Entrada pela nota de compra ${nota.numero ?? nota.id}`,
+          observacoes:
+            f > 1
+              ? `Entrada pela nota ${nota.numero ?? nota.id}: ${item.quantidade} x ${f} un.`
+              : `Entrada pela nota de compra ${nota.numero ?? nota.id}`,
           created_by: userId,
         });
       }
@@ -277,12 +317,19 @@ function LancarEstoque({
 
   return (
     <div className="space-y-4">
+      <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        Se o fornecedor vende em caixa e você revende por unidade, informe quantas unidades vêm em
+        cada caixa. O estoque soma sempre em unidades e o valor fica salvo no cadastro do produto
+        para as próximas notas.
+      </p>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Item da nota</TableHead>
-              <TableHead className="text-right">Qtd.</TableHead>
+              <TableHead className="text-right">Qtd. na nota</TableHead>
+              <TableHead className="text-right">Unid. por caixa</TableHead>
+              <TableHead className="text-right">Entra no estoque</TableHead>
               <TableHead>Vai entrar em</TableHead>
             </TableRow>
           </TableHeader>
@@ -296,6 +343,22 @@ function LancarEstoque({
                   </span>
                 </TableCell>
                 <TableCell className="text-right">{item.quantidade}</TableCell>
+                <TableCell className="text-right">
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    className="ml-auto h-8 w-20 text-right"
+                    value={fator(idx, item)}
+                    onChange={(e) => setFatores((f) => ({ ...f, [idx]: e.target.value }))}
+                    disabled={valor(idx, item) === "ignorar"}
+                  />
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {valor(idx, item) === "ignorar"
+                    ? "—"
+                    : `${item.quantidade * fatorNum(idx, item)} ${unidadeDestino(idx, item)}`}
+                </TableCell>
                 <TableCell className="min-w-56">
                   <Select
                     value={valor(idx, item)}

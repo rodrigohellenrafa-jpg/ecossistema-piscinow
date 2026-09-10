@@ -87,6 +87,7 @@ const vazio = {
   preco_venda: "0",
   estoque_atual: "0",
   estoque_minimo: "0",
+  unidades_por_compra: "1",
   custo_fabricacao: "0",
   custo_logistico: "0",
   fornecedor_id: SEM_FORNECEDOR,
@@ -165,6 +166,9 @@ function Produtos() {
       preco_venda: String(p.preco_venda ?? 0),
       estoque_atual: String(p.estoque_atual ?? 0),
       estoque_minimo: String(p.estoque_minimo ?? 0),
+      unidades_por_compra: String(
+        (p as { unidades_por_compra?: number }).unidades_por_compra ?? 1,
+      ),
       custo_fabricacao: String(p.custo_fabricacao ?? 0),
       custo_logistico: String(p.custo_logistico ?? 0),
       fornecedor_id: p.fornecedor_id ?? SEM_FORNECEDOR,
@@ -199,6 +203,7 @@ function Produtos() {
         preco_venda: Number(form.preco_venda) || 0,
         estoque_atual: Number(form.estoque_atual) || 0,
         estoque_minimo: Number(form.estoque_minimo) || 0,
+        unidades_por_compra: Math.max(Number(form.unidades_por_compra) || 1, 1),
         custo_fabricacao: Number(form.custo_fabricacao) || 0,
         custo_logistico: Number(form.custo_logistico) || 0,
         fornecedor_id: form.fornecedor_id === SEM_FORNECEDOR ? null : form.fornecedor_id,
@@ -396,6 +401,19 @@ function Produtos() {
                         value={form.estoque_minimo}
                         onChange={(e) => set("estoque_minimo")(e.target.value)}
                       />
+                    </Field>
+                    <Field label="Unidades por caixa (compra)">
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.unidades_por_compra}
+                        onChange={(e) => set("unidades_por_compra")(e.target.value)}
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Quantas unidades vêm em cada caixa do fornecedor. Use 1 quando comprar e
+                        vender na mesma unidade.
+                      </p>
                     </Field>
                   </>
                 )}

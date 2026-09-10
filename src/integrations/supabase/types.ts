@@ -1261,6 +1261,7 @@ export type Database = {
           sob_encomenda: boolean
           tipo: string
           unidade: string
+          unidades_por_compra: number
           updated_at: string
         }
         Insert: {
@@ -1294,6 +1295,7 @@ export type Database = {
           sob_encomenda?: boolean
           tipo?: string
           unidade?: string
+          unidades_por_compra?: number
           updated_at?: string
         }
         Update: {
@@ -1327,6 +1329,7 @@ export type Database = {
           sob_encomenda?: boolean
           tipo?: string
           unidade?: string
+          unidades_por_compra?: number
           updated_at?: string
         }
         Relationships: [
