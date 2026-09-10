@@ -664,9 +664,10 @@ function NovoPedido() {
             valor: c.valor,
             conta_bancaria: c.bandeira || null,
             observacoes:
-              c.parcelas > 1
-                ? `${c.parcelas}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
+              parcelasNum(c.parcelas) > 1
+                ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
                 : c.observacoes || "Pagamento no fechamento do pedido",
+
             created_by: userId,
           })) as never,
         );
