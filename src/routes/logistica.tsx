@@ -45,7 +45,7 @@ export const Route = createFileRoute("/logistica")({
       {
         name: "description",
         content:
-          "Quadro Kanban das obras: agendado, em execução, pausado e concluído, com checklist técnico.",
+          "Lista linear das obras: agendado, em execução, pausado e concluído, com checklist técnico.",
       },
       { property: "og:title", content: "Flight Board | Piscinow ERP" },
       {
@@ -251,7 +251,7 @@ function FlightBoard() {
     <div className="space-y-6">
       <PageHeader
         title="Flight Board"
-        subtitle="Painel Kanban das obras por status, com prazos e checklist técnico."
+        subtitle="Lista linear das obras por status, com prazos e checklist técnico."
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -350,136 +350,155 @@ function FlightBoard() {
         <Kpi label="Prazo médio" value={`${kpis.prazoMedio} dias`} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {porStatus.map((col) => (
-          <div key={col.status} className="flex min-h-40 flex-col gap-3 rounded-xl border border-border bg-card/50 p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{col.status}</span>
-              <Badge variant="secondary">{col.itens.length}</Badge>
-            </div>
-
-            {col.itens.length === 0 && (
-              <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                Sem obras neste status
-              </p>
-            )}
-
-            {col.itens.map((obra) => {
-              const d = diasAte(obra.data_limite);
-              const atrasada = d !== null && d < 0 && obra.status_geral !== "Concluído";
-              const proximo = d !== null && d >= 0 && d <= 3 && obra.status_geral !== "Concluído";
-              const concluidas = progresso(obra);
-              const statusTone = atrasada
-                ? "text-destructive"
-                : proximo
-                  ? "text-warning"
-                  : obra.status_geral === "Concluído"
-                    ? "text-success"
-                    : "text-primary";
-              return (
-                <div
-                  key={obra.id}
-                  className="group overflow-hidden rounded-sm border border-border bg-card shadow-sm transition-all hover:border-primary/50 hover:shadow-md"
-                >
-                  {/* Header / Top Bar */}
-                  <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Obra</span>
-                      <Link
-                        to="/obras/$id"
-                        params={{ id: obra.id }}
-                        className="text-sm font-bold text-primary hover:underline"
-                      >
-                        {obra.numero ?? "—"}
-                      </Link>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                        <Link to="/obras/$id" params={{ id: obra.id }}>
-                          <Pencil className="size-3.5" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => setExcluirId(obra.id)}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Destination / Client */}
-                  <div className="px-3 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Cliente</div>
-                    <div className="truncate text-base font-semibold tracking-tight">
-                      {obra.cliente_nome ?? "—"}
-                    </div>
-                  </div>
-
-                  {/* Mid Section */}
-                  <div className="grid grid-cols-2 border-y border-border">
-                    <div className="border-r border-border px-3 py-2.5">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Prazo</div>
-                      <div className="text-sm font-semibold">{obra.prazo_dias} dias úteis</div>
-                    </div>
-                    <div className="px-3 py-2.5">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Data limite</div>
-                      <div className={`text-sm font-semibold ${statusTone}`}>{dataBR(obra.data_limite)}</div>
-                    </div>
-                  </div>
-
-                  {/* Service & Codes */}
-                  <div className="space-y-2 px-3 py-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{obra.tipo_servico}</span>
-                      <span className="text-muted-foreground">{obra.responsavel ?? "sem responsável"}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {obra.os_instalacao && <Badge variant="outline">{obra.os_instalacao}</Badge>}
-                      {obra.os_logistica && <Badge variant="outline">{obra.os_logistica}</Badge>}
-                      {obra.os_acabamento && <Badge variant="outline">{obra.os_acabamento}</Badge>}
-                    </div>
-                  </div>
-
-                  {/* Status Footer */}
-                  <div className="flex items-center justify-between border-t border-border bg-muted/20 px-3 py-2.5">
-                    <div className="flex flex-col">
-                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground">Status</span>
-                      <span className={`text-xs font-bold uppercase tracking-wider ${statusTone}`}>
-                        {obra.status_geral}
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-[10px] text-muted-foreground">Checklist {concluidas}/10</span>
-                      <Progress className="h-1.5 w-24" value={(concluidas / 10) * 100} />
-                    </div>
-                  </div>
-
-                  {/* Status changer */}
-                  <div className="border-t border-border px-3 py-2">
-                    <Select
-                      value={obra.status_geral}
-                      onValueChange={(status) => mudarStatus.mutate({ id: obra.id, status })}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OBRA.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+      <div className="space-y-6">
+        {porStatus.map((col) => {
+          const concluido = col.status === "Concluído";
+          return (
+            <div
+              key={col.status}
+              className="rounded-xl border border-border bg-card/50"
+            >
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">{col.status}</span>
+                  <Badge variant="secondary">{col.itens.length}</Badge>
                 </div>
-              );
-            })}
-          </div>
-        ))}
+                <span className="text-xs text-muted-foreground">
+                  {concluido ? "Finalizadas" : "Em andamento"}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="min-w-[900px]">
+                  {/* Header */}
+                  <div className="grid grid-cols-12 gap-2 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="col-span-1">Obra</div>
+                    <div className="col-span-3">Cliente</div>
+                    <div className="col-span-1 text-center">Prazo</div>
+                    <div className="col-span-2 text-center">Data limite</div>
+                    <div className="col-span-2">Ordem de serviço</div>
+                    <div className="col-span-2">Status</div>
+                    <div className="col-span-1 text-right">Ações</div>
+                  </div>
+
+                  {col.itens.length === 0 && (
+                    <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                      Sem obras neste status
+                    </p>
+                  )}
+
+                  {col.itens.map((obra) => {
+                    const d = diasAte(obra.data_limite);
+                    const atrasada = d !== null && d < 0 && obra.status_geral !== "Concluído";
+                    const proximo = d !== null && d >= 0 && d <= 3 && obra.status_geral !== "Concluído";
+                    const concluidas = progresso(obra);
+                    const dataTone = atrasada
+                      ? "text-destructive"
+                      : proximo
+                        ? "text-warning"
+                        : "text-foreground";
+                    return (
+                      <div
+                        key={obra.id}
+                        className="group grid grid-cols-12 items-center gap-2 border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-primary/5"
+                      >
+                        <div className="col-span-1">
+                          <Link
+                            to="/obras/$id"
+                            params={{ id: obra.id }}
+                            className="font-bold text-primary hover:underline"
+                          >
+                            {obra.numero ?? "—"}
+                          </Link>
+                        </div>
+
+                        <div className="col-span-3 min-w-0">
+                          <div className="truncate font-medium">{obra.cliente_nome ?? "—"}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {obra.tipo_servico}
+                            {obra.responsavel ? ` · ${obra.responsavel}` : ""}
+                          </div>
+                        </div>
+
+                        <div className="col-span-1 text-center tabular-nums">
+                          {obra.prazo_dias} dias
+                        </div>
+
+                        <div className={`col-span-2 text-center font-medium tabular-nums ${dataTone}`}>
+                          {dataBR(obra.data_limite)}
+                          {atrasada && (
+                            <span className="ml-1 text-[10px] font-bold">({d}d)</span>
+                          )}
+                          {proximo && !atrasada && (
+                            <span className="ml-1 text-[10px] font-bold">({d}d)</span>
+                          )}
+                        </div>
+
+                        <div className="col-span-2 flex flex-wrap gap-1">
+                          {obra.os_instalacao && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {obra.os_instalacao}
+                            </Badge>
+                          )}
+                          {obra.os_logistica && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {obra.os_logistica}
+                            </Badge>
+                          )}
+                          {obra.os_acabamento && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {obra.os_acabamento}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="col-span-2 space-y-1.5">
+                          <Select
+                            value={obra.status_geral}
+                            onValueChange={(status) => mudarStatus.mutate({ id: obra.id, status })}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OBRA.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex items-center gap-2">
+                            <Progress className="h-1 flex-1" value={(concluidas / 10) * 100} />
+                            <span className="text-[10px] text-muted-foreground tabular-nums">
+                              {concluidas}/10
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="col-span-1 flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                            <Link to="/obras/$id" params={{ id: obra.id }}>
+                              <Pencil className="size-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setExcluirId(obra.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <Dialog open={!!excluirId} onOpenChange={(v) => !v && setExcluirId(null)}>
