@@ -168,6 +168,19 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
     const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const desdeDia = desde.slice(0, 10);
 
+    const { data: equipe } = await supabaseAdmin
+      .from("funcionarios")
+      .select("email")
+      .eq("ativo", true)
+      .not("email", "is", null);
+    const convidados = Array.from(
+      new Set(
+        (equipe ?? [])
+          .map((f) => (f.email ?? "").trim().toLowerCase())
+          .filter((e) => /.+@.+\..+/.test(e)),
+      ),
+    ).map((email) => ({ email }));
+
     const [{ data: eventos }, { data: ordens }, { data: obras }] = await Promise.all([
       supabaseAdmin
         .from("agenda_eventos")
