@@ -435,22 +435,51 @@ function NovoPedido() {
         if (erroCond) throw erroCond;
       }
 
-      // 1b) Condições a receber viram títulos em Contas a Receber (com juros).
-      // Cartão: a operadora repassa o total, então gera um único título com o
-      // valor cheio, mesmo quando o cliente parcelou.
+      // 1b) Contas a Receber recebe SEMPRE o valor do pedido (sem juros).
+      // Cartão: a operadora repassa em um crédito só, então gera um título único.
       for (const c of condicoes.filter((x) => !x.pago && x.valor > 0)) {
-        const cobrado = cobradoCondicao(c);
         const cartao = ehCartao(c.forma_pagamento);
+        const parcelas = cartao ? 1 : Math.max(1, c.parcelas);
         await provisionarFinanceiro(
           { ...ctx, data: c.data_prevista || data },
           {
             valorEntrada: 0,
-            saldoDevedor: cobrado,
-            parcelas: cartao ? 1 : Math.max(1, c.parcelas),
-            valorParcela: cartao ? cobrado : c.valor_parcela,
+            saldoDevedor: c.valor,
+            parcelas,
+            valorParcela: Number((c.valor / parcelas).toFixed(2)),
           },
         );
       }
+
+      // 1b-2) Os juros/acréscimo da maquininha viram receita financeira
+      // vinculada ao pedido (não inflam a receita de vendas no DRE).
+      const comJuros = condicoes.filter((c) => acrescimoCondicao(c) > 0);
+      if (comJuros.length > 0) {
+        const { error: erroJuros } = await supabase.from("lancamentos_financeiros").insert(
+          comJuros.map((c) => ({
+            tipo_fluxo: "receita",
+            categoria: "Juros de cartão",
+            descricao: `Juros ${c.forma_pagamento} - Pedido ${numero}${
+              cliente?.nome ? ` - ${cliente.nome}` : ""
+            }`,
+            valor: acrescimoCondicao(c),
+            data_competencia: c.data_prevista || data,
+            vencimento: c.data_prevista || data,
+            data_pagamento: c.pago ? c.data_prevista || data : null,
+            venda_id: venda.id,
+            forma_pagamento: c.forma_pagamento || null,
+            conta_bancaria: c.bandeira || null,
+            status: c.pago ? "pago" : "pendente",
+            conciliado: false,
+            observacoes: `${Math.max(1, c.parcelas)}x de ${brl(c.valor_parcela)} - cobrado ${brl(
+              cobradoCondicao(c),
+            )} sobre ${brl(c.valor)}`,
+            created_by: userId,
+          })) as never,
+        );
+        if (erroJuros) throw erroJuros;
+      }
+
 
       // 1c) Condições já pagas viram transações da venda: recalculam saldo,
       // status do pedido e entram no fluxo de caixa.

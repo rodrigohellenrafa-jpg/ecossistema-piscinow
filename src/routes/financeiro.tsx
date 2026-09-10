@@ -165,6 +165,15 @@ function Financeiro() {
     },
   });
 
+  /** Rótulo do pedido vinculado (número · cliente) por id. */
+  const rotuloPedido = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const p of pedidos) {
+      mapa.set(p.id, `${p.numero ?? p.id.slice(0, 8)}${p.cliente_nome ? ` · ${p.cliente_nome}` : ""}`);
+    }
+    return mapa;
+  }, [pedidos]);
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição.");
@@ -577,6 +586,7 @@ function Financeiro() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Descrição</TableHead>
+                      <TableHead>Pedido</TableHead>
                       <TableHead>Conta</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                       <TableHead>Status</TableHead>
@@ -595,6 +605,9 @@ function Financeiro() {
                         </TableCell>
                         <TableCell>{l.categoria}</TableCell>
                         <TableCell className="max-w-[220px] truncate">{l.descricao}</TableCell>
+                        <TableCell className="max-w-[180px] truncate">
+                          {l.venda_id ? (rotuloPedido.get(l.venda_id) ?? "Pedido") : "—"}
+                        </TableCell>
                         <TableCell>{l.conta_bancaria ?? "—"}</TableCell>
                         <TableCell
                           className={`text-right tabular-nums ${l.tipo_fluxo === "receita" ? "text-success" : "text-destructive"}`}
