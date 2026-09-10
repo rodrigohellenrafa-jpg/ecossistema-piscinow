@@ -50,10 +50,11 @@ function idGoogle(prefixo: string, uuid: string) {
 
 async function enviarEvento(calendarId: string, id: string, corpo: Record<string, unknown>) {
   const base = `/calendars/${encodeURIComponent(calendarId)}/events`;
-  const criar = await requisitar(base, { method: "POST", body: { ...corpo, id } });
+  const query = { sendUpdates: "all" };
+  const criar = await requisitar(base, { method: "POST", body: { ...corpo, id }, query });
   if (criar.ok) return "criado";
   if (criar.status === 409) {
-    const atualizar = await requisitar(`${base}/${id}`, { method: "PUT", body: { ...corpo, id } });
+    const atualizar = await requisitar(`${base}/${id}`, { method: "PUT", body: { ...corpo, id }, query });
     if (atualizar.ok) return "atualizado";
     throw new Error(`Google Agenda respondeu ${atualizar.status}: ${atualizar.texto}`);
   }
