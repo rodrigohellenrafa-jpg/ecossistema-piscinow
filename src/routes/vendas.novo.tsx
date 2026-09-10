@@ -1222,13 +1222,22 @@ function NovoPedido() {
 
                     <Field label="Parcelas">
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         min={1}
                         max={48}
                         className="text-white"
-                        value={c.parcelas}
+                        placeholder="0"
+                        value={c.parcelas || ""}
                         onChange={(e) => {
-                          const parcelas = Math.min(48, Math.max(1, num(e.target.value) || 1));
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            atualizarCondicao(c.key, { parcelas: "" });
+                            return;
+                          }
+                          const n = Number(raw);
+                          if (!Number.isFinite(n)) return;
+                          const parcelas = Math.min(48, Math.max(1, n));
                           const cobradoAtual = cobradoCondicao(c);
                           atualizarCondicao(c.key, {
                             parcelas,
@@ -1237,6 +1246,7 @@ function NovoPedido() {
                         }}
                       />
                     </Field>
+
 
                     <Field label="Valor de cada parcela (R$)">
                       <Input
