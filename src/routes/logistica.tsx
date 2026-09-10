@@ -481,6 +481,29 @@ function FlightBoard() {
           </div>
         ))}
       </div>
+
+      <Dialog open={!!excluirId} onOpenChange={(v) => !v && setExcluirId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir obra</DialogTitle>
+            <DialogDescription>
+              Deseja realmente excluir esta obra? A ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => excluirId && excluir.mutate(excluirId)}
+              disabled={excluir.isPending}
+            >
+              <Trash2 className="size-4" /> Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
