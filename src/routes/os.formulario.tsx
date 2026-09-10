@@ -46,7 +46,7 @@ const LINHAS_VAZIAS = Array.from({ length: TOTAL_LINHAS }, () => "");
 const LINHAS_APOIO_VAZIAS = Array.from({ length: TOTAL_LINHAS_APOIO }, () => "");
 
 function FormularioOS() {
-  const [obraId, setObraId] = useState<string>("");
+  const [selecao, setSelecao] = useState<string>("");
   const [cliente, setCliente] = useState("");
   const [profissional, setProfissional] = useState("");
   const [linhas, setLinhas] = useState<string[]>(LINHAS_VAZIAS);
@@ -71,36 +71,79 @@ function FormularioOS() {
     },
   });
 
-  const obra = obras.find((o) => o.id === obraId);
+  const { data: vendas = [] } = useQuery({
+    queryKey: ["vendas-formulario"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("id, numero, cliente_nome, vendedor")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data as Array<{
+        id: string;
+        numero: string | null;
+        cliente_nome: string | null;
+        vendedor: string | null;
+      }>;
+    },
+  });
+
+  const obra = selecao.startsWith("obra:")
+    ? obras.find((o) => o.id === selecao.slice(5))
+    : undefined;
+
+  const vendaSelecionada = selecao.startsWith("venda:")
+    ? vendas.find((v) => v.id === selecao.slice(6))
+    : undefined;
+
+  // Obra escolhida usa o pedido vinculado; senão tenta casar pelo cliente.
+  const vendaDaObra = obra
+    ? (obra.venda_id ??
+      vendas.find(
+        (v) =>
+          (v.cliente_nome ?? "").trim().toLowerCase() ===
+          (obra.cliente_nome ?? "").trim().toLowerCase(),
+      )?.id ??
+      null)
+    : null;
+
+  const vendaId = vendaSelecionada?.id ?? vendaDaObra ?? null;
 
   const { data: itensVenda = [] } = useQuery({
-    queryKey: ["formulario-itens", obra?.venda_id],
-    enabled: Boolean(obra?.venda_id),
+    queryKey: ["formulario-itens", vendaId],
+    enabled: Boolean(vendaId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("venda_itens")
         .select("descricao, quantidade")
-        .eq("venda_id", obra!.venda_id!);
+        .eq("venda_id", vendaId!)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return data as Array<{ descricao: string; quantidade: number }>;
     },
   });
 
   useEffect(() => {
-    if (!obra) return;
-    setCliente(obra.cliente_nome ?? "");
-    setProfissional(obra.responsavel ?? "");
-  }, [obra]);
+    if (obra) {
+      setCliente(obra.cliente_nome ?? "");
+      setProfissional(obra.responsavel ?? "");
+    } else if (vendaSelecionada) {
+      setCliente(vendaSelecionada.cliente_nome ?? "");
+      setProfissional(vendaSelecionada.vendedor ?? "");
+    }
+  }, [obra, vendaSelecionada]);
 
   useEffect(() => {
-    if (!obra?.venda_id) return;
+    if (!vendaId) return;
     const preenchidas = itensVenda.map(
       (i) => `${Number(i.quantidade) % 1 === 0 ? Number(i.quantidade) : Number(i.quantidade).toFixed(2)}x ${i.descricao}`,
     );
     setLinhas(
       Array.from({ length: Math.max(TOTAL_LINHAS, preenchidas.length) }, (_, i) => preenchidas[i] ?? ""),
     );
-  }, [itensVenda, obra?.venda_id]);
+  }, [itensVenda, vendaId]);
+
 
   return (
     <div className="space-y-4">
