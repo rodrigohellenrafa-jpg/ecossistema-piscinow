@@ -268,6 +268,108 @@ function NovoPedido() {
 
   const [condicoes, setCondicoes] = useState<CondicaoLinha[]>([]);
 
+  // ----- Rascunho automático: mantém o pedido em andamento ao trocar de tela -----
+  const [rascunhoPronto, setRascunhoPronto] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RASCUNHO_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof d.data === "string") setData(d.data);
+        if (d.tipoAtendimento === "in" || d.tipoAtendimento === "out")
+          setTipoAtendimento(d.tipoAtendimento);
+        if (typeof d.clienteId === "string") setClienteId(d.clienteId);
+        if (typeof d.vendedorId === "string") setVendedorId(d.vendedorId);
+        if (typeof d.observacoes === "string") setObservacoes(d.observacoes);
+        if (Array.isArray(d.itens)) setItens(d.itens as ItemLinha[]);
+        if (d.descontoInputs && typeof d.descontoInputs === "object")
+          setDescontoInputs(d.descontoInputs as Record<string, string>);
+        if (typeof d.cascoId === "string") setCascoId(d.cascoId);
+        if (typeof d.filtroId === "string") setFiltroId(d.filtroId);
+        if (Array.isArray(d.acessorios)) setAcessorios(d.acessorios as AcessorioLinha[]);
+        if (typeof d.custoFrete === "number") setCustoFrete(d.custoFrete);
+        if (typeof d.custoMaoObra === "number") setCustoMaoObra(d.custoMaoObra);
+        if (typeof d.impostosKit === "number") setImpostosKit(d.impostosKit);
+        if (typeof d.precoVendaKit === "number") setPrecoVendaKit(d.precoVendaKit);
+        if (Array.isArray(d.condicoes)) setCondicoes(d.condicoes as CondicaoLinha[]);
+        const temConteudo =
+          (Array.isArray(d.itens) && d.itens.length > 0) ||
+          Boolean(d.clienteId) ||
+          Boolean(d.cascoId);
+        if (temConteudo) toast.info("Rascunho do pedido restaurado.");
+      }
+    } catch {
+      /* rascunho inválido é ignorado */
+    }
+    setRascunhoPronto(true);
+  }, []);
+
+  useEffect(() => {
+    if (!rascunhoPronto) return;
+    try {
+      localStorage.setItem(
+        RASCUNHO_KEY,
+        JSON.stringify({
+          data,
+          tipoAtendimento,
+          clienteId,
+          vendedorId,
+          observacoes,
+          itens,
+          descontoInputs,
+          cascoId,
+          filtroId,
+          acessorios,
+          custoFrete,
+          custoMaoObra,
+          impostosKit,
+          precoVendaKit,
+          condicoes,
+        }),
+      );
+    } catch {
+      /* armazenamento indisponível */
+    }
+  }, [
+    rascunhoPronto,
+    data,
+    tipoAtendimento,
+    clienteId,
+    vendedorId,
+    observacoes,
+    itens,
+    descontoInputs,
+    cascoId,
+    filtroId,
+    acessorios,
+    custoFrete,
+    custoMaoObra,
+    impostosKit,
+    precoVendaKit,
+    condicoes,
+  ]);
+
+  const descartarRascunho = () => {
+    localStorage.removeItem(RASCUNHO_KEY);
+    setData(hojeISO());
+    setTipoAtendimento("in");
+    setClienteId("");
+    setObservacoes("");
+    setItens([]);
+    setDescontoInputs({});
+    setCascoId("");
+    setFiltroId("");
+    setAcessorios([]);
+    setCustoFrete(0);
+    setCustoMaoObra(0);
+    setImpostosKit(0);
+    setPrecoVendaKit(0);
+    setCondicoes([]);
+    toast.success("Rascunho descartado.");
+  };
+
+
   const subtotalProdutos = useMemo(
     () => itens.reduce((s, i) => s + totalItem(i), 0),
     [itens],
