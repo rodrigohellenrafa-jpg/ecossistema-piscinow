@@ -322,7 +322,9 @@ function LancarEstoque({
           <TableHeader>
             <TableRow>
               <TableHead>Item da nota</TableHead>
-              <TableHead className="text-right">Qtd.</TableHead>
+              <TableHead className="text-right">Qtd. na nota</TableHead>
+              <TableHead className="text-right">Unid. por caixa</TableHead>
+              <TableHead className="text-right">Entra no estoque</TableHead>
               <TableHead>Vai entrar em</TableHead>
             </TableRow>
           </TableHeader>
