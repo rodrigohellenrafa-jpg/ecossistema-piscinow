@@ -14,25 +14,55 @@ type GoogleEvento = {
   end?: { date?: string; dateTime?: string };
 };
 
-async function chamar(path: string, query: Record<string, string>) {
+async function requisitar(
+  path: string,
+  opts: { query?: Record<string, string>; method?: string; body?: unknown } = {},
+) {
   const lovableKey = process.env["LOVABLE_API_KEY"];
   const connKey = process.env["GOOGLE_CALENDAR_API_KEY"];
   if (!lovableKey || !connKey) {
     throw new Error("Conexão com o Google Agenda não está configurada.");
   }
-  const url = `${GATEWAY}${path}?${new URLSearchParams(query).toString()}`;
-  const res = await fetch(url, {
+  const qs = opts.query ? `?${new URLSearchParams(opts.query).toString()}` : "";
+  const res = await fetch(`${GATEWAY}${path}${qs}`, {
+    method: opts.method ?? "GET",
     headers: {
       Authorization: `Bearer ${lovableKey}`,
       "X-Connection-Api-Key": connKey,
+      ...(opts.body ? { "Content-Type": "application/json" } : {}),
     },
+    ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
   });
   const texto = await res.text();
-  if (!res.ok) {
-    throw new Error(`Google Agenda respondeu ${res.status}: ${texto}`);
-  }
-  return JSON.parse(texto) as { items?: GoogleEvento[]; nextPageToken?: string };
+  return { ok: res.ok, status: res.status, texto };
 }
+
+async function chamar(path: string, query: Record<string, string>) {
+  const r = await requisitar(path, { query });
+  if (!r.ok) throw new Error(`Google Agenda respondeu ${r.status}: ${r.texto}`);
+  return JSON.parse(r.texto) as { items?: GoogleEvento[]; nextPageToken?: string };
+}
+
+/** ID estável no Google (só aceita 0-9 a-v), derivado do id do registro. */
+function idGoogle(prefixo: string, uuid: string) {
+  return `${prefixo}${uuid.replace(/-/g, "")}`;
+}
+
+async function enviarEvento(calendarId: string, id: string, corpo: Record<string, unknown>) {
+  const base = `/calendars/${encodeURIComponent(calendarId)}/events`;
+  const criar = await requisitar(base, { method: "POST", body: { ...corpo, id } });
+  if (criar.ok) return "criado";
+  if (criar.status === 409) {
+    const atualizar = await requisitar(`${base}/${id}`, { method: "PUT", body: { ...corpo, id } });
+    if (atualizar.ok) return "atualizado";
+    throw new Error(`Google Agenda respondeu ${atualizar.status}: ${atualizar.texto}`);
+  }
+  throw new Error(`Google Agenda respondeu ${criar.status}: ${criar.texto}`);
+}
+
+const FUSO = "America/Sao_Paulo";
+const proximoDia = (data: string) =>
+  new Date(new Date(`${data}T12:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
 
 /** Lista as agendas disponíveis na conta Google conectada. */
 export const listarAgendasGoogle = createServerFn({ method: "POST" })
