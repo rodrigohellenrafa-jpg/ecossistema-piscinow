@@ -165,9 +165,13 @@ interface CondicaoLinha {
 }
 
 
+/** Normaliza a quantidade de parcelas (em branco ou zero vira 1). */
+const parcelasNum = (parcelas: number | string) =>
+  Math.max(1, Number(parcelas) || 1);
+
 /** Total que o cliente desembolsa nessa condição (parcelas x valor da parcela). */
 const cobradoCondicao = (c: CondicaoLinha) =>
-  Math.max(1, c.parcelas) * c.valor_parcela;
+  parcelasNum(c.parcelas) * c.valor_parcela;
 
 /** Pagamentos no cartão são repassados pela operadora em um único crédito. */
 const ehCartao = (forma: string) => /cart[ãa]o/i.test(forma ?? "");
@@ -175,6 +179,7 @@ const ehCartao = (forma: string) => /cart[ãa]o/i.test(forma ?? "");
 /** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
 const acrescimoCondicao = (c: CondicaoLinha) =>
   Math.max(0, cobradoCondicao(c) - c.valor);
+
 
 function NovoPedido() {
   const navigate = useNavigate();
