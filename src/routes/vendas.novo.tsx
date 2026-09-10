@@ -696,6 +696,11 @@ function NovoPedido() {
           `Itens sem saldo: ordem(ns) de compra ${roteamento.ordensCriadas.join(", ")} gerada(s) sob encomenda.`,
         );
       }
+      try {
+        localStorage.removeItem(RASCUNHO_KEY);
+      } catch {
+        /* armazenamento indisponível */
+      }
       navigate({ to: "/vendas/$id", params: { id } });
     },
 
