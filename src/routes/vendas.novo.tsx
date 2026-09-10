@@ -410,7 +410,7 @@ function NovoPedido() {
   const corMargem = margemKit >= 0.25 ? "text-success" : margemKit < 0.1 ? "text-destructive" : "text-warning";
 
   const custoTotalGeral = custoTotalItens + custoTotalKit;
-  const valorTotal = subtotalProdutos + precoVendaKit;
+  const valorTotal = Number((subtotalProdutos + precoVendaKit).toFixed(2));
 
   // Condições de pagamento: cada linha abate um valor do pedido e pode ter
   // parcelas com juros da maquininha (o cliente paga mais do que abate).
@@ -1188,16 +1188,10 @@ function NovoPedido() {
                     </Field>
 
                     <Field label="Valor abatido do pedido (R$)">
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        className="text-white"
-                        value={c.valor ? String(c.valor) : ""}
-                        placeholder="0,00"
-                        onChange={(e) => {
-                          const valor = parseMoedaInput(e.target.value);
+                      <MoedaInput
+                        value={c.valor}
+                        onChange={(valor) => {
                           const parcelas = parcelasNum(c.parcelas);
-                          // Sem juros informados, a parcela acompanha o valor abatido.
                           const semJuros = Math.abs(cobradoCondicao(c) - c.valor) < 0.01;
                           atualizarCondicao(c.key, {
                             valor,
@@ -1249,39 +1243,36 @@ function NovoPedido() {
 
 
                     <Field label="Valor de cada parcela (R$)">
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        className="text-white"
-                        placeholder="0,00"
-                        value={c.valor_parcela ? c.valor_parcela.toFixed(2) : ""}
-                        onChange={(e) =>
-                          atualizarCondicao(c.key, {
-                            valor_parcela: parseMoedaInput(e.target.value),
-                          })
+                      <MoedaInput
+                        value={c.valor_parcela}
+                        onChange={(valor_parcela) =>
+                          atualizarCondicao(c.key, { valor_parcela })
                         }
                       />
                     </Field>
 
                     <Field label="Total cobrado do cliente (R$)">
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        className="text-white"
-                        placeholder="0,00"
-                        value={cobradoCondicao(c) ? cobradoCondicao(c).toFixed(2) : ""}
-                        onChange={(e) => {
-                          const cobrado = parseMoedaInput(e.target.value);
+                      <MoedaInput
+                        value={Number(cobradoCondicao(c).toFixed(2))}
+                        onChange={(cobrado) =>
                           atualizarCondicao(c.key, {
                             valor_parcela: cobrado / parcelasNum(c.parcelas),
-                          });
-                        }}
+                          })
+                        }
                       />
                     </Field>
 
-                    <Field label="Juros / acréscimo da maquininha">
-                      <Input value={brl(acrescimoCondicao(c))} disabled />
+                    <Field label="Juros / acréscimo da maquininha (R$)">
+                      <MoedaInput
+                        value={Number(acrescimoCondicao(c).toFixed(2))}
+                        onChange={(juros) =>
+                          atualizarCondicao(c.key, {
+                            valor_parcela: (c.valor + juros) / parcelasNum(c.parcelas),
+                          })
+                        }
+                      />
                     </Field>
+
 
                     <Field label="Situação">
                       <Select
