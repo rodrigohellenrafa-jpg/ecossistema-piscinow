@@ -165,6 +165,15 @@ function Financeiro() {
     },
   });
 
+  /** Rótulo do pedido vinculado (número · cliente) por id. */
+  const rotuloPedido = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const p of pedidos) {
+      mapa.set(p.id, `${p.numero ?? p.id.slice(0, 8)}${p.cliente_nome ? ` · ${p.cliente_nome}` : ""}`);
+    }
+    return mapa;
+  }, [pedidos]);
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição.");
