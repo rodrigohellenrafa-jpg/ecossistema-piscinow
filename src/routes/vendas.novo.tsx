@@ -294,6 +294,8 @@ function NovoPedido() {
         if (Array.isArray(d.itens)) setItens(d.itens as ItemLinha[]);
         if (d.descontoInputs && typeof d.descontoInputs === "object")
           setDescontoInputs(d.descontoInputs as Record<string, string>);
+        if (d.descontoPctInputs && typeof d.descontoPctInputs === "object")
+          setDescontoPctInputs(d.descontoPctInputs as Record<string, string>);
         if (typeof d.cascoId === "string") setCascoId(d.cascoId);
         if (typeof d.filtroId === "string") setFiltroId(d.filtroId);
         if (Array.isArray(d.acessorios)) setAcessorios(d.acessorios as AcessorioLinha[]);
@@ -327,6 +329,7 @@ function NovoPedido() {
           observacoes,
           itens,
           descontoInputs,
+          descontoPctInputs,
           cascoId,
           filtroId,
           acessorios,
@@ -349,6 +352,7 @@ function NovoPedido() {
     observacoes,
     itens,
     descontoInputs,
+    descontoPctInputs,
     cascoId,
     filtroId,
     acessorios,
@@ -367,6 +371,7 @@ function NovoPedido() {
     setObservacoes("");
     setItens([]);
     setDescontoInputs({});
+    setDescontoPctInputs({});
     setCascoId("");
     setFiltroId("");
     setAcessorios([]);
