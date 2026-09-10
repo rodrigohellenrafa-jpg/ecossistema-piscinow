@@ -519,13 +519,14 @@ function Agenda() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <CalendarDays className="size-4" /> Trazer os compromissos do Google
+            <CalendarDays className="size-4" /> Google Agenda (nos dois sentidos)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Puxa os compromissos da conta do Google conectada (Campinas Jardim do Trevo) para a
-            agenda da equipe. Pode repetir quando quiser: nada é duplicado, apenas atualizado.
+            "Trazer do Google" puxa os compromissos da conta conectada (Campinas Jardim do Trevo).
+            "Enviar para o Google" leva tudo que é criado aqui — compromissos, obras do Flight
+            Board e ordens de serviço. Pode repetir quando quiser: nada é duplicado, só atualizado.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select value={agendaGoogle} onValueChange={setAgendaGoogle}>
