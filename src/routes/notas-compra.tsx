@@ -161,7 +161,13 @@ function lerItensXml(texto: string): ItemXml[] {
   });
 }
 
-type ProdutoSimples = { id: string; codigo: string | null; nome: string };
+type ProdutoSimples = {
+  id: string;
+  codigo: string | null;
+  nome: string;
+  unidade: string;
+  unidades_por_compra: number | null;
+};
 
 function LancarEstoque({
   nota,
