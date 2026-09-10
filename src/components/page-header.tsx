@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 
 export function PageHeader({
   title,
@@ -25,11 +26,13 @@ export function Kpi({
   value,
   hint,
   tone = "default",
+  to,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "default" | "positive" | "negative" | "warning";
+  to?: string;
 }) {
   const cor =
     tone === "positive"
@@ -39,11 +42,21 @@ export function Kpi({
         : tone === "warning"
           ? "text-warning"
           : "text-foreground";
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
+  const body = (
+    <>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className={`mt-1 text-2xl font-semibold tabular-nums ${cor}`}>{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-    </div>
+    </>
   );
+  const className =
+    "block rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-primary/5";
+  if (to) {
+    return (
+      <Link to={to} className={className}>
+        {body}
+      </Link>
+    );
+  }
+  return <div className={className}>{body}</div>;
 }
