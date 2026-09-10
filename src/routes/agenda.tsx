@@ -32,7 +32,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { meuTokenAgenda, regenerarTokenAgenda } from "@/lib/agenda.functions";
-import { listarAgendasGoogle, sincronizarAgendaGoogle } from "@/lib/google-agenda.functions";
+import {
+  enviarAgendaParaGoogle,
+  listarAgendasGoogle,
+  sincronizarAgendaGoogle,
+} from "@/lib/google-agenda.functions";
 
 export const Route = createFileRoute("/agenda")({
   head: () => ({
