@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.espelhar_condicao_conta() FROM PUBLIC, anon, authenticated;
