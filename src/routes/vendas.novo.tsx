@@ -174,7 +174,6 @@ const parcelasNum = (parcelas: number | string) =>
 const cobradoCondicao = (c: CondicaoLinha) =>
   parcelasNum(c.parcelas) * c.valor_parcela;
 
-/** Pagamentos no cartão são repassados pela operadora em um único crédito. */
 
 /** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
 const acrescimoCondicao = (c: CondicaoLinha) =>
