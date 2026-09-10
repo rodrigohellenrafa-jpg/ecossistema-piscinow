@@ -44,6 +44,7 @@ const TOTAL_LINHAS_APOIO = 12;
 
 const LINHAS_VAZIAS = Array.from({ length: TOTAL_LINHAS }, () => "");
 const LINHAS_APOIO_VAZIAS = Array.from({ length: TOTAL_LINHAS_APOIO }, () => "");
+const ITENS_VAZIOS: Array<{ descricao: string; quantidade: number }> = [];
 
 function FormularioOS() {
   const [selecao, setSelecao] = useState<string>("");
@@ -110,7 +111,7 @@ function FormularioOS() {
 
   const vendaId = vendaSelecionada?.id ?? vendaDaObra ?? null;
 
-  const { data: itensVenda = [] } = useQuery({
+  const { data: itensVenda = ITENS_VAZIOS } = useQuery({
     queryKey: ["formulario-itens", vendaId],
     enabled: Boolean(vendaId),
     queryFn: async () => {
