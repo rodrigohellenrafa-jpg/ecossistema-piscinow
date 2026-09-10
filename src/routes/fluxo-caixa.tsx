@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, mesLabel } from "@/lib/erp";
 
 export const Route = createFileRoute("/fluxo-caixa")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Fluxo de Caixa Consolidado | Piscinow ERP" },

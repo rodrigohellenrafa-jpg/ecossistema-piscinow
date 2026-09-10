@@ -36,6 +36,7 @@ import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from 
 import { rotearEstoque } from "@/lib/venda-automacao";
 
 export const Route = createFileRoute("/vendas/novo")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Novo Pedido (PDV) | Piscinow ERP" },

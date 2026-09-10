@@ -39,6 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { dataBR } from "@/lib/erp";
 
 export const Route = createFileRoute("/estoque/entradas")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Entradas e Saídas de Estoque | Piscinow ERP" },

@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, hojeISO, proximoCodigo } from "@/lib/erp";
 
 export const Route = createFileRoute("/compras")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Central de Reposição | Piscinow ERP" },

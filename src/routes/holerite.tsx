@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR } from "@/lib/erp";
 
 export const Route = createFileRoute("/holerite")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Holerite e Comissões | Piscinow ERP" },

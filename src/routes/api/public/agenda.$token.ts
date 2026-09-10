@@ -46,6 +46,7 @@ function vevento(opts: {
 }
 
 export const Route = createFileRoute("/api/public/agenda/$token")({
+  staticData: { sitemap: false },
   server: {
     handlers: {
       GET: async ({ params }) => {

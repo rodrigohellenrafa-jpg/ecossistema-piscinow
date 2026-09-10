@@ -27,6 +27,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/relatorio-contas")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Relatório Financeiro por Mês | Piscinow ERP" },

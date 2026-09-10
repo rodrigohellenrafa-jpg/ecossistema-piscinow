@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/erp";
 
 export const Route = createFileRoute("/estoque/inventario")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Inventário Físico | Piscinow ERP" },

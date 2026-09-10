@@ -42,6 +42,7 @@ import {
 } from "@/lib/import-config";
 
 export const Route = createFileRoute("/importacao")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Importação de Dados | Piscinow ERP" },

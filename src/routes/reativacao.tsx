@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR } from "@/lib/erp";
 
 export const Route = createFileRoute("/reativacao")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Reativação de Clientes | Piscinow ERP" },

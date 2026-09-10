@@ -32,6 +32,7 @@ import { brl, dataBR, FORMAS_PAGAMENTO, STATUS_PEDIDO } from "@/lib/erp";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/vendas/$id")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Detalhe do Pedido | Piscinow ERP" },

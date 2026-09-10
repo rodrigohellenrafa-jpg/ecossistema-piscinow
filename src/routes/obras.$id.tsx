@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { dataBR, ETAPAS_OBRA, type EtapaKey } from "@/lib/erp";
 
 export const Route = createFileRoute("/obras/$id")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Detalhe da Obra | Piscinow ERP" },

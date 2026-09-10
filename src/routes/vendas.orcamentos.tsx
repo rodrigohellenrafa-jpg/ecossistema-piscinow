@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, diasAte, ETIQUETAS_ORCAMENTO, etiquetaInfo } from "@/lib/erp";
 
 export const Route = createFileRoute("/vendas/orcamentos")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Orçamentos | Piscinow ERP" },

@@ -39,6 +39,7 @@ import {
 } from "@/lib/google-agenda.functions";
 
 export const Route = createFileRoute("/agenda")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Agenda da Equipe | Piscinow ERP" },

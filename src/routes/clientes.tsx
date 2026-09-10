@@ -47,6 +47,7 @@ import { ETAPAS_FUNIL, proximoCodigo } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/clientes")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Clientes | Piscinow ERP" },
