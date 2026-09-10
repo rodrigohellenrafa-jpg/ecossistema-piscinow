@@ -307,6 +307,7 @@ export type Database = {
         Row: {
           categoria: string | null
           cliente_id: string | null
+          condicao_id: string | null
           created_at: string
           created_by: string | null
           data_pagamento: string | null
@@ -319,10 +320,12 @@ export type Database = {
           updated_at: string
           valor: number
           vencimento: string
+          venda_id: string | null
         }
         Insert: {
           categoria?: string | null
           cliente_id?: string | null
+          condicao_id?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
@@ -335,10 +338,12 @@ export type Database = {
           updated_at?: string
           valor?: number
           vencimento?: string
+          venda_id?: string | null
         }
         Update: {
           categoria?: string | null
           cliente_id?: string | null
+          condicao_id?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
@@ -351,6 +356,7 @@ export type Database = {
           updated_at?: string
           valor?: number
           vencimento?: string
+          venda_id?: string | null
         }
         Relationships: [
           {
@@ -358,6 +364,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
         ]

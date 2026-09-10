@@ -33,7 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
-import { provisionarFinanceiro, rotearEstoque } from "@/lib/venda-automacao";
+import { rotearEstoque } from "@/lib/venda-automacao";
 
 export const Route = createFileRoute("/vendas/novo")({
   head: () => ({
@@ -174,8 +174,6 @@ const parcelasNum = (parcelas: number | string) =>
 const cobradoCondicao = (c: CondicaoLinha) =>
   parcelasNum(c.parcelas) * c.valor_parcela;
 
-/** Pagamentos no cartão são repassados pela operadora em um único crédito. */
-const ehCartao = (forma: string) => /cart[ãa]o/i.test(forma ?? "");
 
 /** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
 const acrescimoCondicao = (c: CondicaoLinha) =>
@@ -723,21 +721,9 @@ function NovoPedido() {
         if (erroCond) throw erroCond;
       }
 
-      // 1b) Contas a Receber recebe SEMPRE o valor do pedido (sem juros).
-      // Cartão: a operadora repassa em um crédito só, então gera um título único.
-      for (const c of condicoes.filter((x) => !x.pago && x.valor > 0)) {
-        const cartao = ehCartao(c.forma_pagamento);
-        const parcelas = cartao ? 1 : parcelasNum(c.parcelas);
-        await provisionarFinanceiro(
-          { ...ctx, data: c.data_prevista || data },
-          {
-            valorEntrada: 0,
-            saldoDevedor: c.valor,
-            parcelas,
-            valorParcela: Number((c.valor / parcelas).toFixed(2)),
-          },
-        );
-      }
+      // 1b) Contas a Receber é gerado automaticamente pelo banco a partir de
+      // cada condição de pagamento (valor abatido, sem juros), vinculado ao
+      // pedido. Editar ou excluir a condição atualiza/remove o título sozinho.
 
       // 1b-2) Os juros/acréscimo da maquininha viram receita financeira
       // vinculada ao pedido (não inflam a receita de vendas no DRE).
