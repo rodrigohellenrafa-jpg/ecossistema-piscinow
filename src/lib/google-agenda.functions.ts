@@ -252,6 +252,7 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
             .join("\n"),
           start: { date: dia },
           end: { date: proximoDia(dia) },
+          attendees: convidados,
         });
         enviados++;
       } catch (err) {
