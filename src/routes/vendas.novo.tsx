@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -147,6 +147,7 @@ function MoedaInput({
 }
 
 const RASCUNHO_KEY = "piscinow:pdv-rascunho";
+const RASCUNHO_VENDA_KEY = "piscinow:pdv-rascunho-venda";
 
 /** Uma forma de pagamento aplicada ao pedido (pode haver várias no mesmo pedido). */
 interface CondicaoLinha {
@@ -183,6 +184,14 @@ const acrescimoCondicao = (c: CondicaoLinha) =>
 
 function NovoPedido() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [rascunhoVendaId, setRascunhoVendaId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(RASCUNHO_VENDA_KEY);
+    } catch {
+      return null;
+    }
+  });
 
   const { data: clientes = [], refetch: refetchClientes } = useQuery({
     queryKey: ["clientes-select"],
