@@ -227,6 +227,7 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
             start: { dateTime: inicioIso, timeZone: FUSO },
             end: { dateTime: fimIso, timeZone: FUSO },
           };
+      Object.assign(corpo, { attendees: convidados, guestsCanSeeOtherGuests: true });
       try {
         await enviarEvento(calendarId, id, corpo);
         enviados++;
