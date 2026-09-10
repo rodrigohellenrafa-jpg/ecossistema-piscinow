@@ -45,7 +45,7 @@ export const Route = createFileRoute("/logistica")({
       {
         name: "description",
         content:
-          "Quadro Kanban das obras: agendado, em execução, pausado e concluído, com checklist técnico.",
+          "Lista linear das obras: agendado, em execução, pausado e concluído, com checklist técnico.",
       },
       { property: "og:title", content: "Flight Board | Piscinow ERP" },
       {
