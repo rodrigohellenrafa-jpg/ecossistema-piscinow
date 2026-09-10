@@ -251,7 +251,7 @@ function FlightBoard() {
     <div className="space-y-6">
       <PageHeader
         title="Flight Board"
-        subtitle="Painel Kanban das obras por status, com prazos e checklist técnico."
+        subtitle="Lista linear das obras por status, com prazos e checklist técnico."
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
