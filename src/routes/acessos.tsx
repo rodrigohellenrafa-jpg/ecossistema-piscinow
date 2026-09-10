@@ -134,8 +134,10 @@ function AcessosAdmin() {
     onSuccess: (res) => {
       toast.success("Usuário criado com sucesso.");
       setSenhaGerada(res.senhaTemporaria);
+      setSenhaDefinida(Boolean(senha.trim()));
       setEmail("");
       setNome("");
+      setSenha("");
       setPerfis(["usuario"]);
       qc.invalidateQueries({ queryKey: ["usuarios-sistema"] });
     },
@@ -161,6 +163,16 @@ function AcessosAdmin() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const trocarSenha = useMutation({
+    mutationFn: doRedefinirSenha,
+    onSuccess: () => {
+      toast.success("Senha atualizada.");
+      setTrocandoSenha(null);
+      setNovaSenha("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const alternarPerfil = (lista: Perfil[], p: Perfil) =>
     lista.includes(p) ? lista.filter((x) => x !== p) : [...lista, p];
 
@@ -171,7 +183,7 @@ function AcessosAdmin() {
       return;
     }
     setSenhaGerada(null);
-    criar.mutate({ data: { email, nome, perfis } });
+    criar.mutate({ data: { email, nome, perfis, senha: senha.trim() } });
   };
 
 
