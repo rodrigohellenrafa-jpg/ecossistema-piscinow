@@ -111,8 +111,12 @@ export const sincronizarAgendaGoogle = createServerFn({ method: "POST" })
       await supabaseAdmin.from("agenda_eventos").delete().in("google_event_id", cancelados);
     }
 
+    const nosso = /^(ev|obra|os)[0-9a-f]{32}$/;
     const linhas = eventos
-      .filter((e) => e.status !== "cancelled" && (e.start?.date || e.start?.dateTime))
+      .filter(
+        (e) =>
+          e.status !== "cancelled" && !nosso.test(e.id) && (e.start?.date || e.start?.dateTime),
+      )
       .map((e) => {
         const diaInteiro = !!e.start?.date;
         const inicio = diaInteiro
