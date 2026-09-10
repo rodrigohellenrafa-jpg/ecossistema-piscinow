@@ -94,6 +94,51 @@ const parseMoedaInput = (valor: string): number => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
   };
 
+/** Formata número no padrão brasileiro sem o símbolo (1500,00). */
+const formatMoedaInput = (n: number) =>
+  n ? n.toFixed(2).replace(".", ",") : "";
+
+/** Campo monetário que aceita vírgula/ponto e formata ao sair do campo. */
+function MoedaInput({
+  value,
+  onChange,
+  className = "",
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  className?: string;
+}) {
+  const [texto, setTexto] = useState(formatMoedaInput(value));
+
+  useEffect(() => {
+    if (Math.abs(parseMoedaInput(texto) - value) > 0.005) {
+      setTexto(formatMoedaInput(value));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      placeholder="0,00"
+      className={`text-white ${className}`}
+      value={texto}
+      onChange={(e) => {
+        setTexto(e.target.value);
+        onChange(parseMoedaInput(e.target.value));
+      }}
+      onBlur={() => {
+        const n = parseMoedaInput(texto);
+        setTexto(formatMoedaInput(n));
+        onChange(n);
+      }}
+    />
+  );
+}
+
+const RASCUNHO_KEY = "piscinow:pdv-rascunho";
+
 /** Uma forma de pagamento aplicada ao pedido (pode haver várias no mesmo pedido). */
 interface CondicaoLinha {
   key: string;
