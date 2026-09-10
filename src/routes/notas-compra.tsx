@@ -206,6 +206,24 @@ function LancarEstoque({
 
   const valor = (idx: number, item: ItemXml) => destinos[idx] ?? sugestao(item);
 
+  /** Quantas unidades de venda vêm em cada volume da nota do fornecedor. */
+  const fator = (idx: number, item: ItemXml) => {
+    if (fatores[idx] !== undefined) return fatores[idx];
+    const alvo = valor(idx, item);
+    const p = produtos.find((x) => x.id === alvo);
+    return String(p?.unidades_por_compra ?? 1);
+  };
+
+  const fatorNum = (idx: number, item: ItemXml) => {
+    const n = Number(String(fator(idx, item)).replace(",", "."));
+    return n > 0 ? n : 1;
+  };
+
+  const unidadeDestino = (idx: number, item: ItemXml) => {
+    const p = produtos.find((x) => x.id === valor(idx, item));
+    return p?.unidade ?? item.unidade ?? "UN";
+  };
+
   const confirmar = async () => {
     if (itens.length === 0) return;
     setSalvando(true);
