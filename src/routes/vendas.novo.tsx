@@ -154,7 +154,8 @@ interface CondicaoLinha {
   forma_pagamento: string;
   /** Valor que essa condição abate do total do pedido. */
   valor: number;
-  parcelas: number;
+  /** Quantidade de parcelas (em branco ou zero enquanto não preenchido). */
+  parcelas: number | string;
   /** Valor de cada parcela cobrada do cliente (já com juros da maquininha). */
   valor_parcela: number;
   data_prevista: string;
@@ -163,9 +164,14 @@ interface CondicaoLinha {
   observacoes: string;
 }
 
+
+/** Normaliza a quantidade de parcelas (em branco ou zero vira 1). */
+const parcelasNum = (parcelas: number | string) =>
+  Math.max(1, Number(parcelas) || 1);
+
 /** Total que o cliente desembolsa nessa condição (parcelas x valor da parcela). */
 const cobradoCondicao = (c: CondicaoLinha) =>
-  Math.max(1, c.parcelas) * c.valor_parcela;
+  parcelasNum(c.parcelas) * c.valor_parcela;
 
 /** Pagamentos no cartão são repassados pela operadora em um único crédito. */
 const ehCartao = (forma: string) => /cart[ãa]o/i.test(forma ?? "");
@@ -173,6 +179,7 @@ const ehCartao = (forma: string) => /cart[ãa]o/i.test(forma ?? "");
 /** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
 const acrescimoCondicao = (c: CondicaoLinha) =>
   Math.max(0, cobradoCondicao(c) - c.valor);
+
 
 function NovoPedido() {
   const navigate = useNavigate();
@@ -414,7 +421,7 @@ function NovoPedido() {
   const valorEntrada = condicoes.filter((c) => c.pago).reduce((s, c) => s + c.valor, 0);
   const saldoDevedor = Math.max(valorTotal - valorEntrada, 0);
   const pendentes = condicoes.filter((c) => !c.pago);
-  const parcelasQtd = Math.max(1, pendentes.reduce((s, c) => s + Math.max(1, c.parcelas), 0));
+  const parcelasQtd = Math.max(1, pendentes.reduce((s, c) => s + parcelasNum(c.parcelas), 0));
   const valorParcela = pendentes.length > 0 ? pendentes[0].valor_parcela : saldoDevedor;
   const formaPagamento =
     condicoes.length > 0
@@ -429,9 +436,10 @@ function NovoPedido() {
         key: novaKey(),
         forma_pagamento: FORMAS_PAGAMENTO[0],
         valor: restante,
-        parcelas: 1,
+        parcelas: "",
         valor_parcela: restante,
         data_prevista: data,
+
         pago: false,
         bandeira: "",
         observacoes: "",
@@ -584,7 +592,7 @@ function NovoPedido() {
             ordem: idx + 1,
             forma_pagamento: c.forma_pagamento,
             valor: c.valor,
-            parcelas: Math.max(1, c.parcelas),
+            parcelas: parcelasNum(c.parcelas),
             acrescimo: acrescimoCondicao(c),
             valor_cobrado: cobradoCondicao(c),
             valor_parcela: c.valor_parcela,
@@ -602,7 +610,7 @@ function NovoPedido() {
       // Cartão: a operadora repassa em um crédito só, então gera um título único.
       for (const c of condicoes.filter((x) => !x.pago && x.valor > 0)) {
         const cartao = ehCartao(c.forma_pagamento);
-        const parcelas = cartao ? 1 : Math.max(1, c.parcelas);
+        const parcelas = cartao ? 1 : parcelasNum(c.parcelas);
         await provisionarFinanceiro(
           { ...ctx, data: c.data_prevista || data },
           {
@@ -634,7 +642,7 @@ function NovoPedido() {
             conta_bancaria: c.bandeira || null,
             status: c.pago ? "pago" : "pendente",
             conciliado: false,
-            observacoes: `${Math.max(1, c.parcelas)}x de ${brl(c.valor_parcela)} - cobrado ${brl(
+            observacoes: `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} - cobrado ${brl(
               cobradoCondicao(c),
             )} sobre ${brl(c.valor)}`,
             created_by: userId,
@@ -656,9 +664,10 @@ function NovoPedido() {
             valor: c.valor,
             conta_bancaria: c.bandeira || null,
             observacoes:
-              c.parcelas > 1
-                ? `${c.parcelas}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
+              parcelasNum(c.parcelas) > 1
+                ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
                 : c.observacoes || "Pagamento no fechamento do pedido",
+
             created_by: userId,
           })) as never,
         );
@@ -1187,7 +1196,7 @@ function NovoPedido() {
                         placeholder="0,00"
                         onChange={(e) => {
                           const valor = parseMoedaInput(e.target.value);
-                          const parcelas = Math.max(1, c.parcelas);
+                          const parcelas = parcelasNum(c.parcelas);
                           // Sem juros informados, a parcela acompanha o valor abatido.
                           const semJuros = Math.abs(cobradoCondicao(c) - c.valor) < 0.01;
                           atualizarCondicao(c.key, {
@@ -1203,7 +1212,7 @@ function NovoPedido() {
                           const metade = Number((valorTotal / 2).toFixed(2));
                           atualizarCondicao(c.key, {
                             valor: metade,
-                            valor_parcela: metade / Math.max(1, c.parcelas),
+                            valor_parcela: metade / parcelasNum(c.parcelas),
                           });
                         }}
                       >
@@ -1213,13 +1222,22 @@ function NovoPedido() {
 
                     <Field label="Parcelas">
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         min={1}
                         max={48}
                         className="text-white"
-                        value={c.parcelas}
+                        placeholder="0"
+                        value={c.parcelas || ""}
                         onChange={(e) => {
-                          const parcelas = Math.min(48, Math.max(1, num(e.target.value) || 1));
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            atualizarCondicao(c.key, { parcelas: "" });
+                            return;
+                          }
+                          const n = Number(raw);
+                          if (!Number.isFinite(n)) return;
+                          const parcelas = Math.min(48, Math.max(1, n));
                           const cobradoAtual = cobradoCondicao(c);
                           atualizarCondicao(c.key, {
                             parcelas,
@@ -1228,6 +1246,7 @@ function NovoPedido() {
                         }}
                       />
                     </Field>
+
 
                     <Field label="Valor de cada parcela (R$)">
                       <Input
@@ -1254,7 +1273,7 @@ function NovoPedido() {
                         onChange={(e) => {
                           const cobrado = parseMoedaInput(e.target.value);
                           atualizarCondicao(c.key, {
-                            valor_parcela: cobrado / Math.max(1, c.parcelas),
+                            valor_parcela: cobrado / parcelasNum(c.parcelas),
                           });
                         }}
                       />
@@ -1290,7 +1309,7 @@ function NovoPedido() {
                   </div>
 
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {Math.max(1, c.parcelas)}x de {brl(c.valor_parcela)} = {brl(cobradoCondicao(c))}{" "}
+                    {parcelasNum(c.parcelas)}x de {brl(c.valor_parcela)} = {brl(cobradoCondicao(c))}{" "}
                     cobrados · abate {brl(c.valor)} do pedido
                   </p>
                 </div>
