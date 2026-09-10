@@ -86,6 +86,7 @@ const vazio = {
   nome: "",
   cargo: "",
   perfil: "usuario" as Perfil,
+  perfis: ["usuario"] as Perfil[],
   email: "",
   telefone: "",
   data_admissao: "",
