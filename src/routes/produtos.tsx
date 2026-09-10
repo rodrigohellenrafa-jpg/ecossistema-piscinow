@@ -87,6 +87,7 @@ const vazio = {
   preco_venda: "0",
   estoque_atual: "0",
   estoque_minimo: "0",
+  unidades_por_compra: "1",
   custo_fabricacao: "0",
   custo_logistico: "0",
   fornecedor_id: SEM_FORNECEDOR,
@@ -165,6 +166,9 @@ function Produtos() {
       preco_venda: String(p.preco_venda ?? 0),
       estoque_atual: String(p.estoque_atual ?? 0),
       estoque_minimo: String(p.estoque_minimo ?? 0),
+      unidades_por_compra: String(
+        (p as { unidades_por_compra?: number }).unidades_por_compra ?? 1,
+      ),
       custo_fabricacao: String(p.custo_fabricacao ?? 0),
       custo_logistico: String(p.custo_logistico ?? 0),
       fornecedor_id: p.fornecedor_id ?? SEM_FORNECEDOR,
