@@ -178,6 +178,7 @@ function LancarEstoque({
 }) {
   const itens = useMemo(() => (nota.xml ? lerItensXml(nota.xml) : []), [nota.xml]);
   const [destinos, setDestinos] = useState<Record<number, string>>({});
+  const [fatores, setFatores] = useState<Record<number, string>>({});
   const [salvando, setSalvando] = useState(false);
 
   const { data: produtos = [] } = useQuery({
@@ -185,7 +186,7 @@ function LancarEstoque({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome")
+        .select("id, codigo, nome, unidade, unidades_por_compra")
         .order("nome");
       if (error) throw error;
       return data as ProdutoSimples[];
