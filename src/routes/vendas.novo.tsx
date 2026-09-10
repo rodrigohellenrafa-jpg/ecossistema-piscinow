@@ -723,21 +723,9 @@ function NovoPedido() {
         if (erroCond) throw erroCond;
       }
 
-      // 1b) Contas a Receber recebe SEMPRE o valor do pedido (sem juros).
-      // Cartão: a operadora repassa em um crédito só, então gera um título único.
-      for (const c of condicoes.filter((x) => !x.pago && x.valor > 0)) {
-        const cartao = ehCartao(c.forma_pagamento);
-        const parcelas = cartao ? 1 : parcelasNum(c.parcelas);
-        await provisionarFinanceiro(
-          { ...ctx, data: c.data_prevista || data },
-          {
-            valorEntrada: 0,
-            saldoDevedor: c.valor,
-            parcelas,
-            valorParcela: Number((c.valor / parcelas).toFixed(2)),
-          },
-        );
-      }
+      // 1b) Contas a Receber é gerado automaticamente pelo banco a partir de
+      // cada condição de pagamento (valor abatido, sem juros), vinculado ao
+      // pedido. Editar ou excluir a condição atualiza/remove o título sozinho.
 
       // 1b-2) Os juros/acréscimo da maquininha viram receita financeira
       // vinculada ao pedido (não inflam a receita de vendas no DRE).
