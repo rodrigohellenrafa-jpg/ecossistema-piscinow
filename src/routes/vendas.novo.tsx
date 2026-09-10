@@ -444,6 +444,95 @@ function NovoPedido() {
       ? Array.from(new Set(condicoes.map((c) => c.forma_pagamento))).join(" + ")
       : FORMAS_PAGAMENTO[0];
 
+  // ----- Rascunho salvo no banco como orçamento não concluído -----
+  useEffect(() => {
+    if (!rascunhoPronto) return;
+    if (!clienteId && itens.length === 0) return;
+    const timer = setTimeout(async () => {
+      try {
+        const cliente = clientes.find((c) => c.id === clienteId);
+        const cabecalho = {
+          numero,
+          data,
+          cliente_id: clienteId || null,
+          cliente_nome: cliente?.nome ?? null,
+          forma_pagamento: formaPagamento,
+          status_pagamento: "pendente",
+          status_pedido: "orcamento",
+          tipo_atendimento: tipoAtendimento,
+          etiqueta: "Rascunho não concluído",
+          observacoes: observacoes || null,
+          valor_total: valorTotal,
+          subtotal_produtos: subtotalProdutos,
+          valor_frete: custoFrete,
+          valor_mao_obra: custoMaoObra,
+          valor_impostos: impostosKit,
+          custo_total: custoTotalGeral,
+          valor_entrada: valorEntrada,
+          saldo_devedor: saldoDevedor,
+          parcelas: parcelasQtd,
+          valor_parcela: valorParcela,
+          created_by: user?.id ?? null,
+        };
+
+        let id = rascunhoVendaId;
+        if (id) {
+          const { error } = await supabase.from("vendas").update(cabecalho).eq("id", id);
+          if (error) throw error;
+        } else {
+          const { data: nova, error } = await supabase
+            .from("vendas")
+            .insert(cabecalho)
+            .select("id")
+            .single();
+          if (error) throw error;
+          id = nova.id as string;
+          setRascunhoVendaId(id);
+          localStorage.setItem(RASCUNHO_VENDA_KEY, id);
+        }
+
+        await supabase.from("venda_itens").delete().eq("venda_id", id);
+        if (itens.length > 0) {
+          await supabase.from("venda_itens").insert(
+            itens.map((i) => {
+              const bruto = subtotalBrutoItem(i);
+              return {
+                venda_id: id,
+                produto_id: i.produto_id,
+                sku: i.sku || null,
+                descricao: i.descricao,
+                quantidade: i.quantidade,
+                preco_unitario: i.preco_unitario,
+                desconto_valor: Number(descontoTotalItem(i).toFixed(2)),
+                desconto_perc:
+                  bruto > 0 ? Number(((descontoTotalItem(i) / bruto) * 100).toFixed(2)) : 0,
+                total: totalItem(i),
+                custo_unitario: i.custo_unitario,
+              };
+            }),
+          );
+        }
+        queryClient.invalidateQueries({ queryKey: ["vendas", "orcamentos"] });
+      } catch {
+        /* rascunho no banco é best-effort */
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    rascunhoPronto,
+    clienteId,
+    itens,
+    condicoes,
+    observacoes,
+    data,
+    tipoAtendimento,
+    valorTotal,
+    precoVendaKit,
+  ]);
+
+
+
   const adicionarCondicao = () => {
     const restante = Math.max(0, Number((valorTotal - totalAplicado).toFixed(2)));
     setCondicoes((prev) => [
