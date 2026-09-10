@@ -264,6 +264,7 @@ function NovoPedido() {
 
   const [itens, setItens] = useState<ItemLinha[]>([]);
   const [descontoInputs, setDescontoInputs] = useState<Record<string, string>>({});
+  const [descontoPctInputs, setDescontoPctInputs] = useState<Record<string, string>>({});
   const [produtoSel, setProdutoSel] = useState("");
 
   const [cascoId, setCascoId] = useState("");
@@ -450,6 +451,7 @@ function NovoPedido() {
         descricao: p.nome,
         quantidade: 1,
         preco_unitario: num(p.preco_venda),
+        desconto_pct: 0,
         desconto_valor: 0,
         custo_unitario: num(p.preco_custo),
         sob_encomenda: Boolean((p as { sob_encomenda?: boolean }).sob_encomenda),
