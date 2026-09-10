@@ -153,7 +153,7 @@ function FormularioOS() {
           </div>
 
           {/* Linha 2 — Cliente / Profissional */}
-          <div className="grid grid-cols-2 border-b border-slate-900">
+          <div className="os-campo grid grid-cols-2 border-b border-slate-900">
             <div className="border-r border-slate-900 p-3">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Nome do Cliente
@@ -181,7 +181,7 @@ function FormularioOS() {
           </div>
 
           {/* Linha 3 — Início / Término */}
-          <div className="grid grid-cols-2 border-b border-slate-900">
+          <div className="os-campo grid grid-cols-2 border-b border-slate-900">
             <div className="border-r border-slate-900 p-3">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
                 Início
@@ -203,6 +203,7 @@ function FormularioOS() {
               />
             </div>
           </div>
+
 
           {/* Divisória central */}
           <div className="border-b border-slate-900 bg-slate-100 py-2 text-center text-sm font-bold uppercase tracking-widest text-slate-800">
