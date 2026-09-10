@@ -113,6 +113,9 @@ interface CondicaoLinha {
 const cobradoCondicao = (c: CondicaoLinha) =>
   Math.max(1, c.parcelas) * c.valor_parcela;
 
+/** Pagamentos no cartão são repassados pela operadora em um único crédito. */
+const ehCartao = (forma: string) => /cart[ãa]o/i.test(forma ?? "");
+
 /** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
 const acrescimoCondicao = (c: CondicaoLinha) =>
   Math.max(0, cobradoCondicao(c) - c.valor);
