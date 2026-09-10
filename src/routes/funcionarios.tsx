@@ -435,7 +435,13 @@ function Funcionarios() {
                   <TableCell className="font-medium">{f.nome}</TableCell>
                   <TableCell>{f.cargo || "—"}</TableCell>
                   <TableCell>
-                    <Badge>{PERFIL_LABEL[f.perfil] ?? f.perfil}</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {(((f as { perfis?: Perfil[] }).perfis?.length
+                        ? (f as { perfis?: Perfil[] }).perfis!
+                        : [f.perfil]) as Perfil[]).map((p) => (
+                        <Badge key={p}>{PERFIL_LABEL[p] ?? p}</Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">{brl(totalProventos(f))}</TableCell>
                   <TableCell>
