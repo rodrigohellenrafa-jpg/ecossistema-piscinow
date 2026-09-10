@@ -33,7 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
-import { provisionarFinanceiro, rotearEstoque } from "@/lib/venda-automacao";
+import { rotearEstoque } from "@/lib/venda-automacao";
 
 export const Route = createFileRoute("/vendas/novo")({
   head: () => ({
@@ -175,7 +175,6 @@ const cobradoCondicao = (c: CondicaoLinha) =>
   parcelasNum(c.parcelas) * c.valor_parcela;
 
 /** Pagamentos no cartão são repassados pela operadora em um único crédito. */
-const ehCartao = (forma: string) => /cart[ãa]o/i.test(forma ?? "");
 
 /** Juros/acréscimo embutido: diferença entre o cobrado e o valor abatido. */
 const acrescimoCondicao = (c: CondicaoLinha) =>
