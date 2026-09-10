@@ -432,15 +432,19 @@ function NovoPedido() {
         if (erroCond) throw erroCond;
       }
 
-      // 1b) Condições a receber viram parcelas em Contas a Receber (com juros).
+      // 1b) Condições a receber viram títulos em Contas a Receber (com juros).
+      // Cartão: a operadora repassa o total, então gera um único título com o
+      // valor cheio, mesmo quando o cliente parcelou.
       for (const c of condicoes.filter((x) => !x.pago && x.valor > 0)) {
+        const cobrado = cobradoCondicao(c);
+        const cartao = ehCartao(c.forma_pagamento);
         await provisionarFinanceiro(
           { ...ctx, data: c.data_prevista || data },
           {
             valorEntrada: 0,
-            saldoDevedor: cobradoCondicao(c),
-            parcelas: Math.max(1, c.parcelas),
-            valorParcela: c.valor_parcela,
+            saldoDevedor: cobrado,
+            parcelas: cartao ? 1 : Math.max(1, c.parcelas),
+            valorParcela: cartao ? cobrado : c.valor_parcela,
           },
         );
       }
