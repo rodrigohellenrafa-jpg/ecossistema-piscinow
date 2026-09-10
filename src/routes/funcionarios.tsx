@@ -258,20 +258,37 @@ function Funcionarios() {
                 <Field label="Cargo">
                   <Input value={form.cargo} onChange={(e) => set("cargo")(e.target.value)} />
                 </Field>
-                <Field label="Perfil de acesso">
-                  <Select value={form.perfil} onValueChange={(v) => set("perfil")(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERFIS.map((p) => (
-                        <SelectItem key={p.value} value={p.value}>
-                          {p.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Funções de acesso">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {PERFIS.map((p) => {
+                        const marcado = form.perfis.includes(p.value);
+                        return (
+                          <label
+                            key={p.value}
+                            className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
+                          >
+                            <Checkbox
+                              checked={marcado}
+                              onCheckedChange={(v) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  perfis: v
+                                    ? [...f.perfis, p.value]
+                                    : f.perfis.filter((x) => x !== p.value),
+                                }))
+                              }
+                            />
+                            {p.label}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Selecione uma ou mais funções. A primeira selecionada é a função principal.
+                    </p>
+                  </Field>
+                </div>
                 <Field label="E-mail">
                   <Input
                     type="email"
