@@ -709,7 +709,15 @@ function NovoPedido() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Novo Pedido (PDV)" subtitle={`Pedido ${numero}`} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PageHeader title="Novo Pedido (PDV)" subtitle={`Pedido ${numero}`} />
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">Rascunho salvo automaticamente</span>
+          <Button variant="outline" size="sm" onClick={descartarRascunho}>
+            Descartar rascunho
+          </Button>
+        </div>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
