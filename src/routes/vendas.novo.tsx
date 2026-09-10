@@ -410,7 +410,7 @@ function NovoPedido() {
   const corMargem = margemKit >= 0.25 ? "text-success" : margemKit < 0.1 ? "text-destructive" : "text-warning";
 
   const custoTotalGeral = custoTotalItens + custoTotalKit;
-  const valorTotal = subtotalProdutos + precoVendaKit;
+  const valorTotal = Number((subtotalProdutos + precoVendaKit).toFixed(2));
 
   // Condições de pagamento: cada linha abate um valor do pedido e pode ter
   // parcelas com juros da maquininha (o cliente paga mais do que abate).
