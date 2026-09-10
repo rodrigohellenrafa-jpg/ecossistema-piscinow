@@ -604,6 +604,9 @@ function Financeiro() {
                         </TableCell>
                         <TableCell>{l.categoria}</TableCell>
                         <TableCell className="max-w-[220px] truncate">{l.descricao}</TableCell>
+                        <TableCell className="max-w-[180px] truncate">
+                          {l.venda_id ? (rotuloPedido.get(l.venda_id) ?? "Pedido") : "—"}
+                        </TableCell>
                         <TableCell>{l.conta_bancaria ?? "—"}</TableCell>
                         <TableCell
                           className={`text-right tabular-nums ${l.tipo_fluxo === "receita" ? "text-success" : "text-destructive"}`}
