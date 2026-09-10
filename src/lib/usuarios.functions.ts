@@ -72,24 +72,28 @@ export const listarUsuarios = createServerFn({ method: "GET" })
 
 export const criarUsuario = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { email: string; nome: string; perfil?: Perfil; perfis?: Perfil[] }) => {
-    const email = String(input?.email ?? "").trim().toLowerCase();
-    const nome = String(input?.nome ?? "").trim();
-    const brutos = input?.perfis?.length ? input.perfis : input?.perfil ? [input.perfil] : [];
-    const perfis = Array.from(new Set(brutos.map((p) => String(p).trim() as Perfil)));
+  .inputValidator(
+    (input: { email: string; nome: string; perfil?: Perfil; perfis?: Perfil[]; senha?: string }) => {
+      const email = String(input?.email ?? "").trim().toLowerCase();
+      const nome = String(input?.nome ?? "").trim();
+      const senha = String(input?.senha ?? "").trim();
+      const brutos = input?.perfis?.length ? input.perfis : input?.perfil ? [input.perfil] : [];
+      const perfis = Array.from(new Set(brutos.map((p) => String(p).trim() as Perfil)));
 
-    if (!email || !email.includes("@")) throw new Error("Informe um e-mail válido.");
-    if (!nome) throw new Error("Informe o nome do usuário.");
-    if (perfis.length === 0) throw new Error("Selecione ao menos uma função.");
-    if (perfis.some((p) => !PERFIS.includes(p))) throw new Error("Perfil inválido.");
+      if (!email || !email.includes("@")) throw new Error("Informe um e-mail válido.");
+      if (!nome) throw new Error("Informe o nome do usuário.");
+      if (perfis.length === 0) throw new Error("Selecione ao menos uma função.");
+      if (perfis.some((p) => !PERFIS.includes(p))) throw new Error("Perfil inválido.");
+      if (senha && senha.length < 6) throw new Error("A senha deve ter ao menos 6 caracteres.");
 
-    return { email, nome, perfis };
-  })
+      return { email, nome, perfis, senha };
+    },
+  )
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const db = await admin();
 
-    const tempPassword = senhaTemporaria();
+    const tempPassword = data.senha || senhaTemporaria();
 
     const { data: created, error: createError } = await db.auth.admin.createUser({
       email: data.email,
