@@ -86,6 +86,7 @@ const groups: {
       { title: "Ordens de Compra", url: "/ordens-compra", icon: FileText },
       { title: "Entradas de Estoque", url: "/estoque/entradas", icon: Boxes },
       { title: "Inventário Físico", url: "/estoque/inventario", icon: ClipboardList },
+      { title: "Relatório de Estoque", url: "/estoque/relatorio", icon: Boxes },
       { title: "Notas de Compra", url: "/notas-compra", icon: Receipt },
     ],
   },

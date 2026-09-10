@@ -39,6 +39,7 @@ import { Route as VendasIdRouteImport } from './routes/vendas.$id'
 import { Route as OsFormularioRouteImport } from './routes/os.formulario'
 import { Route as ObrasIdRouteImport } from './routes/obras.$id'
 import { Route as FiscalConfigRouteImport } from './routes/fiscal.config'
+import { Route as EstoqueRelatorioRouteImport } from './routes/estoque.relatorio'
 import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventario'
 import { Route as EstoqueEntradasRouteImport } from './routes/estoque.entradas'
 import { Route as ApiPublicAgendaTokenRouteImport } from './routes/api/public/agenda.$token'
@@ -193,6 +194,11 @@ const FiscalConfigRoute = FiscalConfigRouteImport.update({
   path: '/config',
   getParentRoute: () => FiscalRoute,
 } as any)
+const EstoqueRelatorioRoute = EstoqueRelatorioRouteImport.update({
+  id: '/estoque/relatorio',
+  path: '/estoque/relatorio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EstoqueInventarioRoute = EstoqueInventarioRouteImport.update({
   id: '/estoque/inventario',
   path: '/estoque/inventario',
@@ -235,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/estoque/relatorio': typeof EstoqueRelatorioRoute
   '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
   '/os/formulario': typeof OsFormularioRoute
@@ -270,6 +277,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/estoque/relatorio': typeof EstoqueRelatorioRoute
   '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
   '/os/formulario': typeof OsFormularioRoute
@@ -306,6 +314,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
+  '/estoque/relatorio': typeof EstoqueRelatorioRoute
   '/fiscal/config': typeof FiscalConfigRoute
   '/obras/$id': typeof ObrasIdRoute
   '/os/formulario': typeof OsFormularioRoute
@@ -343,6 +352,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
+    | '/estoque/relatorio'
     | '/fiscal/config'
     | '/obras/$id'
     | '/os/formulario'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
+    | '/estoque/relatorio'
     | '/fiscal/config'
     | '/obras/$id'
     | '/os/formulario'
@@ -413,6 +424,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
+    | '/estoque/relatorio'
     | '/fiscal/config'
     | '/obras/$id'
     | '/os/formulario'
@@ -449,6 +461,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   EstoqueEntradasRoute: typeof EstoqueEntradasRoute
   EstoqueInventarioRoute: typeof EstoqueInventarioRoute
+  EstoqueRelatorioRoute: typeof EstoqueRelatorioRoute
   ObrasIdRoute: typeof ObrasIdRoute
   OsFormularioRoute: typeof OsFormularioRoute
   VendasIdRoute: typeof VendasIdRoute
@@ -670,6 +683,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FiscalConfigRouteImport
       parentRoute: typeof FiscalRoute
     }
+    '/estoque/relatorio': {
+      id: '/estoque/relatorio'
+      path: '/estoque/relatorio'
+      fullPath: '/estoque/relatorio'
+      preLoaderRoute: typeof EstoqueRelatorioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/estoque/inventario': {
       id: '/estoque/inventario'
       path: '/estoque/inventario'
@@ -731,6 +751,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   EstoqueEntradasRoute: EstoqueEntradasRoute,
   EstoqueInventarioRoute: EstoqueInventarioRoute,
+  EstoqueRelatorioRoute: EstoqueRelatorioRoute,
   ObrasIdRoute: ObrasIdRoute,
   OsFormularioRoute: OsFormularioRoute,
   VendasIdRoute: VendasIdRoute,
