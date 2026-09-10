@@ -50,10 +50,11 @@ function idGoogle(prefixo: string, uuid: string) {
 
 async function enviarEvento(calendarId: string, id: string, corpo: Record<string, unknown>) {
   const base = `/calendars/${encodeURIComponent(calendarId)}/events`;
-  const criar = await requisitar(base, { method: "POST", body: { ...corpo, id } });
+  const query = { sendUpdates: "all" };
+  const criar = await requisitar(base, { method: "POST", body: { ...corpo, id }, query });
   if (criar.ok) return "criado";
   if (criar.status === 409) {
-    const atualizar = await requisitar(`${base}/${id}`, { method: "PUT", body: { ...corpo, id } });
+    const atualizar = await requisitar(`${base}/${id}`, { method: "PUT", body: { ...corpo, id }, query });
     if (atualizar.ok) return "atualizado";
     throw new Error(`Google Agenda respondeu ${atualizar.status}: ${atualizar.texto}`);
   }
@@ -167,6 +168,19 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
     const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const desdeDia = desde.slice(0, 10);
 
+    const { data: equipe } = await supabaseAdmin
+      .from("funcionarios")
+      .select("email")
+      .eq("ativo", true)
+      .not("email", "is", null);
+    const convidados = Array.from(
+      new Set(
+        (equipe ?? [])
+          .map((f) => (f.email ?? "").trim().toLowerCase())
+          .filter((e) => /.+@.+\..+/.test(e)),
+      ),
+    ).map((email) => ({ email }));
+
     const [{ data: eventos }, { data: ordens }, { data: obras }] = await Promise.all([
       supabaseAdmin
         .from("agenda_eventos")
@@ -213,6 +227,7 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
             start: { dateTime: inicioIso, timeZone: FUSO },
             end: { dateTime: fimIso, timeZone: FUSO },
           };
+      Object.assign(corpo, { attendees: convidados, guestsCanSeeOtherGuests: true });
       try {
         await enviarEvento(calendarId, id, corpo);
         enviados++;
@@ -237,6 +252,7 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
             .join("\n"),
           start: { date: dia },
           end: { date: proximoDia(dia) },
+          attendees: convidados,
         });
         enviados++;
       } catch (err) {
@@ -255,6 +271,7 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
           location: ob.endereco_obra ?? undefined,
           start: { date: dia },
           end: { date: proximoDia(dia) },
+          attendees: convidados,
         });
         enviados++;
       } catch (err) {
