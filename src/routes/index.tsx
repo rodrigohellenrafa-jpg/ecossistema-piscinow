@@ -269,24 +269,28 @@ function Dashboard() {
           value={brl(faturamentoMes)}
           hint={`${vendasMes.length} pedidos · ticket ${brl(ticket)}`}
           tone="positive"
+          to="/vendas"
         />
         <Kpi
           label="Margem bruta média"
           value={pct(margemMedia)}
           hint={`Custo de obra ${brl(custoMes)}`}
           tone={margemMedia >= 0.25 ? "positive" : margemMedia >= 0.1 ? "warning" : "negative"}
+          to="/dre"
         />
         <Kpi
           label="Obras em campo"
           value={String(obrasAtivas.length)}
           hint={`${atrasadas.length} fora do prazo`}
           tone={atrasadas.length ? "negative" : "default"}
+          to="/logistica"
         />
         <Kpi
           label="Saldo financeiro"
           value={brl(saldo)}
           hint="Receitas menos despesas lançadas"
           tone={saldo >= 0 ? "positive" : "negative"}
+          to="/fluxo-caixa"
         />
       </div>
 
@@ -296,22 +300,26 @@ function Dashboard() {
           value={pct(margemLiquida)}
           hint={`Lucro ${brl(lucroLiquidoMes)} · despesas ${brl(despesasMes)}`}
           tone={margemLiquida >= 0.15 ? "positive" : margemLiquida >= 0 ? "warning" : "negative"}
+          to="/dre"
         />
         <Kpi
           label="Notas emitidas no mês"
           value={String(nfAutorizadas.length)}
           hint={`${nfPendentes.length} pendentes de transmissão`}
           tone={nfPendentes.length ? "warning" : "positive"}
+          to="/fiscal"
         />
         <Kpi
           label="Valor autorizado (NF-e/NFS-e)"
           value={brl(nfValor)}
           hint="Somatório das notas autorizadas no mês"
+          to="/fiscal"
         />
         <Kpi
           label="Notas recebidas no mês"
           value={String(ncMes.length)}
           hint={`${brl(ncValor)} em compras lançadas`}
+          to="/notas-compra"
         />
       </div>
 
