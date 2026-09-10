@@ -328,29 +328,54 @@
   }
 
   .os-form-wrapper {
-    position: fixed !important;
+    position: absolute !important;
     top: 0 !important;
     left: 0 !important;
     display: block !important;
-    width: 210mm !important;
+    width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
-    padding: 10mm !important;
+    padding: 0 !important;
     background: #fff !important;
     color: #0f172a !important;
     box-shadow: none !important;
     z-index: 9999 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
+  /* Mantém os fundos cinzas dos cabeçalhos e as bordas das caixas */
+  .os-form-wrapper * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Campos de escrita: sem caixa, apenas texto */
   .os-form-wrapper input {
     border: none !important;
-    border-bottom: 1px solid #0f172a !important;
     background: transparent !important;
     color: #0f172a !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /* Somente os campos de cabeçalho e medidas ganham linha de preenchimento */
+  .os-form-wrapper .os-campo input {
+    border-bottom: 1px solid #0f172a !important;
+  }
+
+  /* Evita quebras no meio das tabelas e blocos */
+  .os-form-wrapper table,
+  .os-form-wrapper tr,
+  .os-form-wrapper svg,
+  .os-form-wrapper .os-bloco {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   @page {
     size: A4 portrait;
-    margin: 8mm;
+    margin: 10mm;
   }
 }
+
