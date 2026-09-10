@@ -277,6 +277,7 @@ function Vendas() {
                     <TableHead>Vendedor</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -301,11 +302,25 @@ function Vendas() {
                           {STATUS_LABEL[v.status_pedido] ?? v.status_pedido}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label={`Excluir pedido ${v.numero ?? ""}`}
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setSenha("");
+                            setAlvo({ id: v.id, numero: v.numero });
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {pedidos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                         Nenhum pedido encontrado.
                       </TableCell>
                     </TableRow>
