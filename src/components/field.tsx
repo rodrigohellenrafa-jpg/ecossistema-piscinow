@@ -17,11 +17,14 @@ export function Field({
   const generatedId = useId();
   const fieldId = id ?? generatedId;
 
-  const child = Children.only(children);
-  const control =
-    isValidElement<{ id?: string }>(child) && child.props.id === undefined
-      ? cloneElement(child, { id: fieldId })
-      : child;
+  let assigned = false;
+  const control = Children.map(children, (child) => {
+    if (!assigned && isValidElement<{ id?: string }>(child) && child.props.id === undefined) {
+      assigned = true;
+      return cloneElement(child, { id: fieldId });
+    }
+    return child;
+  });
 
   return (
     <div className={cn("space-y-1.5", className)}>

@@ -71,7 +71,9 @@ function AuthPage() {
           <div className="mx-auto flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
             <Waves className="size-5" />
           </div>
-          <CardTitle>Piscinow ERP</CardTitle>
+          <h1 className="text-lg font-semibold leading-none tracking-tight">
+            Entrar no Piscinow ERP
+          </h1>
           <CardDescription>Acesso da equipe</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
