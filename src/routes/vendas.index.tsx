@@ -90,6 +90,36 @@ function Vendas() {
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
   const qc = useQueryClient();
+  const validarMestra = useServerFn(validarSenhaMestra);
+  const [alvo, setAlvo] = useState<{ id: string; numero: string | null } | null>(null);
+  const [senha, setSenha] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
+
+  async function confirmarExclusao() {
+    if (!alvo) return;
+    setExcluindo(true);
+    try {
+      const r = await validarMestra({ data: { senha } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      const { error } = await supabase.from("vendas").delete().eq("id", alvo.id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success(`Pedido ${alvo.numero ?? ""} excluído.`);
+      setAlvo(null);
+      setSenha("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir o pedido.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
 
   const { data: vendas = [] } = useQuery({
     queryKey: ["vendas"],
