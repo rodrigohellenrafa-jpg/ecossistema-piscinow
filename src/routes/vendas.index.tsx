@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, Search, X } from "lucide-react";
+import { Check, Plus, Search, Trash2, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { Kpi, PageHeader } from "@/components/page-header";
@@ -26,7 +27,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
 export const Route = createFileRoute("/vendas/")({
