@@ -69,7 +69,7 @@ interface Props {
 }
 
 const EMPRESA_PADRAO = {
-  nome: "Piscinow",
+  nome: "Splash Jardim do Trevo",
   documento: "CNPJ 26.108.962/0001-52",
   endereco: "Comércio e Instalação de Piscinas",
   contato: "",
@@ -151,7 +151,7 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
             </div>
           </div>
 
-          <table className="doc-table">
+          <table className="doc-table doc-itens">
             <thead>
               <tr>
                 <th style={{ width: "12%" }}>Código</th>
@@ -277,7 +277,7 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
             serviços discriminados no Pedido de Venda nº {venda.numero ?? "—"}, emitido em {dataBR(venda.data)},
             a saber:
           </p>
-          <table className="doc-table">
+          <table className="doc-table doc-itens">
             <thead>
               <tr>
                 <th>Item</th>

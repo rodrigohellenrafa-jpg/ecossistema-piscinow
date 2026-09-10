@@ -157,14 +157,31 @@
 }
 
 @media print {
+  html,
+  body,
+  body.imprimindo-documento {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
   body.imprimindo-documento > *:not(#documentos-venda) {
     display: none !important;
   }
 
   body.imprimindo-documento #documentos-venda {
     display: block;
-    background: #fff;
-    color: #111;
+    visibility: visible !important;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: #fff !important;
+    color: #111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.imprimindo-documento #documentos-venda * {
+    visibility: visible !important;
   }
 
   @page {
@@ -180,6 +197,13 @@
   color: #111;
   background: #fff;
   page-break-after: always;
+}
+#documentos-venda .doc-page,
+#documentos-venda .doc-page p,
+#documentos-venda .doc-page strong,
+#documentos-venda .doc-page td,
+#documentos-venda .doc-page th {
+  color: #111;
 }
 #documentos-venda .doc-page:last-child {
   page-break-after: auto;
@@ -242,9 +266,17 @@
   vertical-align: top;
 }
 #documentos-venda .doc-table th {
-  background: #eee;
+  background: #f2f4f7;
   font-size: 9pt;
   text-transform: uppercase;
+}
+#documentos-venda .doc-itens th,
+#documentos-venda .doc-itens td {
+  color: #0b4f8a;
+  border-color: #0b4f8a;
+}
+#documentos-venda .doc-itens th {
+  background: #eaf3fb;
 }
 #documentos-venda .doc-center {
   text-align: center;
@@ -286,12 +318,12 @@
 /* ---- Formulário de Ordem de Serviço (impressão A4) ---- */
 @media print {
   /* Esconde todo o conteúdo da página, exceto o formulário de OS */
-  body * {
+  body:not(.imprimindo-documento) * {
     visibility: hidden;
   }
 
-  body .os-form-wrapper,
-  body .os-form-wrapper * {
+  body:not(.imprimindo-documento) .os-form-wrapper,
+  body:not(.imprimindo-documento) .os-form-wrapper * {
     visibility: visible;
   }
 

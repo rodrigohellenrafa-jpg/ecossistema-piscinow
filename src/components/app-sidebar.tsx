@@ -136,7 +136,7 @@ export function AppSidebar() {
             <Waves className="size-4" />
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-semibold tracking-tight">Piscinow</p>
+            <p className="truncate text-sm font-semibold tracking-tight">Splash Jardim do Trevo</p>
             <p className="truncate text-xs text-muted-foreground">ERP &amp; CRM</p>
           </div>
         </div>

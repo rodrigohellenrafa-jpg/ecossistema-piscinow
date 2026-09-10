@@ -181,7 +181,7 @@ function RootComponent() {
             <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur">
               <SidebarTrigger />
               <span className="text-sm font-medium text-muted-foreground">
-                Piscinow <span className="text-primary">ERP</span>
+                Splash Jardim do Trevo <span className="text-primary">ERP</span>
               </span>
               <UserBadge />
               <SenhaMestra />
