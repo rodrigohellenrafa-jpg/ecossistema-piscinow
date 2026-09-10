@@ -402,6 +402,19 @@ function Produtos() {
                         onChange={(e) => set("estoque_minimo")(e.target.value)}
                       />
                     </Field>
+                    <Field label="Unidades por caixa (compra)">
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={form.unidades_por_compra}
+                        onChange={(e) => set("unidades_por_compra")(e.target.value)}
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Quantas unidades vêm em cada caixa do fornecedor. Use 1 quando comprar e
+                        vender na mesma unidade.
+                      </p>
+                    </Field>
                   </>
                 )}
                 {form.tipo === "produto" && (
