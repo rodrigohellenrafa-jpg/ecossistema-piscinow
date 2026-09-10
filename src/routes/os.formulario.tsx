@@ -348,7 +348,7 @@ function FormularioOS() {
                   <h3 className="mb-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
                     Principais Medidas
                   </h3>
-                  <div className="flex flex-1 flex-col items-center justify-center">
+                  <div className="os-campo flex flex-1 flex-col items-center justify-center">
                     <svg
                       viewBox="0 0 180 160"
                       className="h-36 w-full"
