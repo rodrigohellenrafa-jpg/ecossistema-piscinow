@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Lock, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { Copy, KeyRound, Lock, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -35,6 +35,7 @@ import {
   criarUsuario,
   definirPapeis,
   listarUsuarios,
+  redefinirSenha,
   removerUsuario,
 } from "@/lib/usuarios.functions";
 
