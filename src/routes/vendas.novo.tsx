@@ -371,8 +371,15 @@ function NovoPedido() {
     condicoes,
   ]);
 
-  const descartarRascunho = () => {
+  const descartarRascunho = async () => {
     localStorage.removeItem(RASCUNHO_KEY);
+    localStorage.removeItem(RASCUNHO_VENDA_KEY);
+    if (rascunhoVendaId) {
+      await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
+      await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
+      setRascunhoVendaId(null);
+      queryClient.invalidateQueries({ queryKey: ["vendas"] });
+    }
     setData(hojeISO());
     setTipoAtendimento("in");
     setClienteId("");
