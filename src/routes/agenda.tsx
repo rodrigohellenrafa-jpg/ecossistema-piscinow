@@ -544,8 +544,15 @@ function Agenda() {
                   ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => sincronizar.mutate()} disabled={sincronizar.isPending}>
-              <RefreshCw /> {sincronizar.isPending ? "Sincronizando…" : "Sincronizar agora"}
+            <Button
+              variant="secondary"
+              onClick={() => sincronizar.mutate()}
+              disabled={sincronizar.isPending}
+            >
+              <RefreshCw /> {sincronizar.isPending ? "Trazendo…" : "Trazer do Google"}
+            </Button>
+            <Button onClick={() => enviar.mutate()} disabled={enviar.isPending}>
+              <Upload /> {enviar.isPending ? "Enviando…" : "Enviar para o Google"}
             </Button>
           </div>
         </CardContent>
