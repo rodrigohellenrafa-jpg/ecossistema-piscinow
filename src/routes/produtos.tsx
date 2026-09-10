@@ -203,6 +203,7 @@ function Produtos() {
         preco_venda: Number(form.preco_venda) || 0,
         estoque_atual: Number(form.estoque_atual) || 0,
         estoque_minimo: Number(form.estoque_minimo) || 0,
+        unidades_por_compra: Math.max(Number(form.unidades_por_compra) || 1, 1),
         custo_fabricacao: Number(form.custo_fabricacao) || 0,
         custo_logistico: Number(form.custo_logistico) || 0,
         fornecedor_id: form.fornecedor_id === SEM_FORNECEDOR ? null : form.fornecedor_id,
