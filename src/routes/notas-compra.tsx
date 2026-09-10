@@ -237,6 +237,9 @@ function LancarEstoque({
         const alvo = valor(idx, item);
         if (alvo === "ignorar" || item.quantidade <= 0) continue;
 
+        const f = fatorNum(idx, item);
+        const quantidadeUnidades = item.quantidade * f;
+
         let produtoId = alvo;
         if (alvo === "novo") {
           const { data: criado, error } = await supabase
@@ -244,11 +247,12 @@ function LancarEstoque({
             .insert({
               codigo: item.codigo || null,
               nome: item.descricao || "Produto sem descrição",
-              unidade: item.unidade || "UN",
+              unidade: "UN",
               tipo: "produto",
-              preco_custo: item.valor_unitario,
+              preco_custo: item.valor_unitario / f,
               preco_venda: 0,
               estoque_atual: 0,
+              unidades_por_compra: f,
               ncm: item.ncm || null,
               cfop: item.cfop || null,
               created_by: userId,
@@ -257,15 +261,26 @@ function LancarEstoque({
             .single();
           if (error) throw error;
           produtoId = criado.id;
+        } else {
+          const atual = produtos.find((p) => p.id === alvo);
+          if (atual && Number(atual.unidades_por_compra ?? 1) !== f) {
+            await supabase
+              .from("produtos")
+              .update({ unidades_por_compra: f } as never)
+              .eq("id", alvo);
+          }
         }
 
         movimentos.push({
           produto_id: produtoId,
           tipo: "entrada",
-          quantidade: item.quantidade,
+          quantidade: quantidadeUnidades,
           origem: "Compra",
           documento,
-          observacoes: `Entrada pela nota de compra ${nota.numero ?? nota.id}`,
+          observacoes:
+            f > 1
+              ? `Entrada pela nota ${nota.numero ?? nota.id}: ${item.quantidade} x ${f} un.`
+              : `Entrada pela nota de compra ${nota.numero ?? nota.id}`,
           created_by: userId,
         });
       }
