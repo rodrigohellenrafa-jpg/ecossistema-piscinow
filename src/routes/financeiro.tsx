@@ -586,6 +586,7 @@ function Financeiro() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Categoria</TableHead>
                       <TableHead>Descrição</TableHead>
+                      <TableHead>Pedido</TableHead>
                       <TableHead>Conta</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                       <TableHead>Status</TableHead>
