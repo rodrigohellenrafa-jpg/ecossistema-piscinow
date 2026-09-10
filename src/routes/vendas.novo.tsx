@@ -813,13 +813,13 @@ function NovoPedido() {
 
           <Card className="overflow-hidden border-border">
             <CardHeader className="border-b border-border p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-2 rounded-full bg-primary" />
-                  <CardTitle className="text-xl tracking-tight">Itens do Pedido</CardTitle>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="h-8 w-1.5 rounded-full bg-primary" />
+                  <CardTitle className="whitespace-nowrap text-xl tracking-tight">Itens do Pedido</CardTitle>
                 </div>
 
-                <div className="flex flex-1 items-center gap-3 md:max-w-2xl">
+                <div className="flex flex-1 items-center gap-3 lg:max-w-2xl">
                   <Field label="Produto" className="flex-1">
                     <div className="relative flex items-center gap-2">
                       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
