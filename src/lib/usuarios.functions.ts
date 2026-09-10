@@ -49,6 +49,11 @@ export const listarUsuarios = createServerFn({ method: "GET" })
       .select("id, nome, email, perfil, ativo");
     if (importError) throw new Error(importError.message);
 
+    const { data: colaboradores, error: funcError } = await db
+      .from("funcionarios")
+      .select("id, nome, email, cargo, perfil, perfis, ativo");
+    if (funcError) throw new Error(funcError.message);
+
     const papeisPorUser = new Map<string, { id: string; role: Perfil }[]>();
     for (const p of papeis ?? []) {
       const lista = papeisPorUser.get(p.user_id) ?? [];
@@ -57,17 +62,66 @@ export const listarUsuarios = createServerFn({ method: "GET" })
     }
 
     const importadosPorId = new Map((importados ?? []).map((u) => [u.id, u]));
+    const colaboradorPorEmail = new Map(
+      (colaboradores ?? [])
+        .filter((f: { email: string | null }) => !!f.email)
+        .map((f: { email: string | null }) => [f.email!.trim().toLowerCase(), f]),
+    );
 
     return (users ?? []).map((u) => {
       const imp = importadosPorId.get(u.id);
+      const email = (u.email ?? imp?.email ?? "").trim().toLowerCase();
+      const col = email ? colaboradorPorEmail.get(email) : undefined;
+      const funcoes: Perfil[] = col
+        ? ((col.perfis?.length ? col.perfis : [col.perfil]) as Perfil[])
+        : [];
       return {
         id: u.id,
         email: u.email ?? imp?.email ?? "—",
-        nome: imp?.nome ?? u.user_metadata?.nome ?? u.email?.split("@")[0] ?? "—",
-        ativo: imp?.ativo ?? true,
+        nome:
+          col?.nome ?? imp?.nome ?? u.user_metadata?.nome ?? u.email?.split("@")[0] ?? "—",
+        ativo: col?.ativo ?? imp?.ativo ?? true,
+        colaboradorId: col?.id ?? null,
+        cargo: col?.cargo ?? null,
+        funcoesColaborador: funcoes,
         papeis: papeisPorUser.get(u.id) ?? [],
       };
     });
+  });
+
+/** Atualiza o nome exibido do usuário em todos os lugares (login, colaborador, cadastro). */
+export const atualizarNomeUsuario = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string; nome: string }) => {
+    const userId = String(input?.userId ?? "").trim();
+    const nome = String(input?.nome ?? "").trim();
+    if (!userId) throw new Error("Usuário inválido.");
+    if (nome.length < 2) throw new Error("Informe o nome completo.");
+    return { userId, nome };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as never);
+    const db = await admin();
+
+    const { data: alvo, error: readError } = await db.auth.admin.getUserById(data.userId);
+    if (readError) throw new Error(readError.message);
+    const email = alvo?.user?.email?.trim().toLowerCase() ?? null;
+
+    const { error: metaError } = await db.auth.admin.updateUserById(data.userId, {
+      user_metadata: { ...(alvo?.user?.user_metadata ?? {}), nome: data.nome },
+    });
+    if (metaError) throw new Error(metaError.message);
+
+    await db.from("usuarios_importados").upsert(
+      { id: data.userId, nome: data.nome, email, ativo: true, created_by: context.userId },
+      { onConflict: "id" },
+    );
+
+    if (email) {
+      await db.from("funcionarios").update({ nome: data.nome }).ilike("email", email);
+    }
+
+    return { ok: true, nome: data.nome };
   });
 
 export const criarUsuario = createServerFn({ method: "POST" })
