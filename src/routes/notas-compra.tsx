@@ -317,6 +317,11 @@ function LancarEstoque({
 
   return (
     <div className="space-y-4">
+      <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        Se o fornecedor vende em caixa e você revende por unidade, informe quantas unidades vêm em
+        cada caixa. O estoque soma sempre em unidades e o valor fica salvo no cadastro do produto
+        para as próximas notas.
+      </p>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
