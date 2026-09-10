@@ -530,6 +530,7 @@ export type Database = {
           irrf_perc: number
           nome: string
           perfil: Database["public"]["Enums"]["app_role"]
+          perfis: Database["public"]["Enums"]["app_role"][]
           salario_base: number
           sindicato: number
           telefone: string | null
@@ -555,6 +556,7 @@ export type Database = {
           irrf_perc?: number
           nome: string
           perfil?: Database["public"]["Enums"]["app_role"]
+          perfis?: Database["public"]["Enums"]["app_role"][]
           salario_base?: number
           sindicato?: number
           telefone?: string | null
@@ -580,6 +582,7 @@ export type Database = {
           irrf_perc?: number
           nome?: string
           perfil?: Database["public"]["Enums"]["app_role"]
+          perfis?: Database["public"]["Enums"]["app_role"][]
           salario_base?: number
           sindicato?: number
           telefone?: string | null
