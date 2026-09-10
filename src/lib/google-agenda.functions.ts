@@ -271,6 +271,7 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
           location: ob.endereco_obra ?? undefined,
           start: { date: dia },
           end: { date: proximoDia(dia) },
+          attendees: convidados,
         });
         enviados++;
       } catch (err) {
