@@ -333,6 +333,7 @@ function DetalhePedido() {
             cliente={cliente ?? null}
             itens={itens}
             condicoes={condicoes as never}
+            empresa={{ nome: "Splash Jardim do Trevo" }}
           />
           <Button variant="ghost" onClick={() => window.print()}>
             <Printer /> Espelho fiscal
@@ -597,7 +598,7 @@ function DetalhePedido() {
       <div className="print:block rounded-xl border border-border bg-card p-6 text-sm">
         <div className="mb-6 flex items-start justify-between border-b border-border pb-4">
           <div>
-            <p className="text-lg font-semibold">Piscinow</p>
+            <p className="text-lg font-semibold">Splash Jardim do Trevo</p>
             <p className="text-muted-foreground">Comércio e Instalação de Piscinas</p>
           </div>
           <div className="text-right">
