@@ -204,7 +204,11 @@ function FlightBoard() {
     }) => {
       const { error } = await supabase
         .from("obras")
-        .update({ [campo]: valor || null })
+        .update(
+          (campo === "data_inicio"
+            ? { data_inicio: valor || null }
+            : { data_termino: valor || null }),
+        )
         .eq("id", id);
       if (error) throw error;
     },
