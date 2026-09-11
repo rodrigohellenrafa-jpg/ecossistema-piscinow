@@ -1448,6 +1448,69 @@ function OrdensCompra() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={faturaOpen} onOpenChange={setFaturaOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Condições de pagamento do fornecedor</DialogTitle>
+            <DialogDescription>
+              Informe o que o fornecedor cobrou. O título será criado no Contas a Pagar vinculado a
+              esta ordem.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <Field label="Valor cobrado (R$) *">
+              <Input
+                type="number"
+                step="0.01"
+                value={fatura.valor}
+                onChange={(e) => setFatura((f) => ({ ...f, valor: e.target.value }))}
+              />
+            </Field>
+            <Field label="Data de vencimento *">
+              <Input
+                type="date"
+                value={fatura.vencimento}
+                onChange={(e) => setFatura((f) => ({ ...f, vencimento: e.target.value }))}
+              />
+            </Field>
+            <Field label="Forma de pagamento">
+              <Select
+                value={fatura.forma}
+                onValueChange={(v) => setFatura((f) => ({ ...f, forma: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["Boleto", "Pix", "Transferência", "Cartão de Crédito", "Dinheiro"].map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Observações">
+              <Textarea
+                rows={2}
+                value={fatura.observacoes}
+                onChange={(e) => setFatura((f) => ({ ...f, observacoes: e.target.value }))}
+                placeholder="Ex.: nota 12345, entrega em 5 dias"
+              />
+            </Field>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaturaOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => faturarOrdem.mutate()} disabled={faturarOrdem.isPending}>
+              Faturar e gerar conta a pagar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
