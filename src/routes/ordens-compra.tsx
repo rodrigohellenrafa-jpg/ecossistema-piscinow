@@ -206,6 +206,19 @@ function OrdensCompra() {
     },
   });
 
+  const { data: clientes = [] } = useQuery({
+    queryKey: ["clientes", "lista-simples"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data as Cliente[];
+    },
+  });
+
   const { data: itensDetalhe = [] } = useQuery({
     queryKey: ["ordem_compra_itens", detalheId],
     enabled: !!detalheId,
