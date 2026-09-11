@@ -100,6 +100,11 @@ type Ordem = {
   valor_total: number;
   status: string;
   observacoes: string | null;
+  /** Valor efetivamente faturado na nota fiscal do fornecedor (meia nota). */
+  valor_nota: number | null;
+  /** Valor realmente pago ao fornecedor, incluindo a parte fora da nota. */
+  valor_pago: number | null;
+  obs_pagamento: string | null;
 };
 
 type Item = {
