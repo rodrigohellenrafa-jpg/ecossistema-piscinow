@@ -186,6 +186,22 @@ function Ordens() {
   const gerarObra = useMutation({
     mutationFn: async (os: (typeof data)[number]) => {
       const cliente = clientes.find((c) => c.id === os.cliente_id);
+
+      // Não duplica: se o cliente já tem obra em aberto do mesmo serviço, avisa.
+      const duplicada = obras.find(
+        (o) =>
+          o.status_geral !== "Concluído" &&
+          o.tipo_servico === os.tipo_servico &&
+          (os.cliente_id
+            ? o.cliente_id === os.cliente_id
+            : (o.cliente_nome ?? "") === (os.cliente_nome ?? "")),
+      );
+      if (duplicada) {
+        throw new Error(
+          `Este cliente já tem a obra ${duplicada.numero ?? ""} em aberto para "${os.tipo_servico}".`,
+        );
+      }
+
       const dataPedido = hojeISO();
       const prazoDias = 30;
       const dataLimite = addDiasUteis(dataPedido, prazoDias);
