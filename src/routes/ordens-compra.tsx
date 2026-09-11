@@ -38,6 +38,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, proximoCodigo } from "@/lib/erp";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 
 export const Route = createFileRoute("/ordens-compra")({
   staticData: { sitemap: false },
@@ -583,6 +584,7 @@ function OrdensCompra() {
               </DialogHeader>
 
               <div className="hidden print:block">
+                <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="mb-2 h-16 w-auto" />
                 <h1 className="text-xl font-semibold">Ordem de Compra {ordemDetalhe.numero}</h1>
               </div>
 

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import plantaPiscina from "@/assets/planta-piscina-limpa.png";
 
@@ -262,9 +263,11 @@ function FormularioOS() {
           {/* Cabeçalho */}
           <header className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-3">
             <div>
-              <div className="flex h-12 w-40 items-center justify-center border border-dashed border-slate-300 text-[10px] uppercase tracking-widest text-slate-400">
-                Splash Jardim do Trevo
-              </div>
+              <img
+                src={logoSplash.url}
+                alt="Splash Jardim do Trevo"
+                className="h-16 w-auto"
+              />
               <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
                 Instalação de piscinas
               </p>
@@ -369,13 +372,16 @@ function FormularioOS() {
         {/* -------- VERSO -------- */}
         <section className="os-pagina os-verso bg-white p-6 shadow-sm print:p-0 print:shadow-none">
           <header className="flex items-end justify-between border-b-2 border-slate-900 pb-2">
-            <div>
+            <div className="flex items-center gap-3">
+              <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-12 w-auto" />
+              <div>
               <h2 className="text-base font-bold uppercase tracking-[0.18em] text-slate-900">
                 Checklist de materiais e equipamentos
               </h2>
               <p className="text-[11px] text-slate-500">
                 {cliente || "Cliente"} · O.S. {numeroOS || "—"}
               </p>
+              </div>
             </div>
             <p className="text-[11px] text-slate-500">Verso</p>
           </header>

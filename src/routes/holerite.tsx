@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR } from "@/lib/erp";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 
 export const Route = createFileRoute("/holerite")({
   staticData: { sitemap: false },
@@ -164,6 +165,13 @@ function Holerite() {
 
   return (
     <div className="space-y-6">
+      <div className="hidden print:flex print:items-center print:gap-3">
+        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-14 w-auto" />
+        <div>
+          <p className="text-lg font-semibold">Splash Jardim do Trevo</p>
+          <p className="text-sm text-muted-foreground">Holerite e Comissões</p>
+        </div>
+      </div>
       <PageHeader
         title="Holerite e Comissões"
         subtitle="Cálculo mensal de salário, comissões por categoria e descontos."

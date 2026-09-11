@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/erp";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 
 export const Route = createFileRoute("/estoque/relatorio")({
   staticData: { sitemap: false },
@@ -149,6 +150,10 @@ function RelatorioEstoque() {
 
   return (
     <div className="space-y-6">
+      <div className="hidden print:flex print:items-center print:gap-3">
+        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-14 w-auto" />
+        <p className="text-lg font-semibold">Splash Jardim do Trevo — Relatório de Estoque</p>
+      </div>
       <PageHeader
         title="Relatório de Estoque"
         subtitle="Entradas, saídas e saldo por produto no período selecionado."
