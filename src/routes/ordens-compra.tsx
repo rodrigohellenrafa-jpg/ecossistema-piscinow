@@ -126,6 +126,8 @@ type Ordem = {
   /** Valor realmente pago ao fornecedor, incluindo a parte fora da nota. */
   valor_pago: number;
   obs_pagamento: string | null;
+  enviada_em?: string | null;
+  faturada_em?: string | null;
 };
 
 type Item = {
