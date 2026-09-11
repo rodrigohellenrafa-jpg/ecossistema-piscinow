@@ -153,6 +153,7 @@ function Contas() {
         parceiro: form.parceiro || null,
         categoria: form.categoria || null,
         valor: Number(form.valor) || 0,
+        valor_juros: Number(form.valor_juros) || 0,
         vencimento: form.vencimento,
         status: "aberto",
         observacoes: form.observacoes || null,
