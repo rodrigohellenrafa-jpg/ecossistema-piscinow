@@ -270,6 +270,8 @@ function OrdensCompra() {
         quantidade: Number(i.quantidade),
         valor_unitario: Number(i.valor_unitario),
         desconto: Number(i.desconto),
+        cliente_id: i.cliente_id ?? null,
+        cliente_nome: i.cliente_nome ?? null,
       })),
     });
     setModoEdicao(true);
