@@ -128,7 +128,9 @@ function Ordens() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("numero, os_instalacao, os_logistica, os_acabamento");
+        .select(
+          "numero, os_instalacao, os_logistica, os_acabamento, cliente_id, cliente_nome, tipo_servico, status_geral",
+        );
       if (error) throw error;
       return data;
     },
