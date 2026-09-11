@@ -109,7 +109,7 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
   const cabecalho = (titulo: string) => (
     <header className="doc-header">
       <div>
-        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="mb-1 h-16 w-auto" />
+        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="mb-1 h-24 w-auto" />
         <p className="doc-logo">{emp.nome}</p>
         <p className="doc-mini">{emp.endereco}</p>
         <p className="doc-mini">{emp.documento}</p>

@@ -79,14 +79,14 @@ function Campo({
 }) {
   return (
     <div className={`os-campo px-3 py-2 ${className}`}>
-      <label className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+      <label className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-700">
         {label}
       </label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
-        className="w-full border-b border-slate-300 bg-transparent py-0.5 text-[12px] font-medium text-slate-900 outline-none"
+        className="w-full border-b border-slate-900 bg-transparent py-0.5 text-[12px] font-medium text-slate-900 outline-none"
       />
     </div>
   );
@@ -266,9 +266,9 @@ function FormularioOS() {
               <img
                 src={logoSplash.url}
                 alt="Splash Jardim do Trevo"
-                className="h-16 w-auto"
+                className="h-24 w-auto"
               />
-              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-700">
                 Instalação de piscinas
               </p>
             </div>
@@ -276,60 +276,60 @@ function FormularioOS() {
               <h2 className="text-lg font-bold uppercase tracking-[0.18em] text-slate-900">
                 Ordem de Serviço
               </h2>
-              <p className="text-[11px] text-slate-500">Instalação · Frente</p>
+              <p className="text-[11px] text-slate-700">Instalação · Frente</p>
             </div>
           </header>
 
           {/* Dados do cliente / pedido */}
-          <div className="mt-3 grid grid-cols-4 border border-slate-300">
+          <div className="mt-3 grid grid-cols-4 border border-slate-900">
             <Campo
               label="Cliente"
               value={cliente}
               onChange={setCliente}
-              className="col-span-2 border-b border-r border-slate-300"
+              className="col-span-2 border-b border-r border-slate-900"
             />
             <Campo
               label="Telefone"
               value={telefone}
               onChange={setTelefone}
-              className="border-b border-r border-slate-300"
+              className="border-b border-r border-slate-900"
             />
             <Campo
               label="Nº da O.S."
               value={numeroOS}
               onChange={setNumeroOS}
-              className="border-b border-slate-300"
+              className="border-b border-slate-900"
             />
             <Campo
               label="Endereço da obra"
               value={endereco}
               onChange={setEndereco}
-              className="col-span-2 border-b border-r border-slate-300"
+              className="col-span-2 border-b border-r border-slate-900"
             />
             <Campo
               label="Modelo da piscina"
               value={modelo}
               onChange={setModelo}
-              className="col-span-2 border-b border-slate-300"
+              className="col-span-2 border-b border-slate-900"
             />
             <Campo
               label="Profissional responsável"
               value={profissional}
               onChange={setProfissional}
-              className="col-span-2 border-r border-slate-300"
+              className="col-span-2 border-r border-slate-900"
             />
             <Campo
               label="Início"
               value={inicio}
               onChange={setInicio}
-              className="border-r border-slate-300"
+              className="border-r border-slate-900"
             />
             <Campo label="Término" value={termino} onChange={setTermino} />
           </div>
 
           {/* Desenho técnico */}
-          <div className="mt-4 border border-slate-300">
-            <div className="border-b border-slate-300 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
+          <div className="mt-4 border border-slate-900">
+            <div className="border-b border-slate-900 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
               Desenho técnico — planta baixa e corte
             </div>
 
@@ -341,15 +341,15 @@ function FormularioOS() {
               />
             </div>
 
-            <div className="flex items-center gap-8 border-t border-slate-300 px-3 py-2 text-[11px] text-slate-700">
-              <span className="font-semibold uppercase tracking-wide text-slate-500">Borda:</span>
+            <div className="flex items-center gap-8 border-t border-slate-900 px-3 py-2 text-[11px] text-slate-700">
+              <span className="font-semibold uppercase tracking-wide text-slate-700">Borda:</span>
               <span className="flex items-center gap-2">
                 <span className="inline-block h-3 w-3 border border-slate-900" /> Normal
               </span>
               <span className="flex items-center gap-2">
                 <span className="inline-block h-3 w-3 border border-slate-900" /> Rebaixada
               </span>
-              <span className="ml-auto font-semibold uppercase tracking-wide text-slate-500">
+              <span className="ml-auto font-semibold uppercase tracking-wide text-slate-700">
                 Referência de nível:
               </span>
               <span className="inline-block w-40 border-b border-slate-400" />
@@ -357,14 +357,14 @@ function FormularioOS() {
           </div>
 
           {/* Observações */}
-          <div className="mt-4 border border-slate-300">
-            <div className="border-b border-slate-300 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
+          <div className="mt-4 border border-slate-900">
+            <div className="border-b border-slate-900 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
               Observações da obra
             </div>
             <div className="space-y-4 p-3">
-              <div className="border-b border-slate-300" />
-              <div className="border-b border-slate-300" />
-              <div className="border-b border-slate-300" />
+              <div className="border-b border-slate-900" />
+              <div className="border-b border-slate-900" />
+              <div className="border-b border-slate-900" />
             </div>
           </div>
         </section>
@@ -373,29 +373,29 @@ function FormularioOS() {
         <section className="os-pagina os-verso bg-white p-6 shadow-sm print:p-0 print:shadow-none">
           <header className="flex items-end justify-between border-b-2 border-slate-900 pb-2">
             <div className="flex items-center gap-3">
-              <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-12 w-auto" />
+              <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-16 w-auto" />
               <div>
               <h2 className="text-base font-bold uppercase tracking-[0.18em] text-slate-900">
                 Checklist de materiais e equipamentos
               </h2>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-700">
                 {cliente || "Cliente"} · O.S. {numeroOS || "—"}
               </p>
               </div>
             </div>
-            <p className="text-[11px] text-slate-500">Verso</p>
+            <p className="text-[11px] text-slate-700">Verso</p>
           </header>
 
-          <table className="mt-3 w-full border-collapse border border-slate-300 text-[11px]">
+          <table className="mt-3 w-full border-collapse border border-slate-900 text-[11px]">
             <thead>
               <tr className="bg-slate-100 text-slate-700">
-                <th className="border border-slate-300 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wide">
+                <th className="border border-slate-900 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wide">
                   Item / Descrição
                 </th>
-                <th className="w-28 border border-slate-300 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
+                <th className="w-28 border border-slate-900 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
                   Conferência Loja (saída)
                 </th>
-                <th className="w-28 border border-slate-300 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
+                <th className="w-28 border border-slate-900 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
                   Conferência Obra (cliente)
                 </th>
               </tr>
@@ -403,13 +403,13 @@ function FormularioOS() {
             <tbody>
               {itensVenda.map((item, index) => (
                 <tr key={`venda-${index}`}>
-                  <td className="border border-slate-300 px-2 py-1 text-slate-900">
+                  <td className="border border-slate-900 px-2 py-1 text-slate-900">
                     {formatarQtd(item.quantidade)}x {item.descricao}
                   </td>
-                  <td className="border border-slate-300 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-1 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
-                  <td className="border border-slate-300 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-1 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
                 </tr>
@@ -418,7 +418,7 @@ function FormularioOS() {
               <tr>
                 <td
                   colSpan={3}
-                  className="border border-slate-300 bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-700"
+                  className="border border-slate-900 bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-700"
                 >
                   Itens de apoio — preencher na conferência da loja
                 </td>
@@ -426,7 +426,7 @@ function FormularioOS() {
 
               {linhasApoio.map((valor, index) => (
                 <tr key={`apoio-${index}`}>
-                  <td className="border border-slate-300 px-2 py-0">
+                  <td className="border border-slate-900 px-2 py-0">
                     <input
                       type="text"
                       value={valor}
@@ -439,10 +439,10 @@ function FormularioOS() {
                       placeholder=""
                     />
                   </td>
-                  <td className="border border-slate-300 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-1 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
-                  <td className="border border-slate-300 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-1 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
                 </tr>
@@ -454,13 +454,13 @@ function FormularioOS() {
           <div className="mt-10 grid grid-cols-2 gap-10 text-[11px] text-slate-700">
             <div>
               <div className="border-b border-slate-900" />
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">
                 Assinatura do Cliente
               </p>
             </div>
             <div>
               <div className="border-b border-slate-900" />
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">
                 Assinatura do Técnico
               </p>
             </div>

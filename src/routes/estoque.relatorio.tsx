@@ -151,7 +151,7 @@ function RelatorioEstoque() {
   return (
     <div className="space-y-6">
       <div className="hidden print:flex print:items-center print:gap-3">
-        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-14 w-auto" />
+        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-20 w-auto" />
         <p className="text-lg font-semibold">Splash Jardim do Trevo — Relatório de Estoque</p>
       </div>
       <PageHeader

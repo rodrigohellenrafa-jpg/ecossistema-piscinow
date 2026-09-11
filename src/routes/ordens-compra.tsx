@@ -584,7 +584,7 @@ function OrdensCompra() {
               </DialogHeader>
 
               <div className="hidden print:block">
-                <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="mb-2 h-16 w-auto" />
+                <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="mb-2 h-24 w-auto" />
                 <h1 className="text-xl font-semibold">Ordem de Compra {ordemDetalhe.numero}</h1>
               </div>
 
