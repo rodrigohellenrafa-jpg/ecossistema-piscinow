@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
 import { supabase } from "@/integrations/supabase/client";
-import plantaPiscina from "@/assets/planta-piscina.webp.asset.json";
+import plantaPiscina from "@/assets/planta-piscina-limpa.png";
 
 export const Route = createFileRoute("/os/formulario")({
   staticData: { sitemap: false },
@@ -324,24 +324,18 @@ function FormularioOS() {
             <Campo label="Término" value={termino} onChange={setTermino} />
           </div>
 
-          {/* Desenhos técnicos */}
+          {/* Desenho técnico */}
           <div className="mt-4 border border-slate-300">
             <div className="border-b border-slate-300 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
-              Desenhos técnicos — anotar medidas executadas em obra
+              Desenho técnico — planta baixa e corte
             </div>
 
             <div className="os-desenho p-4">
               <img
-                src={plantaPiscina.url}
+                src={plantaPiscina}
                 alt="Desenho técnico da piscina: planta baixa e corte longitudinal"
-                className="mx-auto max-h-[118mm] w-auto object-contain"
+                className="mx-auto max-h-[130mm] w-auto object-contain"
               />
-            </div>
-
-            <div className="grid grid-cols-3 border-t border-slate-300 text-[10px]">
-              <Campo label="Comprimento executado (m)" value="" className="border-r border-slate-300" />
-              <Campo label="Largura executada (m)" value="" className="border-r border-slate-300" />
-              <Campo label="Profundidade executada (m)" value="" />
             </div>
 
             <div className="flex items-center gap-8 border-t border-slate-300 px-3 py-2 text-[11px] text-slate-700">
