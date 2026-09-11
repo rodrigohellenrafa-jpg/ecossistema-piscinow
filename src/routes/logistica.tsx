@@ -630,6 +630,70 @@ function FlightBoard() {
         })}
       </div>
 
+      {/* Histórico / recorrência do cliente */}
+      <Dialog open={!!historico} onOpenChange={(v) => !v && setHistorico(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="size-4" /> Histórico de {historico?.nome}
+            </DialogTitle>
+            <DialogDescription>
+              Todas as obras e ordens de serviço já abertas para este cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">Obras ({historicoObras.length})</h3>
+              <div className="space-y-1">
+                {historicoObras.map((o) => (
+                  <Link
+                    key={o.id}
+                    to="/obras/$id"
+                    params={{ id: o.id }}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:border-primary"
+                  >
+                    <span className="font-medium">{o.numero ?? "—"}</span>
+                    <span className="text-xs text-muted-foreground">{o.tipo_servico}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {dataBR(o.data_inicio) || dataBR(o.data_pedido)}
+                    </span>
+                    <Badge variant="secondary">{o.status_geral}</Badge>
+                  </Link>
+                ))}
+                {historicoObras.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma obra registrada.</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">
+                Ordens de serviço ({historicoOS.length})
+              </h3>
+              <div className="space-y-1">
+                {historicoOS.map((os) => (
+                  <div
+                    key={os.id}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium">{os.numero ?? "—"}</span>
+                    <span className="text-xs text-muted-foreground">{os.tipo_servico}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {dataBR(os.data_agendada)}
+                    </span>
+                    <Badge variant="secondary">{os.status}</Badge>
+                  </div>
+                ))}
+                {historicoOS.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma OS registrada.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!excluirId} onOpenChange={(v) => !v && setExcluirId(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
