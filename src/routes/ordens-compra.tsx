@@ -955,10 +955,77 @@ function OrdensCompra() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 print:hidden">
-                <Button variant="outline" onClick={() => window.print()}>
-                  <Printer /> Imprimir
-                </Button>
+              <div className="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-3 print:hidden">
+                <div className="sm:col-span-3">
+                  <p className="text-sm font-medium">Pagamento (meia nota)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Informe quanto o fornecedor faturou na nota e quanto foi realmente pago. A
+                    diferença fica registrada como pagamento fora da nota.
+                  </p>
+                </div>
+                <Field label="Valor faturado na nota (R$)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    defaultValue={Number(ordemDetalhe.valor_nota ?? 0)}
+                    onBlur={(e) =>
+                      atualizarIcms.mutate({
+                        id: ordemDetalhe.id,
+                        valor_nota: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Valor pago ao fornecedor (R$)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    defaultValue={Number(ordemDetalhe.valor_pago ?? 0)}
+                    onBlur={(e) =>
+                      atualizarIcms.mutate({
+                        id: ordemDetalhe.id,
+                        valor_pago: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </Field>
+                <div>
+                  <p className="text-xs text-muted-foreground">Diferença fora da nota</p>
+                  <p className="font-medium">
+                    {brl(
+                      Number(ordemDetalhe.valor_pago ?? 0) - Number(ordemDetalhe.valor_nota ?? 0),
+                    )}
+                  </p>
+                </div>
+                <Field label="Observação do pagamento" className="sm:col-span-3">
+                  <Input
+                    defaultValue={ordemDetalhe.obs_pagamento ?? ""}
+                    placeholder="Ex.: R$ 2.000 na nota e R$ 1.500 pagos em Pix"
+                    onBlur={(e) =>
+                      atualizarIcms.mutate({
+                        id: ordemDetalhe.id,
+                        obs_pagamento: e.target.value || null,
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2 print:hidden">
+                <DocumentoOrdemCompra
+                  ordem={ordemDetalhe}
+                  fornecedor={
+                    fornecedorDetalhe
+                      ? {
+                          nome: fornecedorDetalhe.nome,
+                          email: fornecedorDetalhe.email,
+                          telefone: fornecedorDetalhe.telefone,
+                          documento: fornecedorDetalhe.cnpj,
+                        }
+                      : { nome: ordemDetalhe.fornecedor_nome }
+                  }
+                  itens={itensDetalhe}
+                />
                 <Button onClick={iniciarEdicao}>
                   <Pencil className="size-4" /> Editar
                 </Button>
