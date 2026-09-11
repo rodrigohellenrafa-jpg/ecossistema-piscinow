@@ -425,6 +425,10 @@ function Lista({
                     {new Date(`${c.vencimento}T00:00:00`).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell className="text-right">{brl(Number(c.valor))}</TableCell>
+                  <TableCell className="text-right">{brl(Number(c.valor_juros ?? 0))}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {brl(Number(c.valor) + Number(c.valor_juros ?? 0))}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={c.status === "pago" ? "secondary" : vencido ? "destructive" : "outline"}>
                       {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
