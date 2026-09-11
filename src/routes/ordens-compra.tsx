@@ -192,7 +192,10 @@ function OrdensCompra() {
   const { data: fornecedores = [] } = useQuery({
     queryKey: ["fornecedores", "lista"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("fornecedores").select("id, nome").order("nome");
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome, email, telefone, documento")
+        .order("nome");
       if (error) throw error;
       return data as Fornecedor[];
     },
