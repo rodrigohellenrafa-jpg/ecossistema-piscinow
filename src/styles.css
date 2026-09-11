@@ -287,6 +287,25 @@
 #documentos-venda .doc-itens th {
   background: #eaf3fb;
 }
+/* Ordem de compra: linhas intercaladas verde claro / branco */
+#documentos-venda .doc-itens-compra th,
+#documentos-venda .doc-itens-compra td {
+  border-color: #14532d;
+  color: #0f2e18;
+}
+#documentos-venda .doc-itens-compra th {
+  background: #bbf7d0;
+}
+#documentos-venda .doc-itens-compra tbody tr:nth-child(odd) td {
+  background: #e9f9ee;
+}
+#documentos-venda .doc-itens-compra tbody tr:nth-child(even) td {
+  background: #ffffff;
+}
+#documentos-venda .doc-compra .doc-box,
+#documentos-venda .doc-compra .doc-header {
+  border-color: #14532d;
+}
 #documentos-venda .doc-center {
   text-align: center;
 }
