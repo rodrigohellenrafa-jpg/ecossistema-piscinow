@@ -372,7 +372,9 @@ function FormularioOS() {
         {/* -------- VERSO -------- */}
         <section className="os-pagina os-verso bg-white p-6 shadow-sm print:p-0 print:shadow-none">
           <header className="flex items-end justify-between border-b-2 border-slate-900 pb-2">
-            <div>
+            <div className="flex items-center gap-3">
+              <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-12 w-auto" />
+              <div>
               <h2 className="text-base font-bold uppercase tracking-[0.18em] text-slate-900">
                 Checklist de materiais e equipamentos
               </h2>
