@@ -455,25 +455,9 @@ function OrdensCompra() {
   };
 
   const adicionarItemNovaOrdem = () => {
-    const produto = produtos.find((p) => p.id === novoItem.produto_id);
-    if (!produto) return toast.error("Selecione um produto");
-    const quantidade = Number(novoItem.quantidade) || 0;
-    const valor_unitario = Number(novoItem.valor_unitario) || Number(produto.preco_custo);
-    const desconto = Number(novoItem.desconto) || 0;
-    setItensNovaOrdem((it) => [
-      ...it,
-      {
-        produto_id: produto.id,
-        codigo: produto.codigo ?? "",
-        descricao: produto.nome,
-        ncm: produto.ncm ?? "",
-        cst: produto.cst ?? "",
-        unidade: produto.unidade,
-        quantidade,
-        valor_unitario,
-        desconto,
-      },
-    ]);
+    const item = montarItemForm();
+    if (!item) return;
+    setItensNovaOrdem((it) => [...it, item]);
     setNovoItem(novoItemVazio);
   };
 
