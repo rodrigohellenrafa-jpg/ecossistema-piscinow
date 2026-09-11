@@ -69,6 +69,7 @@ const vazio = {
   parceiro: "",
   categoria: "",
   valor: "0",
+  valor_juros: "0",
   vencimento: "",
   observacoes: "",
 };
