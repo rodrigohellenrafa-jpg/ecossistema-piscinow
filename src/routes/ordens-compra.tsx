@@ -124,7 +124,13 @@ type Item = {
   cliente_nome: string | null;
 };
 
-type Fornecedor = { id: string; nome: string };
+type Fornecedor = {
+  id: string;
+  nome: string;
+  email?: string | null;
+  telefone?: string | null;
+  cnpj?: string | null;
+};
 type Cliente = { id: string; nome: string };
 type Produto = {
   id: string;
