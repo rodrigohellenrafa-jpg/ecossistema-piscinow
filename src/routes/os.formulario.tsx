@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import plantaPiscina from "@/assets/planta-piscina-limpa.png";
 

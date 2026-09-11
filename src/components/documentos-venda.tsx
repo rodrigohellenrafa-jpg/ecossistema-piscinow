@@ -4,6 +4,7 @@ import { FileSignature, Printer, Files } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { brl, dataBR } from "@/lib/erp";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 
 type Venda = {
   numero: string | null;
