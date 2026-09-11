@@ -189,7 +189,26 @@ function Contas() {
                 </Select>
               </Field>
               <Field label={form.tipo === "pagar" ? "Fornecedor" : "Cliente"}>
-                <Input value={form.parceiro} onChange={(e) => set("parceiro")(e.target.value)} />
+                {form.tipo === "pagar" ? (
+                  <Select value={form.parceiro} onValueChange={set("parceiro")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o fornecedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fornecedores.map((f) => (
+                        <SelectItem key={f.id} value={f.nome}>
+                          {f.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={form.parceiro}
+                    onChange={(e) => set("parceiro")(e.target.value)}
+                    placeholder="Nome do cliente"
+                  />
+                )}
               </Field>
               <Field label="Descrição" className="sm:col-span-2">
                 <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
