@@ -1049,6 +1049,8 @@ export type Database = {
       }
       ordem_compra_itens: {
         Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
           codigo: string | null
           created_at: string
           cst: string | null
@@ -1062,8 +1064,11 @@ export type Database = {
           total: number
           unidade: string
           valor_unitario: number
+          venda_id: string | null
         }
         Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
           codigo?: string | null
           created_at?: string
           cst?: string | null
@@ -1077,8 +1082,11 @@ export type Database = {
           total?: number
           unidade?: string
           valor_unitario?: number
+          venda_id?: string | null
         }
         Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
           codigo?: string | null
           created_at?: string
           cst?: string | null
@@ -1092,8 +1100,16 @@ export type Database = {
           total?: number
           unidade?: string
           valor_unitario?: number
+          venda_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ordem_compra_itens_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordem_compra_itens_ordem_id_fkey"
             columns: ["ordem_id"]
@@ -1106,6 +1122,13 @@ export type Database = {
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordem_compra_itens_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
         ]

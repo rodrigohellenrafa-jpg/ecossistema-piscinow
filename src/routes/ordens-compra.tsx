@@ -115,9 +115,12 @@ type Item = {
   valor_unitario: number;
   desconto: number;
   total: number;
+  cliente_id: string | null;
+  cliente_nome: string | null;
 };
 
 type Fornecedor = { id: string; nome: string };
+type Cliente = { id: string; nome: string };
 type Produto = {
   id: string;
   codigo: string | null;
@@ -128,11 +131,30 @@ type Produto = {
   preco_custo: number;
 };
 
+/** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
+const SEM_CLIENTE = "__estoque__";
+
+type ItemForm = {
+  id?: string;
+  produto_id: string;
+  codigo: string;
+  descricao: string;
+  ncm: string;
+  cst: string;
+  unidade: string;
+  quantidade: number;
+  valor_unitario: number;
+  desconto: number;
+  cliente_id: string | null;
+  cliente_nome: string | null;
+};
+
 const novoItemVazio = {
   produto_id: "",
   quantidade: "1",
   valor_unitario: "0",
   desconto: "0",
+  cliente_id: SEM_CLIENTE,
 };
 
 function OrdensCompra() {
@@ -148,9 +170,7 @@ function OrdensCompra() {
     condicoes: "",
     observacoes: "",
   });
-  const [itensNovaOrdem, setItensNovaOrdem] = useState<
-    { produto_id: string; codigo: string; descricao: string; ncm: string; cst: string; unidade: string; quantidade: number; valor_unitario: number; desconto: number }[]
-  >([]);
+  const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
 
   const { data: ordens = [] } = useQuery({
     queryKey: ["ordens_compra"],
@@ -186,6 +206,19 @@ function OrdensCompra() {
     },
   });
 
+  const { data: clientes = [] } = useQuery({
+    queryKey: ["clientes", "lista-simples"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data as Cliente[];
+    },
+  });
+
   const { data: itensDetalhe = [] } = useQuery({
     queryKey: ["ordem_compra_itens", detalheId],
     enabled: !!detalheId,
@@ -205,6 +238,26 @@ function OrdensCompra() {
     [ordens, filtroStatus],
   );
 
+  /** Ordens agrupadas por fornecedor (e não por pedido). */
+  const gruposFornecedor = useMemo(() => {
+    const mapa = new Map<string, { chave: string; nome: string; ordens: Ordem[]; total: number }>();
+    for (const o of ordensFiltradas) {
+      const chave = o.fornecedor_id ?? "sem-fornecedor";
+      const grupo =
+        mapa.get(chave) ??
+        {
+          chave,
+          nome: o.fornecedor_nome ?? "Fornecedor não definido",
+          ordens: [] as Ordem[],
+          total: 0,
+        };
+      grupo.ordens.push(o);
+      grupo.total += Number(o.valor_total ?? 0);
+      mapa.set(chave, grupo);
+    }
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [ordensFiltradas]);
+
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
 
   const [formEdicao, setFormEdicao] = useState<{
@@ -214,18 +267,7 @@ function OrdensCompra() {
     condicoes: string;
     observacoes: string;
     status: string;
-    itens: {
-      id?: string;
-      produto_id: string;
-      codigo: string;
-      descricao: string;
-      ncm: string;
-      cst: string;
-      unidade: string;
-      quantidade: number;
-      valor_unitario: number;
-      desconto: number;
-    }[];
+    itens: ItemForm[];
   }>({ fornecedor_id: "", fornecedor_nome: "", previsao_entrega: "", condicoes: "", observacoes: "", status: "pendente", itens: [] });
 
   const iniciarEdicao = () => {
@@ -248,6 +290,8 @@ function OrdensCompra() {
         quantidade: Number(i.quantidade),
         valor_unitario: Number(i.valor_unitario),
         desconto: Number(i.desconto),
+        cliente_id: i.cliente_id ?? null,
+        cliente_nome: i.cliente_nome ?? null,
       })),
     });
     setModoEdicao(true);
@@ -308,6 +352,8 @@ function OrdensCompra() {
         valor_unitario: i.valor_unitario,
         desconto: i.desconto,
         total: i.quantidade * i.valor_unitario - i.desconto,
+        cliente_id: i.cliente_id,
+        cliente_nome: i.cliente_nome,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
@@ -321,30 +367,49 @@ function OrdensCompra() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const adicionarItemEdicao = () => {
+  const montarItemForm = (): ItemForm | null => {
     const produto = produtos.find((p) => p.id === novoItem.produto_id);
-    if (!produto) return toast.error("Selecione um produto");
-    const quantidade = Number(novoItem.quantidade) || 0;
-    const valor_unitario = Number(novoItem.valor_unitario) || Number(produto.preco_custo);
-    const desconto = Number(novoItem.desconto) || 0;
-    setFormEdicao((f) => ({
-      ...f,
-      itens: [
-        ...f.itens,
-        {
-          produto_id: produto.id,
-          codigo: produto.codigo ?? "",
-          descricao: produto.nome,
-          ncm: produto.ncm ?? "",
-          cst: produto.cst ?? "",
-          unidade: produto.unidade,
-          quantidade,
-          valor_unitario,
-          desconto,
-        },
-      ],
-    }));
+    if (!produto) {
+      toast.error("Selecione um produto");
+      return null;
+    }
+    const cliente =
+      novoItem.cliente_id && novoItem.cliente_id !== SEM_CLIENTE
+        ? clientes.find((c) => c.id === novoItem.cliente_id)
+        : undefined;
+    return {
+      produto_id: produto.id,
+      codigo: produto.codigo ?? "",
+      descricao: produto.nome,
+      ncm: produto.ncm ?? "",
+      cst: produto.cst ?? "",
+      unidade: produto.unidade,
+      quantidade: Number(novoItem.quantidade) || 0,
+      valor_unitario: Number(novoItem.valor_unitario) || Number(produto.preco_custo),
+      desconto: Number(novoItem.desconto) || 0,
+      cliente_id: cliente?.id ?? null,
+      cliente_nome: cliente?.nome ?? null,
+    };
+  };
+
+  const adicionarItemEdicao = () => {
+    const item = montarItemForm();
+    if (!item) return;
+    setFormEdicao((f) => ({ ...f, itens: [...f.itens, item] }));
     setNovoItem(novoItemVazio);
+  };
+
+  const alterarClienteItemEdicao = (idx: number, valor: string) => {
+    const cliente = valor === SEM_CLIENTE ? undefined : clientes.find((c) => c.id === valor);
+    setFormEdicao((f) => {
+      const itens = [...f.itens];
+      itens[idx] = {
+        ...itens[idx],
+        cliente_id: cliente?.id ?? null,
+        cliente_nome: cliente?.nome ?? null,
+      };
+      return { ...f, itens };
+    });
   };
 
   const removerItemEdicao = (idx: number) => {
@@ -412,25 +477,9 @@ function OrdensCompra() {
   };
 
   const adicionarItemNovaOrdem = () => {
-    const produto = produtos.find((p) => p.id === novoItem.produto_id);
-    if (!produto) return toast.error("Selecione um produto");
-    const quantidade = Number(novoItem.quantidade) || 0;
-    const valor_unitario = Number(novoItem.valor_unitario) || Number(produto.preco_custo);
-    const desconto = Number(novoItem.desconto) || 0;
-    setItensNovaOrdem((it) => [
-      ...it,
-      {
-        produto_id: produto.id,
-        codigo: produto.codigo ?? "",
-        descricao: produto.nome,
-        ncm: produto.ncm ?? "",
-        cst: produto.cst ?? "",
-        unidade: produto.unidade,
-        quantidade,
-        valor_unitario,
-        desconto,
-      },
-    ]);
+    const item = montarItemForm();
+    if (!item) return;
+    setItensNovaOrdem((it) => [...it, item]);
     setNovoItem(novoItemVazio);
   };
 
@@ -485,6 +534,8 @@ function OrdensCompra() {
         valor_unitario: i.valor_unitario,
         desconto: i.desconto,
         total: i.quantidade * i.valor_unitario - i.desconto,
+        cliente_id: i.cliente_id,
+        cliente_nome: i.cliente_nome,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
@@ -595,6 +646,22 @@ function OrdensCompra() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Select
+                      value={novoItem.cliente_id}
+                      onValueChange={(v) => setNovoItem((i) => ({ ...i, cliente_id: v }))}
+                    >
+                      <SelectTrigger className="sm:col-span-2">
+                        <SelectValue placeholder="Cliente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SEM_CLIENTE}>Estoque (sem cliente)</SelectItem>
+                        {clientes.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input
                       type="number"
                       placeholder="Qtd"
@@ -619,6 +686,7 @@ function OrdensCompra() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Produto</TableHead>
+                          <TableHead>Cliente</TableHead>
                           <TableHead className="text-right">Qtd</TableHead>
                           <TableHead className="text-right">Vlr Unit</TableHead>
                           <TableHead className="text-right">Total</TableHead>
@@ -629,6 +697,7 @@ function OrdensCompra() {
                         {itensNovaOrdem.map((i, idx) => (
                           <TableRow key={idx}>
                             <TableCell>{i.descricao}</TableCell>
+                            <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
                             <TableCell className="text-right">{i.quantidade}</TableCell>
                             <TableCell className="text-right">{brl(i.valor_unitario)}</TableCell>
                             <TableCell className="text-right">
@@ -663,78 +732,89 @@ function OrdensCompra() {
         }
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Ordens <Badge variant="secondary">{ordensFiltradas.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {ordensFiltradas.length === 0 ? (
+      {ordensFiltradas.length === 0 ? (
+        <Card>
+          <CardContent>
             <p className="py-10 text-center text-sm text-muted-foreground">
               Nenhuma ordem de compra encontrada.
             </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Previsão</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ordensFiltradas.map((o) => (
-                    <TableRow
-                      key={o.id}
-                      className="cursor-pointer"
-                      onClick={() => setDetalheId(o.id)}
-                    >
-                      <TableCell className="font-mono text-xs">{o.numero ?? "—"}</TableCell>
-                      <TableCell className="font-medium">{o.fornecedor_nome ?? "—"}</TableCell>
-                      <TableCell>{dataBR(o.data_pedido)}</TableCell>
-                      <TableCell>{dataBR(o.previsao_entrega)}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant(o.status)}>
-                          {statusLabel[o.status] ?? o.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{brl(Number(o.valor_total))}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDetalheId(o.id);
-                          }}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            excluirOrdem.mutate(o.id);
-                          }}
-                        >
-                          <Trash2 className="text-destructive" />
-                        </Button>
-                      </TableCell>
+          </CardContent>
+        </Card>
+      ) : (
+        gruposFornecedor.map((g) => (
+          <Card key={g.chave}>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2">
+                {g.nome}
+                <Badge variant="secondary">
+                  {g.ordens.length} ordem{g.ordens.length === 1 ? "" : "s"}
+                </Badge>
+              </CardTitle>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Total do fornecedor</p>
+                <p className="text-lg font-semibold">{brl(g.total)}</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Número</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Previsão</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {g.ordens.map((o) => (
+                      <TableRow
+                        key={o.id}
+                        className="cursor-pointer"
+                        onClick={() => setDetalheId(o.id)}
+                      >
+                        <TableCell className="font-mono text-xs">{o.numero ?? "—"}</TableCell>
+                        <TableCell>{dataBR(o.data_pedido)}</TableCell>
+                        <TableCell>{dataBR(o.previsao_entrega)}</TableCell>
+                        <TableCell>
+                          <Badge variant={statusVariant(o.status)}>
+                            {statusLabel[o.status] ?? o.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{brl(Number(o.valor_total))}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDetalheId(o.id);
+                            }}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              excluirOrdem.mutate(o.id);
+                            }}
+                          >
+                            <Trash2 className="text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
 
       <Dialog
         open={!!detalheId}
@@ -804,6 +884,7 @@ function OrdensCompra() {
                   <TableRow>
                     <TableHead>Cód</TableHead>
                     <TableHead>Descrição</TableHead>
+                    <TableHead>Cliente</TableHead>
                     <TableHead>NCM</TableHead>
                     <TableHead>CST</TableHead>
                     <TableHead>Unid.</TableHead>
@@ -818,6 +899,7 @@ function OrdensCompra() {
                     <TableRow key={i.id}>
                       <TableCell className="font-mono text-xs">{i.codigo ?? "—"}</TableCell>
                       <TableCell>{i.descricao}</TableCell>
+                      <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
                       <TableCell>{i.ncm ?? "—"}</TableCell>
                       <TableCell>{i.cst ?? "—"}</TableCell>
                       <TableCell>{i.unidade}</TableCell>
@@ -959,6 +1041,22 @@ function OrdensCompra() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Select
+                    value={novoItem.cliente_id}
+                    onValueChange={(v) => setNovoItem((i) => ({ ...i, cliente_id: v }))}
+                  >
+                    <SelectTrigger className="sm:col-span-2">
+                      <SelectValue placeholder="Cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SEM_CLIENTE}>Estoque (sem cliente)</SelectItem>
+                      {clientes.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number"
                     placeholder="Qtd"
@@ -983,6 +1081,7 @@ function OrdensCompra() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Produto</TableHead>
+                        <TableHead>Cliente</TableHead>
                         <TableHead className="text-right">Qtd</TableHead>
                         <TableHead className="text-right">Vlr Unit</TableHead>
                         <TableHead className="text-right">Desc</TableHead>
@@ -994,6 +1093,24 @@ function OrdensCompra() {
                       {formEdicao.itens.map((i, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{i.descricao}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={i.cliente_id ?? SEM_CLIENTE}
+                              onValueChange={(v) => alterarClienteItemEdicao(idx, v)}
+                            >
+                              <SelectTrigger className="w-44">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={SEM_CLIENTE}>Estoque (sem cliente)</SelectItem>
+                                {clientes.map((c) => (
+                                  <SelectItem key={c.id} value={c.id}>
+                                    {c.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell className="text-right">
                             <Input
                               type="number"
