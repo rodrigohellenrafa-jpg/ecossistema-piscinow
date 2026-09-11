@@ -207,6 +207,159 @@ function OrdensCompra() {
 
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
 
+  const [formEdicao, setFormEdicao] = useState<{
+    fornecedor_id: string;
+    fornecedor_nome: string;
+    previsao_entrega: string;
+    condicoes: string;
+    observacoes: string;
+    status: string;
+    itens: {
+      id?: string;
+      produto_id: string;
+      codigo: string;
+      descricao: string;
+      ncm: string;
+      cst: string;
+      unidade: string;
+      quantidade: number;
+      valor_unitario: number;
+      desconto: number;
+    }[];
+  }>({ fornecedor_id: "", fornecedor_nome: "", previsao_entrega: "", condicoes: "", observacoes: "", status: "pendente", itens: [] });
+
+  const iniciarEdicao = () => {
+    if (!ordemDetalhe) return;
+    setFormEdicao({
+      fornecedor_id: ordemDetalhe.fornecedor_id ?? "",
+      fornecedor_nome: ordemDetalhe.fornecedor_nome ?? "Fornecedor não definido",
+      previsao_entrega: ordemDetalhe.previsao_entrega ?? "",
+      condicoes: ordemDetalhe.condicoes ?? "",
+      observacoes: ordemDetalhe.observacoes ?? "",
+      status: ordemDetalhe.status,
+      itens: itensDetalhe.map((i) => ({
+        id: i.id,
+        produto_id: i.produto_id ?? "",
+        codigo: i.codigo ?? "",
+        descricao: i.descricao,
+        ncm: i.ncm ?? "",
+        cst: i.cst ?? "",
+        unidade: i.unidade,
+        quantidade: Number(i.quantidade),
+        valor_unitario: Number(i.valor_unitario),
+        desconto: Number(i.desconto),
+      })),
+    });
+    setModoEdicao(true);
+  };
+
+  const atualizarOrdem = useMutation({
+    mutationFn: async () => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      if (!formEdicao.fornecedor_id) throw new Error("Selecione o fornecedor");
+      if (formEdicao.itens.length === 0) throw new Error("Adicione ao menos um item");
+
+      const fornecedor = fornecedores.find((f) => f.id === formEdicao.fornecedor_id);
+      const valorProdutos = formEdicao.itens.reduce(
+        (s, i) => s + (i.quantidade * i.valor_unitario - i.desconto),
+        0,
+      );
+      const icmsBase = valorProdutos;
+      const icmsValor = icmsBase * 0.18;
+      const icmsStBase = 0;
+      const icmsStValor = 0;
+      const valorTotal = valorProdutos;
+
+      const { error: erroOrdem } = await supabase
+        .from("ordens_compra")
+        .update({
+          fornecedor_id: formEdicao.fornecedor_id,
+          fornecedor_nome: fornecedor?.nome ?? formEdicao.fornecedor_nome,
+          previsao_entrega: formEdicao.previsao_entrega || null,
+          condicoes: formEdicao.condicoes || null,
+          observacoes: formEdicao.observacoes || null,
+          status: formEdicao.status,
+          valor_produtos: valorProdutos,
+          desconto: 0,
+          icms_base: icmsBase,
+          icms_valor: icmsValor,
+          icms_st_base: icmsStBase,
+          icms_st_valor: icmsStValor,
+          valor_total: valorTotal,
+        })
+        .eq("id", ordemDetalhe.id);
+      if (erroOrdem) throw erroOrdem;
+
+      const { error: erroExcluirItens } = await supabase
+        .from("ordem_compra_itens")
+        .delete()
+        .eq("ordem_id", ordemDetalhe.id);
+      if (erroExcluirItens) throw erroExcluirItens;
+
+      const payload = formEdicao.itens.map((i) => ({
+        ordem_id: ordemDetalhe.id,
+        produto_id: i.produto_id || null,
+        codigo: i.codigo,
+        descricao: i.descricao,
+        ncm: i.ncm,
+        cst: i.cst,
+        unidade: i.unidade,
+        quantidade: i.quantidade,
+        valor_unitario: i.valor_unitario,
+        desconto: i.desconto,
+        total: i.quantidade * i.valor_unitario - i.desconto,
+      }));
+      const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
+      if (erroItens) throw erroItens;
+    },
+    onSuccess: () => {
+      toast.success("Ordem de compra atualizada");
+      setModoEdicao(false);
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const adicionarItemEdicao = () => {
+    const produto = produtos.find((p) => p.id === novoItem.produto_id);
+    if (!produto) return toast.error("Selecione um produto");
+    const quantidade = Number(novoItem.quantidade) || 0;
+    const valor_unitario = Number(novoItem.valor_unitario) || Number(produto.preco_custo);
+    const desconto = Number(novoItem.desconto) || 0;
+    setFormEdicao((f) => ({
+      ...f,
+      itens: [
+        ...f.itens,
+        {
+          produto_id: produto.id,
+          codigo: produto.codigo ?? "",
+          descricao: produto.nome,
+          ncm: produto.ncm ?? "",
+          cst: produto.cst ?? "",
+          unidade: produto.unidade,
+          quantidade,
+          valor_unitario,
+          desconto,
+        },
+      ],
+    }));
+    setNovoItem(novoItemVazio);
+  };
+
+  const removerItemEdicao = (idx: number) => {
+    setFormEdicao((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
+  };
+
+  const alterarItemEdicao = (idx: number, campo: "quantidade" | "valor_unitario" | "desconto", valor: string) => {
+    const num = Number(valor) || 0;
+    setFormEdicao((f) => {
+      const itens = [...f.itens];
+      itens[idx] = { ...itens[idx], [campo]: num };
+      return { ...f, itens };
+    });
+  };
+
   const atualizarStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase.from("ordens_compra").update({ status }).eq("id", id);
