@@ -1045,6 +1045,7 @@ function OrdensCompra() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Produto</TableHead>
+                        <TableHead>Cliente</TableHead>
                         <TableHead className="text-right">Qtd</TableHead>
                         <TableHead className="text-right">Vlr Unit</TableHead>
                         <TableHead className="text-right">Desc</TableHead>
@@ -1056,6 +1057,24 @@ function OrdensCompra() {
                       {formEdicao.itens.map((i, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{i.descricao}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={i.cliente_id ?? SEM_CLIENTE}
+                              onValueChange={(v) => alterarClienteItemEdicao(idx, v)}
+                            >
+                              <SelectTrigger className="w-44">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={SEM_CLIENTE}>Estoque (sem cliente)</SelectItem>
+                                {clientes.map((c) => (
+                                  <SelectItem key={c.id} value={c.id}>
+                                    {c.nome}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell className="text-right">
                             <Input
                               type="number"
