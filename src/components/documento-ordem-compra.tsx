@@ -113,6 +113,126 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
   const valorNota = Number(ordem.valor_nota ?? 0);
   const valorPago = Number(ordem.valor_pago ?? 0);
 
+  const nomeArquivo = `Ordem-de-Compra-${(ordem.numero ?? "s-numero").replace(/[^\w-]/g, "")}.pdf`;
+
+  /** Gera o PDF da ordem com todos os itens e devolve o documento. */
+  const gerarPdf = async () => {
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const m = 14;
+    let y = m;
+
+    try {
+      const resp = await fetch(logoSplash.url);
+      const blob = await resp.blob();
+      const dataUrl: string = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result));
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+      doc.addImage(dataUrl, "PNG", m, y, 34, 20);
+    } catch {
+      /* segue sem logo */
+    }
+
+    doc.setFontSize(14).setFont("helvetica", "bold");
+    doc.text("ORDEM DE COMPRA", 196, y + 6, { align: "right" });
+    doc.setFontSize(9).setFont("helvetica", "normal");
+    doc.text(`Nº ${ordem.numero ?? "—"}`, 196, y + 12, { align: "right" });
+    doc.text(`Emissão: ${dataBR(ordem.data_pedido)}`, 196, y + 17, { align: "right" });
+    doc.text(`Previsão: ${dataBR(ordem.previsao_entrega)}`, 196, y + 22, { align: "right" });
+
+    y += 24;
+    doc.setFont("helvetica", "bold").setFontSize(11);
+    doc.text(emp.nome, m, y);
+    doc.setFont("helvetica", "normal").setFontSize(9);
+    doc.text(`${emp.endereco} — ${emp.documento}`, m, y + 5);
+
+    y += 12;
+    doc.setDrawColor(20, 83, 45).line(m, y, 196, y);
+    y += 6;
+
+    doc.setFont("helvetica", "bold").setFontSize(10);
+    doc.text("DADOS DO FORNECEDOR", m, y);
+    doc.setFont("helvetica", "normal").setFontSize(9);
+    y += 5;
+    doc.text(`Fornecedor: ${fornecedor?.nome ?? "—"}`, m, y);
+    doc.text(`CNPJ/CPF: ${fornecedor?.documento ?? "—"}`, 110, y);
+    y += 5;
+    doc.text(`Telefone: ${fornecedor?.telefone ?? "—"}`, m, y);
+    doc.text(`E-mail: ${fornecedor?.email ?? "—"}`, 110, y);
+    y += 5;
+    doc.text(`Condições de pagamento: ${ordem.condicoes ?? "—"}`, m, y);
+
+    autoTable(doc, {
+      startY: y + 6,
+      margin: { left: m, right: 14 },
+      head: [["Código", "Descrição do produto", "Cliente / destino", "Un.", "Qtd", "Valor unit.", "Total"]],
+      body: itens.map((i) => [
+        i.codigo ?? "—",
+        i.descricao,
+        i.cliente_nome ?? "Estoque",
+        i.unidade,
+        String(i.quantidade),
+        brl(Number(i.valor_unitario)),
+        brl(Number(i.total)),
+      ]),
+      styles: { fontSize: 8, textColor: [15, 46, 24], lineColor: [20, 83, 45], lineWidth: 0.2 },
+      headStyles: { fillColor: [187, 247, 208], textColor: [15, 46, 24], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [233, 249, 238] },
+      columnStyles: {
+        3: { halign: "center" },
+        4: { halign: "center" },
+        5: { halign: "right" },
+        6: { halign: "right" },
+      },
+    });
+
+    let ty = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+    doc.setFont("helvetica", "bold").setFontSize(10);
+    doc.text("TOTALIZAÇÃO", m, ty);
+    doc.setFont("helvetica", "normal").setFontSize(9);
+    ty += 5;
+    doc.text(`Valor dos produtos: ${brl(Number(ordem.valor_produtos))}`, m, ty);
+    doc.text(`Desconto: ${brl(Number(ordem.desconto))}`, 110, ty);
+    ty += 5;
+    doc.text(`Valor faturado na nota: ${brl(valorNota)}`, m, ty);
+    doc.text(`Valor pago ao fornecedor: ${brl(valorPago)}`, 110, ty);
+    ty += 5;
+    doc.setFont("helvetica", "bold");
+    doc.text(`Valor total da compra: ${brl(Number(ordem.valor_total))}`, m, ty);
+    doc.setFont("helvetica", "normal");
+
+    if (ordem.obs_pagamento) {
+      ty += 5;
+      doc.text(doc.splitTextToSize(`Observação de pagamento: ${ordem.obs_pagamento}`, 182), m, ty);
+      ty += 4;
+    }
+    if (ordem.observacoes) {
+      ty += 6;
+      doc.setFont("helvetica", "bold").text("OBSERVAÇÕES", m, ty);
+      doc.setFont("helvetica", "normal");
+      ty += 5;
+      doc.text(doc.splitTextToSize(String(ordem.observacoes), 182), m, ty);
+    }
+
+    return doc;
+  };
+
+  const baixarPdf = async () => {
+    const doc = await gerarPdf();
+    doc.save(nomeArquivo);
+  };
+
+  /** Baixa o PDF e em seguida abre o e-mail para anexá-lo. */
+  const enviarPorEmail = async () => {
+    await baixarPdf();
+    window.setTimeout(() => {
+      window.location.href = mailto;
+    }, 600);
+  };
+
+
   const documento = (
     <div id="documentos-venda" className="doc-root">
       <section className="doc-page doc-compra">
