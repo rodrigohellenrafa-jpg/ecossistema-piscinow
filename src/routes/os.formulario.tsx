@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
 import { supabase } from "@/integrations/supabase/client";
-import plantaPiscina from "@/assets/planta-piscina.webp.asset.json";
+import plantaPiscina from "@/assets/planta-piscina-limpa.png";
 
 export const Route = createFileRoute("/os/formulario")({
   staticData: { sitemap: false },
