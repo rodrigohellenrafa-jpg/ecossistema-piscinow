@@ -1126,6 +1126,61 @@ function OrdensCompra() {
                 </Field>
               </div>
 
+              <div className="space-y-3 rounded-lg border border-border p-4 print:hidden">
+                <div>
+                  <p className="text-sm font-medium">Fluxo da ordem de compra</p>
+                  <p className="text-xs text-muted-foreground">
+                    A dívida no Contas a Pagar só é criada quando o fornecedor fatura o pedido.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {FLUXO.map((s, i) => (
+                    <Badge
+                      key={s}
+                      variant={i <= etapaAtual(ordemDetalhe.status) ? "default" : "secondary"}
+                    >
+                      {i + 1}. {statusLabel[s]}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={
+                      etapaAtual(ordemDetalhe.status) >= 1 || enviarAoFornecedor.isPending
+                    }
+                    onClick={() => enviarAoFornecedor.mutate(ordemDetalhe.id)}
+                  >
+                    Marcar como enviada
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={etapaAtual(ordemDetalhe.status) >= 2}
+                    onClick={abrirFatura}
+                  >
+                    Registrar faturamento
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={
+                      etapaAtual(ordemDetalhe.status) < 2 ||
+                      ordemDetalhe.status === "concluida" ||
+                      ordemDetalhe.status === "recebida"
+                    }
+                    onClick={() =>
+                      atualizarStatus.mutate({ id: ordemDetalhe.id, status: "concluida" })
+                    }
+                  >
+                    Marcar como concluída
+                  </Button>
+                </div>
+                {ordemDetalhe.faturada_em && (
+                  <p className="text-xs text-muted-foreground">
+                    Título gerado no Contas a Pagar em {dataBR(ordemDetalhe.faturada_em)}.
+                  </p>
+                )}
+              </div>
+
               <div className="flex flex-wrap justify-end gap-2 print:hidden">
                 <DocumentoOrdemCompra
                   ordem={ordemDetalhe}
