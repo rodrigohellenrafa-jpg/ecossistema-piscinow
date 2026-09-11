@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/erp";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 
 export const Route = createFileRoute("/estoque/inventario")({
   staticData: { sitemap: false },
@@ -140,6 +141,10 @@ function EstoqueInventario() {
 
   return (
     <div className="space-y-6">
+      <div className="hidden print:flex print:items-center print:gap-3">
+        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-14 w-auto" />
+        <p className="text-lg font-semibold">Splash Jardim do Trevo — Inventário Físico</p>
+      </div>
       <PageHeader
         title="Inventário Físico"
         subtitle="Compare a contagem física com o estoque do sistema e aplique os ajustes necessários."

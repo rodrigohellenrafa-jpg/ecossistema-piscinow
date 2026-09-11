@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { DocumentosVenda } from "@/components/documentos-venda";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -599,6 +600,7 @@ function DetalhePedido() {
       <div className="print:block rounded-xl border border-border bg-card p-6 text-sm">
         <div className="mb-6 flex items-start justify-between border-b border-border pb-4">
           <div>
+            <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="mb-2 h-16 w-auto" />
             <p className="text-lg font-semibold">Splash Jardim do Trevo</p>
             <p className="text-muted-foreground">Comércio e Instalação de Piscinas</p>
           </div>
