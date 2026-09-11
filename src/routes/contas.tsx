@@ -378,6 +378,7 @@ type Conta = {
   parceiro: string | null;
   categoria: string | null;
   valor: number;
+  valor_juros?: number | null;
   vencimento: string;
   status: string;
 };
