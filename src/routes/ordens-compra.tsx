@@ -115,9 +115,12 @@ type Item = {
   valor_unitario: number;
   desconto: number;
   total: number;
+  cliente_id: string | null;
+  cliente_nome: string | null;
 };
 
 type Fornecedor = { id: string; nome: string };
+type Cliente = { id: string; nome: string };
 type Produto = {
   id: string;
   codigo: string | null;
@@ -128,11 +131,30 @@ type Produto = {
   preco_custo: number;
 };
 
+/** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
+const SEM_CLIENTE = "__estoque__";
+
+type ItemForm = {
+  id?: string;
+  produto_id: string;
+  codigo: string;
+  descricao: string;
+  ncm: string;
+  cst: string;
+  unidade: string;
+  quantidade: number;
+  valor_unitario: number;
+  desconto: number;
+  cliente_id: string | null;
+  cliente_nome: string | null;
+};
+
 const novoItemVazio = {
   produto_id: "",
   quantidade: "1",
   valor_unitario: "0",
   desconto: "0",
+  cliente_id: SEM_CLIENTE,
 };
 
 function OrdensCompra() {
