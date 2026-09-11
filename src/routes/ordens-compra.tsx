@@ -67,20 +67,40 @@ export const Route = createFileRoute("/ordens-compra")({
   ),
 });
 
-const STATUS = ["sob_encomenda", "pendente", "enviada", "recebida", "cancelada"] as const;
+const STATUS = [
+  "sob_encomenda",
+  "pendente",
+  "enviada",
+  "faturada",
+  "concluida",
+  "recebida",
+  "cancelada",
+] as const;
 
 const statusLabel: Record<string, string> = {
   sob_encomenda: "Sob encomenda",
-  pendente: "Pendente",
-  enviada: "Enviada",
+  pendente: "Pendente (fila de compras)",
+  enviada: "Enviada ao fornecedor",
+  faturada: "Faturada pelo fornecedor",
+  concluida: "Concluída (material entregue)",
   recebida: "Recebida",
   cancelada: "Cancelada",
 };
 
+/** Ordem das etapas do fluxo da O.C. */
+const FLUXO = ["pendente", "enviada", "faturada", "concluida"] as const;
+
+const etapaAtual = (s: string) => {
+  if (s === "sob_encomenda") return 0;
+  if (s === "recebida") return 3;
+  const i = FLUXO.indexOf(s as (typeof FLUXO)[number]);
+  return i < 0 ? 0 : i;
+};
+
 const statusVariant = (s: string): "secondary" | "default" | "destructive" | "outline" => {
-  if (s === "recebida") return "default";
+  if (s === "recebida" || s === "concluida") return "default";
   if (s === "cancelada") return "destructive";
-  if (s === "enviada") return "outline";
+  if (s === "enviada" || s === "faturada") return "outline";
   return "secondary";
 };
 
