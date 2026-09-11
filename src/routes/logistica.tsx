@@ -117,6 +117,7 @@ function FlightBoard() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
   const [excluirId, setExcluirId] = useState<string | null>(null);
+  const [historico, setHistorico] = useState<{ id: string | null; nome: string } | null>(null);
 
   const { data: obras = [] } = useQuery({
     queryKey: ["obras"],
