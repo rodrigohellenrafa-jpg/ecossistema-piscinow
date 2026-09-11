@@ -183,7 +183,7 @@ export async function rotearEstoque(
         data_pedido: ctx.data,
         valor_produtos: total,
         valor_total: total,
-        status: "sob_encomenda",
+        status: "pendente",
         observacoes: `Gerada automaticamente pelo pedido ${ctx.numero} (itens sem saldo em estoque).`,
         created_by: ctx.userId,
       } as never)
