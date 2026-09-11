@@ -168,6 +168,8 @@ export async function rotearEstoque(
         valor_unitario: unit,
         desconto: 0,
         total: unit * f.falta,
+        cliente_id: ctx.clienteId || null,
+        cliente_nome: ctx.clienteNome,
       };
     });
     const total = linhas.reduce((s, l) => s + l.total, 0);
