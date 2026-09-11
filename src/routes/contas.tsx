@@ -407,7 +407,9 @@ function Lista({
               <TableHead>Descrição</TableHead>
               <TableHead>Parceiro</TableHead>
               <TableHead>Vencimento</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
+              <TableHead className="text-right">Parcela</TableHead>
+              <TableHead className="text-right">Juros</TableHead>
+              <TableHead className="text-right">Total</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-24" />
             </TableRow>
