@@ -103,6 +103,45 @@ function Contas() {
     },
   });
 
+  const { data: categorias = [] } = useQuery({
+    queryKey: ["categorias-financeiras"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categorias_financeiras")
+        .select("id, nome, tipo")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; nome: string; tipo: string }[];
+    },
+  });
+
+  const [novaCategoria, setNovaCategoria] = useState("");
+  const [catOpen, setCatOpen] = useState(false);
+
+  const salvarCategoria = useMutation({
+    mutationFn: async () => {
+      const nome = novaCategoria.trim();
+      if (!nome) throw new Error("Informe o nome da categoria.");
+      const { error } = await supabase.from("categorias_financeiras").insert({
+        nome,
+        tipo: form.tipo,
+        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+      });
+      if (error) throw error;
+      return nome;
+    },
+    onSuccess: (nome) => {
+      toast.success("Categoria cadastrada!");
+      setNovaCategoria("");
+      setCatOpen(false);
+      setForm((f) => ({ ...f, categoria: nome }));
+      qc.invalidateQueries({ queryKey: ["categorias-financeiras"] });
+    },
+    onError: (e: Error) =>
+      toast.error(e.message.includes("duplicate") ? "Categoria já existe." : e.message),
+  });
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição do título.");
@@ -214,7 +253,53 @@ function Contas() {
                 <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
               </Field>
               <Field label="Categoria">
-                <Input value={form.categoria} onChange={(e) => set("categoria")(e.target.value)} />
+                <div className="flex gap-1">
+                  <Select value={form.categoria} onValueChange={set("categoria")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias
+                        .filter((c) => c.tipo === "ambas" || c.tipo === form.tipo)
+                        .map((c) => (
+                          <SelectItem key={c.id} value={c.nome}>
+                            {c.nome}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Dialog open={catOpen} onOpenChange={setCatOpen}>
+                    <DialogTrigger asChild>
+                      <Button type="button" variant="outline" size="icon" title="Nova categoria">
+                        <Plus />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-sm">
+                      <DialogHeader>
+                        <DialogTitle>Nova categoria</DialogTitle>
+                        <DialogDescription>
+                          Cadastre uma categoria de {form.tipo === "pagar" ? "contas a pagar" : "contas a receber"}.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Input
+                        value={novaCategoria}
+                        onChange={(e) => setNovaCategoria(e.target.value)}
+                        placeholder="Ex.: Combustível"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            salvarCategoria.mutate();
+                          }
+                        }}
+                      />
+                      <DialogFooter>
+                        <Button onClick={() => salvarCategoria.mutate()} disabled={salvarCategoria.isPending}>
+                          Salvar categoria
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </Field>
               <Field label="Valor (R$)">
                 <Input
