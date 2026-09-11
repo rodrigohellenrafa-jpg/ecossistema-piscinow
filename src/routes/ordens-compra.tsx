@@ -514,6 +514,8 @@ function OrdensCompra() {
         valor_unitario: i.valor_unitario,
         desconto: i.desconto,
         total: i.quantidade * i.valor_unitario - i.desconto,
+        cliente_id: i.cliente_id,
+        cliente_nome: i.cliente_nome,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
