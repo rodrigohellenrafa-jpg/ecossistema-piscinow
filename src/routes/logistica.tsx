@@ -407,6 +407,20 @@ function FlightBoard() {
                     onChange={(e) => set("responsavel")(e.target.value)}
                   />
                 </Field>
+                <Field label="Data de início dos trabalhos">
+                  <Input
+                    type="date"
+                    value={form.data_inicio}
+                    onChange={(e) => set("data_inicio")(e.target.value)}
+                  />
+                </Field>
+                <Field label="Data de término dos trabalhos">
+                  <Input
+                    type="date"
+                    value={form.data_termino}
+                    onChange={(e) => set("data_termino")(e.target.value)}
+                  />
+                </Field>
                 <Field label="Endereço da obra" className="sm:col-span-2">
                   <Input
                     value={form.endereco_obra}
