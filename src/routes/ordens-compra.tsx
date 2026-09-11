@@ -67,20 +67,40 @@ export const Route = createFileRoute("/ordens-compra")({
   ),
 });
 
-const STATUS = ["sob_encomenda", "pendente", "enviada", "recebida", "cancelada"] as const;
+const STATUS = [
+  "sob_encomenda",
+  "pendente",
+  "enviada",
+  "faturada",
+  "concluida",
+  "recebida",
+  "cancelada",
+] as const;
 
 const statusLabel: Record<string, string> = {
   sob_encomenda: "Sob encomenda",
-  pendente: "Pendente",
-  enviada: "Enviada",
+  pendente: "Pendente (fila de compras)",
+  enviada: "Enviada ao fornecedor",
+  faturada: "Faturada pelo fornecedor",
+  concluida: "Concluída (material entregue)",
   recebida: "Recebida",
   cancelada: "Cancelada",
 };
 
+/** Ordem das etapas do fluxo da O.C. */
+const FLUXO = ["pendente", "enviada", "faturada", "concluida"] as const;
+
+const etapaAtual = (s: string) => {
+  if (s === "sob_encomenda") return 0;
+  if (s === "recebida") return 3;
+  const i = FLUXO.indexOf(s as (typeof FLUXO)[number]);
+  return i < 0 ? 0 : i;
+};
+
 const statusVariant = (s: string): "secondary" | "default" | "destructive" | "outline" => {
-  if (s === "recebida") return "default";
+  if (s === "recebida" || s === "concluida") return "default";
   if (s === "cancelada") return "destructive";
-  if (s === "enviada") return "outline";
+  if (s === "enviada" || s === "faturada") return "outline";
   return "secondary";
 };
 
@@ -106,6 +126,8 @@ type Ordem = {
   /** Valor realmente pago ao fornecedor, incluindo a parte fora da nota. */
   valor_pago: number;
   obs_pagamento: string | null;
+  enviada_em?: string | null;
+  faturada_em?: string | null;
 };
 
 type Item = {
@@ -454,6 +476,95 @@ function OrdensCompra() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  /** Envio da O.C. ao fornecedor: ainda não gera dívida. */
+  const enviarAoFornecedor = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ordens_compra")
+        .update({ status: "enviada", enviada_em: new Date().toISOString() } as never)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Ordem marcada como enviada ao fornecedor");
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [faturaOpen, setFaturaOpen] = useState(false);
+  const [fatura, setFatura] = useState({
+    valor: "",
+    vencimento: hojeISO(),
+    forma: "Boleto",
+    observacoes: "",
+  });
+
+  const abrirFatura = () => {
+    if (!ordemDetalhe) return;
+    setFatura({
+      valor: String(Number(ordemDetalhe.valor_total ?? 0)),
+      vencimento: hojeISO(),
+      forma: "Boleto",
+      observacoes: "",
+    });
+    setFaturaOpen(true);
+  };
+
+  /** Faturamento: só aqui nasce o título no Contas a Pagar. */
+  const faturarOrdem = useMutation({
+    mutationFn: async () => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const valor = Number(fatura.valor) || 0;
+      if (valor <= 0) throw new Error("Informe o valor cobrado pelo fornecedor");
+      if (!fatura.vencimento) throw new Error("Informe a data de vencimento");
+
+      const { data: auth } = await supabase.auth.getUser();
+
+      const { data: existentes, error: erroBusca } = await supabase
+        .from("contas")
+        .select("id")
+        .eq("ordem_compra_id" as never, ordemDetalhe.id as never);
+      if (erroBusca) throw erroBusca;
+      if ((existentes ?? []).length > 0) {
+        throw new Error("Esta ordem já possui título no Contas a Pagar");
+      }
+
+      const { error: erroConta } = await supabase.from("contas").insert({
+        tipo: "pagar",
+        descricao: `Ordem de compra ${ordemDetalhe.numero ?? ""} - ${ordemDetalhe.fornecedor_nome ?? "Fornecedor"}`,
+        parceiro: ordemDetalhe.fornecedor_nome,
+        categoria: "Compras",
+        valor,
+        vencimento: fatura.vencimento,
+        status: "pendente",
+        observacoes: [fatura.forma, fatura.observacoes].filter(Boolean).join(" - ") || null,
+        ordem_compra_id: ordemDetalhe.id,
+        created_by: auth.user?.id ?? null,
+      } as never);
+      if (erroConta) throw erroConta;
+
+      const { error: erroOrdem } = await supabase
+        .from("ordens_compra")
+        .update({
+          status: "faturada",
+          faturada_em: new Date().toISOString(),
+          condicoes: `${fatura.forma} - venc. ${fatura.vencimento}`,
+        } as never)
+        .eq("id", ordemDetalhe.id);
+      if (erroOrdem) throw erroOrdem;
+    },
+    onSuccess: () => {
+      toast.success("Ordem faturada e título lançado no Contas a Pagar");
+      setFaturaOpen(false);
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["contas"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
 
   const atualizarIcms = useMutation({
     mutationFn: async (campos: Partial<Ordem> & { id: string }) => {
@@ -1015,6 +1126,61 @@ function OrdensCompra() {
                 </Field>
               </div>
 
+              <div className="space-y-3 rounded-lg border border-border p-4 print:hidden">
+                <div>
+                  <p className="text-sm font-medium">Fluxo da ordem de compra</p>
+                  <p className="text-xs text-muted-foreground">
+                    A dívida no Contas a Pagar só é criada quando o fornecedor fatura o pedido.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {FLUXO.map((s, i) => (
+                    <Badge
+                      key={s}
+                      variant={i <= etapaAtual(ordemDetalhe.status) ? "default" : "secondary"}
+                    >
+                      {i + 1}. {statusLabel[s]}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={
+                      etapaAtual(ordemDetalhe.status) >= 1 || enviarAoFornecedor.isPending
+                    }
+                    onClick={() => enviarAoFornecedor.mutate(ordemDetalhe.id)}
+                  >
+                    Marcar como enviada
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={etapaAtual(ordemDetalhe.status) >= 2}
+                    onClick={abrirFatura}
+                  >
+                    Registrar faturamento
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={
+                      etapaAtual(ordemDetalhe.status) < 2 ||
+                      ordemDetalhe.status === "concluida" ||
+                      ordemDetalhe.status === "recebida"
+                    }
+                    onClick={() =>
+                      atualizarStatus.mutate({ id: ordemDetalhe.id, status: "concluida" })
+                    }
+                  >
+                    Marcar como concluída
+                  </Button>
+                </div>
+                {ordemDetalhe.faturada_em && (
+                  <p className="text-xs text-muted-foreground">
+                    Título gerado no Contas a Pagar em {dataBR(ordemDetalhe.faturada_em)}.
+                  </p>
+                )}
+              </div>
+
               <div className="flex flex-wrap justify-end gap-2 print:hidden">
                 <DocumentoOrdemCompra
                   ordem={ordemDetalhe}
@@ -1282,6 +1448,69 @@ function OrdensCompra() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={faturaOpen} onOpenChange={setFaturaOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Condições de pagamento do fornecedor</DialogTitle>
+            <DialogDescription>
+              Informe o que o fornecedor cobrou. O título será criado no Contas a Pagar vinculado a
+              esta ordem.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <Field label="Valor cobrado (R$) *">
+              <Input
+                type="number"
+                step="0.01"
+                value={fatura.valor}
+                onChange={(e) => setFatura((f) => ({ ...f, valor: e.target.value }))}
+              />
+            </Field>
+            <Field label="Data de vencimento *">
+              <Input
+                type="date"
+                value={fatura.vencimento}
+                onChange={(e) => setFatura((f) => ({ ...f, vencimento: e.target.value }))}
+              />
+            </Field>
+            <Field label="Forma de pagamento">
+              <Select
+                value={fatura.forma}
+                onValueChange={(v) => setFatura((f) => ({ ...f, forma: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["Boleto", "Pix", "Transferência", "Cartão de Crédito", "Dinheiro"].map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Observações">
+              <Textarea
+                rows={2}
+                value={fatura.observacoes}
+                onChange={(e) => setFatura((f) => ({ ...f, observacoes: e.target.value }))}
+                placeholder="Ex.: nota 12345, entrega em 5 dias"
+              />
+            </Field>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFaturaOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => faturarOrdem.mutate()} disabled={faturarOrdem.isPending}>
+              Faturar e gerar conta a pagar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
