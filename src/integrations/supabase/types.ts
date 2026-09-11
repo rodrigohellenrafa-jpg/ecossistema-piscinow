@@ -350,6 +350,7 @@ export type Database = {
           descricao: string
           id: string
           observacoes: string | null
+          ordem_compra_id: string | null
           parceiro: string | null
           status: string
           tipo: string
@@ -369,6 +370,7 @@ export type Database = {
           descricao: string
           id?: string
           observacoes?: string | null
+          ordem_compra_id?: string | null
           parceiro?: string | null
           status?: string
           tipo?: string
@@ -388,6 +390,7 @@ export type Database = {
           descricao?: string
           id?: string
           observacoes?: string | null
+          ordem_compra_id?: string | null
           parceiro?: string | null
           status?: string
           tipo?: string
@@ -403,6 +406,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_ordem_compra_id_fkey"
+            columns: ["ordem_compra_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
             referencedColumns: ["id"]
           },
           {
@@ -1140,6 +1150,8 @@ export type Database = {
           created_by: string | null
           data_pedido: string
           desconto: number
+          enviada_em: string | null
+          faturada_em: string | null
           fornecedor_id: string | null
           fornecedor_nome: string | null
           icms_base: number
@@ -1164,6 +1176,8 @@ export type Database = {
           created_by?: string | null
           data_pedido?: string
           desconto?: number
+          enviada_em?: string | null
+          faturada_em?: string | null
           fornecedor_id?: string | null
           fornecedor_nome?: string | null
           icms_base?: number
@@ -1188,6 +1202,8 @@ export type Database = {
           created_by?: string | null
           data_pedido?: string
           desconto?: number
+          enviada_em?: string | null
+          faturada_em?: string | null
           fornecedor_id?: string | null
           fornecedor_nome?: string | null
           icms_base?: number
