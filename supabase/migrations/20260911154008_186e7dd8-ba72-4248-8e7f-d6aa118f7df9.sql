@@ -1,0 +1,1 @@
+ALTER TABLE public.contas ADD COLUMN IF NOT EXISTS valor_juros numeric NOT NULL DEFAULT 0;

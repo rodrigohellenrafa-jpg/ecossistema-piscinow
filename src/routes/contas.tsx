@@ -69,6 +69,7 @@ const vazio = {
   parceiro: "",
   categoria: "",
   valor: "0",
+  valor_juros: "0",
   vencimento: "",
   observacoes: "",
 };
@@ -152,6 +153,7 @@ function Contas() {
         parceiro: form.parceiro || null,
         categoria: form.categoria || null,
         valor: Number(form.valor) || 0,
+        valor_juros: Number(form.valor_juros) || 0,
         vencimento: form.vencimento,
         status: "aberto",
         observacoes: form.observacoes || null,
@@ -301,13 +303,24 @@ function Contas() {
                   </Dialog>
                 </div>
               </Field>
-              <Field label="Valor (R$)">
+              <Field label="Valor da parcela (R$)">
                 <Input
                   type="number"
                   step="0.01"
                   value={form.valor}
                   onChange={(e) => set("valor")(e.target.value)}
                 />
+              </Field>
+              <Field label="Juros (R$)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={form.valor_juros}
+                  onChange={(e) => set("valor_juros")(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Total do título: {brl((Number(form.valor) || 0) + (Number(form.valor_juros) || 0))}
+                </p>
               </Field>
               <Field label="Vencimento">
                 <Input
@@ -365,6 +378,7 @@ type Conta = {
   parceiro: string | null;
   categoria: string | null;
   valor: number;
+  valor_juros?: number | null;
   vencimento: string;
   status: string;
 };
@@ -393,7 +407,9 @@ function Lista({
               <TableHead>Descrição</TableHead>
               <TableHead>Parceiro</TableHead>
               <TableHead>Vencimento</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
+              <TableHead className="text-right">Parcela</TableHead>
+              <TableHead className="text-right">Juros</TableHead>
+              <TableHead className="text-right">Total</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-24" />
             </TableRow>
@@ -409,6 +425,10 @@ function Lista({
                     {new Date(`${c.vencimento}T00:00:00`).toLocaleDateString("pt-BR")}
                   </TableCell>
                   <TableCell className="text-right">{brl(Number(c.valor))}</TableCell>
+                  <TableCell className="text-right">{brl(Number(c.valor_juros ?? 0))}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {brl(Number(c.valor) + Number(c.valor_juros ?? 0))}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={c.status === "pago" ? "secondary" : vencido ? "destructive" : "outline"}>
                       {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
