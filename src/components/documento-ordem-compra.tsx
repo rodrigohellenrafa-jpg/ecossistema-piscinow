@@ -362,10 +362,11 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
       <Button variant="outline" onClick={() => setImprimindo(true)}>
         <Printer /> Imprimir ordem de compra
       </Button>
-      <Button asChild>
-        <a href={mailto}>
-          <Mail /> Enviar por e-mail
-        </a>
+      <Button variant="outline" onClick={baixarPdf}>
+        <FileDown /> Baixar PDF do pedido
+      </Button>
+      <Button onClick={enviarPorEmail}>
+        <Mail /> Gerar PDF e enviar por e-mail
       </Button>
       {imprimindo && typeof document !== "undefined"
         ? createPortal(documento, document.body)
