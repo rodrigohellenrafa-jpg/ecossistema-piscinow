@@ -37,6 +37,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/contas")({
   staticData: { sitemap: false },
@@ -86,6 +87,19 @@ function Contas() {
         .order("vencimento", { ascending: true });
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: fornecedores = [] } = useQuery({
+    queryKey: ["fornecedores-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as Tables<"fornecedores">[];
     },
   });
 
@@ -175,7 +189,26 @@ function Contas() {
                 </Select>
               </Field>
               <Field label={form.tipo === "pagar" ? "Fornecedor" : "Cliente"}>
-                <Input value={form.parceiro} onChange={(e) => set("parceiro")(e.target.value)} />
+                {form.tipo === "pagar" ? (
+                  <Select value={form.parceiro} onValueChange={set("parceiro")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o fornecedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fornecedores.map((f) => (
+                        <SelectItem key={f.id} value={f.nome}>
+                          {f.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={form.parceiro}
+                    onChange={(e) => set("parceiro")(e.target.value)}
+                    placeholder="Nome do cliente"
+                  />
+                )}
               </Field>
               <Field label="Descrição" className="sm:col-span-2">
                 <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
