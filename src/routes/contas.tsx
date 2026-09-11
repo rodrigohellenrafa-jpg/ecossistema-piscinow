@@ -90,6 +90,19 @@ function Contas() {
     },
   });
 
+  const { data: fornecedores = [] } = useQuery({
+    queryKey: ["fornecedores-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as Tables<"fornecedores">[];
+    },
+  });
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição do título.");
