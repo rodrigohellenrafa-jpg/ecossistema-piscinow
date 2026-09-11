@@ -13,20 +13,23 @@ import {
 } from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
 import { supabase } from "@/integrations/supabase/client";
+import plantaPiscina from "@/assets/planta-piscina.webp.asset.json";
 
 export const Route = createFileRoute("/os/formulario")({
   staticData: { sitemap: false },
   head: () => ({
     meta: [
-      { title: "Formulário de OS | Piscinow ERP" },
+      { title: "Ordem de Serviço de Instalação | Piscinow ERP" },
       {
         name: "description",
-        content: "Formulário de Ordem de Serviço otimizado para impressão A4 e PDF.",
+        content:
+          "Ordem de Serviço de instalação de piscinas com desenhos técnicos e checklist de conferência, pronta para impressão A4 frente e verso.",
       },
-      { property: "og:title", content: "Formulário de OS | Piscinow ERP" },
+      { property: "og:title", content: "Ordem de Serviço de Instalação | Piscinow ERP" },
       {
         property: "og:description",
-        content: "Formulário de Ordem de Serviço otimizado para impressão A4 e PDF.",
+        content:
+          "Ordem de Serviço de instalação de piscinas com desenhos técnicos e checklist de conferência, pronta para impressão A4 frente e verso.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -39,18 +42,65 @@ export const Route = createFileRoute("/os/formulario")({
   ),
 });
 
-const TOTAL_LINHAS = 20;
-const TOTAL_LINHAS_APOIO = 12;
-
-const LINHAS_VAZIAS = Array.from({ length: TOTAL_LINHAS }, () => "");
+const TOTAL_LINHAS_APOIO = 14;
 const LINHAS_APOIO_VAZIAS = Array.from({ length: TOTAL_LINHAS_APOIO }, () => "");
 const ITENS_VAZIOS: Array<{ descricao: string; quantidade: number }> = [];
+
+type Obra = {
+  id: string;
+  numero: string | null;
+  cliente_id: string | null;
+  cliente_nome: string | null;
+  responsavel: string | null;
+  venda_id: string | null;
+  endereco_obra: string | null;
+  tipo_servico: string | null;
+};
+
+type Venda = {
+  id: string;
+  numero: string | null;
+  cliente_id: string | null;
+  cliente_nome: string | null;
+  vendedor: string | null;
+};
+
+function Campo({
+  label,
+  value,
+  onChange,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  onChange?: (v: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`os-campo px-3 py-2 ${className}`}>
+      <label className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange?.(e.target.value)}
+        className="w-full border-b border-slate-300 bg-transparent py-0.5 text-[12px] font-medium text-slate-900 outline-none"
+      />
+    </div>
+  );
+}
 
 function FormularioOS() {
   const [selecao, setSelecao] = useState<string>("");
   const [cliente, setCliente] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [modelo, setModelo] = useState("");
+  const [numeroOS, setNumeroOS] = useState("");
   const [profissional, setProfissional] = useState("");
-  const [linhas, setLinhas] = useState<string[]>(LINHAS_VAZIAS);
+  const [inicio, setInicio] = useState("");
+  const [termino, setTermino] = useState("");
   const [linhasApoio, setLinhasApoio] = useState<string[]>(LINHAS_APOIO_VAZIAS);
 
   const { data: obras = [] } = useQuery({
@@ -58,17 +108,11 @@ function FormularioOS() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("id, numero, cliente_nome, responsavel, venda_id")
+        .select("id, numero, cliente_id, cliente_nome, responsavel, venda_id, endereco_obra, tipo_servico")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
-      return data as Array<{
-        id: string;
-        numero: string | null;
-        cliente_nome: string | null;
-        responsavel: string | null;
-        venda_id: string | null;
-      }>;
+      return data as Obra[];
     },
   });
 
@@ -77,16 +121,11 @@ function FormularioOS() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendas")
-        .select("id, numero, cliente_nome, vendedor")
+        .select("id, numero, cliente_id, cliente_nome, vendedor")
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return data as Array<{
-        id: string;
-        numero: string | null;
-        cliente_nome: string | null;
-        vendedor: string | null;
-      }>;
+      return data as Venda[];
     },
   });
 
@@ -98,7 +137,6 @@ function FormularioOS() {
     ? vendas.find((v) => v.id === selecao.slice(6))
     : undefined;
 
-  // Obra escolhida usa o pedido vinculado; senão tenta casar pelo cliente.
   const vendaDaObra = obra
     ? (obra.venda_id ??
       vendas.find(
@@ -110,6 +148,7 @@ function FormularioOS() {
     : null;
 
   const vendaId = vendaSelecionada?.id ?? vendaDaObra ?? null;
+  const clienteId = obra?.cliente_id ?? vendaSelecionada?.cliente_id ?? null;
 
   const { data: itensVenda = ITENS_VAZIOS } = useQuery({
     queryKey: ["formulario-itens", vendaId],
@@ -125,35 +164,65 @@ function FormularioOS() {
     },
   });
 
+  const { data: clienteDados } = useQuery({
+    queryKey: ["formulario-cliente", clienteId],
+    enabled: Boolean(clienteId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("nome, telefone, endereco_obra, logradouro, numero, bairro, cidade, estado")
+        .eq("id", clienteId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   useEffect(() => {
     if (obra) {
       setCliente(obra.cliente_nome ?? "");
       setProfissional(obra.responsavel ?? "");
+      setNumeroOS(obra.numero ?? "");
+      if (obra.endereco_obra) setEndereco(obra.endereco_obra);
+      if (obra.tipo_servico) setModelo(obra.tipo_servico);
     } else if (vendaSelecionada) {
       setCliente(vendaSelecionada.cliente_nome ?? "");
       setProfissional(vendaSelecionada.vendedor ?? "");
+      setNumeroOS(vendaSelecionada.numero ?? "");
     }
   }, [obra, vendaSelecionada]);
 
   useEffect(() => {
-    if (!vendaId) return;
-    const preenchidas = itensVenda.map(
-      (i) => `${Number(i.quantidade) % 1 === 0 ? Number(i.quantidade) : Number(i.quantidade).toFixed(2)}x ${i.descricao}`,
-    );
-    setLinhas(
-      Array.from({ length: Math.max(TOTAL_LINHAS, preenchidas.length) }, (_, i) => preenchidas[i] ?? ""),
-    );
-  }, [itensVenda, vendaId]);
+    if (!clienteDados) return;
+    setTelefone(clienteDados.telefone ?? "");
+    const completo = [
+      clienteDados.logradouro,
+      clienteDados.numero,
+      clienteDados.bairro,
+      clienteDados.cidade,
+      clienteDados.estado,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    setEndereco((atual) => atual || clienteDados.endereco_obra || completo);
+  }, [clienteDados]);
 
+  useEffect(() => {
+    const piscina = itensVenda.find((i) => /piscina|casco|spa/i.test(i.descricao));
+    if (piscina) setModelo((atual) => atual || piscina.descricao);
+  }, [itensVenda]);
+
+  const formatarQtd = (q: number) => (Number(q) % 1 === 0 ? String(Number(q)) : Number(q).toFixed(2));
 
   return (
     <div className="space-y-4">
       {/* Controles — ocultos na impressão */}
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Formulário de OS</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Ordem de Serviço de Instalação</h1>
           <p className="text-sm text-muted-foreground">
-            Selecione a obra ou o pedido de venda para trazer os itens e imprima o formulário.
+            Selecione a obra ou o pedido. A frente traz os desenhos técnicos e o verso o checklist de
+            conferência.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -186,299 +255,217 @@ function FormularioOS() {
         </div>
       </div>
 
-      {/* Área imprimível */}
-      <div className="os-form-wrapper mx-auto max-w-4xl bg-white p-4 text-slate-900 shadow-sm print:m-0 print:max-w-none print:shadow-none print:p-0">
-        {/* Título geral */}
-        <h2 className="mb-4 text-center font-cursive text-4xl text-slate-900">
-          Ordem de Serviço
-        </h2>
-
-        {/* Caixa principal */}
-        <div className="border border-slate-900">
-          {/* Linha 1 — Logomarca */}
-          <div className="border-b border-slate-900 p-4">
-            <div className="flex h-16 w-48 items-center justify-center border border-dashed border-slate-400 bg-slate-50 text-sm text-slate-500">
-              LOGOMARCA SPLASH
-            </div>
-          </div>
-
-          {/* Linha 2 — Cliente / Profissional */}
-          <div className="os-campo grid grid-cols-2 border-b border-slate-900">
-            <div className="border-r border-slate-900 p-3">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                Nome do Cliente
-              </label>
-              <input
-                type="text"
-                value={cliente}
-                onChange={(e) => setCliente(e.target.value)}
-                className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
-                placeholder=""
-              />
-            </div>
-            <div className="p-3">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                Profissional
-              </label>
-              <input
-                type="text"
-                value={profissional}
-                onChange={(e) => setProfissional(e.target.value)}
-                className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
-                placeholder=""
-              />
-            </div>
-          </div>
-
-          {/* Linha 3 — Início / Término */}
-          <div className="os-campo grid grid-cols-2 border-b border-slate-900">
-            <div className="border-r border-slate-900 p-3">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                Início
-              </label>
-              <input
-                type="text"
-                className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
-                placeholder=""
-              />
-            </div>
-            <div className="p-3">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                Término
-              </label>
-              <input
-                type="text"
-                className="w-full border-b border-slate-400 bg-transparent py-1 text-sm outline-none"
-                placeholder=""
-              />
-            </div>
-          </div>
-
-
-          {/* Divisória central */}
-          <div className="border-b border-slate-900 bg-slate-100 py-2 text-center text-sm font-bold uppercase tracking-widest text-slate-800">
-            Itens Incluídos
-          </div>
-
-          {/* Seção inferior — duas colunas */}
-          <div className="grid grid-cols-2">
-            {/* Coluna esquerda — tabelas de conferência */}
-            <div className="border-r border-slate-900 p-3">
-              {/* Tabela de itens do pedido */}
-              <table className="w-full border-collapse border border-slate-900 text-sm">
-                <thead>
-                  <tr className="bg-slate-100">
-                    <th className="border border-slate-900 px-2 py-1 text-center text-xs font-bold uppercase">
-                      Confere
-                    </th>
-                    <th className="border border-slate-900 px-2 py-1 text-center text-xs font-bold uppercase">
-                      Loja
-                    </th>
-                    <th className="border border-slate-900 px-2 py-1 text-center text-xs font-bold uppercase">
-                      Cliente
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linhas.map((valor, index) => (
-                    <tr key={index}>
-                      <td className="border border-slate-900 px-1 py-0">
-                        <input
-                          type="text"
-                          value={valor}
-                          onChange={(e) =>
-                            setLinhas((atual) =>
-                              atual.map((v, i) => (i === index ? e.target.value : v)),
-                            )
-                          }
-                          className="h-5 w-full bg-transparent text-[11px] leading-none text-slate-900 outline-none"
-                        />
-                      </td>
-                      <td className="w-12 border border-slate-900 px-1 py-0 text-center">
-                        <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
-                      </td>
-                      <td className="w-12 border border-slate-900 px-1 py-0 text-center">
-                        <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {/* Tabela de itens de apoio / conferência em loja */}
-              <div className="mt-4">
-                <h3 className="mb-2 border border-slate-900 bg-slate-100 py-1 text-center text-xs font-bold uppercase tracking-wide text-slate-800">
-                  Itens de Apoio — Conferência em Loja
-                </h3>
-                <table className="w-full border-collapse border border-slate-900 text-sm">
-                  <thead>
-                    <tr className="bg-slate-100">
-                      <th className="border border-slate-900 px-2 py-1 text-center text-xs font-bold uppercase">
-                        Item
-                      </th>
-                      <th className="border border-slate-900 px-2 py-1 text-center text-xs font-bold uppercase">
-                        Loja
-                      </th>
-                      <th className="border border-slate-900 px-2 py-1 text-center text-xs font-bold uppercase">
-                        Cliente
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {linhasApoio.map((valor, index) => (
-                      <tr key={index}>
-                        <td className="border border-slate-900 px-1 py-0">
-                          <input
-                            type="text"
-                            value={valor}
-                            onChange={(e) =>
-                              setLinhasApoio((atual) =>
-                                atual.map((v, i) => (i === index ? e.target.value : v)),
-                              )
-                            }
-                            className="h-5 w-full bg-transparent text-[11px] leading-none text-slate-900 outline-none"
-                          />
-                        </td>
-                        <td className="w-12 border border-slate-900 px-1 py-0 text-center">
-                          <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
-                        </td>
-                        <td className="w-12 border border-slate-900 px-1 py-0 text-center">
-                          <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      {/* ================= Área imprimível ================= */}
+      <div className="os-form-wrapper mx-auto w-full max-w-4xl space-y-6 text-slate-900">
+        {/* -------- FRENTE -------- */}
+        <section className="os-pagina bg-white p-6 shadow-sm print:p-0 print:shadow-none">
+          {/* Cabeçalho */}
+          <header className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-3">
+            <div>
+              <div className="flex h-12 w-40 items-center justify-center border border-dashed border-slate-300 text-[10px] uppercase tracking-widest text-slate-400">
+                Splash Jardim do Trevo
               </div>
+              <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                Instalação de piscinas
+              </p>
+            </div>
+            <div className="text-right">
+              <h2 className="text-lg font-bold uppercase tracking-[0.18em] text-slate-900">
+                Ordem de Serviço
+              </h2>
+              <p className="text-[11px] text-slate-500">Instalação · Frente</p>
+            </div>
+          </header>
+
+          {/* Dados do cliente / pedido */}
+          <div className="mt-3 grid grid-cols-4 border border-slate-300">
+            <Campo
+              label="Cliente"
+              value={cliente}
+              onChange={setCliente}
+              className="col-span-2 border-b border-r border-slate-300"
+            />
+            <Campo
+              label="Telefone"
+              value={telefone}
+              onChange={setTelefone}
+              className="border-b border-r border-slate-300"
+            />
+            <Campo
+              label="Nº da O.S."
+              value={numeroOS}
+              onChange={setNumeroOS}
+              className="border-b border-slate-300"
+            />
+            <Campo
+              label="Endereço da obra"
+              value={endereco}
+              onChange={setEndereco}
+              className="col-span-2 border-b border-r border-slate-300"
+            />
+            <Campo
+              label="Modelo da piscina"
+              value={modelo}
+              onChange={setModelo}
+              className="col-span-2 border-b border-slate-300"
+            />
+            <Campo
+              label="Profissional responsável"
+              value={profissional}
+              onChange={setProfissional}
+              className="col-span-2 border-r border-slate-300"
+            />
+            <Campo
+              label="Início"
+              value={inicio}
+              onChange={setInicio}
+              className="border-r border-slate-300"
+            />
+            <Campo label="Término" value={termino} onChange={setTermino} />
+          </div>
+
+          {/* Desenhos técnicos */}
+          <div className="mt-4 border border-slate-300">
+            <div className="border-b border-slate-300 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
+              Desenhos técnicos — anotar medidas executadas em obra
             </div>
 
-            {/* Coluna direita — Principais Medidas e Nivelamento empilhados */}
-            <div className="flex flex-col p-3">
-              {/* Principais Medidas — planta baixa */}
-              <div className="flex flex-col border-b border-slate-900 p-2">
-                <h3 className="mb-1 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
-                  Principais Medidas
-                </h3>
-                <div className="os-campo flex flex-1 items-center justify-center">
-                  <svg
-                    viewBox="0 0 180 90"
-                    className="h-24 w-full"
-                    aria-label="Planta baixa da piscina com cotas"
-                  >
-                    {/* Cota superior — comprimento */}
-                    <line x1="35" y1="12" x2="145" y2="12" stroke="#0f172a" strokeWidth="1" />
-                    <polygon points="30,12 35,8 35,16" fill="#0f172a" />
-                    <polygon points="150,12 145,8 145,16" fill="#0f172a" />
+            <div className="os-desenho p-4">
+              <img
+                src={plantaPiscina.url}
+                alt="Desenho técnico da piscina: planta baixa e corte longitudinal"
+                className="mx-auto max-h-[118mm] w-auto object-contain"
+              />
+            </div>
 
-                    {/* Cota esquerda — largura */}
-                    <line x1="18" y1="22" x2="18" y2="78" stroke="#0f172a" strokeWidth="1" />
-                    <polygon points="18,17 14,22 22,22" fill="#0f172a" />
-                    <polygon points="18,83 14,78 22,78" fill="#0f172a" />
+            <div className="grid grid-cols-3 border-t border-slate-300 text-[10px]">
+              <Campo label="Comprimento executado (m)" value="" className="border-r border-slate-300" />
+              <Campo label="Largura executada (m)" value="" className="border-r border-slate-300" />
+              <Campo label="Profundidade executada (m)" value="" />
+            </div>
 
-                    {/* Retângulo em planta baixa (centro) */}
-                    <rect x="35" y="22" width="110" height="56" fill="#ffffff" stroke="#0f172a" strokeWidth="2" />
-
-                    {/* Campos sobre as cotas */}
-                    <foreignObject x="70" y="0" width="44" height="12">
-                      <input
-                        type="text"
-                        className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[9px] outline-none"
-                        placeholder="compr. (m)"
-                      />
-                    </foreignObject>
-                    <foreignObject x="26" y="78" width="52" height="12">
-                      <input
-                        type="text"
-                        className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[9px] outline-none"
-                        placeholder="larg. (m)"
-                      />
-                    </foreignObject>
-                    <foreignObject x="60" y="44" width="60" height="14">
-                      <input
-                        type="text"
-                        className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[9px] outline-none"
-                        placeholder="obs. medida"
-                      />
-                    </foreignObject>
-                  </svg>
-                </div>
-              </div>
-
-              {/* Nivelamento — corte transversal */}
-              <div className="flex flex-col p-2">
-                <h3 className="mb-1 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
-                  Nivelamento
-                </h3>
-                <div className="flex flex-1 items-center justify-center">
-                  <svg
-                    viewBox="0 0 180 90"
-                    className="h-24 w-full"
-                    aria-label="Corte transversal da piscina com referência de nível"
-                  >
-                    {/* Terreno */}
-                    <line x1="5" y1="35" x2="175" y2="35" stroke="#0f172a" strokeWidth="1" />
-
-                    {/* Cubo retangular (corte transversal da piscina) */}
-                    <rect x="35" y="35" width="110" height="38" fill="#ffffff" stroke="#0f172a" strokeWidth="2" />
-                    {/* Perspectiva do cubo */}
-                    <polyline points="35,35 50,22 160,22 145,35" fill="none" stroke="#0f172a" strokeWidth="1.2" />
-                    <line x1="160" y1="22" x2="160" y2="60" stroke="#0f172a" strokeWidth="1.2" />
-                    <line x1="145" y1="73" x2="160" y2="60" stroke="#0f172a" strokeWidth="1.2" />
-
-                    {/* Símbolo de nível com traço maior para a referência */}
-                    <line x1="30" y1="44" x2="150" y2="44" stroke="#0f172a" strokeWidth="1" strokeDasharray="4,3" />
-                    <polygon points="86,44 80,36 92,36" fill="none" stroke="#0f172a" strokeWidth="1.2" />
-                    <line x1="60" y1="36" x2="150" y2="36" stroke="#0f172a" strokeWidth="1.5" />
-
-                    {/* Cota de profundidade */}
-                    <line x1="20" y1="35" x2="20" y2="73" stroke="#0f172a" strokeWidth="1" />
-                    <polygon points="20,32 16,38 24,38" fill="#0f172a" />
-                    <polygon points="20,76 16,70 24,70" fill="#0f172a" />
-
-                    <foreignObject x="62" y="20" width="88" height="14">
-                      <input
-                        type="text"
-                        className="h-full w-full bg-transparent text-center text-[9px] outline-none"
-                        placeholder="REF. de nível"
-                      />
-                    </foreignObject>
-                    <foreignObject x="0" y="76" width="60" height="14">
-                      <input
-                        type="text"
-                        className="h-full w-full border-b border-slate-400 bg-transparent text-center text-[9px] outline-none"
-                        placeholder="prof. (m)"
-                      />
-                    </foreignObject>
-                  </svg>
-                </div>
-
-                {/* Rodapé do quadrante — tipo de borda */}
-                <div className="mt-1 flex items-center justify-between border-t border-slate-400 pt-1 text-[10px] text-slate-800">
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
-                    Borda normal
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="inline-block h-3 w-3 border border-slate-900 align-middle" />
-                    Borda rebaixada
-                  </span>
-                </div>
-              </div>
+            <div className="flex items-center gap-8 border-t border-slate-300 px-3 py-2 text-[11px] text-slate-700">
+              <span className="font-semibold uppercase tracking-wide text-slate-500">Borda:</span>
+              <span className="flex items-center gap-2">
+                <span className="inline-block h-3 w-3 border border-slate-900" /> Normal
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="inline-block h-3 w-3 border border-slate-900" /> Rebaixada
+              </span>
+              <span className="ml-auto font-semibold uppercase tracking-wide text-slate-500">
+                Referência de nível:
+              </span>
+              <span className="inline-block w-40 border-b border-slate-400" />
             </div>
           </div>
-        </div>
 
-        {/* Rodapé opcional */}
-        <div className="mt-4 grid grid-cols-2 gap-8 text-sm text-slate-700 print:mt-8">
-          <div>
-            <p className="text-xs font-semibold uppercase">Assinatura do Cliente</p>
-            <div className="mt-8 border-b border-slate-900" />
+          {/* Observações */}
+          <div className="mt-4 border border-slate-300">
+            <div className="border-b border-slate-300 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
+              Observações da obra
+            </div>
+            <div className="space-y-4 p-3">
+              <div className="border-b border-slate-300" />
+              <div className="border-b border-slate-300" />
+              <div className="border-b border-slate-300" />
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase">Assinatura do Profissional</p>
-            <div className="mt-8 border-b border-slate-900" />
+        </section>
+
+        {/* -------- VERSO -------- */}
+        <section className="os-pagina os-verso bg-white p-6 shadow-sm print:p-0 print:shadow-none">
+          <header className="flex items-end justify-between border-b-2 border-slate-900 pb-2">
+            <div>
+              <h2 className="text-base font-bold uppercase tracking-[0.18em] text-slate-900">
+                Checklist de materiais e equipamentos
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                {cliente || "Cliente"} · O.S. {numeroOS || "—"}
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-500">Verso</p>
+          </header>
+
+          <table className="mt-3 w-full border-collapse border border-slate-300 text-[11px]">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700">
+                <th className="border border-slate-300 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wide">
+                  Item / Descrição
+                </th>
+                <th className="w-28 border border-slate-300 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
+                  Conferência Loja (saída)
+                </th>
+                <th className="w-28 border border-slate-300 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
+                  Conferência Obra (cliente)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {itensVenda.map((item, index) => (
+                <tr key={`venda-${index}`}>
+                  <td className="border border-slate-300 px-2 py-1 text-slate-900">
+                    {formatarQtd(item.quantidade)}x {item.descricao}
+                  </td>
+                  <td className="border border-slate-300 px-2 py-1 text-center">
+                    <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
+                  </td>
+                  <td className="border border-slate-300 px-2 py-1 text-center">
+                    <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
+                  </td>
+                </tr>
+              ))}
+
+              <tr>
+                <td
+                  colSpan={3}
+                  className="border border-slate-300 bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-700"
+                >
+                  Itens de apoio — preencher na conferência da loja
+                </td>
+              </tr>
+
+              {linhasApoio.map((valor, index) => (
+                <tr key={`apoio-${index}`}>
+                  <td className="border border-slate-300 px-2 py-0">
+                    <input
+                      type="text"
+                      value={valor}
+                      onChange={(e) =>
+                        setLinhasApoio((atual) =>
+                          atual.map((v, i) => (i === index ? e.target.value : v)),
+                        )
+                      }
+                      className="h-6 w-full bg-transparent text-[11px] text-slate-900 outline-none"
+                      placeholder=""
+                    />
+                  </td>
+                  <td className="border border-slate-300 px-2 py-1 text-center">
+                    <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
+                  </td>
+                  <td className="border border-slate-300 px-2 py-1 text-center">
+                    <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Assinaturas */}
+          <div className="mt-10 grid grid-cols-2 gap-10 text-[11px] text-slate-700">
+            <div>
+              <div className="border-b border-slate-900" />
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Assinatura do Cliente
+              </p>
+            </div>
+            <div>
+              <div className="border-b border-slate-900" />
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Assinatura do Técnico
+              </p>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
