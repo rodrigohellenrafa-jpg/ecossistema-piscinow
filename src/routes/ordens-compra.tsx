@@ -712,7 +712,6 @@ function OrdensCompra() {
                           onClick={(e) => {
                             e.stopPropagation();
                             setDetalheId(o.id);
-                            setModoEdicao(true);
                           }}
                         >
                           <Pencil className="size-4" />
