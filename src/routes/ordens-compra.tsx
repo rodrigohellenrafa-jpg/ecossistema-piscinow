@@ -477,6 +477,95 @@ function OrdensCompra() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Envio da O.C. ao fornecedor: ainda não gera dívida. */
+  const enviarAoFornecedor = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ordens_compra")
+        .update({ status: "enviada", enviada_em: new Date().toISOString() } as never)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Ordem marcada como enviada ao fornecedor");
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [faturaOpen, setFaturaOpen] = useState(false);
+  const [fatura, setFatura] = useState({
+    valor: "",
+    vencimento: hojeISO(),
+    forma: "Boleto",
+    observacoes: "",
+  });
+
+  const abrirFatura = () => {
+    if (!ordemDetalhe) return;
+    setFatura({
+      valor: String(Number(ordemDetalhe.valor_total ?? 0)),
+      vencimento: hojeISO(),
+      forma: "Boleto",
+      observacoes: "",
+    });
+    setFaturaOpen(true);
+  };
+
+  /** Faturamento: só aqui nasce o título no Contas a Pagar. */
+  const faturarOrdem = useMutation({
+    mutationFn: async () => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const valor = Number(fatura.valor) || 0;
+      if (valor <= 0) throw new Error("Informe o valor cobrado pelo fornecedor");
+      if (!fatura.vencimento) throw new Error("Informe a data de vencimento");
+
+      const { data: auth } = await supabase.auth.getUser();
+
+      const { data: existentes, error: erroBusca } = await supabase
+        .from("contas")
+        .select("id")
+        .eq("ordem_compra_id" as never, ordemDetalhe.id as never);
+      if (erroBusca) throw erroBusca;
+      if ((existentes ?? []).length > 0) {
+        throw new Error("Esta ordem já possui título no Contas a Pagar");
+      }
+
+      const { error: erroConta } = await supabase.from("contas").insert({
+        tipo: "pagar",
+        descricao: `Ordem de compra ${ordemDetalhe.numero ?? ""} - ${ordemDetalhe.fornecedor_nome ?? "Fornecedor"}`,
+        parceiro: ordemDetalhe.fornecedor_nome,
+        categoria: "Compras",
+        valor,
+        vencimento: fatura.vencimento,
+        status: "pendente",
+        observacoes: [fatura.forma, fatura.observacoes].filter(Boolean).join(" - ") || null,
+        ordem_compra_id: ordemDetalhe.id,
+        created_by: auth.user?.id ?? null,
+      } as never);
+      if (erroConta) throw erroConta;
+
+      const { error: erroOrdem } = await supabase
+        .from("ordens_compra")
+        .update({
+          status: "faturada",
+          faturada_em: new Date().toISOString(),
+          condicoes: `${fatura.forma} - venc. ${fatura.vencimento}`,
+        } as never)
+        .eq("id", ordemDetalhe.id);
+      if (erroOrdem) throw erroOrdem;
+    },
+    onSuccess: () => {
+      toast.success("Ordem faturada e título lançado no Contas a Pagar");
+      setFaturaOpen(false);
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["contas"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
+
   const atualizarIcms = useMutation({
     mutationFn: async (campos: Partial<Ordem> & { id: string }) => {
       const { id, ...resto } = campos;
