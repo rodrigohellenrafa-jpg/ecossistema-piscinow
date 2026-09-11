@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -72,6 +72,8 @@ type Obra = {
   cliente_nome: string | null;
   tipo_servico: string;
   data_pedido: string;
+  data_inicio: string | null;
+  data_termino: string | null;
   prazo_dias: number;
   data_limite: string | null;
   responsavel: string | null;
@@ -101,6 +103,8 @@ const vazio = {
   prazo_dias: "30",
   responsavel: "",
   endereco_obra: "",
+  data_inicio: "",
+  data_termino: "",
 };
 
 function progresso(obra: Obra) {
@@ -113,6 +117,7 @@ function FlightBoard() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
   const [excluirId, setExcluirId] = useState<string | null>(null);
+  const [historico, setHistorico] = useState<{ id: string | null; nome: string } | null>(null);
 
   const { data: obras = [] } = useQuery({
     queryKey: ["obras"],
@@ -187,6 +192,30 @@ function FlightBoard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const salvarDatas = useMutation({
+    mutationFn: async ({
+      id,
+      campo,
+      valor,
+    }: {
+      id: string;
+      campo: "data_inicio" | "data_termino";
+      valor: string;
+    }) => {
+      const { error } = await supabase
+        .from("obras")
+        .update(
+          (campo === "data_inicio"
+            ? { data_inicio: valor || null }
+            : { data_termino: valor || null }),
+        )
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["obras"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const criar = useMutation({
     mutationFn: async () => {
       if (!form.cliente_id && !form.venda_id) {
@@ -197,9 +226,27 @@ function FlightBoard() {
         clientes.find((c) => c.id === venda?.cliente_id);
       const clienteId = form.cliente_id || venda?.cliente_id || null;
       const clienteNome = cliente?.nome || venda?.cliente_nome || null;
+
+      // Evita obras duplicadas: mesmo cliente, mesmo serviço e ainda em aberto.
+      const duplicada = obras.find(
+        (o) =>
+          o.status_geral !== "Concluído" &&
+          o.tipo_servico === form.tipo_servico &&
+          ((clienteId && o.cliente_id === clienteId) ||
+            (!clienteId &&
+              (o.cliente_nome ?? "").trim().toLowerCase() ===
+                (clienteNome ?? "").trim().toLowerCase())) &&
+          (!form.venda_id || !o.venda_id || o.venda_id === form.venda_id),
+      );
+      if (duplicada) {
+        throw new Error(
+          `Este cliente já tem a obra ${duplicada.numero ?? ""} em aberto para "${form.tipo_servico}". Abra o histórico do cliente antes de criar outra.`,
+        );
+      }
+
       const prazoDias = Number(form.prazo_dias) || 30;
       const dataPedido = hojeISO();
-      const dataLimite = addDiasUteis(dataPedido, prazoDias);
+      const dataLimite = form.data_termino || addDiasUteis(dataPedido, prazoDias);
 
       const codInstalacao = proximoCodigo("OS-02", obras.map((o) => o.os_instalacao));
       const codLogistica = proximoCodigo("OL", obras.map((o) => o.os_logistica));
@@ -212,6 +259,8 @@ function FlightBoard() {
         numero: proximoCodigo("OBRA", obras.map((o) => o.numero)),
         tipo_servico: form.tipo_servico,
         data_pedido: dataPedido,
+        data_inicio: form.data_inicio || null,
+        data_termino: form.data_termino || null,
         prazo_dias: prazoDias,
         data_limite: dataLimite,
         responsavel: form.responsavel || null,
@@ -246,7 +295,39 @@ function FlightBoard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Histórico / recorrência do cliente
+  const { data: historicoOS = [] } = useQuery({
+    queryKey: ["historico-os", historico?.id, historico?.nome],
+    enabled: Boolean(historico),
+    queryFn: async () => {
+      let q = supabase
+        .from("ordens_servico")
+        .select("id, numero, tipo_servico, status, data_agendada, valor, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      q = historico?.id
+        ? q.eq("cliente_id", historico.id)
+        : q.eq("cliente_nome", historico?.nome ?? "");
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const historicoObras = useMemo(
+    () =>
+      historico
+        ? obras.filter((o) =>
+            historico.id
+              ? o.cliente_id === historico.id
+              : (o.cliente_nome ?? "") === historico.nome,
+          )
+        : [],
+    [obras, historico],
+  );
+
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+
 
   return (
     <div className="space-y-6">
@@ -326,6 +407,20 @@ function FlightBoard() {
                     onChange={(e) => set("responsavel")(e.target.value)}
                   />
                 </Field>
+                <Field label="Data de início dos trabalhos">
+                  <Input
+                    type="date"
+                    value={form.data_inicio}
+                    onChange={(e) => set("data_inicio")(e.target.value)}
+                  />
+                </Field>
+                <Field label="Data de término dos trabalhos">
+                  <Input
+                    type="date"
+                    value={form.data_termino}
+                    onChange={(e) => set("data_termino")(e.target.value)}
+                  />
+                </Field>
                 <Field label="Endereço da obra" className="sm:col-span-2">
                   <Input
                     value={form.endereco_obra}
@@ -370,14 +465,14 @@ function FlightBoard() {
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[900px]">
+                <div className="min-w-[1100px]">
                   {/* Header */}
                   <div className="grid grid-cols-12 gap-2 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <div className="col-span-1">Obra</div>
                     <div className="col-span-3">Cliente</div>
-                    <div className="col-span-1 text-center">Prazo</div>
-                    <div className="col-span-2 text-center">Data limite</div>
-                    <div className="col-span-2">Ordem de serviço</div>
+                    <div className="col-span-3 text-center">Início / Término</div>
+                    <div className="col-span-1 text-center">Limite</div>
+                    <div className="col-span-1">O.S.</div>
                     <div className="col-span-2">Status</div>
                     <div className="col-span-1 text-right">Ações</div>
                   </div>
@@ -398,6 +493,11 @@ function FlightBoard() {
                       : proximo
                         ? "text-warning"
                         : "text-foreground";
+                    const recorrencia = obras.filter((o) =>
+                      obra.cliente_id
+                        ? o.cliente_id === obra.cliente_id
+                        : (o.cliente_nome ?? "") === (obra.cliente_nome ?? ""),
+                    ).length;
                     return (
                       <div
                         key={obra.id}
@@ -414,41 +514,68 @@ function FlightBoard() {
                         </div>
 
                         <div className="col-span-3 min-w-0">
-                          <div className="truncate font-medium">{obra.cliente_nome ?? "—"}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate font-medium">{obra.cliente_nome ?? "—"}</span>
+                            <button
+                              type="button"
+                              title="Histórico do cliente"
+                              onClick={() =>
+                                setHistorico({
+                                  id: obra.cliente_id,
+                                  nome: obra.cliente_nome ?? "—",
+                                })
+                              }
+                              className="flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:text-primary"
+                            >
+                              <History className="size-3" />
+                              {recorrencia}
+                            </button>
+                          </div>
                           <div className="truncate text-xs text-muted-foreground">
                             {obra.tipo_servico}
                             {obra.responsavel ? ` · ${obra.responsavel}` : ""}
                           </div>
                         </div>
 
-                        <div className="col-span-1 text-center tabular-nums">
-                          {obra.prazo_dias} dias
+                        <div className="col-span-3 flex items-center justify-center gap-1">
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.data_inicio ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "data_inicio",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground">→</span>
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.data_termino ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "data_termino",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
                         </div>
 
-                        <div className={`col-span-2 text-center font-medium tabular-nums ${dataTone}`}>
+                        <div className={`col-span-1 text-center text-xs font-medium tabular-nums ${dataTone}`}>
                           {dataBR(obra.data_limite)}
-                          {atrasada && (
-                            <span className="ml-1 text-[10px] font-bold">({d}d)</span>
-                          )}
-                          {proximo && !atrasada && (
+                          {d !== null && (atrasada || proximo) && (
                             <span className="ml-1 text-[10px] font-bold">({d}d)</span>
                           )}
                         </div>
 
-                        <div className="col-span-2 flex flex-wrap gap-1">
+                        <div className="col-span-1 flex flex-wrap gap-1">
                           {obra.os_instalacao && (
                             <Badge variant="outline" className="text-[10px]">
                               {obra.os_instalacao}
-                            </Badge>
-                          )}
-                          {obra.os_logistica && (
-                            <Badge variant="outline" className="text-[10px]">
-                              {obra.os_logistica}
-                            </Badge>
-                          )}
-                          {obra.os_acabamento && (
-                            <Badge variant="outline" className="text-[10px]">
-                              {obra.os_acabamento}
                             </Badge>
                           )}
                         </div>
@@ -497,10 +624,75 @@ function FlightBoard() {
                   })}
                 </div>
               </div>
+
             </div>
           );
         })}
       </div>
+
+      {/* Histórico / recorrência do cliente */}
+      <Dialog open={!!historico} onOpenChange={(v) => !v && setHistorico(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="size-4" /> Histórico de {historico?.nome}
+            </DialogTitle>
+            <DialogDescription>
+              Todas as obras e ordens de serviço já abertas para este cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">Obras ({historicoObras.length})</h3>
+              <div className="space-y-1">
+                {historicoObras.map((o) => (
+                  <Link
+                    key={o.id}
+                    to="/obras/$id"
+                    params={{ id: o.id }}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:border-primary"
+                  >
+                    <span className="font-medium">{o.numero ?? "—"}</span>
+                    <span className="text-xs text-muted-foreground">{o.tipo_servico}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {dataBR(o.data_inicio) || dataBR(o.data_pedido)}
+                    </span>
+                    <Badge variant="secondary">{o.status_geral}</Badge>
+                  </Link>
+                ))}
+                {historicoObras.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma obra registrada.</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">
+                Ordens de serviço ({historicoOS.length})
+              </h3>
+              <div className="space-y-1">
+                {historicoOS.map((os) => (
+                  <div
+                    key={os.id}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
+                  >
+                    <span className="font-medium">{os.numero ?? "—"}</span>
+                    <span className="text-xs text-muted-foreground">{os.tipo_servico}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {dataBR(os.data_agendada)}
+                    </span>
+                    <Badge variant="secondary">{os.status}</Badge>
+                  </div>
+                ))}
+                {historicoOS.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhuma OS registrada.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!excluirId} onOpenChange={(v) => !v && setExcluirId(null)}>
         <DialogContent className="sm:max-w-md">

@@ -903,8 +903,10 @@ export type Database = {
           cliente_nome: string | null
           created_at: string
           created_by: string | null
+          data_inicio: string | null
           data_limite: string | null
           data_pedido: string
+          data_termino: string | null
           endereco_obra: string | null
           etapa_aquecimento: string
           etapa_base: string
@@ -934,8 +936,10 @@ export type Database = {
           cliente_nome?: string | null
           created_at?: string
           created_by?: string | null
+          data_inicio?: string | null
           data_limite?: string | null
           data_pedido?: string
+          data_termino?: string | null
           endereco_obra?: string | null
           etapa_aquecimento?: string
           etapa_base?: string
@@ -965,8 +969,10 @@ export type Database = {
           cliente_nome?: string | null
           created_at?: string
           created_by?: string | null
+          data_inicio?: string | null
           data_limite?: string | null
           data_pedido?: string
+          data_termino?: string | null
           endereco_obra?: string | null
           etapa_aquecimento?: string
           etapa_base?: string
