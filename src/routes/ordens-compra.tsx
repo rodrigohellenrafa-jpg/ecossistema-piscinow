@@ -884,6 +884,7 @@ function OrdensCompra() {
                   <TableRow>
                     <TableHead>Cód</TableHead>
                     <TableHead>Descrição</TableHead>
+                    <TableHead>Cliente</TableHead>
                     <TableHead>NCM</TableHead>
                     <TableHead>CST</TableHead>
                     <TableHead>Unid.</TableHead>
@@ -898,6 +899,7 @@ function OrdensCompra() {
                     <TableRow key={i.id}>
                       <TableCell className="font-mono text-xs">{i.codigo ?? "—"}</TableCell>
                       <TableCell>{i.descricao}</TableCell>
+                      <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
                       <TableCell>{i.ncm ?? "—"}</TableCell>
                       <TableCell>{i.cst ?? "—"}</TableCell>
                       <TableCell>{i.unidade}</TableCell>
