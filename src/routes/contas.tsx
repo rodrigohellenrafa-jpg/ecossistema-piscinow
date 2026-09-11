@@ -301,13 +301,24 @@ function Contas() {
                   </Dialog>
                 </div>
               </Field>
-              <Field label="Valor (R$)">
+              <Field label="Valor da parcela (R$)">
                 <Input
                   type="number"
                   step="0.01"
                   value={form.valor}
                   onChange={(e) => set("valor")(e.target.value)}
                 />
+              </Field>
+              <Field label="Juros (R$)">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={form.valor_juros}
+                  onChange={(e) => set("valor_juros")(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Total do título: {brl((Number(form.valor) || 0) + (Number(form.valor_juros) || 0))}
+                </p>
               </Field>
               <Field label="Vencimento">
                 <Input
