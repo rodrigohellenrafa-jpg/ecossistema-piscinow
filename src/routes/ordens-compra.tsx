@@ -694,78 +694,89 @@ function OrdensCompra() {
         }
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Ordens <Badge variant="secondary">{ordensFiltradas.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {ordensFiltradas.length === 0 ? (
+      {ordensFiltradas.length === 0 ? (
+        <Card>
+          <CardContent>
             <p className="py-10 text-center text-sm text-muted-foreground">
               Nenhuma ordem de compra encontrada.
             </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Previsão</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ordensFiltradas.map((o) => (
-                    <TableRow
-                      key={o.id}
-                      className="cursor-pointer"
-                      onClick={() => setDetalheId(o.id)}
-                    >
-                      <TableCell className="font-mono text-xs">{o.numero ?? "—"}</TableCell>
-                      <TableCell className="font-medium">{o.fornecedor_nome ?? "—"}</TableCell>
-                      <TableCell>{dataBR(o.data_pedido)}</TableCell>
-                      <TableCell>{dataBR(o.previsao_entrega)}</TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariant(o.status)}>
-                          {statusLabel[o.status] ?? o.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{brl(Number(o.valor_total))}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDetalheId(o.id);
-                          }}
-                        >
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            excluirOrdem.mutate(o.id);
-                          }}
-                        >
-                          <Trash2 className="text-destructive" />
-                        </Button>
-                      </TableCell>
+          </CardContent>
+        </Card>
+      ) : (
+        gruposFornecedor.map((g) => (
+          <Card key={g.chave}>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2">
+                {g.nome}
+                <Badge variant="secondary">
+                  {g.ordens.length} ordem{g.ordens.length === 1 ? "" : "s"}
+                </Badge>
+              </CardTitle>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Total do fornecedor</p>
+                <p className="text-lg font-semibold">{brl(g.total)}</p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Número</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Previsão</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {g.ordens.map((o) => (
+                      <TableRow
+                        key={o.id}
+                        className="cursor-pointer"
+                        onClick={() => setDetalheId(o.id)}
+                      >
+                        <TableCell className="font-mono text-xs">{o.numero ?? "—"}</TableCell>
+                        <TableCell>{dataBR(o.data_pedido)}</TableCell>
+                        <TableCell>{dataBR(o.previsao_entrega)}</TableCell>
+                        <TableCell>
+                          <Badge variant={statusVariant(o.status)}>
+                            {statusLabel[o.status] ?? o.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{brl(Number(o.valor_total))}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDetalheId(o.id);
+                            }}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              excluirOrdem.mutate(o.id);
+                            }}
+                          >
+                            <Trash2 className="text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
 
       <Dialog
         open={!!detalheId}
