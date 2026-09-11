@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Printer, Trash2 } from "lucide-react";
+import { Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -139,6 +139,7 @@ function OrdensCompra() {
   const qc = useQueryClient();
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
   const [detalheId, setDetalheId] = useState<string | null>(null);
+  const [modoEdicao, setModoEdicao] = useState(false);
   const [novaOpen, setNovaOpen] = useState(false);
   const [novoItem, setNovoItem] = useState(novoItemVazio);
   const [novaOrdem, setNovaOrdem] = useState({
@@ -205,6 +206,159 @@ function OrdensCompra() {
   );
 
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
+
+  const [formEdicao, setFormEdicao] = useState<{
+    fornecedor_id: string;
+    fornecedor_nome: string;
+    previsao_entrega: string;
+    condicoes: string;
+    observacoes: string;
+    status: string;
+    itens: {
+      id?: string;
+      produto_id: string;
+      codigo: string;
+      descricao: string;
+      ncm: string;
+      cst: string;
+      unidade: string;
+      quantidade: number;
+      valor_unitario: number;
+      desconto: number;
+    }[];
+  }>({ fornecedor_id: "", fornecedor_nome: "", previsao_entrega: "", condicoes: "", observacoes: "", status: "pendente", itens: [] });
+
+  const iniciarEdicao = () => {
+    if (!ordemDetalhe) return;
+    setFormEdicao({
+      fornecedor_id: ordemDetalhe.fornecedor_id ?? "",
+      fornecedor_nome: ordemDetalhe.fornecedor_nome ?? "Fornecedor não definido",
+      previsao_entrega: ordemDetalhe.previsao_entrega ?? "",
+      condicoes: ordemDetalhe.condicoes ?? "",
+      observacoes: ordemDetalhe.observacoes ?? "",
+      status: ordemDetalhe.status,
+      itens: itensDetalhe.map((i) => ({
+        id: i.id,
+        produto_id: i.produto_id ?? "",
+        codigo: i.codigo ?? "",
+        descricao: i.descricao,
+        ncm: i.ncm ?? "",
+        cst: i.cst ?? "",
+        unidade: i.unidade,
+        quantidade: Number(i.quantidade),
+        valor_unitario: Number(i.valor_unitario),
+        desconto: Number(i.desconto),
+      })),
+    });
+    setModoEdicao(true);
+  };
+
+  const atualizarOrdem = useMutation({
+    mutationFn: async () => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      if (!formEdicao.fornecedor_id) throw new Error("Selecione o fornecedor");
+      if (formEdicao.itens.length === 0) throw new Error("Adicione ao menos um item");
+
+      const fornecedor = fornecedores.find((f) => f.id === formEdicao.fornecedor_id);
+      const valorProdutos = formEdicao.itens.reduce(
+        (s, i) => s + (i.quantidade * i.valor_unitario - i.desconto),
+        0,
+      );
+      const icmsBase = valorProdutos;
+      const icmsValor = icmsBase * 0.18;
+      const icmsStBase = 0;
+      const icmsStValor = 0;
+      const valorTotal = valorProdutos;
+
+      const { error: erroOrdem } = await supabase
+        .from("ordens_compra")
+        .update({
+          fornecedor_id: formEdicao.fornecedor_id,
+          fornecedor_nome: fornecedor?.nome ?? formEdicao.fornecedor_nome,
+          previsao_entrega: formEdicao.previsao_entrega || null,
+          condicoes: formEdicao.condicoes || null,
+          observacoes: formEdicao.observacoes || null,
+          status: formEdicao.status,
+          valor_produtos: valorProdutos,
+          desconto: 0,
+          icms_base: icmsBase,
+          icms_valor: icmsValor,
+          icms_st_base: icmsStBase,
+          icms_st_valor: icmsStValor,
+          valor_total: valorTotal,
+        })
+        .eq("id", ordemDetalhe.id);
+      if (erroOrdem) throw erroOrdem;
+
+      const { error: erroExcluirItens } = await supabase
+        .from("ordem_compra_itens")
+        .delete()
+        .eq("ordem_id", ordemDetalhe.id);
+      if (erroExcluirItens) throw erroExcluirItens;
+
+      const payload = formEdicao.itens.map((i) => ({
+        ordem_id: ordemDetalhe.id,
+        produto_id: i.produto_id || null,
+        codigo: i.codigo,
+        descricao: i.descricao,
+        ncm: i.ncm,
+        cst: i.cst,
+        unidade: i.unidade,
+        quantidade: i.quantidade,
+        valor_unitario: i.valor_unitario,
+        desconto: i.desconto,
+        total: i.quantidade * i.valor_unitario - i.desconto,
+      }));
+      const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
+      if (erroItens) throw erroItens;
+    },
+    onSuccess: () => {
+      toast.success("Ordem de compra atualizada");
+      setModoEdicao(false);
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const adicionarItemEdicao = () => {
+    const produto = produtos.find((p) => p.id === novoItem.produto_id);
+    if (!produto) return toast.error("Selecione um produto");
+    const quantidade = Number(novoItem.quantidade) || 0;
+    const valor_unitario = Number(novoItem.valor_unitario) || Number(produto.preco_custo);
+    const desconto = Number(novoItem.desconto) || 0;
+    setFormEdicao((f) => ({
+      ...f,
+      itens: [
+        ...f.itens,
+        {
+          produto_id: produto.id,
+          codigo: produto.codigo ?? "",
+          descricao: produto.nome,
+          ncm: produto.ncm ?? "",
+          cst: produto.cst ?? "",
+          unidade: produto.unidade,
+          quantidade,
+          valor_unitario,
+          desconto,
+        },
+      ],
+    }));
+    setNovoItem(novoItemVazio);
+  };
+
+  const removerItemEdicao = (idx: number) => {
+    setFormEdicao((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
+  };
+
+  const alterarItemEdicao = (idx: number, campo: "quantidade" | "valor_unitario" | "desconto", valor: string) => {
+    const num = Number(valor) || 0;
+    setFormEdicao((f) => {
+      const itens = [...f.itens];
+      itens[idx] = { ...itens[idx], [campo]: num };
+      return { ...f, itens };
+    });
+  };
 
   const atualizarStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -557,6 +711,16 @@ function OrdensCompra() {
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
+                            setDetalheId(o.id);
+                          }}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             excluirOrdem.mutate(o.id);
                           }}
                         >
@@ -572,9 +736,17 @@ function OrdensCompra() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!detalheId} onOpenChange={(v) => !v && setDetalheId(null)}>
+      <Dialog
+        open={!!detalheId}
+        onOpenChange={(v) => {
+          if (!v) {
+            setDetalheId(null);
+            setModoEdicao(false);
+          }
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl print:max-h-none print:overflow-visible">
-          {ordemDetalhe && (
+          {ordemDetalhe && !modoEdicao && (
             <div className="space-y-6">
               <DialogHeader className="print:hidden">
                 <DialogTitle>Ordem de compra {ordemDetalhe.numero}</DialogTitle>
@@ -691,11 +863,223 @@ function OrdensCompra() {
                 <Button variant="outline" onClick={() => window.print()}>
                   <Printer /> Imprimir
                 </Button>
+                <Button onClick={iniciarEdicao}>
+                  <Pencil className="size-4" /> Editar
+                </Button>
               </div>
+            </div>
+          )}
+
+          {ordemDetalhe && modoEdicao && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>Editar ordem {ordemDetalhe.numero}</DialogTitle>
+                <DialogDescription>
+                  Altere fornecedor, status, dados gerais e itens da ordem.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Fornecedor *">
+                  <Select
+                    value={formEdicao.fornecedor_id}
+                    onValueChange={(v) => setFormEdicao((f) => ({ ...f, fornecedor_id: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fornecedores.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Status">
+                  <Select
+                    value={formEdicao.status}
+                    onValueChange={(v) => setFormEdicao((f) => ({ ...f, status: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {statusLabel[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Previsão de entrega">
+                  <Input
+                    type="date"
+                    value={formEdicao.previsao_entrega}
+                    onChange={(e) =>
+                      setFormEdicao((f) => ({ ...f, previsao_entrega: e.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label="Condições">
+                  <Input
+                    value={formEdicao.condicoes}
+                    onChange={(e) => setFormEdicao((f) => ({ ...f, condicoes: e.target.value }))}
+                    placeholder="30/60 dias, boleto..."
+                  />
+                </Field>
+                <Field label="Observações" className="sm:col-span-2">
+                  <Textarea
+                    value={formEdicao.observacoes}
+                    onChange={(e) =>
+                      setFormEdicao((f) => ({ ...f, observacoes: e.target.value }))
+                    }
+                  />
+                </Field>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-sm font-medium">Adicionar item</p>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  <Select
+                    value={novoItem.produto_id}
+                    onValueChange={(v) => setNovoItem((i) => ({ ...i, produto_id: v }))}
+                  >
+                    <SelectTrigger className="sm:col-span-2">
+                      <SelectValue placeholder="Produto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {produtos.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.codigo ? `${p.codigo} — ` : ""}
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    placeholder="Qtd"
+                    value={novoItem.quantidade}
+                    onChange={(e) => setNovoItem((i) => ({ ...i, quantidade: e.target.value }))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Vlr unitário"
+                    value={novoItem.valor_unitario}
+                    onChange={(e) =>
+                      setNovoItem((i) => ({ ...i, valor_unitario: e.target.value }))
+                    }
+                  />
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={adicionarItemEdicao}>
+                  <Plus className="size-4" /> Adicionar item
+                </Button>
+
+                {formEdicao.itens.length > 0 && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Produto</TableHead>
+                        <TableHead className="text-right">Qtd</TableHead>
+                        <TableHead className="text-right">Vlr Unit</TableHead>
+                        <TableHead className="text-right">Desc</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {formEdicao.itens.map((i, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>{i.descricao}</TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              className="w-20 text-right"
+                              value={i.quantidade}
+                              onChange={(e) =>
+                                alterarItemEdicao(idx, "quantidade", e.target.value)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="w-28 text-right"
+                              value={i.valor_unitario}
+                              onChange={(e) =>
+                                alterarItemEdicao(idx, "valor_unitario", e.target.value)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="w-24 text-right"
+                              value={i.desconto}
+                              onChange={(e) =>
+                                alterarItemEdicao(idx, "desconto", e.target.value)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {brl(i.quantidade * i.valor_unitario - i.desconto)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removerItemEdicao(idx)}
+                            >
+                              <Trash2 className="text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total estimado</p>
+                <p className="text-xl font-semibold">
+                  {brl(
+                    formEdicao.itens.reduce(
+                      (s, i) => s + (i.quantidade * i.valor_unitario - i.desconto),
+                      0,
+                    ),
+                  )}
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setModoEdicao(false)}
+                  disabled={atualizarOrdem.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => atualizarOrdem.mutate()}
+                  disabled={atualizarOrdem.isPending}
+                >
+                  Salvar alterações
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
