@@ -646,6 +646,22 @@ function OrdensCompra() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Select
+                      value={novoItem.cliente_id}
+                      onValueChange={(v) => setNovoItem((i) => ({ ...i, cliente_id: v }))}
+                    >
+                      <SelectTrigger className="sm:col-span-2">
+                        <SelectValue placeholder="Cliente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SEM_CLIENTE}>Estoque (sem cliente)</SelectItem>
+                        {clientes.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input
                       type="number"
                       placeholder="Qtd"
@@ -670,6 +686,7 @@ function OrdensCompra() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Produto</TableHead>
+                          <TableHead>Cliente</TableHead>
                           <TableHead className="text-right">Qtd</TableHead>
                           <TableHead className="text-right">Vlr Unit</TableHead>
                           <TableHead className="text-right">Total</TableHead>
@@ -680,6 +697,7 @@ function OrdensCompra() {
                         {itensNovaOrdem.map((i, idx) => (
                           <TableRow key={idx}>
                             <TableCell>{i.descricao}</TableCell>
+                            <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
                             <TableCell className="text-right">{i.quantidade}</TableCell>
                             <TableCell className="text-right">{brl(i.valor_unitario)}</TableCell>
                             <TableCell className="text-right">
