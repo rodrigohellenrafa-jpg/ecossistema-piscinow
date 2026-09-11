@@ -238,6 +238,26 @@ function OrdensCompra() {
     [ordens, filtroStatus],
   );
 
+  /** Ordens agrupadas por fornecedor (e não por pedido). */
+  const gruposFornecedor = useMemo(() => {
+    const mapa = new Map<string, { chave: string; nome: string; ordens: Ordem[]; total: number }>();
+    for (const o of ordensFiltradas) {
+      const chave = o.fornecedor_id ?? "sem-fornecedor";
+      const grupo =
+        mapa.get(chave) ??
+        {
+          chave,
+          nome: o.fornecedor_nome ?? "Fornecedor não definido",
+          ordens: [] as Ordem[],
+          total: 0,
+        };
+      grupo.ordens.push(o);
+      grupo.total += Number(o.valor_total ?? 0);
+      mapa.set(chave, grupo);
+    }
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [ordensFiltradas]);
+
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
 
   const [formEdicao, setFormEdicao] = useState<{
