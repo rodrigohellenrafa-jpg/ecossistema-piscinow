@@ -465,14 +465,14 @@ function FlightBoard() {
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[900px]">
+                <div className="min-w-[1100px]">
                   {/* Header */}
                   <div className="grid grid-cols-12 gap-2 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <div className="col-span-1">Obra</div>
                     <div className="col-span-3">Cliente</div>
-                    <div className="col-span-1 text-center">Prazo</div>
-                    <div className="col-span-2 text-center">Data limite</div>
-                    <div className="col-span-2">Ordem de serviço</div>
+                    <div className="col-span-3 text-center">Início / Término</div>
+                    <div className="col-span-1 text-center">Limite</div>
+                    <div className="col-span-1">O.S.</div>
                     <div className="col-span-2">Status</div>
                     <div className="col-span-1 text-right">Ações</div>
                   </div>
@@ -493,6 +493,11 @@ function FlightBoard() {
                       : proximo
                         ? "text-warning"
                         : "text-foreground";
+                    const recorrencia = obras.filter((o) =>
+                      obra.cliente_id
+                        ? o.cliente_id === obra.cliente_id
+                        : (o.cliente_nome ?? "") === (obra.cliente_nome ?? ""),
+                    ).length;
                     return (
                       <div
                         key={obra.id}
@@ -509,41 +514,68 @@ function FlightBoard() {
                         </div>
 
                         <div className="col-span-3 min-w-0">
-                          <div className="truncate font-medium">{obra.cliente_nome ?? "—"}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate font-medium">{obra.cliente_nome ?? "—"}</span>
+                            <button
+                              type="button"
+                              title="Histórico do cliente"
+                              onClick={() =>
+                                setHistorico({
+                                  id: obra.cliente_id,
+                                  nome: obra.cliente_nome ?? "—",
+                                })
+                              }
+                              className="flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:text-primary"
+                            >
+                              <History className="size-3" />
+                              {recorrencia}
+                            </button>
+                          </div>
                           <div className="truncate text-xs text-muted-foreground">
                             {obra.tipo_servico}
                             {obra.responsavel ? ` · ${obra.responsavel}` : ""}
                           </div>
                         </div>
 
-                        <div className="col-span-1 text-center tabular-nums">
-                          {obra.prazo_dias} dias
+                        <div className="col-span-3 flex items-center justify-center gap-1">
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.data_inicio ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "data_inicio",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground">→</span>
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.data_termino ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "data_termino",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
                         </div>
 
-                        <div className={`col-span-2 text-center font-medium tabular-nums ${dataTone}`}>
+                        <div className={`col-span-1 text-center text-xs font-medium tabular-nums ${dataTone}`}>
                           {dataBR(obra.data_limite)}
-                          {atrasada && (
-                            <span className="ml-1 text-[10px] font-bold">({d}d)</span>
-                          )}
-                          {proximo && !atrasada && (
+                          {d !== null && (atrasada || proximo) && (
                             <span className="ml-1 text-[10px] font-bold">({d}d)</span>
                           )}
                         </div>
 
-                        <div className="col-span-2 flex flex-wrap gap-1">
+                        <div className="col-span-1 flex flex-wrap gap-1">
                           {obra.os_instalacao && (
                             <Badge variant="outline" className="text-[10px]">
                               {obra.os_instalacao}
-                            </Badge>
-                          )}
-                          {obra.os_logistica && (
-                            <Badge variant="outline" className="text-[10px]">
-                              {obra.os_logistica}
-                            </Badge>
-                          )}
-                          {obra.os_acabamento && (
-                            <Badge variant="outline" className="text-[10px]">
-                              {obra.os_acabamento}
                             </Badge>
                           )}
                         </div>
@@ -592,6 +624,7 @@ function FlightBoard() {
                   })}
                 </div>
               </div>
+
             </div>
           );
         })}
