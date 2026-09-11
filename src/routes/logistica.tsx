@@ -72,6 +72,8 @@ type Obra = {
   cliente_nome: string | null;
   tipo_servico: string;
   data_pedido: string;
+  data_inicio: string | null;
+  data_termino: string | null;
   prazo_dias: number;
   data_limite: string | null;
   responsavel: string | null;
@@ -101,6 +103,8 @@ const vazio = {
   prazo_dias: "30",
   responsavel: "",
   endereco_obra: "",
+  data_inicio: "",
+  data_termino: "",
 };
 
 function progresso(obra: Obra) {
