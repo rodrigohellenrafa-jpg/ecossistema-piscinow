@@ -381,6 +381,7 @@ function FormularioOS() {
               <p className="text-[11px] text-slate-500">
                 {cliente || "Cliente"} · O.S. {numeroOS || "—"}
               </p>
+              </div>
             </div>
             <p className="text-[11px] text-slate-500">Verso</p>
           </header>
