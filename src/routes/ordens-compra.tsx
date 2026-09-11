@@ -170,9 +170,7 @@ function OrdensCompra() {
     condicoes: "",
     observacoes: "",
   });
-  const [itensNovaOrdem, setItensNovaOrdem] = useState<
-    { produto_id: string; codigo: string; descricao: string; ncm: string; cst: string; unidade: string; quantidade: number; valor_unitario: number; desconto: number }[]
-  >([]);
+  const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
 
   const { data: ordens = [] } = useQuery({
     queryKey: ["ordens_compra"],
