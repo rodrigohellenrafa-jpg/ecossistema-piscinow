@@ -247,18 +247,7 @@ function OrdensCompra() {
     condicoes: string;
     observacoes: string;
     status: string;
-    itens: {
-      id?: string;
-      produto_id: string;
-      codigo: string;
-      descricao: string;
-      ncm: string;
-      cst: string;
-      unidade: string;
-      quantidade: number;
-      valor_unitario: number;
-      desconto: number;
-    }[];
+    itens: ItemForm[];
   }>({ fornecedor_id: "", fornecedor_nome: "", previsao_entrega: "", condicoes: "", observacoes: "", status: "pendente", itens: [] });
 
   const iniciarEdicao = () => {
