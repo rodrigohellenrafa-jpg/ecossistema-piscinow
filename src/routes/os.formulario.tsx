@@ -332,7 +332,7 @@ function FormularioOS() {
 
             <div className="os-desenho p-4">
               <img
-                src={plantaPiscina.url}
+                src={plantaPiscina}
                 alt="Desenho técnico da piscina: planta baixa e corte longitudinal"
                 className="mx-auto max-h-[130mm] w-auto object-contain"
               />
