@@ -324,7 +324,7 @@
   font-family: "Caveat", "Brush Script MT", cursive;
 }
 
-/* ---- Formulário de Ordem de Serviço (impressão A4) ---- */
+/* ---- Ordem de Serviço (impressão A4 frente e verso) ---- */
 @media print {
   /* Esconde todo o conteúdo da página, exceto o formulário de OS */
   body:not(.imprimindo-documento) * {
@@ -337,116 +337,66 @@
   }
 
   .os-form-wrapper {
-    position: fixed !important;
-    top: 5mm !important;
-    left: 5mm !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     display: block !important;
-    width: 200mm !important;
-    height: auto !important;
+    width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #fff !important;
     color: #0f172a !important;
     box-shadow: none !important;
-    z-index: 9999 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Mantém os fundos cinzas dos cabeçalhos e as bordas das caixas */
   .os-form-wrapper * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    box-shadow: none !important;
   }
 
-  /* Campos de escrita: sem caixa, apenas texto */
+  /* Cada seção é uma folha A4 */
+  .os-form-wrapper .os-pagina {
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+  }
+
+  .os-form-wrapper .os-pagina:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* Campos de escrita: sem caixa, apenas a linha de preenchimento */
   .os-form-wrapper input {
     border: none !important;
     background: transparent !important;
     color: #0f172a !important;
-    box-shadow: none !important;
     padding: 0 !important;
   }
 
-  /* Somente os campos de cabeçalho e medidas ganham linha de preenchimento */
   .os-form-wrapper .os-campo input {
-    border-bottom: 1px solid #0f172a !important;
+    border-bottom: 1px solid #94a3b8 !important;
   }
 
-  .os-form-wrapper h2 {
-    margin: 0 0 2mm !important;
-    font-size: 22pt !important;
-    line-height: 1 !important;
-  }
-
-  .os-form-wrapper .border-b.p-4 {
-    padding: 2mm !important;
-  }
-
-  .os-form-wrapper .h-16 {
-    height: 12mm !important;
-  }
-
-  .os-form-wrapper .p-3 {
-    padding: 1.5mm !important;
-  }
-
-  .os-form-wrapper .py-2 {
-    padding-top: 1mm !important;
-    padding-bottom: 1mm !important;
-  }
-
-  .os-form-wrapper .mt-4 {
-    margin-top: 2mm !important;
-  }
-
-  .os-form-wrapper .mb-2 {
-    margin-bottom: 1mm !important;
-  }
-
-  .os-form-wrapper tbody input {
-    height: 4mm !important;
-    font-size: 7pt !important;
-    line-height: 1 !important;
-  }
-
-  .os-form-wrapper tbody span {
-    width: 2.6mm !important;
-    height: 2.6mm !important;
-  }
-
-  .os-form-wrapper svg {
-    max-height: 34mm !important;
-  }
-
-  .os-form-wrapper > .mt-4 {
-    margin-top: 2mm !important;
-  }
-
-  .os-form-wrapper > .mt-4 .mt-8 {
-    margin-top: 7mm !important;
-  }
-
-  .os-form-wrapper td,
-  .os-form-wrapper th {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-  }
-
-  /* Evita quebras no meio das tabelas e blocos */
   .os-form-wrapper table,
   .os-form-wrapper tr,
-  .os-form-wrapper svg,
-  .os-form-wrapper .os-bloco {
+  .os-form-wrapper thead {
     page-break-inside: avoid;
     break-inside: avoid;
   }
 
+  .os-form-wrapper .os-desenho img {
+    max-height: 115mm !important;
+    width: auto !important;
+  }
 
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 12mm;
   }
 }
 
