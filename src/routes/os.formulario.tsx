@@ -262,9 +262,11 @@ function FormularioOS() {
           {/* Cabeçalho */}
           <header className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-3">
             <div>
-              <div className="flex h-12 w-40 items-center justify-center border border-dashed border-slate-300 text-[10px] uppercase tracking-widest text-slate-400">
-                Splash Jardim do Trevo
-              </div>
+              <img
+                src={logoSplash.url}
+                alt="Splash Jardim do Trevo"
+                className="h-16 w-auto"
+              />
               <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
                 Instalação de piscinas
               </p>
