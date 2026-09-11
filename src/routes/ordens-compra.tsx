@@ -273,6 +273,9 @@ function OrdensCompra() {
   }, [ordensFiltradas]);
 
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
+  const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
+    ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
+    : null;
 
   const [formEdicao, setFormEdicao] = useState<{
     fornecedor_id: string;
