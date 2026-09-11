@@ -192,6 +192,26 @@ function FlightBoard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const salvarDatas = useMutation({
+    mutationFn: async ({
+      id,
+      campo,
+      valor,
+    }: {
+      id: string;
+      campo: "data_inicio" | "data_termino";
+      valor: string;
+    }) => {
+      const { error } = await supabase
+        .from("obras")
+        .update({ [campo]: valor || null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["obras"] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const criar = useMutation({
     mutationFn: async () => {
       if (!form.cliente_id && !form.venda_id) {
@@ -202,9 +222,27 @@ function FlightBoard() {
         clientes.find((c) => c.id === venda?.cliente_id);
       const clienteId = form.cliente_id || venda?.cliente_id || null;
       const clienteNome = cliente?.nome || venda?.cliente_nome || null;
+
+      // Evita obras duplicadas: mesmo cliente, mesmo serviço e ainda em aberto.
+      const duplicada = obras.find(
+        (o) =>
+          o.status_geral !== "Concluído" &&
+          o.tipo_servico === form.tipo_servico &&
+          ((clienteId && o.cliente_id === clienteId) ||
+            (!clienteId &&
+              (o.cliente_nome ?? "").trim().toLowerCase() ===
+                (clienteNome ?? "").trim().toLowerCase())) &&
+          (!form.venda_id || !o.venda_id || o.venda_id === form.venda_id),
+      );
+      if (duplicada) {
+        throw new Error(
+          `Este cliente já tem a obra ${duplicada.numero ?? ""} em aberto para "${form.tipo_servico}". Abra o histórico do cliente antes de criar outra.`,
+        );
+      }
+
       const prazoDias = Number(form.prazo_dias) || 30;
       const dataPedido = hojeISO();
-      const dataLimite = addDiasUteis(dataPedido, prazoDias);
+      const dataLimite = form.data_termino || addDiasUteis(dataPedido, prazoDias);
 
       const codInstalacao = proximoCodigo("OS-02", obras.map((o) => o.os_instalacao));
       const codLogistica = proximoCodigo("OL", obras.map((o) => o.os_logistica));
@@ -217,6 +255,8 @@ function FlightBoard() {
         numero: proximoCodigo("OBRA", obras.map((o) => o.numero)),
         tipo_servico: form.tipo_servico,
         data_pedido: dataPedido,
+        data_inicio: form.data_inicio || null,
+        data_termino: form.data_termino || null,
         prazo_dias: prazoDias,
         data_limite: dataLimite,
         responsavel: form.responsavel || null,
@@ -251,7 +291,39 @@ function FlightBoard() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Histórico / recorrência do cliente
+  const { data: historicoOS = [] } = useQuery({
+    queryKey: ["historico-os", historico?.id, historico?.nome],
+    enabled: Boolean(historico),
+    queryFn: async () => {
+      let q = supabase
+        .from("ordens_servico")
+        .select("id, numero, tipo_servico, status, data_agendada, valor, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      q = historico?.id
+        ? q.eq("cliente_id", historico.id)
+        : q.eq("cliente_nome", historico?.nome ?? "");
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const historicoObras = useMemo(
+    () =>
+      historico
+        ? obras.filter((o) =>
+            historico.id
+              ? o.cliente_id === historico.id
+              : (o.cliente_nome ?? "") === historico.nome,
+          )
+        : [],
+    [obras, historico],
+  );
+
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+
 
   return (
     <div className="space-y-6">
