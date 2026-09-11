@@ -1148,10 +1148,13 @@ export type Database = {
           icms_valor: number
           id: string
           numero: string | null
+          obs_pagamento: string | null
           observacoes: string | null
           previsao_entrega: string | null
           status: string
           updated_at: string
+          valor_nota: number
+          valor_pago: number
           valor_produtos: number
           valor_total: number
         }
@@ -1169,10 +1172,13 @@ export type Database = {
           icms_valor?: number
           id?: string
           numero?: string | null
+          obs_pagamento?: string | null
           observacoes?: string | null
           previsao_entrega?: string | null
           status?: string
           updated_at?: string
+          valor_nota?: number
+          valor_pago?: number
           valor_produtos?: number
           valor_total?: number
         }
@@ -1190,10 +1196,13 @@ export type Database = {
           icms_valor?: number
           id?: string
           numero?: string | null
+          obs_pagamento?: string | null
           observacoes?: string | null
           previsao_entrega?: string | null
           status?: string
           updated_at?: string
+          valor_nota?: number
+          valor_pago?: number
           valor_produtos?: number
           valor_total?: number
         }
