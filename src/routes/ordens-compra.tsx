@@ -345,30 +345,49 @@ function OrdensCompra() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const adicionarItemEdicao = () => {
+  const montarItemForm = (): ItemForm | null => {
     const produto = produtos.find((p) => p.id === novoItem.produto_id);
-    if (!produto) return toast.error("Selecione um produto");
-    const quantidade = Number(novoItem.quantidade) || 0;
-    const valor_unitario = Number(novoItem.valor_unitario) || Number(produto.preco_custo);
-    const desconto = Number(novoItem.desconto) || 0;
-    setFormEdicao((f) => ({
-      ...f,
-      itens: [
-        ...f.itens,
-        {
-          produto_id: produto.id,
-          codigo: produto.codigo ?? "",
-          descricao: produto.nome,
-          ncm: produto.ncm ?? "",
-          cst: produto.cst ?? "",
-          unidade: produto.unidade,
-          quantidade,
-          valor_unitario,
-          desconto,
-        },
-      ],
-    }));
+    if (!produto) {
+      toast.error("Selecione um produto");
+      return null;
+    }
+    const cliente =
+      novoItem.cliente_id && novoItem.cliente_id !== SEM_CLIENTE
+        ? clientes.find((c) => c.id === novoItem.cliente_id)
+        : undefined;
+    return {
+      produto_id: produto.id,
+      codigo: produto.codigo ?? "",
+      descricao: produto.nome,
+      ncm: produto.ncm ?? "",
+      cst: produto.cst ?? "",
+      unidade: produto.unidade,
+      quantidade: Number(novoItem.quantidade) || 0,
+      valor_unitario: Number(novoItem.valor_unitario) || Number(produto.preco_custo),
+      desconto: Number(novoItem.desconto) || 0,
+      cliente_id: cliente?.id ?? null,
+      cliente_nome: cliente?.nome ?? null,
+    };
+  };
+
+  const adicionarItemEdicao = () => {
+    const item = montarItemForm();
+    if (!item) return;
+    setFormEdicao((f) => ({ ...f, itens: [...f.itens, item] }));
     setNovoItem(novoItemVazio);
+  };
+
+  const alterarClienteItemEdicao = (idx: number, valor: string) => {
+    const cliente = valor === SEM_CLIENTE ? undefined : clientes.find((c) => c.id === valor);
+    setFormEdicao((f) => {
+      const itens = [...f.itens];
+      itens[idx] = {
+        ...itens[idx],
+        cliente_id: cliente?.id ?? null,
+        cliente_nome: cliente?.nome ?? null,
+      };
+      return { ...f, itens };
+    });
   };
 
   const removerItemEdicao = (idx: number) => {
