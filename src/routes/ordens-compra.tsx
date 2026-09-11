@@ -194,7 +194,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("fornecedores")
-        .select("id, nome, email, telefone, documento")
+        .select("id, nome, email, telefone, cnpj")
         .order("nome");
       if (error) throw error;
       return data as Fornecedor[];
