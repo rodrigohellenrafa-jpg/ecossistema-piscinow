@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { DocumentoOrdemCompra } from "@/components/documento-ordem-compra";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, proximoCodigo } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
@@ -100,6 +101,11 @@ type Ordem = {
   valor_total: number;
   status: string;
   observacoes: string | null;
+  /** Valor efetivamente faturado na nota fiscal do fornecedor (meia nota). */
+  valor_nota: number;
+  /** Valor realmente pago ao fornecedor, incluindo a parte fora da nota. */
+  valor_pago: number;
+  obs_pagamento: string | null;
 };
 
 type Item = {
@@ -119,7 +125,13 @@ type Item = {
   cliente_nome: string | null;
 };
 
-type Fornecedor = { id: string; nome: string };
+type Fornecedor = {
+  id: string;
+  nome: string;
+  email?: string | null;
+  telefone?: string | null;
+  cnpj?: string | null;
+};
 type Cliente = { id: string; nome: string };
 type Produto = {
   id: string;
@@ -187,7 +199,10 @@ function OrdensCompra() {
   const { data: fornecedores = [] } = useQuery({
     queryKey: ["fornecedores", "lista"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("fornecedores").select("id, nome").order("nome");
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome, email, telefone, cnpj")
+        .order("nome");
       if (error) throw error;
       return data as Fornecedor[];
     },
@@ -259,6 +274,9 @@ function OrdensCompra() {
   }, [ordensFiltradas]);
 
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
+  const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
+    ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
+    : null;
 
   const [formEdicao, setFormEdicao] = useState<{
     fornecedor_id: string;
@@ -941,10 +959,77 @@ function OrdensCompra() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 print:hidden">
-                <Button variant="outline" onClick={() => window.print()}>
-                  <Printer /> Imprimir
-                </Button>
+              <div className="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-3 print:hidden">
+                <div className="sm:col-span-3">
+                  <p className="text-sm font-medium">Pagamento (meia nota)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Informe quanto o fornecedor faturou na nota e quanto foi realmente pago. A
+                    diferença fica registrada como pagamento fora da nota.
+                  </p>
+                </div>
+                <Field label="Valor faturado na nota (R$)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    defaultValue={Number(ordemDetalhe.valor_nota ?? 0)}
+                    onBlur={(e) =>
+                      atualizarIcms.mutate({
+                        id: ordemDetalhe.id,
+                        valor_nota: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="Valor pago ao fornecedor (R$)">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    defaultValue={Number(ordemDetalhe.valor_pago ?? 0)}
+                    onBlur={(e) =>
+                      atualizarIcms.mutate({
+                        id: ordemDetalhe.id,
+                        valor_pago: Number(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </Field>
+                <div>
+                  <p className="text-xs text-muted-foreground">Diferença fora da nota</p>
+                  <p className="font-medium">
+                    {brl(
+                      Number(ordemDetalhe.valor_pago ?? 0) - Number(ordemDetalhe.valor_nota ?? 0),
+                    )}
+                  </p>
+                </div>
+                <Field label="Observação do pagamento" className="sm:col-span-3">
+                  <Input
+                    defaultValue={ordemDetalhe.obs_pagamento ?? ""}
+                    placeholder="Ex.: R$ 2.000 na nota e R$ 1.500 pagos em Pix"
+                    onBlur={(e) =>
+                      atualizarIcms.mutate({
+                        id: ordemDetalhe.id,
+                        obs_pagamento: e.target.value || null,
+                      })
+                    }
+                  />
+                </Field>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2 print:hidden">
+                <DocumentoOrdemCompra
+                  ordem={ordemDetalhe}
+                  fornecedor={
+                    fornecedorDetalhe
+                      ? {
+                          nome: fornecedorDetalhe.nome,
+                          email: fornecedorDetalhe.email,
+                          telefone: fornecedorDetalhe.telefone,
+                          documento: fornecedorDetalhe.cnpj,
+                        }
+                      : { nome: ordemDetalhe.fornecedor_nome }
+                  }
+                  itens={itensDetalhe}
+                />
                 <Button onClick={iniciarEdicao}>
                   <Pencil className="size-4" /> Editar
                 </Button>
