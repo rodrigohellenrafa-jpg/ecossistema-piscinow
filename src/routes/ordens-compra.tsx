@@ -737,9 +737,17 @@ function OrdensCompra() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!detalheId} onOpenChange={(v) => !v && setDetalheId(null)}>
+      <Dialog
+        open={!!detalheId}
+        onOpenChange={(v) => {
+          if (!v) {
+            setDetalheId(null);
+            setModoEdicao(false);
+          }
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl print:max-h-none print:overflow-visible">
-          {ordemDetalhe && (
+          {ordemDetalhe && !modoEdicao && (
             <div className="space-y-6">
               <DialogHeader className="print:hidden">
                 <DialogTitle>Ordem de compra {ordemDetalhe.numero}</DialogTitle>
@@ -856,7 +864,218 @@ function OrdensCompra() {
                 <Button variant="outline" onClick={() => window.print()}>
                   <Printer /> Imprimir
                 </Button>
+                <Button onClick={iniciarEdicao}>
+                  <Pencil className="size-4" /> Editar
+                </Button>
               </div>
+            </div>
+          )}
+
+          {ordemDetalhe && modoEdicao && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>Editar ordem {ordemDetalhe.numero}</DialogTitle>
+                <DialogDescription>
+                  Altere fornecedor, status, dados gerais e itens da ordem.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Fornecedor *">
+                  <Select
+                    value={formEdicao.fornecedor_id}
+                    onValueChange={(v) => setFormEdicao((f) => ({ ...f, fornecedor_id: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fornecedores.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Status">
+                  <Select
+                    value={formEdicao.status}
+                    onValueChange={(v) => setFormEdicao((f) => ({ ...f, status: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {statusLabel[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Previsão de entrega">
+                  <Input
+                    type="date"
+                    value={formEdicao.previsao_entrega}
+                    onChange={(e) =>
+                      setFormEdicao((f) => ({ ...f, previsao_entrega: e.target.value }))
+                    }
+                  />
+                </Field>
+                <Field label="Condições">
+                  <Input
+                    value={formEdicao.condicoes}
+                    onChange={(e) => setFormEdicao((f) => ({ ...f, condicoes: e.target.value }))}
+                    placeholder="30/60 dias, boleto..."
+                  />
+                </Field>
+                <Field label="Observações" className="sm:col-span-2">
+                  <Textarea
+                    value={formEdicao.observacoes}
+                    onChange={(e) =>
+                      setFormEdicao((f) => ({ ...f, observacoes: e.target.value }))
+                    }
+                  />
+                </Field>
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-sm font-medium">Adicionar item</p>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  <Select
+                    value={novoItem.produto_id}
+                    onValueChange={(v) => setNovoItem((i) => ({ ...i, produto_id: v }))}
+                  >
+                    <SelectTrigger className="sm:col-span-2">
+                      <SelectValue placeholder="Produto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {produtos.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.codigo ? `${p.codigo} — ` : ""}
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    placeholder="Qtd"
+                    value={novoItem.quantidade}
+                    onChange={(e) => setNovoItem((i) => ({ ...i, quantidade: e.target.value }))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Vlr unitário"
+                    value={novoItem.valor_unitario}
+                    onChange={(e) =>
+                      setNovoItem((i) => ({ ...i, valor_unitario: e.target.value }))
+                    }
+                  />
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={adicionarItemEdicao}>
+                  <Plus className="size-4" /> Adicionar item
+                </Button>
+
+                {formEdicao.itens.length > 0 && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Produto</TableHead>
+                        <TableHead className="text-right">Qtd</TableHead>
+                        <TableHead className="text-right">Vlr Unit</TableHead>
+                        <TableHead className="text-right">Desc</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {formEdicao.itens.map((i, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>{i.descricao}</TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              className="w-20 text-right"
+                              value={i.quantidade}
+                              onChange={(e) =>
+                                alterarItemEdicao(idx, "quantidade", e.target.value)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="w-28 text-right"
+                              value={i.valor_unitario}
+                              onChange={(e) =>
+                                alterarItemEdicao(idx, "valor_unitario", e.target.value)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="w-24 text-right"
+                              value={i.desconto}
+                              onChange={(e) =>
+                                alterarItemEdicao(idx, "desconto", e.target.value)
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {brl(i.quantidade * i.valor_unitario - i.desconto)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removerItemEdicao(idx)}
+                            >
+                              <Trash2 className="text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total estimado</p>
+                <p className="text-xl font-semibold">
+                  {brl(
+                    formEdicao.itens.reduce(
+                      (s, i) => s + (i.quantidade * i.valor_unitario - i.desconto),
+                      0,
+                    ),
+                  )}
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setModoEdicao(false)}
+                  disabled={atualizarOrdem.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => atualizarOrdem.mutate()}
+                  disabled={atualizarOrdem.isPending}
+                >
+                  Salvar alterações
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
