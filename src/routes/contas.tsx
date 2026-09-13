@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -120,6 +121,27 @@ function Contas() {
   const [novaCategoria, setNovaCategoria] = useState("");
   const [catOpen, setCatOpen] = useState(false);
 
+  const [ratear, setRatear] = useState(false);
+  const [rateio, setRateio] = useState<{ categoria: string; valor: string }[]>([
+    { categoria: "", valor: "" },
+    { categoria: "", valor: "" },
+  ]);
+
+  const { data: rateios = [] } = useQuery({
+    queryKey: ["conta-rateios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("conta_rateios")
+        .select("id, conta_id, categoria, valor");
+      if (error) throw error;
+      return data as { id: string; conta_id: string; categoria: string; valor: number }[];
+    },
+  });
+
+  const totalTitulo = (Number(form.valor) || 0) + (Number(form.valor_juros) || 0);
+  const somaRateio = rateio.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+  const diferenca = Math.round((totalTitulo - somaRateio) * 100) / 100;
+
   const salvarCategoria = useMutation({
     mutationFn: async () => {
       const nome = novaCategoria.trim();
@@ -147,25 +169,61 @@ function Contas() {
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição do título.");
       if (!form.vencimento) throw new Error("Informe o vencimento.");
-      const { error } = await supabase.from("contas").insert({
-        tipo: form.tipo,
-        descricao: form.descricao.trim(),
-        parceiro: form.parceiro || null,
-        categoria: form.categoria || null,
-        valor: Number(form.valor) || 0,
-        valor_juros: Number(form.valor_juros) || 0,
-        vencimento: form.vencimento,
-        status: "aberto",
-        observacoes: form.observacoes || null,
-        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
-      });
+
+      const linhas = rateio
+        .map((r) => ({ categoria: r.categoria.trim(), valor: Number(r.valor) || 0 }))
+        .filter((r) => r.categoria && r.valor > 0);
+
+      if (ratear) {
+        if (linhas.length < 2) throw new Error("Informe ao menos duas categorias no rateio.");
+        if (Math.abs(diferenca) > 0.005)
+          throw new Error(
+            `A soma das categorias (${brl(somaRateio)}) precisa bater com o total do título (${brl(totalTitulo)}).`,
+          );
+      }
+
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const { data: criada, error } = await supabase
+        .from("contas")
+        .insert({
+          tipo: form.tipo,
+          descricao: form.descricao.trim(),
+          parceiro: form.parceiro || null,
+          categoria: ratear ? "Rateio" : form.categoria || null,
+          valor: Number(form.valor) || 0,
+          valor_juros: Number(form.valor_juros) || 0,
+          vencimento: form.vencimento,
+          status: "aberto",
+          observacoes: form.observacoes || null,
+          created_by: uid,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      if (ratear && criada) {
+        const { error: err2 } = await supabase.from("conta_rateios").insert(
+          linhas.map((l) => ({
+            conta_id: criada.id,
+            categoria: l.categoria,
+            valor: l.valor,
+            created_by: uid,
+          })),
+        );
+        if (err2) throw err2;
+      }
     },
     onSuccess: () => {
       toast.success("Título lançado!");
       setForm(vazio);
+      setRatear(false);
+      setRateio([
+        { categoria: "", valor: "" },
+        { categoria: "", valor: "" },
+      ]);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["conta-rateios"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -254,6 +312,7 @@ function Contas() {
               <Field label="Descrição" className="sm:col-span-2">
                 <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
               </Field>
+              {!ratear && (
               <Field label="Categoria">
                 <div className="flex gap-1">
                   <Select value={form.categoria} onValueChange={set("categoria")}>
@@ -303,6 +362,7 @@ function Contas() {
                   </Dialog>
                 </div>
               </Field>
+              )}
               <Field label="Valor da parcela (R$)">
                 <Input
                   type="number"
@@ -329,6 +389,92 @@ function Contas() {
                   onChange={(e) => set("vencimento")(e.target.value)}
                 />
               </Field>
+              <div className="rounded-lg border p-3 sm:col-span-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Rateio de categorias</p>
+                    <p className="text-xs text-muted-foreground">
+                      Um único pagamento dividido entre várias categorias no DRE e nos relatórios.
+                    </p>
+                  </div>
+                  <Switch checked={ratear} onCheckedChange={setRatear} aria-label="Ativar rateio" />
+                </div>
+
+                {ratear && (
+                  <div className="mt-3 space-y-2">
+                    {rateio.map((linha, i) => (
+                      <div key={i} className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <Select
+                            value={linha.categoria}
+                            onValueChange={(v) =>
+                              setRateio((r) =>
+                                r.map((x, j) => (j === i ? { ...x, categoria: v } : x)),
+                              )
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Categoria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categorias
+                                .filter((c) => c.tipo === "ambas" || c.tipo === form.tipo)
+                                .map((c) => (
+                                  <SelectItem key={c.id} value={c.nome}>
+                                    {c.nome}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Input
+                          className="w-32"
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={linha.valor}
+                          onChange={(e) =>
+                            setRateio((r) =>
+                              r.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)),
+                            )
+                          }
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Remover linha"
+                          onClick={() => setRateio((r) => r.filter((_, j) => j !== i))}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRateio((r) => [...r, { categoria: "", valor: "" }])}
+                      >
+                        <Plus /> Adicionar categoria
+                      </Button>
+                      <p
+                        className={
+                          Math.abs(diferenca) > 0.005
+                            ? "text-xs font-medium text-destructive"
+                            : "text-xs font-medium text-emerald-600"
+                        }
+                      >
+                        Rateado {brl(somaRateio)} de {brl(totalTitulo)}
+                        {Math.abs(diferenca) > 0.005
+                          ? ` — faltam ${brl(diferenca)}`
+                          : " — valores conferem"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
               <Field label="Observações" className="sm:col-span-2">
                 <Textarea
                   rows={3}
@@ -355,6 +501,7 @@ function Contas() {
           <Lista
             titulo={`Em aberto: ${brl(soma(pagar))}`}
             itens={pagar}
+            rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
             onExcluir={(id) => excluir.mutate(id)}
           />
@@ -363,6 +510,7 @@ function Contas() {
           <Lista
             titulo={`Em aberto: ${brl(soma(receber))}`}
             itens={receber}
+            rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
             onExcluir={(id) => excluir.mutate(id)}
           />
@@ -386,11 +534,13 @@ type Conta = {
 function Lista({
   titulo,
   itens,
+  rateios = [],
   onBaixar,
   onExcluir,
 }: {
   titulo: string;
   itens: Conta[];
+  rateios?: { conta_id: string; categoria: string; valor: number }[];
   onBaixar: (id: string) => void;
   onExcluir: (id: string) => void;
 }) {
@@ -419,7 +569,18 @@ function Lista({
               const vencido = c.status !== "pago" && c.vencimento < hoje;
               return (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.descricao}</TableCell>
+                  <TableCell className="font-medium">
+                    {c.descricao}
+                    {rateios.some((r) => r.conta_id === c.id) && (
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        Rateio:{" "}
+                        {rateios
+                          .filter((r) => r.conta_id === c.id)
+                          .map((r) => `${r.categoria} ${brl(Number(r.valor))}`)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{c.parceiro ?? "—"}</TableCell>
                   <TableCell className={vencido ? "text-destructive" : undefined}>
                     {new Date(`${c.vencimento}T00:00:00`).toLocaleDateString("pt-BR")}

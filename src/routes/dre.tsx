@@ -83,6 +83,30 @@ function Dre() {
     },
   });
 
+  const { data: contasPagas = [] } = useQuery({
+    queryKey: ["contas-dre"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select("id, categoria, valor, valor_juros, data_pagamento, vencimento, status")
+        .eq("tipo", "pagar")
+        .eq("status", "pago");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: rateios = [] } = useQuery({
+    queryKey: ["conta-rateios-dre"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("conta_rateios")
+        .select("conta_id, categoria, valor");
+      if (error) throw error;
+      return data as { conta_id: string; categoria: string; valor: number }[];
+    },
+  });
+
   const { data: funcionarios = [] } = useQuery({
     queryKey: ["funcionarios-dre"],
     queryFn: async () => {
@@ -109,9 +133,35 @@ function Dre() {
     );
     const lucroBruto = faturamentoLiquido - cmv;
 
-    const despesasFixas = lancamentos
+    const despesasLancamentos = lancamentos
       .filter((l) => l.tipo_fluxo === "despesa" && noPeriodo(l.data_competencia))
       .reduce((s, l) => s + Number(l.valor), 0);
+
+    // Contas a pagar quitadas: uma saída no caixa, mas quebradas por categoria no DRE.
+    const porCategoria = new Map<string, number>();
+    const somaCat = (cat: string, v: number) =>
+      porCategoria.set(cat, (porCategoria.get(cat) ?? 0) + v);
+
+    for (const c of contasPagas) {
+      const ref = c.data_pagamento ?? c.vencimento;
+      if (!ref || !noPeriodo(ref)) continue;
+      const total = Number(c.valor ?? 0) + Number(c.valor_juros ?? 0);
+      const linhas = rateios.filter((r) => r.conta_id === c.id);
+      if (linhas.length > 0) {
+        for (const l of linhas) somaCat(l.categoria, Number(l.valor) || 0);
+        const resto = total - linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+        if (Math.abs(resto) > 0.005) somaCat(c.categoria ?? "Sem categoria", resto);
+      } else {
+        somaCat(c.categoria ?? "Sem categoria", total);
+      }
+    }
+
+    const despesasContas = [...porCategoria.values()].reduce((s, v) => s + v, 0);
+    const despesasFixas = despesasLancamentos + despesasContas;
+    const categorias = [...porCategoria.entries()]
+      .map(([categoria, valor]) => ({ categoria, valor }))
+      .sort((a, b) => b.valor - a.valor);
+
 
     const salarios = funcionarios.reduce((s, f) => s + Number(f.salario_base), 0);
     // Comissão estimada: 3% do faturamento bruto do período como proxy de comissões.
@@ -128,12 +178,13 @@ function Dre() {
       cmv,
       lucroBruto,
       despesasFixas,
+      categorias,
       folha,
       resultado,
       base,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendas, lancamentos, funcionarios, visao, ano, mes]);
+  }, [vendas, lancamentos, contasPagas, rateios, funcionarios, visao, ano, mes]);
 
   const evolucao = useMemo(() => {
     const porMes: Record<string, { faturamento: number; custo: number; despesa: number }> = {};
@@ -248,6 +299,22 @@ function Dre() {
           ))}
         </CardContent>
       </Card>
+
+      {linha.categorias.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Despesas por categoria (com rateio)</CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            {linha.categorias.map((c) => (
+              <div key={c.categoria} className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-muted-foreground">{c.categoria}</span>
+                <span className="text-sm tabular-nums">{brl(c.valor)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
