@@ -311,6 +311,7 @@ function Contas() {
               <Field label="Descrição" className="sm:col-span-2">
                 <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
               </Field>
+              {!ratear && (
               <Field label="Categoria">
                 <div className="flex gap-1">
                   <Select value={form.categoria} onValueChange={set("categoria")}>
