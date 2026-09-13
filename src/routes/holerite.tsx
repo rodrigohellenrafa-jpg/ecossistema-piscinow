@@ -118,12 +118,8 @@ function Holerite() {
     },
   });
 
-  const funcionariosFiltrados = funcionarios.filter(
-    (f) => funcionarioId === "todos" || f.id === funcionarioId,
-  );
-
-  const holerites = useMemo(() => {
-    return funcionariosFiltrados.map((f) => {
+  const holeritesTodos = useMemo(() => {
+    return funcionarios.map((f) => {
       const vendasFunc = vendas.filter((v) => v.vendedor_id === f.id);
       const linhasVenda = vendasFunc.map((v) => {
         const itensVenda = itens.filter((i) => i.venda_id === v.id);
