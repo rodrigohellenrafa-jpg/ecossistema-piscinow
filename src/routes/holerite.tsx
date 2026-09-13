@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Printer } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Printer, Wallet } from "lucide-react";
+import { toast } from "sonner";
+
 
 import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
@@ -24,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR } from "@/lib/erp";
+import { brl, dataBR, hojeISO, mesSeguinte, provisaoFolha, quintoDiaUtil } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 
 export const Route = createFileRoute("/holerite")({
@@ -56,9 +58,13 @@ function mesAtualISO() {
   return new Date().toISOString().slice(0, 7);
 }
 
+const mesBR = (mesISO: string) => `${mesISO.slice(5, 7)}/${mesISO.slice(0, 4)}`;
+
 function Holerite() {
+  const qc = useQueryClient();
   const [mes, setMes] = useState(mesAtualISO());
   const [funcionarioId, setFuncionarioId] = useState("todos");
+
 
   const { data: funcionarios = [] } = useQuery({
     queryKey: ["funcionarios-holerite"],
@@ -112,12 +118,8 @@ function Holerite() {
     },
   });
 
-  const funcionariosFiltrados = funcionarios.filter(
-    (f) => funcionarioId === "todos" || f.id === funcionarioId,
-  );
-
-  const holerites = useMemo(() => {
-    return funcionariosFiltrados.map((f) => {
+  const holeritesTodos = useMemo(() => {
+    return funcionarios.map((f) => {
       const vendasFunc = vendas.filter((v) => v.vendedor_id === f.id);
       const linhasVenda = vendasFunc.map((v) => {
         const itensVenda = itens.filter((i) => i.venda_id === v.id);
@@ -161,7 +163,76 @@ function Holerite() {
         liquido,
       };
     });
-  }, [funcionariosFiltrados, vendas, itens]);
+  }, [funcionarios, vendas, itens]);
+
+  const holerites = holeritesTodos.filter(
+    (h) => funcionarioId === "todos" || h.funcionario.id === funcionarioId,
+  );
+
+  // Folha entra no Contas a Pagar 7 dias antes do 5º dia útil do mês seguinte.
+  const mesPagamento = mesSeguinte(mes);
+  const vencimentoFolha = quintoDiaUtil(mesPagamento);
+  const dataProvisao = provisaoFolha(mesPagamento);
+  const marcador = (id: string) => `folha:${mes}:${id}`;
+
+  const { data: folhaLancada = [] } = useQuery({
+    queryKey: ["folha-contas", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select("id, observacoes")
+        .eq("categoria", "Folha de pagamento")
+        .like("observacoes", `folha:${mes}:%`);
+      if (error) throw error;
+      return data as { id: string; observacoes: string | null }[];
+    },
+  });
+
+  const pendentes = holeritesTodos.filter(
+    (h) =>
+      h.funcionario.ativo &&
+      h.liquido > 0 &&
+      !folhaLancada.some((c) => c.observacoes === marcador(h.funcionario.id)),
+  );
+
+  const lancarFolha = useMutation({
+    mutationFn: async () => {
+      if (pendentes.length === 0) throw new Error("Folha deste mês já está lançada.");
+      const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const { error } = await supabase.from("contas").insert(
+        pendentes.map((h) => ({
+          tipo: "pagar",
+          descricao: `Folha ${mesBR(mes)} — ${h.funcionario.nome}`,
+          parceiro: h.funcionario.nome,
+          categoria: "Folha de pagamento",
+          valor: Number(h.liquido.toFixed(2)),
+          valor_juros: 0,
+          vencimento: vencimentoFolha,
+          status: "aberto",
+          observacoes: marcador(h.funcionario.id),
+          created_by: userId,
+        })),
+      );
+      if (error) throw error;
+      return pendentes.length;
+    },
+    onSuccess: (qtd) => {
+      toast.success(`${qtd} título(s) de folha lançados em Contas a Pagar.`);
+      qc.invalidateQueries({ queryKey: ["folha-contas", mes] });
+      qc.invalidateQueries({ queryKey: ["contas"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const autoRef = useRef<string>("");
+  useEffect(() => {
+    if (autoRef.current === mes) return;
+    if (hojeISO() < dataProvisao) return;
+    if (pendentes.length === 0) return;
+    autoRef.current = mes;
+    lancarFolha.mutate();
+  }, [mes, dataProvisao, pendentes.length]);
+
 
   return (
     <div className="space-y-6">
@@ -181,6 +252,29 @@ function Holerite() {
           </Button>
         }
       />
+
+      <Card className="print:hidden">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+          <div className="text-sm">
+            <p className="font-medium">Folha {mesBR(mes)} no Contas a Pagar</p>
+            <p className="text-muted-foreground">
+              Vencimento no 5º dia útil ({dataBR(vencimentoFolha)}) — lançamento automático a partir de{" "}
+              {dataBR(dataProvisao)}.
+            </p>
+            <p className="text-muted-foreground">
+              {pendentes.length === 0
+                ? "Todos os títulos desta folha já foram lançados."
+                : `${pendentes.length} funcionário(s) ainda sem título lançado.`}
+            </p>
+          </div>
+          <Button
+            onClick={() => lancarFolha.mutate()}
+            disabled={pendentes.length === 0 || lancarFolha.isPending}
+          >
+            <Wallet /> Lançar folha agora
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card className="print:hidden">
         <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
