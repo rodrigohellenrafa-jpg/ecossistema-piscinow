@@ -339,6 +339,47 @@ export type Database = {
         }
         Relationships: []
       }
+      conta_rateios: {
+        Row: {
+          categoria: string
+          conta_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          observacoes: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          categoria: string
+          conta_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          categoria?: string
+          conta_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conta_rateios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contas: {
         Row: {
           categoria: string | null
