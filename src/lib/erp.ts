@@ -33,6 +33,36 @@ export const addDiasUteis = (inicioISO: string, dias: number) => {
   return d.toISOString().slice(0, 10);
 };
 
+/** Quinto dia útil do mês informado (YYYY-MM). */
+export const quintoDiaUtil = (mesISO: string) => {
+  const [ano, mes] = mesISO.slice(0, 7).split("-").map(Number);
+  const d = new Date(ano, mes - 1, 1, 12);
+  let uteis = 0;
+  while (true) {
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) uteis++;
+    if (uteis === 5) break;
+    d.setDate(d.getDate() + 1);
+  }
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+};
+
+/** Data em que a folha deve entrar no contas a pagar: 7 dias antes do 5º dia útil. */
+export const provisaoFolha = (mesISO: string) => {
+  const d = new Date(`${quintoDiaUtil(mesISO)}T12:00:00`);
+  d.setDate(d.getDate() - 7);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Mês seguinte ao informado (YYYY-MM). */
+export const mesSeguinte = (mesISO: string) => {
+  const [ano, mes] = mesISO.slice(0, 7).split("-").map(Number);
+  const d = new Date(ano, mes, 1, 12);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
 export const diasAte = (iso: string | null | undefined) => {
   if (!iso) return null;
   const alvo = new Date(`${iso.slice(0, 10)}T12:00:00`).getTime();
