@@ -172,7 +172,8 @@ function Dre() {
     const salarios = funcionarios.reduce((s, f) => s + Number(f.salario_base), 0);
     // Comissão estimada: 3% do faturamento bruto do período como proxy de comissões.
     const comissoesEstimadas = faturamentoBruto * 0.03;
-    const folha = (visao === "anual" ? salarios * 12 : salarios) + comissoesEstimadas;
+    const mesesFolha = visao === "anual" ? 12 : visao === "trimestral" ? 3 : visao === "personalizado" ? Math.max(0, (Number(fim.slice(0, 4)) - Number(inicio.slice(0, 4))) * 12 + Number(fim.slice(5, 7)) - Number(inicio.slice(5, 7)) + 1) : 1;
+    const folha = salarios * mesesFolha + comissoesEstimadas;
 
     const resultado = lucroBruto - despesasFixas - folha;
 
