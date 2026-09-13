@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR } from "@/lib/erp";
+import { brl, dataBR, hojeISO, mesSeguinte, provisaoFolha, quintoDiaUtil } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 
 export const Route = createFileRoute("/holerite")({
@@ -58,9 +58,13 @@ function mesAtualISO() {
   return new Date().toISOString().slice(0, 7);
 }
 
+const mesBR = (mesISO: string) => `${mesISO.slice(5, 7)}/${mesISO.slice(0, 4)}`;
+
 function Holerite() {
+  const qc = useQueryClient();
   const [mes, setMes] = useState(mesAtualISO());
   const [funcionarioId, setFuncionarioId] = useState("todos");
+
 
   const { data: funcionarios = [] } = useQuery({
     queryKey: ["funcionarios-holerite"],
