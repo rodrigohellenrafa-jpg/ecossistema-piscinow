@@ -168,25 +168,61 @@ function Contas() {
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição do título.");
       if (!form.vencimento) throw new Error("Informe o vencimento.");
-      const { error } = await supabase.from("contas").insert({
-        tipo: form.tipo,
-        descricao: form.descricao.trim(),
-        parceiro: form.parceiro || null,
-        categoria: form.categoria || null,
-        valor: Number(form.valor) || 0,
-        valor_juros: Number(form.valor_juros) || 0,
-        vencimento: form.vencimento,
-        status: "aberto",
-        observacoes: form.observacoes || null,
-        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
-      });
+
+      const linhas = rateio
+        .map((r) => ({ categoria: r.categoria.trim(), valor: Number(r.valor) || 0 }))
+        .filter((r) => r.categoria && r.valor > 0);
+
+      if (ratear) {
+        if (linhas.length < 2) throw new Error("Informe ao menos duas categorias no rateio.");
+        if (Math.abs(diferenca) > 0.005)
+          throw new Error(
+            `A soma das categorias (${brl(somaRateio)}) precisa bater com o total do título (${brl(totalTitulo)}).`,
+          );
+      }
+
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const { data: criada, error } = await supabase
+        .from("contas")
+        .insert({
+          tipo: form.tipo,
+          descricao: form.descricao.trim(),
+          parceiro: form.parceiro || null,
+          categoria: ratear ? "Rateio" : form.categoria || null,
+          valor: Number(form.valor) || 0,
+          valor_juros: Number(form.valor_juros) || 0,
+          vencimento: form.vencimento,
+          status: "aberto",
+          observacoes: form.observacoes || null,
+          created_by: uid,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      if (ratear && criada) {
+        const { error: err2 } = await supabase.from("conta_rateios").insert(
+          linhas.map((l) => ({
+            conta_id: criada.id,
+            categoria: l.categoria,
+            valor: l.valor,
+            created_by: uid,
+          })),
+        );
+        if (err2) throw err2;
+      }
     },
     onSuccess: () => {
       toast.success("Título lançado!");
       setForm(vazio);
+      setRatear(false);
+      setRateio([
+        { categoria: "", valor: "" },
+        { categoria: "", valor: "" },
+      ]);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["conta-rateios"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
