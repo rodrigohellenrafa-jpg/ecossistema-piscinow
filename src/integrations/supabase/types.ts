@@ -677,6 +677,47 @@ export type Database = {
         }
         Relationships: []
       }
+      lancamento_rateios: {
+        Row: {
+          categoria: string
+          created_at: string
+          created_by: string | null
+          id: string
+          lancamento_id: string
+          observacoes: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lancamento_id: string
+          observacoes?: string | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lancamento_id?: string
+          observacoes?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamento_rateios_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "lancamentos_financeiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lancamentos_financeiros: {
         Row: {
           categoria: string
