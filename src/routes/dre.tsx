@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { Input } from "@/components/ui/input";
 import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -57,7 +58,10 @@ const meses = [
 ];
 
 function Dre() {
-  const [visao, setVisao] = useState<"mensal" | "anual">("mensal");
+  const [visao, setVisao] = useState<"mensal" | "anual" | "trimestral" | "personalizado">("mensal");
+  const [trimestre, setTrimestre] = useState("1");
+  const [inicio, setInicio] = useState(`${anoAtual}-01-01`);
+  const [fim, setFim] = useState(`${anoAtual}-12-31`);
   const [ano, setAno] = useState(String(anoAtual));
   const [mes, setMes] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
 
@@ -120,6 +124,8 @@ function Dre() {
   });
 
   const noPeriodo = (iso: string) =>
+    visao === "personalizado" ? iso >= inicio && iso <= fim :
+    visao === "trimestral" ? iso.slice(0, 4) === ano && Math.ceil(Number(iso.slice(5, 7)) / 3) === Number(trimestre) :
     visao === "anual" ? iso.slice(0, 4) === ano : iso.slice(0, 7) === `${ano}-${mes}`;
 
   const linha = useMemo(() => {
@@ -184,7 +190,7 @@ function Dre() {
       base,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendas, lancamentos, contasPagas, rateios, funcionarios, visao, ano, mes]);
+  }, [vendas, lancamentos, contasPagas, rateios, funcionarios, visao, ano, mes, trimestre, inicio, fim]);
 
   const evolucao = useMemo(() => {
     const porMes: Record<string, { faturamento: number; custo: number; despesa: number }> = {};
@@ -230,16 +236,20 @@ function Dre() {
       <Card>
         <CardContent className="grid gap-3 pt-6 sm:grid-cols-3">
           <Field label="Visão">
-            <Select value={visao} onValueChange={(v) => setVisao(v as "mensal" | "anual")}>
+            <Select value={visao} onValueChange={(v) => setVisao(v as typeof visao)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="mensal">Mensal</SelectItem>
                 <SelectItem value="anual">Anual</SelectItem>
+                <SelectItem value="trimestral">Trimestral</SelectItem>
+                <SelectItem value="personalizado">Personalizado</SelectItem>
               </SelectContent>
             </Select>
           </Field>
+          {visao === "trimestral" && <Field label="Trimestre"><Select value={trimestre} onValueChange={setTrimestre}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[1,2,3,4].map(t => <SelectItem key={t} value={String(t)}>{t}º trimestre</SelectItem>)}</SelectContent></Select></Field>}
+          {visao === "personalizado" && <><Field label="De"><Input type="date" value={inicio} onChange={e => setInicio(e.target.value)} /></Field><Field label="Até"><Input type="date" min={inicio} value={fim} onChange={e => setFim(e.target.value)} /></Field></>}
           <Field label="Ano">
             <Select value={ano} onValueChange={setAno}>
               <SelectTrigger>
