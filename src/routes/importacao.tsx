@@ -230,7 +230,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
           wb.SheetNames.find((s) =>
             s.toLowerCase().includes(entidade.id.slice(0, 5).toLowerCase()),
           ) ?? wb.SheetNames[0];
-        carregarAba(wb, preferida);
+        if (preferida) carregarAba(wb, preferida);
         return;
       }
       if (!nome.endsWith(".csv")) {
