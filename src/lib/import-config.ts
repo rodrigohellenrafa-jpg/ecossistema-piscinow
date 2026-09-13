@@ -19,7 +19,8 @@ export interface EntidadeImport {
     | "clientes"
     | "produtos"
     | "vendas"
-    | "contas";
+    | "contas"
+    | "lancamentos_financeiros";
   campos: CampoImport[];
 }
 
@@ -53,15 +54,15 @@ export function paraDataISO(valor: unknown): string | null {
   if (valor === null || valor === undefined) return null;
   const s = String(valor).trim();
   if (!s) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
+  let iso = s;
+  const m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
   if (m) {
-    const [, d, mes, a] = m;
-    const ano = a!.length === 2 ? `20${a}` : a!;
-    return `${ano}-${mes!.padStart(2, "0")}-${d!.padStart(2, "0")}`;
+    const [, d = "", mes = "", a = ""] = m;
+    iso = `${a.length === 2 ? `20${a}` : a}-${mes.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  const dt = new Date(s);
-  return Number.isNaN(dt.getTime()) ? null : dt.toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const dt = new Date(`${iso}T00:00:00Z`);
+  return Number.isNaN(dt.getTime()) || dt.toISOString().slice(0, 10) !== iso ? null : iso;
 }
 
 export function paraBooleano(valor: unknown): boolean {
@@ -160,20 +161,58 @@ export const ENTIDADES: EntidadeImport[] = [
   },
   {
     id: "financeiro",
-    titulo: "Histórico Financeiro",
+    titulo: "Contas a Pagar e Receber em Lote",
     descricao: "Contas a pagar e a receber com vencimento e baixa.",
     tabela: "contas",
     chave: "descricao",
     campos: [
-      { coluna: "tipo", rotulo: "Tipo", tipo: "texto", aliases: ["pagar receber", "natureza"] },
+      { coluna: "tipo", rotulo: "Tipo", tipo: "texto", aliases: ["pagar receber", "natureza"], obrigatorio: true },
       { coluna: "descricao", rotulo: "Descrição", tipo: "texto", aliases: ["historico", "titulo", "lancamento"], obrigatorio: true },
+      { coluna: "valor_juros", rotulo: "Juros", tipo: "moeda", aliases: ["juros"] },
       { coluna: "parceiro", rotulo: "Fornecedor / Cliente", tipo: "texto", aliases: ["fornecedor", "cliente", "favorecido"] },
       { coluna: "categoria", rotulo: "Categoria", tipo: "texto", aliases: ["plano de contas", "grupo"] },
-      { coluna: "valor", rotulo: "Valor", tipo: "moeda", aliases: ["total", "montante"] },
-      { coluna: "vencimento", rotulo: "Vencimento", tipo: "data", aliases: ["data vencimento", "venc"] },
+      { coluna: "valor", rotulo: "Valor", tipo: "moeda", aliases: ["total", "montante"], obrigatorio: true },
+      { coluna: "vencimento", rotulo: "Vencimento", tipo: "data", aliases: ["data vencimento", "venc"], obrigatorio: true },
       { coluna: "status", rotulo: "Status", tipo: "texto", aliases: ["situacao"] },
       { coluna: "data_pagamento", rotulo: "Data de pagamento", tipo: "data", aliases: ["pagamento", "baixa", "data baixa"] },
       { coluna: "observacoes", rotulo: "Observações", tipo: "texto", aliases: ["obs"] },
     ],
   },
+  {
+    id: "lancamentos",
+    titulo: "Lançamentos Financeiros em Lote",
+    descricao: "Receitas e despesas do fluxo de caixa.",
+    tabela: "lancamentos_financeiros",
+    campos: [
+      { coluna: "tipo_fluxo", rotulo: "Tipo (receita/despesa)", tipo: "texto", aliases: ["tipo", "natureza"], obrigatorio: true },
+      { coluna: "descricao", rotulo: "Descrição", tipo: "texto", aliases: ["historico", "titulo"], obrigatorio: true },
+      { coluna: "categoria", rotulo: "Categoria", tipo: "texto", aliases: ["plano de contas"], obrigatorio: true },
+      { coluna: "valor", rotulo: "Valor", tipo: "moeda", aliases: ["total"], obrigatorio: true },
+      { coluna: "data_competencia", rotulo: "Competência", tipo: "data", aliases: ["data", "competencia"], obrigatorio: true },
+      { coluna: "vencimento", rotulo: "Vencimento", tipo: "data", aliases: ["data vencimento"] },
+      { coluna: "data_pagamento", rotulo: "Data de pagamento", tipo: "data", aliases: ["baixa"] },
+      { coluna: "status", rotulo: "Status", tipo: "texto", aliases: ["situacao"] },
+      { coluna: "conta_bancaria", rotulo: "Conta bancária", tipo: "texto", aliases: ["banco"] },
+      { coluna: "forma_pagamento", rotulo: "Forma de pagamento", tipo: "texto", aliases: ["forma"] },
+      { coluna: "observacoes", rotulo: "Observações", tipo: "texto", aliases: ["obs"] },
+    ],
+  },
 ];
+
+export function normalizarFinanceiro(tabela: string, reg: Record<string, unknown>) {
+  if (!["contas", "lancamentos_financeiros"].includes(tabela)) return reg;
+  const contas = tabela === "contas";
+  const campo = contas ? "tipo" : "tipo_fluxo";
+  const tipo = norm(String(reg[campo] ?? ""));
+  reg[campo] = ["pagar", "contasapagar", "apagar", "despesa", "saida"].includes(tipo)
+    ? (contas ? "pagar" : "despesa")
+    : ["receber", "contasareceber", "areceber", "receita", "entrada"].includes(tipo)
+      ? (contas ? "receber" : "receita") : tipo;
+  const status = norm(String(reg.status ?? ""));
+  reg.status = ["pago", "recebido", "baixado", "realizado"].includes(status)
+    ? (contas ? "pago" : "Pago")
+    : ["", "aberto", "pendente", "previsto"].includes(status)
+      ? (contas ? "aberto" : "Pendente") : status;
+  return reg;
+}
+

@@ -38,6 +38,7 @@ import {
   ENTIDADES,
   acharCabecalho,
   converter,
+  normalizarFinanceiro,
   type EntidadeImport,
 } from "@/lib/import-config";
 
@@ -79,7 +80,7 @@ function Importacao() {
         </p>
       </div>
 
-      <Tabs defaultValue={ENTIDADES[0]!.id}>
+      <Tabs defaultValue={ENTIDADES[0]?.id ?? "financeiro"}>
         <TabsList className="flex h-auto flex-wrap justify-start gap-1">
           {ENTIDADES.map((e) => (
             <TabsTrigger key={e.id} value={e.id} className="text-xs sm:text-sm">
@@ -112,6 +113,8 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
   const [mapaManual, setMapaManual] = useState<Record<string, string>>({});
   const [dragging, setDragging] = useState(false);
   const [progresso, setProgresso] = useState<number | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const enviados = useRef(new Set<number>());
   const [importados, setImportados] = useState(0);
   const [loteAtual, setLoteAtual] = useState(0);
   const [totalLotes, setTotalLotes] = useState(0);
@@ -167,6 +170,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
 
   const aplicarDados = useCallback(
     (nome: string, campos: string[], dados: Linha[], brutas: number) => {
+      enviados.current.clear();
       setCabecalhos(campos.map((f) => f.trim()));
       setLinhas(dados);
       setMapaManual({});
@@ -225,8 +229,8 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
         const preferida =
           wb.SheetNames.find((s) =>
             s.toLowerCase().includes(entidade.id.slice(0, 5).toLowerCase()),
-          ) ?? wb.SheetNames[0]!;
-        carregarAba(wb, preferida);
+          ) ?? wb.SheetNames[0];
+        if (preferida) carregarAba(wb, preferida);
         return;
       }
       if (!nome.endsWith(".csv")) {
@@ -269,9 +273,9 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
           const valor = converter(campo.tipo, linha[origem]);
           if (valor !== null) reg[campo.coluna] = valor;
         }
-        return reg;
+        return normalizarFinanceiro(entidade.tabela, reg);
       }),
-    [linhas, mapa],
+    [linhas, mapa, entidade.tabela],
   );
 
   async function validar() {
@@ -318,6 +322,18 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
         }
       }
     });
+
+    if (["contas", "lancamentos_financeiros"].includes(entidade.tabela)) {
+      montarRegistros(null).forEach((reg, i) => {
+        const erro = (campo: string, texto: string) => achados.push({ linha: i + 2, campo, tipo: "erro", texto });
+        const contas = entidade.tabela === "contas";
+        if (!(Number(reg.valor) > 0)) erro("Valor", "Informe um valor maior que zero.");
+        if (reg.valor_juros !== undefined && Number(reg.valor_juros) < 0) erro("Juros", "Juros não podem ser negativos.");
+        if (!(contas ? ["pagar", "receber"] : ["receita", "despesa"]).includes(String(reg[contas ? "tipo" : "tipo_fluxo"]))) erro("Tipo", contas ? "Use pagar ou receber." : "Use receita ou despesa.");
+        if (!(contas ? ["aberto", "pago"] : ["Pendente", "Pago"]).includes(String(reg.status))) erro("Status", "Use pendente ou pago.");
+        if (["pago", "Pago"].includes(String(reg.status)) && !reg.data_pagamento) erro("Data de pagamento", "Obrigatória para registros pagos.");
+      });
+    }
 
     // Duplicidade contra o que já existe no banco
     if (chave && vistos.size > 0) {
@@ -368,15 +384,16 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
   }
 
   async function processar(pularErros: boolean) {
+    if (ocupado || !problemas || (!pularErros && erros.length > 0)) return;
     if (semObrigatorio) {
       toast.error(`Falta mapear a coluna obrigatória: ${semObrigatorio.campo.rotulo}`);
       return;
     }
-    const usuario = (await supabase.auth.getUser()).data.user?.id ?? null;
+    const usuario = (await supabase.auth.getUser()).data.user?.id;
+    if (!usuario) { toast.error("Entre novamente para importar."); return; }
     const todos = montarRegistros(usuario);
-    const registros = pularErros
-      ? todos.filter((_, i) => !linhasComErro.has(i + 2))
-      : todos;
+    const indices = todos.map((_, i) => i).filter(i => !enviados.current.has(i) && (!pularErros || !linhasComErro.has(i + 2)));
+    const registros = indices.map(i => todos[i]);
 
     if (registros.length === 0) {
       toast.error("Nenhum registro válido para importar.");
@@ -389,6 +406,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
     const lote = 500;
     const total = Math.ceil(registros.length / lote);
 
+    setOcupado(true);
     setProgresso(0);
     setImportados(0);
     setLoteAtual(0);
@@ -405,6 +423,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
       const { error } = await supabase.from(entidade.tabela as never).insert(bloco as never);
 
       if (error) {
+        setOcupado(false);
         setProgresso(null);
         log("erro", `Lote ${indice}/${total} falhou: ${error.message}`);
         toast.error(`Erro no lote ${indice}: ${error.message}`);
@@ -413,6 +432,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
         return;
       }
 
+      indices.slice(i, i + lote).forEach(index => enviados.current.add(index));
       ok += bloco.length;
       setImportados(ok);
       setProgresso(Math.round((ok / registros.length) * 100));
@@ -423,6 +443,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
       .from(entidade.tabela as never)
       .select("id", { count: "exact", head: true });
     log("ok", `Importação finalizada: ${ok} registros. Total agora no ERP: ${count ?? "?"}.`);
+    setOcupado(false);
     toast.success(`${ok} registros importados em ${entidade.titulo}.`);
   }
 
@@ -436,6 +457,14 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
         <CardDescription>{entidade.descricao}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        <Button variant="outline" disabled={ocupado} onClick={() => {
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.aoa_to_sheet([entidade.campos.map(c => c.coluna)]);
+          ws["!cols"] = entidade.campos.map(() => ({ wch: 24 }));
+          XLSX.utils.book_append_sheet(wb, ws, "Lançamentos");
+          XLSX.writeFile(wb, `modelo-${entidade.id}.xlsx`);
+        }}><FileSpreadsheet /> Baixar modelo de planilha</Button>
+        <fieldset disabled={ocupado} className="space-y-5 min-w-0">
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -566,7 +595,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
                     <TableRow key={i}>
                       {colunasPrevia.map(({ campo, origem }) => (
                         <TableCell key={campo.coluna} className="whitespace-nowrap">
-                          {String(converter(campo.tipo, linha[origem!]) ?? "—")}
+                          {String(converter(campo.tipo, linha[origem ?? ""]) ?? "—")}
                         </TableCell>
                       ))}
                     </TableRow>
@@ -671,7 +700,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
           <Button
             variant="outline"
             onClick={() => void validar()}
-            disabled={!arquivo || linhas.length === 0 || validando}
+            disabled={!arquivo || linhas.length === 0 || validando || ocupado}
           >
             {validando ? <Loader2 className="animate-spin" /> : <AlertTriangle />}
             Validar dados
@@ -679,7 +708,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
           <Button
             onClick={() => void processar(false)}
             disabled={
-              !problemas ||
+              ocupado || progresso === 100 || !problemas ||
               erros.length > 0 ||
               !!semObrigatorio ||
               (progresso !== null && progresso < 100)
@@ -706,6 +735,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
             </span>
           )}
         </div>
+        </fieldset>
       </CardContent>
     </Card>
   );
