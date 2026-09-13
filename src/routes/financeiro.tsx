@@ -213,10 +213,24 @@ function Financeiro() {
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição.");
-      if (!form.categoria.trim()) throw new Error("Informe a categoria.");
-      const { error } = await supabase.from("lancamentos_financeiros").insert({
+      if (!ratear && !form.categoria.trim()) throw new Error("Informe a categoria.");
+
+      const linhas = rateio
+        .map((r) => ({ categoria: r.categoria.trim(), valor: Number(r.valor) || 0 }))
+        .filter((r) => r.categoria && r.valor > 0);
+
+      if (ratear) {
+        if (linhas.length < 2) throw new Error("Informe ao menos duas categorias no rateio.");
+        if (Math.abs(diferencaRateio) > 0.005)
+          throw new Error(
+            `A soma das categorias (${brl(somaRateio)}) precisa bater com o valor do lançamento (${brl(totalLancamento)}).`,
+          );
+      }
+
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const { data: criado, error } = await supabase.from("lancamentos_financeiros").insert({
         tipo_fluxo: form.tipo_fluxo,
-        categoria: form.categoria.trim(),
+        categoria: ratear ? "Rateio" : form.categoria.trim(),
         descricao: form.descricao.trim(),
         valor: Number(form.valor) || 0,
         data_competencia: form.data_competencia || hojeISO(),
