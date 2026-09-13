@@ -178,12 +178,13 @@ function Dre() {
       cmv,
       lucroBruto,
       despesasFixas,
+      categorias,
       folha,
       resultado,
       base,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendas, lancamentos, funcionarios, visao, ano, mes]);
+  }, [vendas, lancamentos, contasPagas, rateios, funcionarios, visao, ano, mes]);
 
   const evolucao = useMemo(() => {
     const porMes: Record<string, { faturamento: number; custo: number; despesa: number }> = {};
