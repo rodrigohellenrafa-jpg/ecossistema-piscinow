@@ -300,6 +300,22 @@ function Dre() {
         </CardContent>
       </Card>
 
+      {linha.categorias.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Despesas por categoria (com rateio)</CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            {linha.categorias.map((c) => (
+              <div key={c.categoria} className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-muted-foreground">{c.categoria}</span>
+                <span className="text-sm tabular-nums">{brl(c.valor)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Evolução mensal do resultado — {ano}</CardTitle>
