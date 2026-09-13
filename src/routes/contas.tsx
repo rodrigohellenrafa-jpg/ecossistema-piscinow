@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { CentroCustoField } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,8 @@ export const Route = createFileRoute("/contas")({
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const vazio = {
+  obra_id: "",
+  numero_documento: "",
   tipo: "pagar",
   descricao: "",
   parceiro: "",
@@ -195,6 +198,8 @@ function Contas() {
           vencimento: form.vencimento,
           status: "aberto",
           observacoes: form.observacoes || null,
+          obra_id: form.obra_id || null,
+          numero_documento: form.numero_documento || null,
           created_by: uid,
         })
         .select("id")
@@ -475,6 +480,8 @@ function Contas() {
                   </div>
                 )}
               </div>
+              <CentroCustoField value={form.obra_id} onChange={v=>setForm(f=>({...f,obra_id:v}))} />
+              <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
               <Field label="Observações" className="sm:col-span-2">
                 <Textarea
                   rows={3}
