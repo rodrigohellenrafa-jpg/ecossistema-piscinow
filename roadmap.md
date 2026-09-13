@@ -6,5 +6,8 @@
 - [ ] Compras/estoque: agrupamento, conversão, ajustes e documentos.
 - [ ] Operações: painel, clima, serviços, materiais e horas.
 - [ ] Equipe externa: PWA, atualização compartilhada, aceite e fotos.
-- [ ] RH: holerites individuais e em lote.
+- [x] RH: holerites individuais e em lote, com quebra de página e assinatura.
 - [ ] Validar fluxos, permissões e visualização no celular.
+
+Entregas parciais: expansão de modais, períodos do DRE, recorrências mensais, vínculo financeiro à obra/documento, busca de OS e registro de materiais/horas.
+Validação: páginas autenticadas abriram sem erros; testes de gravação, fotos, clima e demais itens ainda pendentes.

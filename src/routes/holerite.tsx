@@ -306,8 +306,9 @@ function Holerite() {
 
       <div className="space-y-8">
         {holerites.map((h) => (
-          <Card key={h.funcionario.id} className="break-inside-avoid">
+          <Card key={h.funcionario.id} className="break-inside-avoid print:break-before-page">
             <CardHeader>
+              <div className="hidden print:flex items-center gap-4"><img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-20 w-auto" /><div><p className="font-semibold">Splash Jardim do Trevo</p><p>Recibo de pagamento — {mesBR(mes)}</p></div></div>
               <CardTitle>
                 {h.funcionario.nome} — {h.funcionario.cargo}
               </CardTitle>
@@ -336,6 +337,7 @@ function Holerite() {
                 <span className="text-lg font-semibold tabular-nums">{brl(h.liquido)}</span>
               </div>
 
+              <div className="hidden print:flex justify-between gap-8 pt-12"><span className="border-t pt-2">Assinatura do funcionário</span><span className="border-t pt-2">Data: ____/____/________</span></div>
               {h.linhasVenda.length > 0 && (
                 <div>
                   <p className="mb-2 text-sm font-medium">Vendas consideradas no mês</p>

@@ -384,15 +384,19 @@ export type Database = {
         Row: {
           categoria: string | null
           cliente_id: string | null
+          competencia_recorrencia: string | null
           condicao_id: string | null
           created_at: string
           created_by: string | null
           data_pagamento: string | null
           descricao: string
           id: string
+          numero_documento: string | null
+          obra_id: string | null
           observacoes: string | null
           ordem_compra_id: string | null
           parceiro: string | null
+          recorrencia_id: string | null
           status: string
           tipo: string
           updated_at: string
@@ -404,15 +408,19 @@ export type Database = {
         Insert: {
           categoria?: string | null
           cliente_id?: string | null
+          competencia_recorrencia?: string | null
           condicao_id?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
           descricao: string
           id?: string
+          numero_documento?: string | null
+          obra_id?: string | null
           observacoes?: string | null
           ordem_compra_id?: string | null
           parceiro?: string | null
+          recorrencia_id?: string | null
           status?: string
           tipo?: string
           updated_at?: string
@@ -424,15 +432,19 @@ export type Database = {
         Update: {
           categoria?: string | null
           cliente_id?: string | null
+          competencia_recorrencia?: string | null
           condicao_id?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
           descricao?: string
           id?: string
+          numero_documento?: string | null
+          obra_id?: string | null
           observacoes?: string | null
           ordem_compra_id?: string | null
           parceiro?: string | null
+          recorrencia_id?: string | null
           status?: string
           tipo?: string
           updated_at?: string
@@ -450,6 +462,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contas_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contas_ordem_compra_id_fkey"
             columns: ["ordem_compra_id"]
             isOneToOne: false
@@ -457,10 +476,73 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contas_recorrencia_id_fkey"
+            columns: ["recorrencia_id"]
+            isOneToOne: false
+            referencedRelation: "despesas_recorrentes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contas_venda_id_fkey"
             columns: ["venda_id"]
             isOneToOne: false
             referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      despesas_recorrentes: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          created_at: string
+          created_by: string
+          descricao: string
+          dia_vencimento: number
+          fim: string | null
+          id: string
+          inicio: string
+          obra_id: string | null
+          parceiro: string | null
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          created_at?: string
+          created_by?: string
+          descricao: string
+          dia_vencimento: number
+          fim?: string | null
+          id?: string
+          inicio: string
+          obra_id?: string | null
+          parceiro?: string | null
+          updated_at?: string
+          valor: number
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          created_at?: string
+          created_by?: string
+          descricao?: string
+          dia_vencimento?: number
+          fim?: string | null
+          id?: string
+          inicio?: string
+          obra_id?: string | null
+          parceiro?: string | null
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "despesas_recorrentes_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
             referencedColumns: ["id"]
           },
         ]
@@ -732,6 +814,8 @@ export type Database = {
           fornecedor_id: string | null
           funcionario_id: string | null
           id: string
+          numero_documento: string | null
+          obra_id: string | null
           observacoes: string | null
           status: string
           tipo_fluxo: string
@@ -753,6 +837,8 @@ export type Database = {
           fornecedor_id?: string | null
           funcionario_id?: string | null
           id?: string
+          numero_documento?: string | null
+          obra_id?: string | null
           observacoes?: string | null
           status?: string
           tipo_fluxo?: string
@@ -774,6 +860,8 @@ export type Database = {
           fornecedor_id?: string | null
           funcionario_id?: string | null
           id?: string
+          numero_documento?: string | null
+          obra_id?: string | null
           observacoes?: string | null
           status?: string
           tipo_fluxo?: string
@@ -795,6 +883,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_financeiros_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
             referencedColumns: ["id"]
           },
           {
@@ -1316,6 +1411,8 @@ export type Database = {
       }
       ordens_servico: {
         Row: {
+          aceite_em: string | null
+          aceite_observacoes: string | null
           assinatura_codigo: string | null
           assinatura_documento: string | null
           assinatura_em: string | null
@@ -1328,7 +1425,9 @@ export type Database = {
           created_by: string | null
           data_agendada: string | null
           descricao: string | null
+          horas_trabalhadas: number
           id: string
+          materiais_utilizados: string | null
           numero: string | null
           prioridade: string
           responsavel: string | null
@@ -1339,6 +1438,8 @@ export type Database = {
           venda_id: string | null
         }
         Insert: {
+          aceite_em?: string | null
+          aceite_observacoes?: string | null
           assinatura_codigo?: string | null
           assinatura_documento?: string | null
           assinatura_em?: string | null
@@ -1351,7 +1452,9 @@ export type Database = {
           created_by?: string | null
           data_agendada?: string | null
           descricao?: string | null
+          horas_trabalhadas?: number
           id?: string
+          materiais_utilizados?: string | null
           numero?: string | null
           prioridade?: string
           responsavel?: string | null
@@ -1362,6 +1465,8 @@ export type Database = {
           venda_id?: string | null
         }
         Update: {
+          aceite_em?: string | null
+          aceite_observacoes?: string | null
           assinatura_codigo?: string | null
           assinatura_documento?: string | null
           assinatura_em?: string | null
@@ -1374,7 +1479,9 @@ export type Database = {
           created_by?: string | null
           data_agendada?: string | null
           descricao?: string | null
+          horas_trabalhadas?: number
           id?: string
+          materiais_utilizados?: string | null
           numero?: string | null
           prioridade?: string
           responsavel?: string | null
@@ -1824,6 +1931,7 @@ export type Database = {
           created_by: string | null
           custo_total: number
           data: string
+          endereco_entrega: string | null
           etiqueta: string | null
           forma_pagamento: string | null
           id: string
@@ -1859,6 +1967,7 @@ export type Database = {
           created_by?: string | null
           custo_total?: number
           data?: string
+          endereco_entrega?: string | null
           etiqueta?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -1894,6 +2003,7 @@ export type Database = {
           created_by?: string | null
           custo_total?: number
           data?: string
+          endereco_entrega?: string | null
           etiqueta?: string | null
           forma_pagamento?: string | null
           id?: string
@@ -1938,6 +2048,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gerar_despesas_recorrentes: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
