@@ -361,6 +361,7 @@ function Contas() {
                   </Dialog>
                 </div>
               </Field>
+              )}
               <Field label="Valor da parcela (R$)">
                 <Input
                   type="number"
