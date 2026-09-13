@@ -508,6 +508,96 @@ function Financeiro() {
                     </SelectContent>
                   </Select>
                 </Field>
+                <div className="rounded-lg border p-3 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Rateio de categorias</p>
+                      <p className="text-xs text-muted-foreground">
+                        Um único lançamento dividido entre várias categorias no DRE e nos relatórios.
+                      </p>
+                    </div>
+                    <Switch checked={ratear} onCheckedChange={setRatear} aria-label="Ativar rateio" />
+                  </div>
+
+                  {ratear && (
+                    <div className="mt-3 space-y-2">
+                      {rateio.map((linha, i) => (
+                        <div key={i} className="flex items-end gap-2">
+                          <div className="flex-1">
+                            <Select
+                              value={linha.categoria}
+                              onValueChange={(v) =>
+                                setRateio((r) =>
+                                  r.map((x, j) => (j === i ? { ...x, categoria: v } : x)),
+                                )
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Categoria" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categoriasDb
+                                  .filter(
+                                    (c) =>
+                                      c.tipo === "ambas" ||
+                                      (form.tipo_fluxo === "despesa" ? c.tipo === "pagar" : c.tipo === "receber"),
+                                  )
+                                  .map((c) => (
+                                    <SelectItem key={c.id} value={c.nome}>
+                                      {c.nome}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Input
+                            className="w-32"
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            value={linha.valor}
+                            onChange={(e) =>
+                              setRateio((r) =>
+                                r.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)),
+                              )
+                            }
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Remover linha"
+                            onClick={() => setRateio((r) => r.filter((_, j) => j !== i))}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setRateio((r) => [...r, { categoria: "", valor: "" }])}
+                        >
+                          <Plus /> Adicionar categoria
+                        </Button>
+                        <p
+                          className={
+                            Math.abs(diferencaRateio) > 0.005
+                              ? "text-xs font-medium text-destructive"
+                              : "text-xs font-medium text-emerald-600"
+                          }
+                        >
+                          Rateado {brl(somaRateio)} de {brl(totalLancamento)}
+                          {Math.abs(diferencaRateio) > 0.005
+                            ? ` — faltam ${brl(diferencaRateio)}`
+                            : " — valores conferem"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <Field label="Observações" className="sm:col-span-2">
                   <Textarea
                     value={form.observacoes}
