@@ -83,6 +83,30 @@ function Dre() {
     },
   });
 
+  const { data: contasPagas = [] } = useQuery({
+    queryKey: ["contas-dre"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select("id, categoria, valor, valor_juros, data_pagamento, vencimento, status")
+        .eq("tipo", "pagar")
+        .eq("status", "pago");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: rateios = [] } = useQuery({
+    queryKey: ["conta-rateios-dre"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("conta_rateios")
+        .select("conta_id, categoria, valor");
+      if (error) throw error;
+      return data as { conta_id: string; categoria: string; valor: number }[];
+    },
+  });
+
   const { data: funcionarios = [] } = useQuery({
     queryKey: ["funcionarios-dre"],
     queryFn: async () => {
