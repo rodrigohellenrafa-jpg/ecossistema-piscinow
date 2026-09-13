@@ -266,6 +266,22 @@ function RelatorioContas() {
         ))}
       </div>
 
+      {categoriasDespesa.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Despesas por categoria (com rateio)</CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            {categoriasDespesa.map((c) => (
+              <div key={c.categoria} className="flex items-center justify-between py-2.5">
+                <span className="text-sm text-muted-foreground">{c.categoria}</span>
+                <span className="text-sm tabular-nums">{brl(c.valor)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className={alertas.some((c) => c.dias <= 7) ? "border-destructive/50" : undefined}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
