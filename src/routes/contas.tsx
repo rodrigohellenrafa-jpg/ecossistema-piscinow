@@ -501,6 +501,7 @@ function Contas() {
           <Lista
             titulo={`Em aberto: ${brl(soma(pagar))}`}
             itens={pagar}
+            rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
             onExcluir={(id) => excluir.mutate(id)}
           />
@@ -509,6 +510,7 @@ function Contas() {
           <Lista
             titulo={`Em aberto: ${brl(soma(receber))}`}
             itens={receber}
+            rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
             onExcluir={(id) => excluir.mutate(id)}
           />
