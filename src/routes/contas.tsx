@@ -569,7 +569,18 @@ function Lista({
               const vencido = c.status !== "pago" && c.vencimento < hoje;
               return (
                 <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.descricao}</TableCell>
+                  <TableCell className="font-medium">
+                    {c.descricao}
+                    {rateios.some((r) => r.conta_id === c.id) && (
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        Rateio:{" "}
+                        {rateios
+                          .filter((r) => r.conta_id === c.id)
+                          .map((r) => `${r.categoria} ${brl(Number(r.valor))}`)
+                          .join(" · ")}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{c.parceiro ?? "—"}</TableCell>
                   <TableCell className={vencido ? "text-destructive" : undefined}>
                     {new Date(`${c.vencimento}T00:00:00`).toLocaleDateString("pt-BR")}
