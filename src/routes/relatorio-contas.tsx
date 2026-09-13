@@ -71,12 +71,24 @@ function RelatorioContas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("id,descricao,parceiro,tipo,valor,vencimento,status")
+        .select("id,descricao,parceiro,tipo,valor,valor_juros,categoria,vencimento,status")
         .order("vencimento", { ascending: true });
       if (error) throw error;
       return data;
     },
   });
+
+  const { data: rateios = [] } = useQuery({
+    queryKey: ["conta-rateios-relatorio"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("conta_rateios")
+        .select("conta_id, categoria, valor");
+      if (error) throw error;
+      return data as { conta_id: string; categoria: string; valor: number }[];
+    },
+  });
+
 
   if (isLoading) {
     return (
