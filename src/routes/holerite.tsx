@@ -254,6 +254,29 @@ function Holerite() {
       />
 
       <Card className="print:hidden">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+          <div className="text-sm">
+            <p className="font-medium">Folha {mesBR(mes)} no Contas a Pagar</p>
+            <p className="text-muted-foreground">
+              Vencimento no 5º dia útil ({dataBR(vencimentoFolha)}) — lançamento automático a partir de{" "}
+              {dataBR(dataProvisao)}.
+            </p>
+            <p className="text-muted-foreground">
+              {pendentes.length === 0
+                ? "Todos os títulos desta folha já foram lançados."
+                : `${pendentes.length} funcionário(s) ainda sem título lançado.`}
+            </p>
+          </div>
+          <Button
+            onClick={() => lancarFolha.mutate()}
+            disabled={pendentes.length === 0 || lancarFolha.isPending}
+          >
+            <Wallet /> Lançar folha agora
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="print:hidden">
         <CardContent className="grid gap-3 pt-6 sm:grid-cols-2">
           <Field label="Mês de referência">
             <input
