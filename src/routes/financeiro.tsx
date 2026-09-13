@@ -243,15 +243,35 @@ function Financeiro() {
         funcionario_id: form.funcionario_id || null,
         status: form.status,
         observacoes: form.observacoes || null,
-        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
-      });
+        created_by: uid,
+      })
+        .select("id")
+        .single();
       if (error) throw error;
+
+      if (ratear && criado) {
+        const { error: err2 } = await supabase.from("lancamento_rateios").insert(
+          linhas.map((l) => ({
+            lancamento_id: criado.id,
+            categoria: l.categoria,
+            valor: l.valor,
+            created_by: uid,
+          })),
+        );
+        if (err2) throw err2;
+      }
     },
     onSuccess: () => {
       toast.success("Lançamento criado!");
       setForm(vazio);
+      setRatear(false);
+      setRateio([
+        { categoria: "", valor: "" },
+        { categoria: "", valor: "" },
+      ]);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+      qc.invalidateQueries({ queryKey: ["lancamento-rateios"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
