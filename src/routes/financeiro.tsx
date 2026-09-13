@@ -390,9 +390,11 @@ function Financeiro() {
                     </SelectContent>
                   </Select>
                 </Field>
+                {!ratear && (
                 <Field label="Categoria">
                   <Input value={form.categoria} onChange={(e) => set("categoria")(e.target.value)} />
                 </Field>
+                )}
                 <Field label="Descrição" className="sm:col-span-2">
                   <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
                 </Field>
@@ -764,7 +766,18 @@ function Financeiro() {
                           </Badge>
                         </TableCell>
                         <TableCell>{l.categoria}</TableCell>
-                        <TableCell className="max-w-[220px] truncate">{l.descricao}</TableCell>
+                        <TableCell className="max-w-[220px] truncate">
+                          {l.descricao}
+                          {rateios.some((r) => r.lancamento_id === l.id) && (
+                            <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                              Rateio:{" "}
+                              {rateios
+                                .filter((r) => r.lancamento_id === l.id)
+                                .map((r) => `${r.categoria} ${brl(Number(r.valor))}`)
+                                .join(" · ")}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="max-w-[180px] truncate">
                           {l.venda_id ? (rotuloPedido.get(l.venda_id) ?? "Pedido") : "—"}
                         </TableCell>
