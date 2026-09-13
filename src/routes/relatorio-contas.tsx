@@ -174,6 +174,29 @@ function RelatorioContas() {
     { titulo: "Saldo previsto", valor: saldo },
   ];
 
+  // Despesas por categoria, respeitando o rateio de cada título
+  const mapaCat = new Map<string, number>();
+  for (const c of contas) {
+    if (c.tipo !== "pagar") continue;
+    const totalTitulo = (Number(c.valor) || 0) + (Number(c.valor_juros) || 0);
+    const linhasRateio = rateios.filter((r) => r.conta_id === c.id);
+    if (linhasRateio.length > 0) {
+      for (const l of linhasRateio)
+        mapaCat.set(l.categoria, (mapaCat.get(l.categoria) ?? 0) + (Number(l.valor) || 0));
+      const resto = totalTitulo - linhasRateio.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+      if (Math.abs(resto) > 0.005) {
+        const k = c.categoria ?? "Sem categoria";
+        mapaCat.set(k, (mapaCat.get(k) ?? 0) + resto);
+      }
+    } else {
+      const k = c.categoria ?? "Sem categoria";
+      mapaCat.set(k, (mapaCat.get(k) ?? 0) + totalTitulo);
+    }
+  }
+  const categoriasDespesa = [...mapaCat.entries()]
+    .map(([categoria, valor]) => ({ categoria, valor }))
+    .sort((a, b) => b.valor - a.valor);
+
   // Alertas de vencimento
   const abertas = contas.filter((c) => c.status !== "pago");
   const dias = (venc: string) =>
