@@ -534,11 +534,13 @@ type Conta = {
 function Lista({
   titulo,
   itens,
+  rateios = [],
   onBaixar,
   onExcluir,
 }: {
   titulo: string;
   itens: Conta[];
+  rateios?: { conta_id: string; categoria: string; valor: number }[];
   onBaixar: (id: string) => void;
   onExcluir: (id: string) => void;
 }) {
