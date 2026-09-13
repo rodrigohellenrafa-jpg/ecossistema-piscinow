@@ -133,9 +133,35 @@ function Dre() {
     );
     const lucroBruto = faturamentoLiquido - cmv;
 
-    const despesasFixas = lancamentos
+    const despesasLancamentos = lancamentos
       .filter((l) => l.tipo_fluxo === "despesa" && noPeriodo(l.data_competencia))
       .reduce((s, l) => s + Number(l.valor), 0);
+
+    // Contas a pagar quitadas: uma saída no caixa, mas quebradas por categoria no DRE.
+    const porCategoria = new Map<string, number>();
+    const somaCat = (cat: string, v: number) =>
+      porCategoria.set(cat, (porCategoria.get(cat) ?? 0) + v);
+
+    for (const c of contasPagas) {
+      const ref = c.data_pagamento ?? c.vencimento;
+      if (!ref || !noPeriodo(ref)) continue;
+      const total = Number(c.valor ?? 0) + Number(c.valor_juros ?? 0);
+      const linhas = rateios.filter((r) => r.conta_id === c.id);
+      if (linhas.length > 0) {
+        for (const l of linhas) somaCat(l.categoria, Number(l.valor) || 0);
+        const resto = total - linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+        if (Math.abs(resto) > 0.005) somaCat(c.categoria ?? "Sem categoria", resto);
+      } else {
+        somaCat(c.categoria ?? "Sem categoria", total);
+      }
+    }
+
+    const despesasContas = [...porCategoria.values()].reduce((s, v) => s + v, 0);
+    const despesasFixas = despesasLancamentos + despesasContas;
+    const categorias = [...porCategoria.entries()]
+      .map(([categoria, valor]) => ({ categoria, valor }))
+      .sort((a, b) => b.valor - a.valor);
+
 
     const salarios = funcionarios.reduce((s, f) => s + Number(f.salario_base), 0);
     // Comissão estimada: 3% do faturamento bruto do período como proxy de comissões.
