@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Link2, Plus, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   Bar,
@@ -152,6 +153,40 @@ function Financeiro() {
       return data;
     },
   });
+
+  const { data: categoriasDb = [] } = useQuery({
+    queryKey: ["categorias-financeiras"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categorias_financeiras")
+        .select("id, nome, tipo")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; nome: string; tipo: string }[];
+    },
+  });
+
+  const { data: rateios = [] } = useQuery({
+    queryKey: ["lancamento-rateios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lancamento_rateios")
+        .select("id, lancamento_id, categoria, valor");
+      if (error) throw error;
+      return data as { id: string; lancamento_id: string; categoria: string; valor: number }[];
+    },
+  });
+
+  const [ratear, setRatear] = useState(false);
+  const [rateio, setRateio] = useState<{ categoria: string; valor: string }[]>([
+    { categoria: "", valor: "" },
+    { categoria: "", valor: "" },
+  ]);
+
+  const totalLancamento = Number(form.valor) || 0;
+  const somaRateio = rateio.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+  const diferencaRateio = Math.round((totalLancamento - somaRateio) * 100) / 100;
 
   const { data: pedidos = [] } = useQuery({
     queryKey: ["vendas-lite"],
