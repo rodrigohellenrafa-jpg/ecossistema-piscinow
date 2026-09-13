@@ -120,6 +120,27 @@ function Contas() {
   const [novaCategoria, setNovaCategoria] = useState("");
   const [catOpen, setCatOpen] = useState(false);
 
+  const [ratear, setRatear] = useState(false);
+  const [rateio, setRateio] = useState<{ categoria: string; valor: string }[]>([
+    { categoria: "", valor: "" },
+    { categoria: "", valor: "" },
+  ]);
+
+  const { data: rateios = [] } = useQuery({
+    queryKey: ["conta-rateios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("conta_rateios")
+        .select("id, conta_id, categoria, valor");
+      if (error) throw error;
+      return data as { id: string; conta_id: string; categoria: string; valor: number }[];
+    },
+  });
+
+  const totalTitulo = (Number(form.valor) || 0) + (Number(form.valor_juros) || 0);
+  const somaRateio = rateio.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+  const diferenca = Math.round((totalTitulo - somaRateio) * 100) / 100;
+
   const salvarCategoria = useMutation({
     mutationFn: async () => {
       const nome = novaCategoria.trim();
