@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { DespesasRecorrentes } from "@/components/despesas-recorrentes";
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -363,6 +364,7 @@ function Financeiro() {
 
   return (
     <div className="space-y-6">
+      <DespesasRecorrentes />
       <PageHeader
         title="Fluxo de Caixa"
         subtitle="Lançamentos financeiros, evolução mensal e conciliação bancária."

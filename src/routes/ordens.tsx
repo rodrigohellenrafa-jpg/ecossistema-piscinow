@@ -97,6 +97,9 @@ const vazio = {
 
 function Ordens() {
   const qc = useQueryClient();
+  const [busca, setBusca] = useState("");
+  const [registro, setRegistro] = useState<{id:string; materiais:string; horas:string} | null>(null);
+  const [gravando, setGravando] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(vazio);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -113,6 +116,7 @@ function Ordens() {
 
   const { data = [] } = useQuery({
     queryKey: ["ordens"],
+    refetchInterval: 10000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ordens_servico")
@@ -140,10 +144,11 @@ function Ordens() {
     () =>
       data.filter(
         (o) =>
+          `${o.numero} ${o.cliente_nome} ${o.tipo_servico}`.toLocaleLowerCase().includes(busca.toLocaleLowerCase()) &&
           (filtroStatus === "todos" || o.status === filtroStatus) &&
           (filtroPrioridade === "todos" || o.prioridade === filtroPrioridade),
       ),
-    [data, filtroStatus, filtroPrioridade],
+    [data, filtroStatus, filtroPrioridade, busca],
   );
 
   const salvar = useMutation({
@@ -353,6 +358,7 @@ function Ordens() {
         <CardHeader>
           <CardTitle>Ordens abertas ({filtradas.length})</CardTitle>
           <div className="flex flex-wrap gap-2 pt-2">
+            <Input className="max-w-xs" placeholder="Buscar cliente, OS ou serviço" aria-label="Buscar ordens" value={busca} onChange={e=>setBusca(e.target.value)} />
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger className="w-44">
                 <SelectValue placeholder="Status" />
@@ -438,6 +444,7 @@ function Ordens() {
                       >
                         <Hammer /> Gerar obra
                       </Button>
+                      <Button variant="outline" size="sm" onClick={()=>setRegistro({id:o.id,materiais:o.materiais_utilizados ?? "",horas:String(o.horas_trabalhadas ?? 0)})}>Materiais e horas</Button>
                       <AssinaturaDialog
                         tabela="ordens_servico"
                         registroId={o.id}
@@ -461,6 +468,7 @@ function Ordens() {
         </CardContent>
       </Card>
 
+      <Dialog open={!!registro} onOpenChange={v=>{if(!v)setRegistro(null);}}><DialogContent><DialogHeader><DialogTitle>Registro de execução</DialogTitle></DialogHeader><Field label="Materiais utilizados"><Textarea value={registro?.materiais ?? ""} onChange={e=>registro && setRegistro({...registro,materiais:e.target.value})}/></Field><Field label="Horas trabalhadas"><Input type="number" min="0" step="0.25" value={registro?.horas ?? "0"} onChange={e=>registro && setRegistro({...registro,horas:e.target.value})}/></Field><Button disabled={gravando} onClick={async()=>{if(!registro)return;const horas=Number(registro.horas);if(!Number.isFinite(horas)||horas<0){toast.error("Informe horas válidas.");return;}setGravando(true);try{const {error}=await supabase.from("ordens_servico").update({materiais_utilizados:registro.materiais,horas_trabalhadas:horas}).eq("id",registro.id);if(error)throw error;await qc.invalidateQueries({queryKey:["ordens"]});setRegistro(null);toast.success("Execução registrada.");}catch(e){toast.error(e instanceof Error?e.message:"Não foi possível salvar.");}finally{setGravando(false);}}}>Salvar</Button></DialogContent></Dialog>
       <p className="text-xs text-muted-foreground">
         Acompanhe as obras geradas em{" "}
         <Link to="/logistica" className="underline">
