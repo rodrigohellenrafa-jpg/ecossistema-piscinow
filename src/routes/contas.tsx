@@ -40,6 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/contas")({
   staticData: { sitemap: false },
@@ -81,6 +82,7 @@ const vazio = {
 function Contas() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
 
   const { data = [] } = useQuery({
@@ -123,6 +125,7 @@ function Contas() {
 
   const [novaCategoria, setNovaCategoria] = useState("");
   const [catOpen, setCatOpen] = useState(false);
+  useAbrirModal("categoria", () => setCatOpen(true));
 
   const [ratear, setRatear] = useState(false);
   const [rateio, setRateio] = useState<{ categoria: string; valor: string }[]>([

@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { proximoCodigo } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/fornecedores")({
   staticData: { sitemap: false },
@@ -75,6 +76,7 @@ function Fornecedores() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Fornecedor | null>(null);
   const [form, setForm] = useState(vazio);
 

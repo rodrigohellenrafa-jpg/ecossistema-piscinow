@@ -37,6 +37,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { dataBR } from "@/lib/erp";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/estoque/entradas")({
   staticData: { sitemap: false },
@@ -99,6 +100,7 @@ function EstoqueEntradas() {
   const [tipo, setTipo] = useState<"entrada" | "saida">("entrada");
   const [form, setForm] = useState(formVazio);
   const [importarOpen, setImportarOpen] = useState(false);
+  useAbrirModal("novo", () => setImportarOpen(true));
 
   const set = (campo: keyof typeof formVazio, valor: string) =>
     setForm((f) => ({ ...f, [campo]: valor }));

@@ -38,6 +38,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { addDiasUteis, hojeISO, proximoCodigo } from "@/lib/erp";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/ordens")({
   staticData: { sitemap: false },
@@ -101,6 +102,7 @@ function Ordens() {
   const [registro, setRegistro] = useState<{id:string; materiais:string; horas:string} | null>(null);
   const [gravando, setGravando] = useState(false);
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");

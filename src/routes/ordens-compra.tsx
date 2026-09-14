@@ -40,6 +40,7 @@ import { DocumentoOrdemCompra } from "@/components/documento-ordem-compra";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, proximoCodigo } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/ordens-compra")({
   staticData: { sitemap: false },
@@ -197,6 +198,7 @@ function OrdensCompra() {
   const [detalheId, setDetalheId] = useState<string | null>(null);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [novaOpen, setNovaOpen] = useState(false);
+  useAbrirModal("novo", () => setNovaOpen(true));
   const [novoItem, setNovoItem] = useState(novoItemVazio);
   const [novaOrdem, setNovaOrdem] = useState({
     fornecedor_id: "",

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 import { supabase } from "@/integrations/supabase/client";
 import { meuTokenAgenda, regenerarTokenAgenda } from "@/lib/agenda.functions";
 import {
@@ -118,6 +119,7 @@ function Agenda() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
   const [periodo, setPeriodo] = useState("30");
   const [somenteMeus, setSomenteMeus] = useState(false);

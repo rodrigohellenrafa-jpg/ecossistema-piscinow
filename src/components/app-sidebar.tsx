@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   CalendarDays,
   MessageCircle,
+  Link2,
 } from "lucide-react";
 
 import {
@@ -120,6 +121,7 @@ const groups: {
     items: [
       { title: "Importação de Dados", url: "/importacao", icon: Upload },
       { title: "Controle de Acesso", url: "/acessos", icon: ShieldCheck },
+      { title: "Atalhos de Formulários", url: "/atalhos", icon: Link2 },
     ],
   },
 

@@ -45,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { ETAPAS_FUNIL, proximoCodigo } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/clientes")({
   staticData: { sitemap: false },
@@ -152,6 +153,7 @@ function Clientes() {
   const [q, setQ] = useState("");
   const [filtroEtapa, setFiltroEtapa] = useState<string>(TODAS_ETAPAS);
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Cliente | null>(null);
   const [form, setForm] = useState(vazio);
   const [mostrarInstalacao, setMostrarInstalacao] = useState(false);
