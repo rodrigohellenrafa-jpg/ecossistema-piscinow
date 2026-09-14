@@ -214,6 +214,37 @@ function Contas() {
       toast.error(e.message.includes("duplicate") ? "Categoria já existe." : e.message),
   });
 
+  const salvarFornecedor = useMutation({
+    mutationFn: async () => {
+      const nome = novoFornecedor.nome.trim();
+      if (!nome) throw new Error("Informe o nome do fornecedor.");
+      const { data: criado, error } = await supabase
+        .from("fornecedores")
+        .insert({
+          nome,
+          cnpj: novoFornecedor.cnpj || null,
+          telefone: novoFornecedor.telefone || null,
+          email: novoFornecedor.email || null,
+          prazo_entrega_dias: 0,
+          ativo: true,
+          created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+        })
+        .select("nome")
+        .single();
+      if (error) throw error;
+      return criado.nome;
+    },
+    onSuccess: (nome) => {
+      toast.success("Fornecedor cadastrado!");
+      setNovoFornecedor(fornecedorVazio);
+      setFornOpen(false);
+      setForm((f) => ({ ...f, parceiro: nome }));
+      qc.invalidateQueries({ queryKey: ["fornecedores"] });
+      qc.invalidateQueries({ queryKey: ["fornecedores-select"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const salvar = useMutation({
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição do título.");
