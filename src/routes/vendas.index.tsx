@@ -106,6 +106,14 @@ function Vendas() {
   const [senha, setSenha] = useState("");
   const [excluindo, setExcluindo] = useState(false);
 
+  const [editTipo, setEditTipo] = useState<{
+    id: string;
+    numero: string | null;
+    tipo_atendimento: string;
+  } | null>(null);
+  const [novoTipo, setNovoTipo] = useState<string>("in");
+  const [salvandoTipo, setSalvandoTipo] = useState(false);
+
   async function confirmarAcao() {
     if (!alvo) return;
     setExcluindo(true);
