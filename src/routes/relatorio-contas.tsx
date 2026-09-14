@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -168,10 +168,15 @@ function RelatorioContas() {
   }));
 
   const kpis = [
-    { titulo: "A receber (em aberto)", valor: aReceber },
-    { titulo: "A pagar (em aberto)", valor: aPagar },
-    { titulo: "Vencidos", valor: total.pagarVencido + total.receberVencido, alerta: true },
-    { titulo: "Saldo previsto", valor: saldo },
+    { titulo: "A receber (em aberto)", valor: aReceber, to: "/contas" },
+    { titulo: "A pagar (em aberto)", valor: aPagar, to: "/contas" },
+    {
+      titulo: "Vencidos",
+      valor: total.pagarVencido + total.receberVencido,
+      alerta: true,
+      to: "/contas",
+    },
+    { titulo: "Saldo previsto", valor: saldo, to: "/fluxo-caixa" },
   ];
 
   // Despesas por categoria, respeitando o rateio de cada título
