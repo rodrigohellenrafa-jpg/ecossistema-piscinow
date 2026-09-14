@@ -157,8 +157,12 @@ export function SaldosBancarios() {
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Total em conta</p>
-          <p className="text-xl font-semibold tabular-nums">{brl(total)}</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual com o dia de hoje</p>
+          <p className="text-xl font-semibold tabular-nums">{brl(totalAtual)}</p>
+          <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+            Informado {brl(total)} · recebido hoje <span className="text-emerald-500">+{brl(entradasHoje)}</span> · pago
+            hoje <span className="text-destructive">−{brl(saidasHoje)}</span>
+          </p>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
