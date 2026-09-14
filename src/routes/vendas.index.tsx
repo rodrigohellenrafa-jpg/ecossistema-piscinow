@@ -560,6 +560,68 @@ function Vendas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={editTipo !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditTipo(null);
+            setSenha("");
+            setNovoTipo("in");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar tipo do pedido {editTipo?.numero ?? ""}</DialogTitle>
+            <DialogDescription>
+              Escolha se o pedido é IN (balcão) ou OUT (serviço externo). A alteração exige senha mestra.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={novoTipo} onValueChange={setNovoTipo}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tipo de atendimento" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPOS_ATENDIMENTO.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="password"
+              value={senha}
+              autoComplete="off"
+              placeholder="Senha mestra"
+              onChange={(e) => setSenha(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void salvarTipoAtendimento();
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditTipo(null);
+                setSenha("");
+                setNovoTipo("in");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={salvandoTipo || !senha || novoTipo === editTipo?.tipo_atendimento}
+              onClick={() => void salvarTipoAtendimento()}
+            >
+              Salvar tipo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
