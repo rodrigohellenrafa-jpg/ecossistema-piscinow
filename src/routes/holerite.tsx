@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Printer, Wallet } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Pencil, Printer, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -9,6 +10,18 @@ import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
+import { useMestre } from "@/hooks/use-mestre";
+import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
