@@ -596,6 +596,25 @@ function Financeiro() {
                     onChange={(e) => set("vencimento")(e.target.value)}
                   />
                 </Field>
+                <Field label="Recorrência">
+                  <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RECORRENCIAS.map((r) => (
+                        <SelectItem key={r.v} value={r.v}>
+                          {r.r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {form.recorrencia !== "nenhuma" && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Ao marcar como pago, o próximo lançamento é gerado automaticamente.
+                    </p>
+                  )}
+                </Field>
                 <Field label="Data de pagamento">
                   <Input
                     type="date"
@@ -863,8 +882,13 @@ function Financeiro() {
                           </Badge>
                         </TableCell>
                         <TableCell>{l.categoria}</TableCell>
-                        <TableCell className="max-w-[220px] truncate">
+                         <TableCell className="max-w-[220px] truncate">
                           {l.descricao}
+                          {rotuloRecorrencia(l.recorrencia) && (
+                            <Badge variant="outline" className="ml-2 text-[10px]">
+                              {rotuloRecorrencia(l.recorrencia)}
+                            </Badge>
+                          )}
                           {rateios.some((r) => r.lancamento_id === l.id) && (
                             <span className="mt-1 block text-xs font-normal text-muted-foreground">
                               Rateio:{" "}
