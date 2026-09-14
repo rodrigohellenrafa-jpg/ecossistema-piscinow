@@ -638,6 +638,8 @@ function Financeiro() {
         />
       </div>
 
+      <SaldosBancarios />
+
       <Tabs defaultValue="lancamentos">
         <TabsList>
           <TabsTrigger value="lancamentos">Lançamentos</TabsTrigger>
