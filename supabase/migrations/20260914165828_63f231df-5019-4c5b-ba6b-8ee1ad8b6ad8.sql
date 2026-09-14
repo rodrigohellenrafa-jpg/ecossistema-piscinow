@@ -1,0 +1,1 @@
+ALTER TABLE public.contas ADD COLUMN IF NOT EXISTS recorrencia_fim date;

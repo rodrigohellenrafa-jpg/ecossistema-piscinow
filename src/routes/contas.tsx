@@ -78,6 +78,7 @@ const vazio = {
   valor_juros: "0",
   vencimento: "",
   recorrencia: "nenhuma",
+  recorrencia_fim: "",
   tipo_despesa: "",
   observacoes: "",
 };
@@ -291,6 +292,10 @@ function Contas() {
             cliente_id: parseVinculo(form.vinculo).cliente_id,
             numero_documento: form.numero_documento || null,
             recorrencia: form.recorrencia,
+            recorrencia_fim:
+              form.recorrencia !== "nenhuma" && form.recorrencia_fim
+                ? form.recorrencia_fim
+                : null,
             tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
           })
           .eq("id", editando);
@@ -332,6 +337,8 @@ function Contas() {
           cliente_id: parseVinculo(form.vinculo).cliente_id,
           numero_documento: form.numero_documento || null,
           recorrencia: form.recorrencia,
+          recorrencia_fim:
+            form.recorrencia !== "nenhuma" && form.recorrencia_fim ? form.recorrencia_fim : null,
           tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
           created_by: uid,
         })
@@ -383,7 +390,8 @@ function Contas() {
         .single();
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
-        if (proxima) {
+        const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
+        if (proxima && (!fimRecorrencia || proxima <= fimRecorrencia)) {
           const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
           const { error: errRec } = await supabase.from("contas").insert({
             tipo: conta.tipo,
@@ -401,6 +409,7 @@ function Contas() {
             numero_documento: conta.numero_documento,
             venda_id: conta.venda_id,
             recorrencia: conta.recorrencia,
+            recorrencia_fim: fimRecorrencia ?? null,
             tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
             created_by: uid,
           });
@@ -443,6 +452,7 @@ function Contas() {
       valor_juros: String(c.valor_juros ?? 0),
       vencimento: c.vencimento,
       recorrencia: c.recorrencia ?? "nenhuma",
+      recorrencia_fim: c.recorrencia_fim ?? "",
       tipo_despesa: c.tipo_despesa ?? "",
       observacoes: c.observacoes ?? "",
     });
@@ -797,6 +807,19 @@ function Contas() {
                   </p>
                 )}
               </Field>
+              {form.recorrencia !== "nenhuma" && (
+                <Field label="Repetir até (opcional)">
+                  <Input
+                    type="date"
+                    value={form.recorrencia_fim}
+                    onChange={(e) => set("recorrencia_fim")(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Deixe em branco para repetir sem limite. Depois dessa data nenhum novo
+                    vencimento é gerado.
+                  </p>
+                </Field>
+              )}
               {form.tipo === "pagar" && (
                 <Field label="Tipo de despesa">
                   <Select
@@ -880,6 +903,7 @@ type Conta = {
   vencimento: string;
   status: string;
   recorrencia?: string | null;
+  recorrencia_fim?: string | null;
   tipo_despesa?: string | null;
   observacoes?: string | null;
   numero_documento?: string | null;
