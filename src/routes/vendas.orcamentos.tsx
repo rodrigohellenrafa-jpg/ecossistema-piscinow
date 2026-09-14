@@ -135,13 +135,14 @@ function Orcamentos() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Orçamentos abertos" value={String(lista.length)} />
-        <Kpi label="Valor em negociação" value={brl(total)} />
-        <Kpi label="Ticket médio" value={brl(ticket)} />
+        <Kpi label="Orçamentos abertos" value={String(lista.length)} to="/vendas" />
+        <Kpi label="Valor em negociação" value={brl(total)} to="/vendas" />
+        <Kpi label="Ticket médio" value={brl(ticket)} to="/vendas" />
         <Kpi
           label="Parados há 15+ dias"
           value={String(antigos)}
           tone={antigos > 0 ? "warning" : "default"}
+          to="/clientes"
         />
       </div>
 

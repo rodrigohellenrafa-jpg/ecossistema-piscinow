@@ -239,14 +239,16 @@ function FluxoCaixa() {
           label="Saldo em caixa (realizado)"
           value={brl(saldoAtual)}
           hint="Somente títulos e lançamentos já baixados"
+          to="/financeiro"
           tone={saldoAtual >= 0 ? "positive" : "negative"}
         />
-        <Kpi label="Entradas do mês" value={brl(entradasMes)} hint="Previsto + realizado" tone="positive" />
-        <Kpi label="Saídas do mês" value={brl(saidasMes)} hint="Previsto + realizado" tone="negative" />
+        <Kpi label="Entradas do mês" value={brl(entradasMes)} hint="Previsto + realizado" tone="positive" to="/contas" />
+        <Kpi label="Saídas do mês" value={brl(saidasMes)} hint="Previsto + realizado" tone="negative" to="/contas" />
         <Kpi
           label={`Saldo projetado (${horizonte} dias)`}
           value={brl(saldoProjetado)}
           hint={`${brl(previstoEntrada)} a receber · ${brl(previstoSaida)} a pagar`}
+          to="/relatorio-contas"
           tone={saldoProjetado >= 0 ? "positive" : "negative"}
         />
       </div>

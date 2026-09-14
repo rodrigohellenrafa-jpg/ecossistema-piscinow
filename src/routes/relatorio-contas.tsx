@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -168,10 +168,15 @@ function RelatorioContas() {
   }));
 
   const kpis = [
-    { titulo: "A receber (em aberto)", valor: aReceber },
-    { titulo: "A pagar (em aberto)", valor: aPagar },
-    { titulo: "Vencidos", valor: total.pagarVencido + total.receberVencido, alerta: true },
-    { titulo: "Saldo previsto", valor: saldo },
+    { titulo: "A receber (em aberto)", valor: aReceber, to: "/contas" },
+    { titulo: "A pagar (em aberto)", valor: aPagar, to: "/contas" },
+    {
+      titulo: "Vencidos",
+      valor: total.pagarVencido + total.receberVencido,
+      alerta: true,
+      to: "/contas",
+    },
+    { titulo: "Saldo previsto", valor: saldo, to: "/fluxo-caixa" },
   ];
 
   // Despesas por categoria, respeitando o rateio de cada título
@@ -245,24 +250,26 @@ function RelatorioContas() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((k) => (
-          <Card key={k.titulo}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {k.titulo}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p
-                className={
-                  k.alerta && k.valor > 0
-                    ? "text-2xl font-semibold text-destructive"
-                    : "text-2xl font-semibold"
-                }
-              >
-                {brl(k.valor)}
-              </p>
-            </CardContent>
-          </Card>
+          <Link key={k.titulo} to={k.to} className="block">
+            <Card className="h-full transition-colors hover:border-primary/50 hover:bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {k.titulo}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p
+                  className={
+                    k.alerta && k.valor > 0
+                      ? "text-2xl font-semibold text-destructive"
+                      : "text-2xl font-semibold"
+                  }
+                >
+                  {brl(k.valor)}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

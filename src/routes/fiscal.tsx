@@ -1173,10 +1173,10 @@ function Fiscal() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <Kpi label="Autorizadas no mês" value={String(kpis.autorizadas)} />
-        <Kpi label="Valor total autorizado" value={brl(kpis.valorAutorizado)} tone="positive" />
-        <Kpi label="Rejeitadas" value={String(kpis.rejeitadas)} tone="negative" />
-        <Kpi label="Rascunhos" value={String(kpis.rascunhos)} tone="warning" />
+        <Kpi label="Autorizadas no mês" value={String(kpis.autorizadas)} to="/vendas" />
+        <Kpi label="Valor total autorizado" value={brl(kpis.valorAutorizado)} tone="positive" to="/dre" />
+        <Kpi label="Rejeitadas" value={String(kpis.rejeitadas)} tone="negative" to="/fiscal/config" />
+        <Kpi label="Rascunhos" value={String(kpis.rascunhos)} tone="warning" to="/fiscal/config" />
       </div>
 
       <Card>

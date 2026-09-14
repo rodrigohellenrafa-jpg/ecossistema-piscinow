@@ -164,12 +164,13 @@ function EstoqueInventario() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3 print:hidden">
-        <Kpi label="Produtos no filtro" value={String(filtrados.length)} />
-        <Kpi label="Itens com diferença" value={String(divergentes.length)} tone="warning" />
+        <Kpi label="Produtos no filtro" value={String(filtrados.length)} to="/produtos" />
+        <Kpi label="Itens com diferença" value={String(divergentes.length)} tone="warning" to="/estoque/relatorio" />
         <Kpi
           label="Valor da diferença"
           value={brl(valorDivergencia)}
           tone={valorDivergencia < 0 ? "negative" : valorDivergencia > 0 ? "positive" : "default"}
+          to="/estoque/relatorio"
         />
       </div>
 

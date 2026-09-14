@@ -242,9 +242,9 @@ function Compras() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Kpi label="Itens críticos" value={String(sugestoes.length)} tone="warning" />
-        <Kpi label="Valor total de reposição selecionada" value={brl(totalSelecionado)} />
-        <Kpi label="Fornecedores envolvidos" value={String(fornecedoresEnvolvidos)} />
+        <Kpi label="Itens críticos" value={String(sugestoes.length)} tone="warning" to="/estoque/relatorio" />
+        <Kpi label="Valor total de reposição selecionada" value={brl(totalSelecionado)} to="/ordens-compra" />
+        <Kpi label="Fornecedores envolvidos" value={String(fornecedoresEnvolvidos)} to="/fornecedores" />
       </div>
 
       <Card>

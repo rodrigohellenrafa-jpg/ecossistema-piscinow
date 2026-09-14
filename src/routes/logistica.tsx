@@ -442,10 +442,10 @@ function FlightBoard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Obras ativas" value={String(kpis.ativas)} />
-        <Kpi label="Atrasadas" value={String(kpis.atrasadas)} tone={kpis.atrasadas > 0 ? "negative" : "default"} />
-        <Kpi label="Concluídas no mês" value={String(kpis.concluidasMes)} tone="positive" />
-        <Kpi label="Prazo médio" value={`${kpis.prazoMedio} dias`} />
+        <Kpi label="Obras ativas" value={String(kpis.ativas)} to="/ordens" />
+        <Kpi label="Atrasadas" value={String(kpis.atrasadas)} tone={kpis.atrasadas > 0 ? "negative" : "default"} to="/ordens" />
+        <Kpi label="Concluídas no mês" value={String(kpis.concluidasMes)} tone="positive" to="/vendas" />
+        <Kpi label="Prazo médio" value={`${kpis.prazoMedio} dias`} to="/ordens" />
       </div>
 
       <div className="space-y-6">

@@ -168,12 +168,14 @@ function RelatorioEstoque() {
         <Kpi
           label="Entradas no período"
           value={totais.entradas.toLocaleString("pt-BR")}
+          to="/estoque/entradas"
         />
         <Kpi
           label="Saídas no período"
           value={totais.saidas.toLocaleString("pt-BR")}
+          to="/vendas"
         />
-        <Kpi label="Valor em estoque" value={brl(totais.valor)} />
+        <Kpi label="Valor em estoque" value={brl(totais.valor)} to="/produtos" />
         <Kpi
           label="Abaixo do mínimo"
           value={String(totais.abaixoMinimo)}

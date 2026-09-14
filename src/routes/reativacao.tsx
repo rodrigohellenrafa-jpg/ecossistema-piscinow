@@ -160,10 +160,10 @@ function Reativacao() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Clientes parados" value={String(lista.length)} tone={lista.length > 0 ? "warning" : "default"} />
-        <Kpi label="Já compraram (histórico)" value={brl(valorHistorico)} />
-        <Kpi label="Sem telefone cadastrado" value={String(semTelefone)} />
-        <Kpi label="Corte usado" value={`${corte} dias`} />
+        <Kpi label="Clientes parados" value={String(lista.length)} tone={lista.length > 0 ? "warning" : "default"} to="/clientes" />
+        <Kpi label="Já compraram (histórico)" value={brl(valorHistorico)} to="/vendas" />
+        <Kpi label="Sem telefone cadastrado" value={String(semTelefone)} to="/clientes" />
+        <Kpi label="Corte usado" value={`${corte} dias`} to="/clientes" />
       </div>
 
       <Card>
