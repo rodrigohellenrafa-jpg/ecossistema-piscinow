@@ -356,6 +356,7 @@ function Contas() {
             numero_documento: conta.numero_documento,
             venda_id: conta.venda_id,
             recorrencia: conta.recorrencia,
+            tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
             created_by: uid,
           });
           if (errRec) throw errRec;
