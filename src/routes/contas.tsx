@@ -340,15 +340,16 @@ function Contas() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button>
-              <Plus /> Novo título
+              <Plus /> Novo lançamento
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Novo lançamento</DialogTitle>
               <DialogDescription>Conta a pagar ou a receber.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Dados do lançamento</h3>
               <Field label="Tipo">
                 <Select value={form.tipo} onValueChange={set("tipo")}>
                   <SelectTrigger>
@@ -385,6 +386,7 @@ function Contas() {
               <Field label="Descrição" className="sm:col-span-2">
                 <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
               </Field>
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Valores e categorias</h3>
               {!ratear && (
               <Field label="Categoria">
                 <div className="flex gap-1">
@@ -436,7 +438,7 @@ function Contas() {
                 </div>
               </Field>
               )}
-              <Field label="Valor da parcela (R$)">
+              <Field label="Valor (R$)">
                 <Input
                   type="number"
                   step="0.01"
@@ -452,34 +454,8 @@ function Contas() {
                   onChange={(e) => set("valor_juros")(e.target.value)}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Total do título: {brl((Number(form.valor) || 0) + (Number(form.valor_juros) || 0))}
+                  Total do lançamento: {brl((Number(form.valor) || 0) + (Number(form.valor_juros) || 0))}
                 </p>
-              </Field>
-              <Field label="Vencimento">
-                <Input
-                  type="date"
-                  value={form.vencimento}
-                  onChange={(e) => set("vencimento")(e.target.value)}
-                />
-              </Field>
-              <Field label="Recorrência">
-                <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pagamento único" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RECORRENCIAS.map((r) => (
-                      <SelectItem key={r.valor} value={r.valor}>
-                        {r.rotulo}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.recorrencia !== "nenhuma" && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Ao dar baixa, o próximo vencimento ({rotuloRecorrencia(form.recorrencia)?.toLowerCase()}) é gerado automaticamente.
-                  </p>
-                )}
               </Field>
               <div className="rounded-lg border p-3 sm:col-span-2">
                 <div className="flex items-center justify-between gap-3">
@@ -567,8 +543,37 @@ function Contas() {
                   </div>
                 )}
               </div>
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Pagamento e recorrência</h3>
+              <Field label="Vencimento">
+                <Input
+                  type="date"
+                  value={form.vencimento}
+                  onChange={(e) => set("vencimento")(e.target.value)}
+                />
+              </Field>
+              <Field label="Recorrência">
+                <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pagamento único" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RECORRENCIAS.map((r) => (
+                      <SelectItem key={r.valor} value={r.valor}>
+                        {r.rotulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.recorrencia !== "nenhuma" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ao dar baixa, o próximo vencimento ({rotuloRecorrencia(form.recorrencia)?.toLowerCase()}) é gerado automaticamente.
+                  </p>
+                )}
+              </Field>
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
               <CentroCustoField value={form.obra_id} onChange={v=>setForm(f=>({...f,obra_id:v}))} />
               <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
               <Field label="Observações" className="sm:col-span-2">
                 <Textarea
                   rows={3}
@@ -578,8 +583,9 @@ function Contas() {
               </Field>
             </div>
             <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                Lançar título
+                {salvar.isPending ? "Salvando…" : "Salvar lançamento"}
               </Button>
             </DialogFooter>
           </DialogContent>

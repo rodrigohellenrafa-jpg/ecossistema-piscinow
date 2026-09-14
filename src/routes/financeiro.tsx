@@ -452,7 +452,8 @@ function Financeiro() {
                 <DialogDescription>Receita ou despesa do fluxo de caixa.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Tipo de fluxo">
+                <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Dados do lançamento</h3>
+<Field label="Tipo">
                   <Select value={form.tipo_fluxo} onValueChange={set("tipo_fluxo")}>
                     <SelectTrigger>
                       <SelectValue />
@@ -463,14 +464,38 @@ function Financeiro() {
                     </SelectContent>
                   </Select>
                 </Field>
-                {!ratear && (
-                <Field label="Categoria">
-                  <Input value={form.categoria} onChange={(e) => set("categoria")(e.target.value)} />
-                </Field>
-                )}
-                <Field label="Descrição" className="sm:col-span-2">
+                <Field label="Fornecedor">
+                  <Select
+                    value={form.fornecedor_id || "none"}
+                    onValueChange={(v) => set("fornecedor_id")(v === "none" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nenhum" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {fornecedores.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                 </Field>
+                                 <Field label="Descrição" className="sm:col-span-2">
                   <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
                 </Field>
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Valores e categorias</h3>
+                {!ratear && (
+                <Field label="Categoria">
+                  <Select value={form.categoria} onValueChange={set("categoria")}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
+                    <SelectContent>
+                      {categoriasDb.filter(c => c.tipo === "ambas" || c.tipo === (form.tipo_fluxo === "despesa" ? "pagar" : "receber")).map(c => <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                )}
                 <Field label="Valor (R$)">
                   <Input
                     type="number"
@@ -570,6 +595,7 @@ function Financeiro() {
                   )}
                 </div>
 
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Pagamento e recorrência</h3>
                 <Field label="Status">
                   <Select value={form.status} onValueChange={set("status")}>
                     <SelectTrigger>
@@ -642,6 +668,7 @@ function Financeiro() {
                     </SelectContent>
                   </Select>
                 </Field>
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
                 <Field label="Pedido vinculado">
                   <Select value={form.venda_id || "none"} onValueChange={(v) => set("venda_id")(v === "none" ? "" : v)}>
                     <SelectTrigger>
@@ -657,25 +684,7 @@ function Financeiro() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Fornecedor vinculado">
-                  <Select
-                    value={form.fornecedor_id || "none"}
-                    onValueChange={(v) => set("fornecedor_id")(v === "none" ? "" : v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {fornecedores.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                 </Field>
-                 {form.tipo_fluxo === "despesa" && (
+{form.tipo_fluxo === "despesa" && (
                    <Field label="Tipo de despesa">
                      <Select
                        value={form.tipo_despesa || "none"}
@@ -713,16 +722,19 @@ function Financeiro() {
                 </Field>
                 <VinculoField value={form.vinculo} onChange={v=>setForm(f=>({...f,vinculo:v}))} />
               <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
+<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
               <Field label="Observações" className="sm:col-span-2">
                   <Textarea
+                    rows={3}
                     value={form.observacoes}
                     onChange={(e) => set("observacoes")(e.target.value)}
                   />
                 </Field>
               </div>
               <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                  Salvar lançamento
+                  {salvar.isPending ? "Salvando…" : "Salvar lançamento"}
                 </Button>
               </DialogFooter>
             </DialogContent>
