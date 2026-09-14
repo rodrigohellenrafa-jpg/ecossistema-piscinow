@@ -1128,6 +1128,296 @@ function DetalhePedido() {
           )}
         </div>
       </div>
+
+      <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar dados do pedido</DialogTitle>
+          </DialogHeader>
+          {editPedido && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Data">
+                <Input
+                  type="date"
+                  value={editPedido.data}
+                  onChange={(e) => setEditPedido({ ...editPedido, data: e.target.value })}
+                />
+              </Field>
+              <Field label="Cliente">
+                <Input
+                  value={editPedido.cliente_nome}
+                  onChange={(e) => setEditPedido({ ...editPedido, cliente_nome: e.target.value })}
+                />
+              </Field>
+              <Field label="Vendedor">
+                <Input
+                  value={editPedido.vendedor}
+                  onChange={(e) => setEditPedido({ ...editPedido, vendedor: e.target.value })}
+                />
+              </Field>
+              <Field label="Tipo de atendimento">
+                <Select
+                  value={editPedido.tipo_atendimento}
+                  onValueChange={(v) => setEditPedido({ ...editPedido, tipo_atendimento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in">IN · Balcão</SelectItem>
+                    <SelectItem value="out">OUT · Serviço externo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Frete (R$)">
+                <Input
+                  value={editPedido.valor_frete}
+                  onChange={(e) => setEditPedido({ ...editPedido, valor_frete: e.target.value })}
+                />
+              </Field>
+              <Field label="Mão de obra (R$)">
+                <Input
+                  value={editPedido.valor_mao_obra}
+                  onChange={(e) => setEditPedido({ ...editPedido, valor_mao_obra: e.target.value })}
+                />
+              </Field>
+              <Field label="Forma de pagamento">
+                <Select
+                  value={editPedido.forma_pagamento || undefined}
+                  onValueChange={(v) => setEditPedido({ ...editPedido, forma_pagamento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGAMENTO.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Entrada (R$)">
+                <Input
+                  value={editPedido.valor_entrada}
+                  onChange={(e) => setEditPedido({ ...editPedido, valor_entrada: e.target.value })}
+                />
+              </Field>
+              <Field label="Endereço de entrega" className="sm:col-span-2">
+                <Input
+                  value={editPedido.endereco_entrega}
+                  onChange={(e) =>
+                    setEditPedido({ ...editPedido, endereco_entrega: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Observações" className="sm:col-span-2">
+                <Input
+                  value={editPedido.observacoes}
+                  onChange={(e) => setEditPedido({ ...editPedido, observacoes: e.target.value })}
+                />
+              </Field>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPedido(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarPedido.mutate()} disabled={salvarPedido.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editItem !== null} onOpenChange={(o) => !o && setEditItem(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar item do pedido</DialogTitle>
+          </DialogHeader>
+          {editItem && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Descrição" className="sm:col-span-2">
+                <Input
+                  value={editItem.descricao}
+                  onChange={(e) => setEditItem({ ...editItem, descricao: e.target.value })}
+                />
+              </Field>
+              <Field label="Quantidade">
+                <Input
+                  value={editItem.quantidade}
+                  onChange={(e) => setEditItem({ ...editItem, quantidade: e.target.value })}
+                />
+              </Field>
+              <Field label="Preço unitário (R$)">
+                <Input
+                  value={editItem.preco_unitario}
+                  onChange={(e) => setEditItem({ ...editItem, preco_unitario: e.target.value })}
+                />
+              </Field>
+              <p className="text-sm text-muted-foreground sm:col-span-2">
+                Total do item: {brl(num(editItem.quantidade) * num(editItem.preco_unitario))}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditItem(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarItem.mutate()} disabled={salvarItem.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editCond !== null} onOpenChange={(o) => !o && setEditCond(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar condição de pagamento</DialogTitle>
+          </DialogHeader>
+          {editCond && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Forma de pagamento">
+                <Select
+                  value={editCond.forma_pagamento}
+                  onValueChange={(v) => setEditCond({ ...editCond, forma_pagamento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGAMENTO.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Cartão / bandeira">
+                <Input
+                  value={editCond.bandeira}
+                  onChange={(e) => setEditCond({ ...editCond, bandeira: e.target.value })}
+                />
+              </Field>
+              <Field label="Data prevista">
+                <Input
+                  type="date"
+                  value={editCond.data_prevista}
+                  onChange={(e) => setEditCond({ ...editCond, data_prevista: e.target.value })}
+                />
+              </Field>
+              <Field label="Parcelas">
+                <Input
+                  value={editCond.parcelas}
+                  onChange={(e) => setEditCond({ ...editCond, parcelas: e.target.value })}
+                />
+              </Field>
+              <Field label="Abate do pedido (R$)">
+                <Input
+                  value={editCond.valor}
+                  onChange={(e) => setEditCond({ ...editCond, valor: e.target.value })}
+                />
+              </Field>
+              <Field label="Juros / acréscimo (R$)">
+                <Input
+                  value={editCond.acrescimo}
+                  onChange={(e) => setEditCond({ ...editCond, acrescimo: e.target.value })}
+                />
+              </Field>
+              <Field label="Situação">
+                <Select
+                  value={editCond.pago ? "pago" : "aberto"}
+                  onValueChange={(v) => setEditCond({ ...editCond, pago: v === "pago" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aberto">A receber</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <p className="self-end text-sm text-muted-foreground">
+                Cliente paga: {brl(num(editCond.valor) + num(editCond.acrescimo))}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCond(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarCondicao.mutate()} disabled={salvarCondicao.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editPag !== null} onOpenChange={(o) => !o && setEditPag(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar pagamento</DialogTitle>
+          </DialogHeader>
+          {editPag && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Data do pagamento">
+                <Input
+                  type="date"
+                  value={editPag.data_pagamento}
+                  onChange={(e) => setEditPag({ ...editPag, data_pagamento: e.target.value })}
+                />
+              </Field>
+              <Field label="Forma de pagamento">
+                <Select
+                  value={editPag.forma_pagamento}
+                  onValueChange={(v) => setEditPag({ ...editPag, forma_pagamento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGAMENTO.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Cartão / conta">
+                <Input
+                  value={editPag.conta_bancaria}
+                  onChange={(e) => setEditPag({ ...editPag, conta_bancaria: e.target.value })}
+                />
+              </Field>
+              <Field label="Valor (R$)">
+                <Input
+                  value={editPag.valor}
+                  onChange={(e) => setEditPag({ ...editPag, valor: e.target.value })}
+                />
+              </Field>
+              <Field label="Observações" className="sm:col-span-2">
+                <Input
+                  value={editPag.observacoes}
+                  onChange={(e) => setEditPag({ ...editPag, observacoes: e.target.value })}
+                />
+              </Field>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPag(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarPagamento.mutate()} disabled={salvarPagamento.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
