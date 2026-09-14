@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { CentroCustoField } from "@/components/centro-custo-field";
+import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +68,7 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 const vazio = {
   obra_id: "",
+  vinculo: "",
   numero_documento: "",
   tipo: "pagar",
   descricao: "",
@@ -334,6 +335,7 @@ function Contas() {
             descricao: conta.descricao,
             parceiro: conta.parceiro,
             cliente_id: conta.cliente_id,
+            funcionario_id: (conta as { funcionario_id?: string | null }).funcionario_id ?? null,
             categoria: conta.categoria,
             valor: conta.valor,
             valor_juros: conta.valor_juros ?? 0,
