@@ -78,8 +78,16 @@ const vazio = {
   valor_juros: "0",
   vencimento: "",
   recorrencia: "nenhuma",
+  tipo_despesa: "",
   observacoes: "",
 };
+
+const TIPOS_DESPESA = [
+  { valor: "fixa", rotulo: "Despesa fixa" },
+  { valor: "variavel", rotulo: "Despesa variável" },
+  { valor: "operacional", rotulo: "Despesa operacional" },
+  { valor: "pessoal", rotulo: "Despesa pessoal" },
+] as const;
 
 const fornecedorVazio = {
   nome: "",
@@ -281,6 +289,7 @@ function Contas() {
           cliente_id: parseVinculo(form.vinculo).cliente_id,
           numero_documento: form.numero_documento || null,
           recorrencia: form.recorrencia,
+          tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
           created_by: uid,
         })
         .select("id")
@@ -348,6 +357,7 @@ function Contas() {
             numero_documento: conta.numero_documento,
             venda_id: conta.venda_id,
             recorrencia: conta.recorrencia,
+            tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
             created_by: uid,
           });
           if (errRec) throw errRec;
@@ -689,6 +699,26 @@ function Contas() {
                   </p>
                 )}
               </Field>
+              {form.tipo === "pagar" && (
+                <Field label="Tipo de despesa">
+                  <Select
+                    value={form.tipo_despesa || "none"}
+                    onValueChange={(v) => set("tipo_despesa")(v === "none" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Não classificado</SelectItem>
+                      {TIPOS_DESPESA.map((t) => (
+                        <SelectItem key={t.valor} value={t.valor}>
+                          {t.rotulo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
               <VinculoField value={form.vinculo} onChange={(v: string)=>setForm(f=>({...f,vinculo:v}))} />
               <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>

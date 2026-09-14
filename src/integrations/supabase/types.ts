@@ -401,6 +401,7 @@ export type Database = {
           recorrencia_id: string | null
           status: string
           tipo: string
+          tipo_despesa: string | null
           updated_at: string
           valor: number
           valor_juros: number
@@ -427,6 +428,7 @@ export type Database = {
           recorrencia_id?: string | null
           status?: string
           tipo?: string
+          tipo_despesa?: string | null
           updated_at?: string
           valor?: number
           valor_juros?: number
@@ -453,6 +455,7 @@ export type Database = {
           recorrencia_id?: string | null
           status?: string
           tipo?: string
+          tipo_despesa?: string | null
           updated_at?: string
           valor?: number
           valor_juros?: number
