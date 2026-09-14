@@ -43,7 +43,7 @@ export const Route = createFileRoute("/os/formulario")({
   ),
 });
 
-const TOTAL_LINHAS_APOIO = 14;
+const TOTAL_LINHAS_APOIO = 26;
 const LINHAS_APOIO_VAZIAS = Array.from({ length: TOTAL_LINHAS_APOIO }, () => "");
 const ITENS_VAZIOS: Array<{ descricao: string; quantidade: number }> = [];
 
@@ -389,13 +389,13 @@ function FormularioOS() {
           <table className="mt-3 w-full border-collapse border border-slate-900 text-[11px]">
             <thead>
               <tr className="bg-slate-100 text-slate-700">
-                <th className="border border-slate-900 px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-wide">
+                <th className="border border-slate-900 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-wide">
                   Item / Descrição
                 </th>
-                <th className="w-28 border border-slate-900 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
+                <th className="w-28 border border-slate-900 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wide">
                   Conferência Loja (saída)
                 </th>
-                <th className="w-28 border border-slate-900 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide">
+                <th className="w-28 border border-slate-900 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wide">
                   Conferência Obra (cliente)
                 </th>
               </tr>
@@ -403,13 +403,13 @@ function FormularioOS() {
             <tbody>
               {itensVenda.map((item, index) => (
                 <tr key={`venda-${index}`}>
-                  <td className="border border-slate-900 px-2 py-1 text-slate-900">
+                  <td className="border border-slate-900 px-2 py-0.5 leading-tight text-slate-900">
                     {formatarQtd(item.quantidade)}x {item.descricao}
                   </td>
-                  <td className="border border-slate-900 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-0.5 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
-                  <td className="border border-slate-900 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-0.5 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
                 </tr>
@@ -418,7 +418,7 @@ function FormularioOS() {
               <tr>
                 <td
                   colSpan={3}
-                  className="border border-slate-900 bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-700"
+                  className="border border-slate-900 bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-700"
                 >
                   Itens de apoio — preencher na conferência da loja
                 </td>
@@ -435,14 +435,14 @@ function FormularioOS() {
                           atual.map((v, i) => (i === index ? e.target.value : v)),
                         )
                       }
-                      className="h-6 w-full bg-transparent text-[11px] text-slate-900 outline-none"
+                      className="h-5 w-full bg-transparent text-[11px] leading-tight text-slate-900 outline-none"
                       placeholder=""
                     />
                   </td>
-                  <td className="border border-slate-900 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-0.5 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
-                  <td className="border border-slate-900 px-2 py-1 text-center">
+                  <td className="border border-slate-900 px-2 py-0.5 text-center">
                     <span className="inline-block h-3.5 w-3.5 border border-slate-900 align-middle" />
                   </td>
                 </tr>

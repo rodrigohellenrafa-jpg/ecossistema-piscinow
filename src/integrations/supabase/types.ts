@@ -1621,6 +1621,42 @@ export type Database = {
           },
         ]
       }
+      saldos_bancarios: {
+        Row: {
+          banco: string | null
+          conta: string
+          created_at: string
+          created_by: string | null
+          data_saldo: string
+          id: string
+          observacoes: string | null
+          saldo: number
+          updated_at: string
+        }
+        Insert: {
+          banco?: string | null
+          conta: string
+          created_at?: string
+          created_by?: string | null
+          data_saldo?: string
+          id?: string
+          observacoes?: string | null
+          saldo?: number
+          updated_at?: string
+        }
+        Update: {
+          banco?: string | null
+          conta?: string
+          created_at?: string
+          created_by?: string | null
+          data_saldo?: string
+          id?: string
+          observacoes?: string | null
+          saldo?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

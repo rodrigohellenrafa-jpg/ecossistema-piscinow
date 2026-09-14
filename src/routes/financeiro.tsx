@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 import { DespesasRecorrentes } from "@/components/despesas-recorrentes";
+import { SaldosBancarios } from "@/components/saldos-bancarios";
 import { CentroCustoField } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
@@ -637,6 +638,8 @@ function Financeiro() {
           hint="Realizado (pago) sobre o previsto no período"
         />
       </div>
+
+      <SaldosBancarios />
 
       <Tabs defaultValue="lancamentos">
         <TabsList>
