@@ -322,9 +322,12 @@ function Holerite() {
           <Card key={h.funcionario.id} className="break-inside-avoid print:break-before-page">
             <CardHeader>
               <div className="hidden print:flex items-center gap-4"><img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-20 w-auto" /><div><p className="font-semibold">Splash Jardim do Trevo</p><p>Recibo de pagamento — {mesBR(mes)}</p></div></div>
-              <CardTitle>
-                {h.funcionario.nome} — {h.funcionario.cargo}
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>
+                  {h.funcionario.nome} — {h.funcionario.cargo}
+                </CardTitle>
+                <EditarValores funcionario={h.funcionario} />
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
