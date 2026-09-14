@@ -80,6 +80,13 @@ const vazio = {
   observacoes: "",
 };
 
+const fornecedorVazio = {
+  nome: "",
+  cnpj: "",
+  telefone: "",
+  email: "",
+};
+
 const RECORRENCIAS: { valor: string; rotulo: string }[] = [
   { valor: "nenhuma", rotulo: "Pagamento único (sem recorrência)" },
   { valor: "diaria", rotulo: "Diária" },
