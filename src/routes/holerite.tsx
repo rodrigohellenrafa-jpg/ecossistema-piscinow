@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Printer, Wallet } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Pencil, Printer, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 
@@ -9,6 +10,18 @@ import { Field } from "@/components/field";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
+import { useMestre } from "@/hooks/use-mestre";
+import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -309,9 +322,12 @@ function Holerite() {
           <Card key={h.funcionario.id} className="break-inside-avoid print:break-before-page">
             <CardHeader>
               <div className="hidden print:flex items-center gap-4"><img src={logoSplash.url} alt="Splash Jardim do Trevo" className="h-20 w-auto" /><div><p className="font-semibold">Splash Jardim do Trevo</p><p>Recibo de pagamento — {mesBR(mes)}</p></div></div>
-              <CardTitle>
-                {h.funcionario.nome} — {h.funcionario.cargo}
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle>
+                  {h.funcionario.nome} — {h.funcionario.cargo}
+                </CardTitle>
+                <EditarValores funcionario={h.funcionario} />
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -382,5 +398,165 @@ function Row({ label, valor, destaque }: { label: string; valor: number; destaqu
       <span className={destaque ? "font-medium" : "text-muted-foreground"}>{label}</span>
       <span className={`tabular-nums ${destaque ? "font-semibold" : ""}`}>{brl(valor)}</span>
     </div>
+  );
+}
+
+/** E-mail do dono: edita os valores sem pedir senha mestra. */
+const DONO_EMAIL = "rodrigohellenrafa@gmail.com";
+
+type FuncionarioHolerite = {
+  id: string;
+  nome: string;
+  salario_base: number;
+  vt: number;
+  vr: number;
+  inss_perc: number;
+  irrf_perc: number;
+  sindicato: number;
+  bonificacao: number;
+  comissao_piscinas: number;
+  comissao_acessorios: number;
+  comissao_quimicos: number;
+};
+
+const CAMPOS: { chave: keyof FuncionarioHolerite; label: string }[] = [
+  { chave: "salario_base", label: "Salário base (R$)" },
+  { chave: "bonificacao", label: "Bonificação (R$)" },
+  { chave: "vt", label: "Vale transporte (R$)" },
+  { chave: "vr", label: "Vale refeição (R$)" },
+  { chave: "inss_perc", label: "INSS (%)" },
+  { chave: "irrf_perc", label: "IRRF (%)" },
+  { chave: "sindicato", label: "Sindicato (R$)" },
+  { chave: "comissao_piscinas", label: "Comissão piscinas (%)" },
+  { chave: "comissao_acessorios", label: "Comissão acessórios (%)" },
+  { chave: "comissao_quimicos", label: "Comissão químicos (%)" },
+];
+
+function EditarValores({ funcionario }: { funcionario: FuncionarioHolerite }) {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const { mestre, ativar } = useMestre();
+  const validar = useServerFn(validarSenhaMestra);
+
+  const dono = (user?.email ?? "").toLowerCase() === DONO_EMAIL;
+  const liberado = dono || mestre;
+
+  const [open, setOpen] = useState(false);
+  const [senha, setSenha] = useState("");
+  const [conferindo, setConferindo] = useState(false);
+  const [valores, setValores] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    const inicial: Record<string, string> = {};
+    for (const c of CAMPOS) inicial[c.chave] = String(Number(funcionario[c.chave] ?? 0));
+    setValores(inicial);
+    setSenha("");
+  }, [open, funcionario]);
+
+  async function conferirSenha() {
+    setConferindo(true);
+    try {
+      const r = await validar({ data: { senha } });
+      if (r.ok) {
+        ativar();
+        toast.success("Edição liberada neste aparelho.");
+      } else if (r.motivo === "nao_configurada") {
+        toast.error("A senha mestra ainda não foi cadastrada.");
+      } else {
+        toast.error("Senha mestra incorreta.");
+      }
+    } catch {
+      toast.error("Não foi possível conferir a senha agora.");
+    } finally {
+      setConferindo(false);
+    }
+  }
+
+  const salvar = useMutation({
+    mutationFn: async () => {
+      const num = (c: (typeof CAMPOS)[number]) => {
+        const n = Number(String(valores[c.chave] ?? "").replace(",", "."));
+        if (!Number.isFinite(n) || n < 0) throw new Error(`Valor inválido em ${c.label}.`);
+        return n;
+      };
+      const patch = Object.fromEntries(CAMPOS.map((c) => [c.chave, num(c)])) as {
+        salario_base: number;
+      };
+      const { error } = await supabase.from("funcionarios").update(patch).eq("id", funcionario.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Valores atualizados.");
+      qc.invalidateQueries({ queryKey: ["funcionarios-holerite"] });
+      setOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="print:hidden"
+        onClick={() => setOpen(true)}
+      >
+        <Pencil className="size-4" /> Editar valores
+      </Button>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar valores — {funcionario.nome}</DialogTitle>
+          <DialogDescription>
+            {liberado
+              ? "Altere salário, benefícios, descontos e percentuais de comissão."
+              : "Digite a senha mestra para liberar a edição dos valores."}
+          </DialogDescription>
+        </DialogHeader>
+
+        {liberado ? (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {CAMPOS.map((c) => (
+                <Field key={c.chave} label={c.label}>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={valores[c.chave] ?? ""}
+                    onChange={(e) =>
+                      setValores((v) => ({ ...v, [c.chave]: e.target.value }))
+                    }
+                  />
+                </Field>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+                Salvar valores
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <Input
+              type="password"
+              autoComplete="off"
+              placeholder="Senha mestra"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void conferirSenha();
+              }}
+            />
+            <DialogFooter>
+              <Button onClick={() => void conferirSenha()} disabled={conferindo || !senha}>
+                Liberar edição
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
