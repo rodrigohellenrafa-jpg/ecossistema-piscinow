@@ -40,6 +40,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { brl, proximoCodigo } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/funcionarios")({
   staticData: { sitemap: false },
@@ -107,6 +108,7 @@ function Funcionarios() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Funcionario | null>(null);
   const [form, setForm] = useState(vazio);
 

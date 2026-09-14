@@ -47,6 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, CATEGORIAS_PRODUTO, margem, pct } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/produtos")({
   staticData: { sitemap: false },
@@ -125,6 +126,7 @@ function Produtos() {
   const [q, setQ] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState<string>(TODAS_CATEGORIAS);
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Produto | null>(null);
   const [form, setForm] = useState(vazio);
 

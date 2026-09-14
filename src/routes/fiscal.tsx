@@ -53,6 +53,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO } from "@/lib/erp";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/fiscal")({
   staticData: { sitemap: false },
@@ -264,6 +265,7 @@ function Fiscal() {
   const [cancelarId, setCancelarId] = useState<string | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [novaOpen, setNovaOpen] = useState(false);
+  useAbrirModal("novo", () => setNovaOpen(true));
 
   const [novaNfe, setNovaNfe] = useState(novaNfeVazia);
   const [itensNfe, setItensNfe] = useState<ItemNota[]>([]);

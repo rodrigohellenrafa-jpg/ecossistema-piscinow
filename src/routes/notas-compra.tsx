@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/notas-compra")({
   staticData: { sitemap: false },
@@ -395,6 +396,7 @@ function LancarEstoque({
 function NotasCompra() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
   const [xml, setXml] = useState<string | null>(null);
   const [arquivo, setArquivo] = useState<string | null>(null);

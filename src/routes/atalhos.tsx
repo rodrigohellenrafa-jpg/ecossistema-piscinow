@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RequireAuth } from "@/components/require-auth";
 
 export const Route = createFileRoute("/atalhos")({
+  staticData: { sitemap: false },
   head: () => ({
     meta: [
       { title: "Atalhos de formulários — Splash Jardim do Trevo" },
@@ -98,7 +99,7 @@ function AtalhosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Atalhos de formulários"
-        description="Links diretos para abrir cada janela do sistema sem precisar procurar o botão."
+        subtitle="Links diretos para abrir cada janela do sistema sem precisar procurar o botão."
       />
 
       <Card>

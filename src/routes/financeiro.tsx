@@ -53,6 +53,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, FORMAS_PAGAMENTO, hojeISO, mesLabel } from "@/lib/erp";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/financeiro")({
   staticData: { sitemap: false },
@@ -120,6 +121,7 @@ const vazio = {
 function Financeiro() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
 
   const [fTipo, setFTipo] = useState("todos");

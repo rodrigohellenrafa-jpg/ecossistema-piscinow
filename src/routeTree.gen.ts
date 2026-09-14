@@ -29,6 +29,7 @@ import { Route as ContasRouteImport } from './routes/contas'
 import { Route as ComprasRouteImport } from './routes/compras'
 import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AtalhosRouteImport } from './routes/atalhos'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as AcessosRouteImport } from './routes/acessos'
 import { Route as IndexRouteImport } from './routes/index'
@@ -144,6 +145,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AtalhosRoute = AtalhosRouteImport.update({
+  id: '/atalhos',
+  path: '/atalhos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgendaRoute = AgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -219,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/acessos': typeof AcessosRoute
   '/agenda': typeof AgendaRoute
+  '/atalhos': typeof AtalhosRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/acessos': typeof AcessosRoute
   '/agenda': typeof AgendaRoute
+  '/atalhos': typeof AtalhosRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
@@ -292,6 +300,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/acessos': typeof AcessosRoute
   '/agenda': typeof AgendaRoute
+  '/atalhos': typeof AtalhosRoute
   '/auth': typeof AuthRoute
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
@@ -330,6 +339,7 @@ export interface FileRouteTypes {
     | '/'
     | '/acessos'
     | '/agenda'
+    | '/atalhos'
     | '/auth'
     | '/clientes'
     | '/compras'
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/'
     | '/acessos'
     | '/agenda'
+    | '/atalhos'
     | '/auth'
     | '/clientes'
     | '/compras'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/'
     | '/acessos'
     | '/agenda'
+    | '/atalhos'
     | '/auth'
     | '/clientes'
     | '/compras'
@@ -439,6 +451,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcessosRoute: typeof AcessosRoute
   AgendaRoute: typeof AgendaRoute
+  AtalhosRoute: typeof AtalhosRoute
   AuthRoute: typeof AuthRoute
   ClientesRoute: typeof ClientesRoute
   ComprasRoute: typeof ComprasRoute
@@ -613,6 +626,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/atalhos': {
+      id: '/atalhos'
+      path: '/atalhos'
+      fullPath: '/atalhos'
+      preLoaderRoute: typeof AtalhosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agenda': {
       id: '/agenda'
       path: '/agenda'
@@ -729,6 +749,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcessosRoute: AcessosRoute,
   AgendaRoute: AgendaRoute,
+  AtalhosRoute: AtalhosRoute,
   AuthRoute: AuthRoute,
   ClientesRoute: ClientesRoute,
   ComprasRoute: ComprasRoute,
