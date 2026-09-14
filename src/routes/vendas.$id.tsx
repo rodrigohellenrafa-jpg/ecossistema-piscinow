@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Printer, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
@@ -13,6 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -259,6 +266,189 @@ function DetalhePedido() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // ---- Edição por bloco (cada card tem seu próprio modal) ----
+  const num = (v: unknown) => Number(String(v ?? "").replace(",", ".")) || 0;
+
+  const [editPedido, setEditPedido] = useState<null | {
+    data: string;
+    cliente_nome: string;
+    vendedor: string;
+    tipo_atendimento: string;
+    endereco_entrega: string;
+    valor_frete: string;
+    valor_mao_obra: string;
+    forma_pagamento: string;
+    valor_entrada: string;
+    observacoes: string;
+  }>(null);
+  const [editItem, setEditItem] = useState<null | {
+    id: string;
+    descricao: string;
+    quantidade: string;
+    preco_unitario: string;
+  }>(null);
+  const [editCond, setEditCond] = useState<null | {
+    id: string;
+    forma_pagamento: string;
+    bandeira: string;
+    data_prevista: string;
+    parcelas: string;
+    valor: string;
+    acrescimo: string;
+    pago: boolean;
+  }>(null);
+  const [editPag, setEditPag] = useState<null | {
+    id: string;
+    data_pagamento: string;
+    forma_pagamento: string;
+    conta_bancaria: string;
+    valor: string;
+    observacoes: string;
+  }>(null);
+
+  const invalidarPedido = () => {
+    qc.invalidateQueries({ queryKey: ["venda", id] });
+    qc.invalidateQueries({ queryKey: ["venda-itens", id] });
+    qc.invalidateQueries({ queryKey: ["venda-condicoes", id] });
+    qc.invalidateQueries({ queryKey: ["vendas"] });
+  };
+
+  async function recalcularTotais(frete?: number, maoObra?: number) {
+    const { data: its } = await supabase.from("venda_itens").select("total").eq("venda_id", id);
+    const subtotal = (its ?? []).reduce((s, i) => s + Number(i.total ?? 0), 0);
+    const f = frete ?? Number(venda?.valor_frete ?? 0);
+    const m = maoObra ?? Number(venda?.valor_mao_obra ?? 0);
+    const { error } = await supabase
+      .from("vendas")
+      .update({ subtotal_produtos: subtotal, valor_total: subtotal + f + m })
+      .eq("id", id);
+    if (error) throw error;
+  }
+
+  const salvarPedido = useMutation({
+    mutationFn: async () => {
+      if (!editPedido) return;
+      const { error } = await supabase
+        .from("vendas")
+        .update({
+          data: editPedido.data,
+          cliente_nome: editPedido.cliente_nome || null,
+          vendedor: editPedido.vendedor || null,
+          tipo_atendimento: editPedido.tipo_atendimento,
+          endereco_entrega: editPedido.endereco_entrega || null,
+          valor_frete: num(editPedido.valor_frete),
+          valor_mao_obra: num(editPedido.valor_mao_obra),
+          forma_pagamento: editPedido.forma_pagamento || null,
+          valor_entrada: num(editPedido.valor_entrada),
+          observacoes: editPedido.observacoes || null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+      await recalcularTotais(num(editPedido.valor_frete), num(editPedido.valor_mao_obra));
+    },
+    onSuccess: () => {
+      toast.success("Dados do pedido atualizados.");
+      setEditPedido(null);
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarItem = useMutation({
+    mutationFn: async () => {
+      if (!editItem) return;
+      const qtd = num(editItem.quantidade);
+      const preco = num(editItem.preco_unitario);
+      if (qtd <= 0) throw new Error("Informe uma quantidade maior que zero.");
+      const { error } = await supabase
+        .from("venda_itens")
+        .update({
+          descricao: editItem.descricao,
+          quantidade: qtd,
+          preco_unitario: preco,
+          total: qtd * preco,
+        })
+        .eq("id", editItem.id);
+      if (error) throw error;
+      await recalcularTotais();
+    },
+    onSuccess: () => {
+      toast.success("Item atualizado.");
+      setEditItem(null);
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removerItem = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase.from("venda_itens").delete().eq("id", itemId);
+      if (error) throw error;
+      await recalcularTotais();
+    },
+    onSuccess: () => {
+      toast.success("Item removido.");
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarCondicao = useMutation({
+    mutationFn: async () => {
+      if (!editCond) return;
+      const parcelas = Math.max(1, Math.round(num(editCond.parcelas)));
+      const valor = num(editCond.valor);
+      const acrescimo = num(editCond.acrescimo);
+      const cobrado = valor + acrescimo;
+      const { error } = await supabase
+        .from("venda_condicoes")
+        .update({
+          forma_pagamento: editCond.forma_pagamento,
+          bandeira: editCond.bandeira || null,
+          data_prevista: editCond.data_prevista || null,
+          parcelas,
+          valor,
+          acrescimo,
+          valor_cobrado: cobrado,
+          valor_parcela: cobrado / parcelas,
+          pago: editCond.pago,
+        })
+        .eq("id", editCond.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Condição de pagamento atualizada.");
+      setEditCond(null);
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarPagamento = useMutation({
+    mutationFn: async () => {
+      if (!editPag) return;
+      const valor = num(editPag.valor);
+      if (valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const { error } = await supabase
+        .from("venda_pagamentos")
+        .update({
+          data_pagamento: editPag.data_pagamento,
+          forma_pagamento: editPag.forma_pagamento,
+          conta_bancaria: editPag.conta_bancaria || null,
+          valor,
+          observacoes: editPag.observacoes || null,
+        })
+        .eq("id", editPag.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pagamento atualizado.");
+      setEditPag(null);
+      invalidarFinanceiro();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const linhas = useMemo(() => {
     const itensGrade = itens.map((i) => ({
       cod: i.sku ?? "—",
@@ -342,6 +532,122 @@ function DetalhePedido() {
           </Button>
         </div>
       </div>
+
+      <Card className="print:hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+          <CardTitle>Dados do pedido</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setEditPedido({
+                data: venda.data,
+                cliente_nome: venda.cliente_nome ?? "",
+                vendedor: venda.vendedor ?? "",
+                tipo_atendimento: venda.tipo_atendimento,
+                endereco_entrega: venda.endereco_entrega ?? "",
+                valor_frete: String(venda.valor_frete ?? ""),
+                valor_mao_obra: String(venda.valor_mao_obra ?? ""),
+                forma_pagamento: venda.forma_pagamento ?? "",
+                valor_entrada: String(venda.valor_entrada ?? ""),
+                observacoes: venda.observacoes ?? "",
+              })
+            }
+          >
+            <Pencil className="size-4" /> Editar dados
+          </Button>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Data</p>
+            <p className="font-medium">{dataBR(venda.data)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Cliente</p>
+            <p className="font-medium">{venda.cliente_nome ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Vendedor</p>
+            <p className="font-medium">{venda.vendedor ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Frete</p>
+            <p className="font-medium">{brl(venda.valor_frete)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Mão de obra</p>
+            <p className="font-medium">{brl(venda.valor_mao_obra)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="font-medium">{brl(venda.valor_total)}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="print:hidden">
+        <CardHeader>
+          <CardTitle>Itens do pedido</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descrição</TableHead>
+                <TableHead className="text-right">Qtd</TableHead>
+                <TableHead className="text-right">Preço unit.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {itens.map((i) => (
+                <TableRow key={i.id}>
+                  <TableCell>{i.descricao}</TableCell>
+                  <TableCell className="text-right">{i.quantidade}</TableCell>
+                  <TableCell className="text-right">{brl(i.preco_unitario)}</TableCell>
+                  <TableCell className="text-right font-medium">{brl(i.total)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Editar item ${i.descricao}`}
+                        onClick={() =>
+                          setEditItem({
+                            id: i.id,
+                            descricao: i.descricao,
+                            quantidade: String(i.quantidade ?? ""),
+                            preco_unitario: String(i.preco_unitario ?? ""),
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        aria-label={`Remover item ${i.descricao}`}
+                        onClick={() => removerItem.mutate(i.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {itens.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                    Nenhum item neste pedido.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Card className="print:hidden">
         <CardHeader>
@@ -435,6 +741,7 @@ function DetalhePedido() {
                   <TableHead className="text-right">Juros</TableHead>
                   <TableHead className="text-right">Cliente paga</TableHead>
                   <TableHead>Situação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -453,6 +760,27 @@ function DetalhePedido() {
                       <Badge variant={c.pago ? "default" : "secondary"}>
                         {c.pago ? "Pago" : "A receber"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Editar condição de pagamento"
+                        onClick={() =>
+                          setEditCond({
+                            id: c.id,
+                            forma_pagamento: c.forma_pagamento,
+                            bandeira: c.bandeira ?? "",
+                            data_prevista: c.data_prevista ?? "",
+                            parcelas: String(c.parcelas ?? 1),
+                            valor: String(c.valor ?? ""),
+                            acrescimo: String(c.acrescimo ?? ""),
+                            pago: !!c.pago,
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -574,14 +902,34 @@ function DetalhePedido() {
                   <TableCell>{p.observacoes ?? "—"}</TableCell>
                   <TableCell className="text-right">{brl(Number(p.valor))}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removerPagamento.mutate(p.id)}
-                      aria-label="Remover pagamento"
-                    >
-                      <Trash2 />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Editar pagamento"
+                        onClick={() =>
+                          setEditPag({
+                            id: p.id,
+                            data_pagamento: p.data_pagamento,
+                            forma_pagamento: p.forma_pagamento,
+                            conta_bancaria: p.conta_bancaria ?? "",
+                            valor: String(p.valor ?? ""),
+                            observacoes: p.observacoes ?? "",
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => removerPagamento.mutate(p.id)}
+                        aria-label="Remover pagamento"
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -780,6 +1128,296 @@ function DetalhePedido() {
           )}
         </div>
       </div>
+
+      <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar dados do pedido</DialogTitle>
+          </DialogHeader>
+          {editPedido && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Data">
+                <Input
+                  type="date"
+                  value={editPedido.data}
+                  onChange={(e) => setEditPedido({ ...editPedido, data: e.target.value })}
+                />
+              </Field>
+              <Field label="Cliente">
+                <Input
+                  value={editPedido.cliente_nome}
+                  onChange={(e) => setEditPedido({ ...editPedido, cliente_nome: e.target.value })}
+                />
+              </Field>
+              <Field label="Vendedor">
+                <Input
+                  value={editPedido.vendedor}
+                  onChange={(e) => setEditPedido({ ...editPedido, vendedor: e.target.value })}
+                />
+              </Field>
+              <Field label="Tipo de atendimento">
+                <Select
+                  value={editPedido.tipo_atendimento}
+                  onValueChange={(v) => setEditPedido({ ...editPedido, tipo_atendimento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in">IN · Balcão</SelectItem>
+                    <SelectItem value="out">OUT · Serviço externo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Frete (R$)">
+                <Input
+                  value={editPedido.valor_frete}
+                  onChange={(e) => setEditPedido({ ...editPedido, valor_frete: e.target.value })}
+                />
+              </Field>
+              <Field label="Mão de obra (R$)">
+                <Input
+                  value={editPedido.valor_mao_obra}
+                  onChange={(e) => setEditPedido({ ...editPedido, valor_mao_obra: e.target.value })}
+                />
+              </Field>
+              <Field label="Forma de pagamento">
+                <Select
+                  value={editPedido.forma_pagamento || undefined}
+                  onValueChange={(v) => setEditPedido({ ...editPedido, forma_pagamento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGAMENTO.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Entrada (R$)">
+                <Input
+                  value={editPedido.valor_entrada}
+                  onChange={(e) => setEditPedido({ ...editPedido, valor_entrada: e.target.value })}
+                />
+              </Field>
+              <Field label="Endereço de entrega" className="sm:col-span-2">
+                <Input
+                  value={editPedido.endereco_entrega}
+                  onChange={(e) =>
+                    setEditPedido({ ...editPedido, endereco_entrega: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Observações" className="sm:col-span-2">
+                <Input
+                  value={editPedido.observacoes}
+                  onChange={(e) => setEditPedido({ ...editPedido, observacoes: e.target.value })}
+                />
+              </Field>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPedido(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarPedido.mutate()} disabled={salvarPedido.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editItem !== null} onOpenChange={(o) => !o && setEditItem(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar item do pedido</DialogTitle>
+          </DialogHeader>
+          {editItem && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Descrição" className="sm:col-span-2">
+                <Input
+                  value={editItem.descricao}
+                  onChange={(e) => setEditItem({ ...editItem, descricao: e.target.value })}
+                />
+              </Field>
+              <Field label="Quantidade">
+                <Input
+                  value={editItem.quantidade}
+                  onChange={(e) => setEditItem({ ...editItem, quantidade: e.target.value })}
+                />
+              </Field>
+              <Field label="Preço unitário (R$)">
+                <Input
+                  value={editItem.preco_unitario}
+                  onChange={(e) => setEditItem({ ...editItem, preco_unitario: e.target.value })}
+                />
+              </Field>
+              <p className="text-sm text-muted-foreground sm:col-span-2">
+                Total do item: {brl(num(editItem.quantidade) * num(editItem.preco_unitario))}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditItem(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarItem.mutate()} disabled={salvarItem.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editCond !== null} onOpenChange={(o) => !o && setEditCond(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar condição de pagamento</DialogTitle>
+          </DialogHeader>
+          {editCond && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Forma de pagamento">
+                <Select
+                  value={editCond.forma_pagamento}
+                  onValueChange={(v) => setEditCond({ ...editCond, forma_pagamento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGAMENTO.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Cartão / bandeira">
+                <Input
+                  value={editCond.bandeira}
+                  onChange={(e) => setEditCond({ ...editCond, bandeira: e.target.value })}
+                />
+              </Field>
+              <Field label="Data prevista">
+                <Input
+                  type="date"
+                  value={editCond.data_prevista}
+                  onChange={(e) => setEditCond({ ...editCond, data_prevista: e.target.value })}
+                />
+              </Field>
+              <Field label="Parcelas">
+                <Input
+                  value={editCond.parcelas}
+                  onChange={(e) => setEditCond({ ...editCond, parcelas: e.target.value })}
+                />
+              </Field>
+              <Field label="Abate do pedido (R$)">
+                <Input
+                  value={editCond.valor}
+                  onChange={(e) => setEditCond({ ...editCond, valor: e.target.value })}
+                />
+              </Field>
+              <Field label="Juros / acréscimo (R$)">
+                <Input
+                  value={editCond.acrescimo}
+                  onChange={(e) => setEditCond({ ...editCond, acrescimo: e.target.value })}
+                />
+              </Field>
+              <Field label="Situação">
+                <Select
+                  value={editCond.pago ? "pago" : "aberto"}
+                  onValueChange={(v) => setEditCond({ ...editCond, pago: v === "pago" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aberto">A receber</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <p className="self-end text-sm text-muted-foreground">
+                Cliente paga: {brl(num(editCond.valor) + num(editCond.acrescimo))}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCond(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarCondicao.mutate()} disabled={salvarCondicao.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editPag !== null} onOpenChange={(o) => !o && setEditPag(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar pagamento</DialogTitle>
+          </DialogHeader>
+          {editPag && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Data do pagamento">
+                <Input
+                  type="date"
+                  value={editPag.data_pagamento}
+                  onChange={(e) => setEditPag({ ...editPag, data_pagamento: e.target.value })}
+                />
+              </Field>
+              <Field label="Forma de pagamento">
+                <Select
+                  value={editPag.forma_pagamento}
+                  onValueChange={(v) => setEditPag({ ...editPag, forma_pagamento: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMAS_PAGAMENTO.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Cartão / conta">
+                <Input
+                  value={editPag.conta_bancaria}
+                  onChange={(e) => setEditPag({ ...editPag, conta_bancaria: e.target.value })}
+                />
+              </Field>
+              <Field label="Valor (R$)">
+                <Input
+                  value={editPag.valor}
+                  onChange={(e) => setEditPag({ ...editPag, valor: e.target.value })}
+                />
+              </Field>
+              <Field label="Observações" className="sm:col-span-2">
+                <Input
+                  value={editPag.observacoes}
+                  onChange={(e) => setEditPag({ ...editPag, observacoes: e.target.value })}
+                />
+              </Field>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPag(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => salvarPagamento.mutate()} disabled={salvarPagamento.isPending}>
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
