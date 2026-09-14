@@ -807,6 +807,19 @@ function Contas() {
                   </p>
                 )}
               </Field>
+              {form.recorrencia !== "nenhuma" && (
+                <Field label="Repetir até (opcional)">
+                  <Input
+                    type="date"
+                    value={form.recorrencia_fim}
+                    onChange={(e) => set("recorrencia_fim")(e.target.value)}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Deixe em branco para repetir sem limite. Depois dessa data nenhum novo
+                    vencimento é gerado.
+                  </p>
+                </Field>
+              )}
               {form.tipo === "pagar" && (
                 <Field label="Tipo de despesa">
                   <Select
