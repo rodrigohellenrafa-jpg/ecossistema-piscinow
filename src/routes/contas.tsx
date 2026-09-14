@@ -129,12 +129,45 @@ function proximaData(iso: string, recorrencia: string): string | null {
 const rotuloRecorrencia = (v: string) =>
   RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
 
+const PERIODOS = [
+  { valor: "todas", rotulo: "Todas" },
+  { valor: "hoje", rotulo: "Hoje" },
+  { valor: "semana", rotulo: "Esta semana" },
+  { valor: "mes", rotulo: "Este mês" },
+  { valor: "trimestre", rotulo: "Este trimestre" },
+  { valor: "semestre", rotulo: "Este semestre" },
+  { valor: "ano", rotulo: "Este ano" },
+];
+
+function noPeriodo(vencimento: string, periodo: string): boolean {
+  if (periodo === "todas") return true;
+  const d = new Date(`${vencimento}T00:00:00`);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  if (periodo === "hoje") return d.getTime() === hoje.getTime();
+  if (periodo === "semana") {
+    const inicio = new Date(hoje);
+    inicio.setDate(hoje.getDate() - hoje.getDay()); // domingo
+    const fim = new Date(inicio);
+    fim.setDate(inicio.getDate() + 6);
+    return d >= inicio && d <= fim;
+  }
+  if (periodo === "mes") return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "trimestre")
+    return Math.floor(d.getMonth() / 3) === Math.floor(hoje.getMonth() / 3) && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "semestre")
+    return Math.floor(d.getMonth() / 6) === Math.floor(hoje.getMonth() / 6) && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "ano") return d.getFullYear() === hoje.getFullYear();
+  return true;
+}
+
 function Contas() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
+  const [periodo, setPeriodo] = useState("todas");
 
   const { data = [] } = useQuery({
     queryKey: ["contas"],
@@ -474,8 +507,9 @@ function Contas() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const pagar = data.filter((c) => c.tipo === "pagar");
-  const receber = data.filter((c) => c.tipo === "receber");
+  const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo));
+  const pagar = filtradas.filter((c) => c.tipo === "pagar");
+  const receber = filtradas.filter((c) => c.tipo === "receber");
   const soma = (l: typeof data) =>
     l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
 
@@ -860,6 +894,27 @@ function Contas() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Período:</span>
+        <Select value={periodo} onValueChange={setPeriodo}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIODOS.map((p) => (
+              <SelectItem key={p.valor} value={p.valor}>
+                {p.rotulo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {periodo !== "todas" && (
+          <span className="text-xs text-muted-foreground">
+            Filtrando por data de vencimento: {PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.
+          </span>
+        )}
       </div>
 
       <Tabs defaultValue="pagar">
