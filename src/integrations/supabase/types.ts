@@ -806,6 +806,7 @@ export type Database = {
       lancamentos_financeiros: {
         Row: {
           categoria: string
+          cliente_id: string | null
           conciliado: boolean
           conta_bancaria: string | null
           created_at: string
@@ -829,6 +830,7 @@ export type Database = {
         }
         Insert: {
           categoria?: string
+          cliente_id?: string | null
           conciliado?: boolean
           conta_bancaria?: string | null
           created_at?: string
@@ -852,6 +854,7 @@ export type Database = {
         }
         Update: {
           categoria?: string
+          cliente_id?: string | null
           conciliado?: boolean
           conta_bancaria?: string | null
           created_at?: string
@@ -874,6 +877,13 @@ export type Database = {
           venda_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lancamentos_financeiros_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lancamentos_financeiros_fornecedor_id_fkey"
             columns: ["fornecedor_id"]

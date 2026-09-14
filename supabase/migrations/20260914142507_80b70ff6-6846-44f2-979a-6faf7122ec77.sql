@@ -1,0 +1,1 @@
+ALTER TABLE public.lancamentos_financeiros ADD COLUMN IF NOT EXISTS cliente_id uuid REFERENCES public.clientes(id) ON DELETE SET NULL; CREATE INDEX IF NOT EXISTS idx_lancamentos_cliente ON public.lancamentos_financeiros(cliente_id);
