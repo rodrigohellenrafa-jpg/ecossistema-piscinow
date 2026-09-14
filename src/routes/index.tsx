@@ -159,6 +159,47 @@ function Dashboard() {
     },
   });
 
+  // Movimentações do dia: quantas ações foram registradas hoje em cada módulo.
+  const { data: atividadeHoje = [] } = useQuery({
+    queryKey: ["dash-atividade-hoje"],
+    refetchInterval: 60000,
+    queryFn: async () => {
+      const inicioDia = new Date();
+      inicioDia.setHours(0, 0, 0, 0);
+      const desde = inicioDia.toISOString();
+      const alvos = [
+        { tabela: "vendas", rotulo: "Vendas" },
+        { tabela: "ordens_servico", rotulo: "Ordens de serviço" },
+        { tabela: "obras", rotulo: "Obras" },
+        { tabela: "ordens_compra", rotulo: "Ordens de compra" },
+        { tabela: "notas_compra", rotulo: "Notas de compra" },
+        { tabela: "notas_fiscais", rotulo: "Notas fiscais" },
+        { tabela: "estoque_movimentos", rotulo: "Movimentos de estoque" },
+        { tabela: "contas", rotulo: "Contas a pagar/receber" },
+        { tabela: "lancamentos_financeiros", rotulo: "Lançamentos financeiros" },
+        { tabela: "venda_pagamentos", rotulo: "Pagamentos recebidos" },
+        { tabela: "clientes", rotulo: "Clientes cadastrados" },
+        { tabela: "produtos", rotulo: "Produtos cadastrados" },
+        { tabela: "fornecedores", rotulo: "Fornecedores cadastrados" },
+        { tabela: "agenda_eventos", rotulo: "Compromissos da agenda" },
+      ] as const;
+      const linhas = await Promise.all(
+        alvos.map(async (a) => {
+          const { count, error } = await supabase
+            .from(a.tabela)
+            .select("id", { count: "exact", head: true })
+            .gte("created_at", desde);
+          if (error) return { rotulo: a.rotulo, total: 0 };
+          return { rotulo: a.rotulo, total: count ?? 0 };
+        }),
+      );
+      return linhas;
+    },
+  });
+
+  const totalAcoesHoje = atividadeHoje.reduce((a, l) => a + l.total, 0);
+  const atividadeOrdenada = [...atividadeHoje].sort((a, b) => b.total - a.total);
+
   const ini = inicioMes();
   const n = (v: unknown) => Number(v ?? 0);
   const s = (v: unknown) => String(v ?? "");
