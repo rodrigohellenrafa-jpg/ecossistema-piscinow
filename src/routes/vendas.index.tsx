@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
@@ -92,11 +92,16 @@ function Vendas() {
   const [fim, setFim] = useState("");
   const qc = useQueryClient();
   const validarMestra = useServerFn(validarSenhaMestra);
-  const [alvo, setAlvo] = useState<{ id: string; numero: string | null } | null>(null);
+  const navigate = useNavigate();
+  const [alvo, setAlvo] = useState<{
+    id: string;
+    numero: string | null;
+    acao: "excluir" | "editar";
+  } | null>(null);
   const [senha, setSenha] = useState("");
   const [excluindo, setExcluindo] = useState(false);
 
-  async function confirmarExclusao() {
+  async function confirmarAcao() {
     if (!alvo) return;
     setExcluindo(true);
     try {
@@ -109,6 +114,13 @@ function Vendas() {
         );
         return;
       }
+      if (alvo.acao === "editar") {
+        const id = alvo.id;
+        setAlvo(null);
+        setSenha("");
+        void navigate({ to: "/vendas/$id", params: { id } });
+        return;
+      }
       const { error } = await supabase.from("vendas").delete().eq("id", alvo.id);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["vendas"] });
@@ -116,7 +128,7 @@ function Vendas() {
       setAlvo(null);
       setSenha("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível excluir o pedido.");
+      toast.error(e instanceof Error ? e.message : "Não foi possível concluir a ação.");
     } finally {
       setExcluindo(false);
     }
@@ -305,18 +317,31 @@ function Vendas() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label={`Excluir pedido ${v.numero ?? ""}`}
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setSenha("");
-                            setAlvo({ id: v.id, numero: v.numero });
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Editar pedido ${v.numero ?? ""}`}
+                            onClick={() => {
+                              setSenha("");
+                              setAlvo({ id: v.id, numero: v.numero, acao: "editar" });
+                            }}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Excluir pedido ${v.numero ?? ""}`}
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setSenha("");
+                              setAlvo({ id: v.id, numero: v.numero, acao: "excluir" });
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -434,9 +459,13 @@ function Vendas() {
       <Dialog open={alvo !== null} onOpenChange={(o) => !o && setAlvo(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Excluir pedido {alvo?.numero ?? ""}</DialogTitle>
+            <DialogTitle>
+              {alvo?.acao === "editar" ? "Editar" : "Excluir"} pedido {alvo?.numero ?? ""}
+            </DialogTitle>
             <DialogDescription>
-              Esta ação não pode ser desfeita. Digite a senha mestra para confirmar.
+              {alvo?.acao === "editar"
+                ? "Digite a senha mestra para abrir o pedido em modo de edição."
+                : "Esta ação não pode ser desfeita. Digite a senha mestra para confirmar."}
             </DialogDescription>
           </DialogHeader>
           <Input
@@ -446,7 +475,7 @@ function Vendas() {
             placeholder="Senha mestra"
             onChange={(e) => setSenha(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") void confirmarExclusao();
+              if (e.key === "Enter") void confirmarAcao();
             }}
           />
           <DialogFooter>
@@ -454,11 +483,11 @@ function Vendas() {
               Cancelar
             </Button>
             <Button
-              variant="destructive"
+              variant={alvo?.acao === "editar" ? "default" : "destructive"}
               disabled={excluindo || !senha}
-              onClick={() => void confirmarExclusao()}
+              onClick={() => void confirmarAcao()}
             >
-              Excluir pedido
+              {alvo?.acao === "editar" ? "Abrir para editar" : "Excluir pedido"}
             </Button>
           </DialogFooter>
         </DialogContent>
