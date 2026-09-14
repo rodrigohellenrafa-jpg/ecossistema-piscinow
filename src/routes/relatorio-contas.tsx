@@ -370,25 +370,25 @@ function RelatorioContas() {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={grafico}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
                 <YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={12}
                   tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
                   formatter={(v: number) => brl(v)}
                   contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
                     borderRadius: 8,
-                    color: "hsl(var(--popover-foreground))",
+                    color: "var(--popover-foreground)",
                   }}
                 />
                 <Legend />
-                <Bar dataKey="Receber" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Pagar" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Receber" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Pagar" fill="var(--muted-foreground)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
