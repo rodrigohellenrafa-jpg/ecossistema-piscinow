@@ -690,7 +690,7 @@ function Contas() {
                 )}
               </Field>
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
-              <CentroCustoField value={form.obra_id} onChange={v=>setForm(f=>({...f,obra_id:v}))} />
+              <VinculoField value={form.vinculo} onChange={(v: string)=>setForm(f=>({...f,vinculo:v}))} />
               <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
               <Field label="Observações" className="sm:col-span-2">
