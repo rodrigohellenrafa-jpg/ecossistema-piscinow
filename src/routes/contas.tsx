@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
@@ -131,6 +131,7 @@ const rotuloRecorrencia = (v: string) =>
 function Contas() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
 
@@ -272,6 +273,48 @@ function Contas() {
       }
 
       const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+
+      if (editando) {
+        const { error } = await supabase
+          .from("contas")
+          .update({
+            tipo: form.tipo,
+            descricao: form.descricao.trim(),
+            parceiro: form.parceiro || null,
+            categoria: ratear ? "Rateio" : form.categoria || null,
+            valor: Number(form.valor) || 0,
+            valor_juros: Number(form.valor_juros) || 0,
+            vencimento: form.vencimento,
+            observacoes: form.observacoes || null,
+            obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
+            funcionario_id: parseVinculo(form.vinculo).funcionario_id,
+            cliente_id: parseVinculo(form.vinculo).cliente_id,
+            numero_documento: form.numero_documento || null,
+            recorrencia: form.recorrencia,
+            tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
+          })
+          .eq("id", editando);
+        if (error) throw error;
+
+        const { error: errDel } = await supabase
+          .from("conta_rateios")
+          .delete()
+          .eq("conta_id", editando);
+        if (errDel) throw errDel;
+        if (ratear) {
+          const { error: err2 } = await supabase.from("conta_rateios").insert(
+            linhas.map((l) => ({
+              conta_id: editando,
+              categoria: l.categoria,
+              valor: l.valor,
+              created_by: uid,
+            })),
+          );
+          if (err2) throw err2;
+        }
+        return;
+      }
+
       const { data: criada, error } = await supabase
         .from("contas")
         .insert({
@@ -309,8 +352,9 @@ function Contas() {
       }
     },
     onSuccess: () => {
-      toast.success("Título lançado!");
+      toast.success(editando ? "Lançamento atualizado!" : "Título lançado!");
       setForm(vazio);
+      setEditando(null);
       setRatear(false);
       setRateio([
         { categoria: "", valor: "" },
@@ -378,6 +422,46 @@ function Contas() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["contas"] }),
   });
 
+  const abrirEdicao = (c: Conta) => {
+    setEditando(c.id);
+    const vinculo = c.obra_id
+      ? `obra:${c.obra_id}`
+      : c.funcionario_id
+        ? `func:${c.funcionario_id}`
+        : c.cliente_id
+          ? `cli:${c.cliente_id}`
+          : "";
+    setForm({
+      obra_id: c.obra_id ?? "",
+      vinculo,
+      numero_documento: c.numero_documento ?? "",
+      tipo: c.tipo,
+      descricao: c.descricao,
+      parceiro: c.parceiro ?? "",
+      categoria: c.categoria === "Rateio" ? "" : (c.categoria ?? ""),
+      valor: String(c.valor ?? 0),
+      valor_juros: String(c.valor_juros ?? 0),
+      vencimento: c.vencimento,
+      recorrencia: c.recorrencia ?? "nenhuma",
+      tipo_despesa: c.tipo_despesa ?? "",
+      observacoes: c.observacoes ?? "",
+    });
+    const linhasExistentes = rateios.filter((r) => r.conta_id === c.id);
+    if (linhasExistentes.length > 0) {
+      setRatear(true);
+      setRateio(
+        linhasExistentes.map((r) => ({ categoria: r.categoria, valor: String(r.valor) })),
+      );
+    } else {
+      setRatear(false);
+      setRateio([
+        { categoria: "", valor: "" },
+        { categoria: "", valor: "" },
+      ]);
+    }
+    setOpen(true);
+  };
+
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const pagar = data.filter((c) => c.tipo === "pagar");
@@ -392,7 +476,21 @@ function Contas() {
           <h1 className="text-2xl font-semibold tracking-tight">Contas a Pagar e Receber</h1>
           <p className="text-sm text-muted-foreground">Títulos com vencimento e baixa manual.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) {
+              setEditando(null);
+              setForm(vazio);
+              setRatear(false);
+              setRateio([
+                { categoria: "", valor: "" },
+                { categoria: "", valor: "" },
+              ]);
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus /> Novo lançamento
@@ -400,7 +498,7 @@ function Contas() {
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Novo lançamento</DialogTitle>
+              <DialogTitle>{editando ? "Editar lançamento" : "Novo lançamento"}</DialogTitle>
               <DialogDescription>Conta a pagar ou a receber.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -734,7 +832,7 @@ function Contas() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                {salvar.isPending ? "Salvando…" : "Salvar lançamento"}
+                {salvar.isPending ? "Salvando…" : editando ? "Salvar alterações" : "Salvar lançamento"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -752,6 +850,7 @@ function Contas() {
             itens={pagar}
             rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
+            onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
         </TabsContent>
@@ -761,6 +860,7 @@ function Contas() {
             itens={receber}
             rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
+            onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
         </TabsContent>
@@ -771,6 +871,7 @@ function Contas() {
 
 type Conta = {
   id: string;
+  tipo: string;
   descricao: string;
   parceiro: string | null;
   categoria: string | null;
@@ -779,6 +880,12 @@ type Conta = {
   vencimento: string;
   status: string;
   recorrencia?: string | null;
+  tipo_despesa?: string | null;
+  observacoes?: string | null;
+  numero_documento?: string | null;
+  obra_id?: string | null;
+  funcionario_id?: string | null;
+  cliente_id?: string | null;
 };
 
 function Lista({
@@ -786,12 +893,14 @@ function Lista({
   itens,
   rateios = [],
   onBaixar,
+  onEditar,
   onExcluir,
 }: {
   titulo: string;
   itens: Conta[];
   rateios?: { conta_id: string; categoria: string; valor: number }[];
   onBaixar: (id: string) => void;
+  onEditar: (c: Conta) => void;
   onExcluir: (id: string) => void;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
@@ -861,6 +970,14 @@ function Lista({
                         <CheckCircle2 className="size-4" />
                       </Button>
                     )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => onEditar(c)}
+                      aria-label="Editar lançamento"
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
                     <Button
                       size="icon"
                       variant="ghost"
