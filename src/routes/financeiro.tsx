@@ -17,7 +17,7 @@ import {
 
 import { DespesasRecorrentes } from "@/components/despesas-recorrentes";
 import { SaldosBancarios } from "@/components/saldos-bancarios";
-import { CentroCustoField } from "@/components/centro-custo-field";
+import { CentroCustoField, VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -101,6 +101,7 @@ type Lancamento = {
 
 const vazio = {
   obra_id: "",
+  vinculo: "",
   numero_documento: "",
   tipo_fluxo: "receita",
   categoria: "",
@@ -235,6 +236,7 @@ function Financeiro() {
       }
 
       const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const vinc = parseVinculo(form.vinculo);
       const { data: criado, error } = await supabase.from("lancamentos_financeiros").insert({
         tipo_fluxo: form.tipo_fluxo,
         categoria: ratear ? "Rateio" : form.categoria.trim(),
@@ -247,11 +249,12 @@ function Financeiro() {
         forma_pagamento: form.forma_pagamento || null,
         venda_id: form.venda_id || null,
         fornecedor_id: form.fornecedor_id || null,
-        funcionario_id: form.funcionario_id || null,
+        funcionario_id: vinc.funcionario_id ?? (form.funcionario_id || null),
+        cliente_id: vinc.cliente_id,
         status: form.status,
         observacoes: form.observacoes || null,
-          obra_id: form.obra_id || null,
-          numero_documento: form.numero_documento || null,
+        obra_id: vinc.obra_id ?? (form.obra_id || null),
+        numero_documento: form.numero_documento || null,
         created_by: uid,
       })
         .select("id")
@@ -611,7 +614,7 @@ function Financeiro() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <CentroCustoField value={form.obra_id} onChange={v=>setForm(f=>({...f,obra_id:v}))} />
+                <VinculoField value={form.vinculo} onChange={v=>setForm(f=>({...f,vinculo:v}))} />
               <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
               <Field label="Observações" className="sm:col-span-2">
                   <Textarea
