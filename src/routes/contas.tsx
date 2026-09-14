@@ -623,6 +623,7 @@ type Conta = {
   valor_juros?: number | null;
   vencimento: string;
   status: string;
+  recorrencia?: string | null;
 };
 
 function Lista({
@@ -665,6 +666,11 @@ function Lista({
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">
                     {c.descricao}
+                    {c.recorrencia && c.recorrencia !== "nenhuma" && (
+                      <Badge variant="outline" className="ml-2 align-middle text-xs font-normal">
+                        {rotuloRecorrencia(c.recorrencia)}
+                      </Badge>
+                    )}
                     {rateios.some((r) => r.conta_id === c.id) && (
                       <span className="mt-1 block text-xs font-normal text-muted-foreground">
                         Rateio:{" "}
