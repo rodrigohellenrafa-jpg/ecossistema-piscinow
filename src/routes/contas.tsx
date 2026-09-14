@@ -78,6 +78,7 @@ const vazio = {
   valor_juros: "0",
   vencimento: "",
   recorrencia: "nenhuma",
+  recorrencia_fim: "",
   tipo_despesa: "",
   observacoes: "",
 };
@@ -291,6 +292,10 @@ function Contas() {
             cliente_id: parseVinculo(form.vinculo).cliente_id,
             numero_documento: form.numero_documento || null,
             recorrencia: form.recorrencia,
+            recorrencia_fim:
+              form.recorrencia !== "nenhuma" && form.recorrencia_fim
+                ? form.recorrencia_fim
+                : null,
             tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
           })
           .eq("id", editando);
@@ -332,6 +337,8 @@ function Contas() {
           cliente_id: parseVinculo(form.vinculo).cliente_id,
           numero_documento: form.numero_documento || null,
           recorrencia: form.recorrencia,
+          recorrencia_fim:
+            form.recorrencia !== "nenhuma" && form.recorrencia_fim ? form.recorrencia_fim : null,
           tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
           created_by: uid,
         })
@@ -383,7 +390,8 @@ function Contas() {
         .single();
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
-        if (proxima) {
+        const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
+        if (proxima && (!fimRecorrencia || proxima <= fimRecorrencia)) {
           const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
           const { error: errRec } = await supabase.from("contas").insert({
             tipo: conta.tipo,
