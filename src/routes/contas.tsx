@@ -999,7 +999,7 @@ function Lista({
               <TableHead className="text-right">Juros</TableHead>
               <TableHead className="text-right">Total</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-24" />
+              <TableHead className="w-36 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1038,7 +1038,7 @@ function Lista({
                       {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="flex gap-1">
+                  <TableCell className="flex justify-end gap-1">
                     {c.status !== "pago" && (
                       <Button
                         size="icon"
@@ -1060,6 +1060,7 @@ function Lista({
                     <Button
                       size="icon"
                       variant="ghost"
+                      className="text-destructive hover:text-destructive"
                       onClick={() => onExcluir(c.id)}
                       aria-label="Excluir"
                     >
