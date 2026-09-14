@@ -354,9 +354,27 @@ function Vendas() {
                       </TableCell>
                       <TableCell>{dataBR(v.data)}</TableCell>
                       <TableCell>
-                        <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
-                          {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
+                            {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
+                          </Badge>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Alterar tipo do pedido ${v.numero ?? ""}`}
+                            onClick={() => {
+                              setSenha("");
+                              setNovoTipo(v.tipo_atendimento || "in");
+                              setEditTipo({
+                                id: v.id,
+                                numero: v.numero,
+                                tipo_atendimento: v.tipo_atendimento || "in",
+                              });
+                            }}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>{v.cliente_nome ?? "—"}</TableCell>
                       <TableCell>{v.vendedor ?? "—"}</TableCell>
