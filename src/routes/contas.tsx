@@ -409,6 +409,37 @@ function Contas() {
         );
         if (err2) throw err2;
       }
+
+      // Recorrência: já cria os próximos vencimentos para aparecerem na lista.
+      const futuras = ocorrenciasFuturas(
+        form.vencimento,
+        form.recorrencia,
+        form.recorrencia !== "nenhuma" && form.recorrencia_fim ? form.recorrencia_fim : null,
+      );
+      if (futuras.length > 0) {
+        const { error: errFut } = await supabase.from("contas").insert(
+          futuras.map((venc) => ({
+            tipo: form.tipo,
+            descricao: form.descricao.trim(),
+            parceiro: form.parceiro || null,
+            categoria: ratear ? "Rateio" : form.categoria || null,
+            valor: Number(form.valor) || 0,
+            valor_juros: Number(form.valor_juros) || 0,
+            vencimento: venc,
+            status: "aberto",
+            observacoes: form.observacoes || null,
+            obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
+            funcionario_id: parseVinculo(form.vinculo).funcionario_id,
+            cliente_id: parseVinculo(form.vinculo).cliente_id,
+            numero_documento: form.numero_documento || null,
+            recorrencia: form.recorrencia,
+            recorrencia_fim: form.recorrencia_fim || null,
+            tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
+            created_by: uid,
+          })),
+        );
+        if (errFut) throw errFut;
+      }
     },
     onSuccess: () => {
       toast.success(editando ? "Lançamento atualizado!" : "Título lançado!");
