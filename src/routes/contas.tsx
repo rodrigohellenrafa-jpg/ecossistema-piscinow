@@ -129,12 +129,45 @@ function proximaData(iso: string, recorrencia: string): string | null {
 const rotuloRecorrencia = (v: string) =>
   RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
 
+const PERIODOS = [
+  { valor: "todas", rotulo: "Todas" },
+  { valor: "hoje", rotulo: "Hoje" },
+  { valor: "semana", rotulo: "Esta semana" },
+  { valor: "mes", rotulo: "Este mês" },
+  { valor: "trimestre", rotulo: "Este trimestre" },
+  { valor: "semestre", rotulo: "Este semestre" },
+  { valor: "ano", rotulo: "Este ano" },
+];
+
+function noPeriodo(vencimento: string, periodo: string): boolean {
+  if (periodo === "todas") return true;
+  const d = new Date(`${vencimento}T00:00:00`);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  if (periodo === "hoje") return d.getTime() === hoje.getTime();
+  if (periodo === "semana") {
+    const inicio = new Date(hoje);
+    inicio.setDate(hoje.getDate() - hoje.getDay()); // domingo
+    const fim = new Date(inicio);
+    fim.setDate(inicio.getDate() + 6);
+    return d >= inicio && d <= fim;
+  }
+  if (periodo === "mes") return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "trimestre")
+    return Math.floor(d.getMonth() / 3) === Math.floor(hoje.getMonth() / 3) && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "semestre")
+    return Math.floor(d.getMonth() / 6) === Math.floor(hoje.getMonth() / 6) && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "ano") return d.getFullYear() === hoje.getFullYear();
+  return true;
+}
+
 function Contas() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
+  const [periodo, setPeriodo] = useState("todas");
 
   const { data = [] } = useQuery({
     queryKey: ["contas"],
