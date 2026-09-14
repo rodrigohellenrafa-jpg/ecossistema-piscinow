@@ -474,7 +474,20 @@ function Contas() {
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
-        if (proxima && (!fimRecorrencia || proxima <= fimRecorrencia)) {
+        const { data: jaExiste } = proxima
+          ? await supabase
+              .from("contas")
+              .select("id")
+              .eq("descricao", conta.descricao)
+              .eq("tipo", conta.tipo)
+              .eq("vencimento", proxima)
+              .limit(1)
+          : { data: [] as { id: string }[] };
+        if (
+          proxima &&
+          (jaExiste ?? []).length === 0 &&
+          (!fimRecorrencia || proxima <= fimRecorrencia)
+        ) {
           const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
           const { error: errRec } = await supabase.from("contas").insert({
             tipo: conta.tipo,
