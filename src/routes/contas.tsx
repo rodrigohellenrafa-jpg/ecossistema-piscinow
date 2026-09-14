@@ -352,8 +352,9 @@ function Contas() {
       }
     },
     onSuccess: () => {
-      toast.success("Título lançado!");
+      toast.success(editando ? "Lançamento atualizado!" : "Título lançado!");
       setForm(vazio);
+      setEditando(null);
       setRatear(false);
       setRateio([
         { categoria: "", valor: "" },
