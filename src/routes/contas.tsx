@@ -855,6 +855,7 @@ function Contas() {
 
 type Conta = {
   id: string;
+  tipo: string;
   descricao: string;
   parceiro: string | null;
   categoria: string | null;
@@ -863,6 +864,12 @@ type Conta = {
   vencimento: string;
   status: string;
   recorrencia?: string | null;
+  tipo_despesa?: string | null;
+  observacoes?: string | null;
+  numero_documento?: string | null;
+  obra_id?: string | null;
+  funcionario_id?: string | null;
+  cliente_id?: string | null;
 };
 
 function Lista({
