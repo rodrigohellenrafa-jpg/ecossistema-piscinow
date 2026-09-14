@@ -174,6 +174,43 @@ function Vendas() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const atualizarTipoAtendimento = useMutation({
+    mutationFn: async ({ id, tipo_atendimento }: { id: string; tipo_atendimento: string }) => {
+      const { error } = await supabase.from("vendas").update({ tipo_atendimento }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success("Tipo de atendimento atualizado.");
+      setEditTipo(null);
+      setNovoTipo("in");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  async function salvarTipoAtendimento() {
+    if (!editTipo || !novoTipo) return;
+    setSalvandoTipo(true);
+    try {
+      const r = await validarMestra({ data: { senha } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      await atualizarTipoAtendimento.mutateAsync({
+        id: editTipo.id,
+        tipo_atendimento: novoTipo,
+      });
+      setSenha("");
+    } finally {
+      setSalvandoTipo(false);
+    }
+  }
+
   const pedidos = useMemo(
     () =>
       vendas.filter((v) => v.status_pedido !== "orcamento").filter((v) => {
