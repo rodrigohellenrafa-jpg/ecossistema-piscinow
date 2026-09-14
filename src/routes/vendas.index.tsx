@@ -459,9 +459,13 @@ function Vendas() {
       <Dialog open={alvo !== null} onOpenChange={(o) => !o && setAlvo(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Excluir pedido {alvo?.numero ?? ""}</DialogTitle>
+            <DialogTitle>
+              {alvo?.acao === "editar" ? "Editar" : "Excluir"} pedido {alvo?.numero ?? ""}
+            </DialogTitle>
             <DialogDescription>
-              Esta ação não pode ser desfeita. Digite a senha mestra para confirmar.
+              {alvo?.acao === "editar"
+                ? "Digite a senha mestra para abrir o pedido em modo de edição."
+                : "Esta ação não pode ser desfeita. Digite a senha mestra para confirmar."}
             </DialogDescription>
           </DialogHeader>
           <Input
@@ -471,7 +475,7 @@ function Vendas() {
             placeholder="Senha mestra"
             onChange={(e) => setSenha(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") void confirmarExclusao();
+              if (e.key === "Enter") void confirmarAcao();
             }}
           />
           <DialogFooter>
@@ -479,11 +483,11 @@ function Vendas() {
               Cancelar
             </Button>
             <Button
-              variant="destructive"
+              variant={alvo?.acao === "editar" ? "default" : "destructive"}
               disabled={excluindo || !senha}
-              onClick={() => void confirmarExclusao()}
+              onClick={() => void confirmarAcao()}
             >
-              Excluir pedido
+              {alvo?.acao === "editar" ? "Abrir para editar" : "Excluir pedido"}
             </Button>
           </DialogFooter>
         </DialogContent>
