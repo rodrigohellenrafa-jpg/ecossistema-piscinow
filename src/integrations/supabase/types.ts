@@ -821,6 +821,7 @@ export type Database = {
           numero_documento: string | null
           obra_id: string | null
           observacoes: string | null
+          recorrencia: string
           status: string
           tipo_despesa: string | null
           tipo_fluxo: string
@@ -846,6 +847,7 @@ export type Database = {
           numero_documento?: string | null
           obra_id?: string | null
           observacoes?: string | null
+          recorrencia?: string
           status?: string
           tipo_despesa?: string | null
           tipo_fluxo?: string
@@ -871,6 +873,7 @@ export type Database = {
           numero_documento?: string | null
           obra_id?: string | null
           observacoes?: string | null
+          recorrencia?: string
           status?: string
           tipo_despesa?: string | null
           tipo_fluxo?: string

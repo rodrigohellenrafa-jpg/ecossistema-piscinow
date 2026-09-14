@@ -97,7 +97,31 @@ type Lancamento = {
   status: string;
   conciliado: boolean;
   observacoes: string | null;
+  recorrencia?: string | null;
 };
+
+const RECORRENCIAS = [
+  { v: "nenhuma", r: "Pagamento único" },
+  { v: "diaria", r: "Diária" },
+  { v: "semanal", r: "Semanal" },
+  { v: "quinzenal", r: "Quinzenal" },
+  { v: "mensal", r: "Mensal" },
+  { v: "bimestral", r: "Bimestral" },
+  { v: "trimestral", r: "Trimestral" },
+  { v: "semestral", r: "Semestral" },
+  { v: "anual", r: "Anual" },
+] as const;
+
+function proximaData(iso: string, recorrencia: string): string {
+  const d = new Date(iso + "T12:00:00");
+  const dias: Record<string, number> = { diaria: 1, semanal: 7, quinzenal: 15 };
+  const meses: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+  if (dias[recorrencia]) d.setDate(d.getDate() + dias[recorrencia]);
+  else if (meses[recorrencia]) d.setMonth(d.getMonth() + meses[recorrencia]);
+  return d.toISOString().slice(0, 10);
+}
+
+const rotuloRecorrencia = (v?: string | null) => RECORRENCIAS.find((r) => r.v === v)?.r ?? null;
 
 const vazio = {
   obra_id: "",
@@ -116,6 +140,7 @@ const vazio = {
   fornecedor_id: "",
   funcionario_id: "",
   tipo_despesa: "",
+  recorrencia: "nenhuma",
   status: "Pendente",
   observacoes: "",
 };
@@ -253,6 +278,7 @@ function Financeiro() {
         funcionario_id: vinc.funcionario_id ?? (form.funcionario_id || null),
         cliente_id: vinc.cliente_id,
         tipo_despesa: form.tipo_fluxo === "despesa" && form.tipo_despesa ? form.tipo_despesa : null,
+        recorrencia: form.recorrencia,
         status: form.status,
         observacoes: form.observacoes || null,
         obra_id: vinc.obra_id ?? (form.obra_id || null),
@@ -297,6 +323,38 @@ function Financeiro() {
         .update({ status: "Pago", data_pagamento: hojeISO() })
         .eq("id", id);
       if (error) throw error;
+
+      const { data: orig } = await supabase
+        .from("lancamentos_financeiros")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (orig && orig.recorrencia && orig.recorrencia !== "nenhuma") {
+        const base = orig.vencimento || orig.data_competencia;
+        const proxima = proximaData(base, orig.recorrencia);
+        const { error: err2 } = await supabase.from("lancamentos_financeiros").insert({
+          tipo_fluxo: orig.tipo_fluxo,
+          categoria: orig.categoria,
+          descricao: orig.descricao,
+          valor: orig.valor,
+          data_competencia: proxima,
+          vencimento: orig.vencimento ? proxima : null,
+          conta_bancaria: orig.conta_bancaria,
+          forma_pagamento: orig.forma_pagamento,
+          venda_id: orig.venda_id,
+          fornecedor_id: orig.fornecedor_id,
+          funcionario_id: orig.funcionario_id,
+          cliente_id: orig.cliente_id,
+          obra_id: orig.obra_id,
+          numero_documento: orig.numero_documento,
+          tipo_despesa: orig.tipo_despesa,
+          recorrencia: orig.recorrencia,
+          status: "Pendente",
+          observacoes: orig.observacoes,
+          created_by: orig.created_by,
+        });
+        if (err2) throw err2;
+      }
     },
     onSuccess: () => {
       toast.success("Lançamento marcado como pago.");
@@ -537,6 +595,25 @@ function Financeiro() {
                     value={form.vencimento}
                     onChange={(e) => set("vencimento")(e.target.value)}
                   />
+                </Field>
+                <Field label="Recorrência">
+                  <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RECORRENCIAS.map((r) => (
+                        <SelectItem key={r.v} value={r.v}>
+                          {r.r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {form.recorrencia !== "nenhuma" && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Ao marcar como pago, o próximo lançamento é gerado automaticamente.
+                    </p>
+                  )}
                 </Field>
                 <Field label="Data de pagamento">
                   <Input
@@ -805,8 +882,13 @@ function Financeiro() {
                           </Badge>
                         </TableCell>
                         <TableCell>{l.categoria}</TableCell>
-                        <TableCell className="max-w-[220px] truncate">
+                         <TableCell className="max-w-[220px] truncate">
                           {l.descricao}
+                          {rotuloRecorrencia(l.recorrencia) && (
+                            <Badge variant="outline" className="ml-2 text-[10px]">
+                              {rotuloRecorrencia(l.recorrencia)}
+                            </Badge>
+                          )}
                           {rateios.some((r) => r.lancamento_id === l.id) && (
                             <span className="mt-1 block text-xs font-normal text-muted-foreground">
                               Rateio:{" "}
