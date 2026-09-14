@@ -266,6 +266,189 @@ function DetalhePedido() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // ---- Edição por bloco (cada card tem seu próprio modal) ----
+  const num = (v: unknown) => Number(String(v ?? "").replace(",", ".")) || 0;
+
+  const [editPedido, setEditPedido] = useState<null | {
+    data: string;
+    cliente_nome: string;
+    vendedor: string;
+    tipo_atendimento: string;
+    endereco_entrega: string;
+    valor_frete: string;
+    valor_mao_obra: string;
+    forma_pagamento: string;
+    valor_entrada: string;
+    observacoes: string;
+  }>(null);
+  const [editItem, setEditItem] = useState<null | {
+    id: string;
+    descricao: string;
+    quantidade: string;
+    preco_unitario: string;
+  }>(null);
+  const [editCond, setEditCond] = useState<null | {
+    id: string;
+    forma_pagamento: string;
+    bandeira: string;
+    data_prevista: string;
+    parcelas: string;
+    valor: string;
+    acrescimo: string;
+    pago: boolean;
+  }>(null);
+  const [editPag, setEditPag] = useState<null | {
+    id: string;
+    data_pagamento: string;
+    forma_pagamento: string;
+    conta_bancaria: string;
+    valor: string;
+    observacoes: string;
+  }>(null);
+
+  const invalidarPedido = () => {
+    qc.invalidateQueries({ queryKey: ["venda", id] });
+    qc.invalidateQueries({ queryKey: ["venda-itens", id] });
+    qc.invalidateQueries({ queryKey: ["venda-condicoes", id] });
+    qc.invalidateQueries({ queryKey: ["vendas"] });
+  };
+
+  async function recalcularTotais(frete?: number, maoObra?: number) {
+    const { data: its } = await supabase.from("venda_itens").select("total").eq("venda_id", id);
+    const subtotal = (its ?? []).reduce((s, i) => s + Number(i.total ?? 0), 0);
+    const f = frete ?? Number(venda?.valor_frete ?? 0);
+    const m = maoObra ?? Number(venda?.valor_mao_obra ?? 0);
+    const { error } = await supabase
+      .from("vendas")
+      .update({ subtotal_produtos: subtotal, valor_total: subtotal + f + m })
+      .eq("id", id);
+    if (error) throw error;
+  }
+
+  const salvarPedido = useMutation({
+    mutationFn: async () => {
+      if (!editPedido) return;
+      const { error } = await supabase
+        .from("vendas")
+        .update({
+          data: editPedido.data,
+          cliente_nome: editPedido.cliente_nome || null,
+          vendedor: editPedido.vendedor || null,
+          tipo_atendimento: editPedido.tipo_atendimento,
+          endereco_entrega: editPedido.endereco_entrega || null,
+          valor_frete: num(editPedido.valor_frete),
+          valor_mao_obra: num(editPedido.valor_mao_obra),
+          forma_pagamento: editPedido.forma_pagamento || null,
+          valor_entrada: num(editPedido.valor_entrada),
+          observacoes: editPedido.observacoes || null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+      await recalcularTotais(num(editPedido.valor_frete), num(editPedido.valor_mao_obra));
+    },
+    onSuccess: () => {
+      toast.success("Dados do pedido atualizados.");
+      setEditPedido(null);
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarItem = useMutation({
+    mutationFn: async () => {
+      if (!editItem) return;
+      const qtd = num(editItem.quantidade);
+      const preco = num(editItem.preco_unitario);
+      if (qtd <= 0) throw new Error("Informe uma quantidade maior que zero.");
+      const { error } = await supabase
+        .from("venda_itens")
+        .update({
+          descricao: editItem.descricao,
+          quantidade: qtd,
+          preco_unitario: preco,
+          total: qtd * preco,
+        })
+        .eq("id", editItem.id);
+      if (error) throw error;
+      await recalcularTotais();
+    },
+    onSuccess: () => {
+      toast.success("Item atualizado.");
+      setEditItem(null);
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removerItem = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase.from("venda_itens").delete().eq("id", itemId);
+      if (error) throw error;
+      await recalcularTotais();
+    },
+    onSuccess: () => {
+      toast.success("Item removido.");
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarCondicao = useMutation({
+    mutationFn: async () => {
+      if (!editCond) return;
+      const parcelas = Math.max(1, Math.round(num(editCond.parcelas)));
+      const valor = num(editCond.valor);
+      const acrescimo = num(editCond.acrescimo);
+      const cobrado = valor + acrescimo;
+      const { error } = await supabase
+        .from("venda_condicoes")
+        .update({
+          forma_pagamento: editCond.forma_pagamento,
+          bandeira: editCond.bandeira || null,
+          data_prevista: editCond.data_prevista || null,
+          parcelas,
+          valor,
+          acrescimo,
+          valor_cobrado: cobrado,
+          valor_parcela: cobrado / parcelas,
+          pago: editCond.pago,
+        })
+        .eq("id", editCond.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Condição de pagamento atualizada.");
+      setEditCond(null);
+      invalidarPedido();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarPagamento = useMutation({
+    mutationFn: async () => {
+      if (!editPag) return;
+      const valor = num(editPag.valor);
+      if (valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const { error } = await supabase
+        .from("venda_pagamentos")
+        .update({
+          data_pagamento: editPag.data_pagamento,
+          forma_pagamento: editPag.forma_pagamento,
+          conta_bancaria: editPag.conta_bancaria || null,
+          valor,
+          observacoes: editPag.observacoes || null,
+        })
+        .eq("id", editPag.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pagamento atualizado.");
+      setEditPag(null);
+      invalidarFinanceiro();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const linhas = useMemo(() => {
     const itensGrade = itens.map((i) => ({
       cod: i.sku ?? "—",
