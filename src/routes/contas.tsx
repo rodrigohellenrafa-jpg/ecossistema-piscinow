@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { CentroCustoField } from "@/components/centro-custo-field";
+import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +68,7 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 const vazio = {
   obra_id: "",
+  vinculo: "",
   numero_documento: "",
   tipo: "pagar",
   descricao: "",
@@ -275,7 +276,9 @@ function Contas() {
           vencimento: form.vencimento,
           status: "aberto",
           observacoes: form.observacoes || null,
-          obra_id: form.obra_id || null,
+          obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
+          funcionario_id: parseVinculo(form.vinculo).funcionario_id,
+          cliente_id: parseVinculo(form.vinculo).cliente_id,
           numero_documento: form.numero_documento || null,
           recorrencia: form.recorrencia,
           created_by: uid,
@@ -334,6 +337,7 @@ function Contas() {
             descricao: conta.descricao,
             parceiro: conta.parceiro,
             cliente_id: conta.cliente_id,
+            funcionario_id: (conta as { funcionario_id?: string | null }).funcionario_id ?? null,
             categoria: conta.categoria,
             valor: conta.valor,
             valor_juros: conta.valor_juros ?? 0,
@@ -686,7 +690,7 @@ function Contas() {
                 )}
               </Field>
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
-              <CentroCustoField value={form.obra_id} onChange={v=>setForm(f=>({...f,obra_id:v}))} />
+              <VinculoField value={form.vinculo} onChange={(v: string)=>setForm(f=>({...f,vinculo:v}))} />
               <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
               <Field label="Observações" className="sm:col-span-2">

@@ -390,6 +390,7 @@ export type Database = {
           created_by: string | null
           data_pagamento: string | null
           descricao: string
+          funcionario_id: string | null
           id: string
           numero_documento: string | null
           obra_id: string | null
@@ -415,6 +416,7 @@ export type Database = {
           created_by?: string | null
           data_pagamento?: string | null
           descricao: string
+          funcionario_id?: string | null
           id?: string
           numero_documento?: string | null
           obra_id?: string | null
@@ -440,6 +442,7 @@ export type Database = {
           created_by?: string | null
           data_pagamento?: string | null
           descricao?: string
+          funcionario_id?: string | null
           id?: string
           numero_documento?: string | null
           obra_id?: string | null
@@ -462,6 +465,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
           {

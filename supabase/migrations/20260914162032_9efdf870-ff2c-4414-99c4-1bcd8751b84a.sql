@@ -1,0 +1,2 @@
+ALTER TABLE public.contas ADD COLUMN IF NOT EXISTS funcionario_id uuid REFERENCES public.funcionarios(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_contas_funcionario ON public.contas(funcionario_id);
