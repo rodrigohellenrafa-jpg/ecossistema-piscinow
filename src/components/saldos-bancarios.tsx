@@ -37,6 +37,54 @@ export function SaldosBancarios() {
     },
   });
 
+  const hoje = hojeISO();
+
+  /** Títulos baixados hoje em Contas a pagar/receber. */
+  const { data: contasHoje = [] } = useQuery({
+    queryKey: ["saldos-contas-hoje", hoje],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select("tipo, valor, valor_juros, status, data_pagamento")
+        .eq("status", "pago")
+        .eq("data_pagamento", hoje);
+      if (error) throw error;
+      return data as { tipo: string; valor: number; valor_juros: number | null }[];
+    },
+    refetchInterval: 60_000,
+  });
+
+  /** Lançamentos financeiros quitados hoje. */
+  const { data: lancHoje = [] } = useQuery({
+    queryKey: ["saldos-lancamentos-hoje", hoje],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lancamentos_financeiros")
+        .select("tipo_fluxo, valor, conta_bancaria, status, data_pagamento")
+        .eq("status", "Pago")
+        .eq("data_pagamento", hoje);
+      if (error) throw error;
+      return data as { tipo_fluxo: string; valor: number; conta_bancaria: string | null }[];
+    },
+    refetchInterval: 60_000,
+  });
+
+  const ehEntrada = (t: string) => t === "receber" || t === "entrada" || t === "receita";
+
+  const entradasHoje =
+    contasHoje.filter((c) => ehEntrada(c.tipo)).reduce((s, c) => s + Number(c.valor ?? 0) + Number(c.valor_juros ?? 0), 0) +
+    lancHoje.filter((l) => ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
+
+  const saidasHoje =
+    contasHoje.filter((c) => !ehEntrada(c.tipo)).reduce((s, c) => s + Number(c.valor ?? 0) + Number(c.valor_juros ?? 0), 0) +
+    lancHoje.filter((l) => !ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
+
+  /** Movimento do dia já identificado com a conta bancária informada. */
+  const movimentoConta = (conta: string) =>
+    lancHoje
+      .filter((l) => (l.conta_bancaria ?? "").trim() === conta.trim())
+      .reduce((s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor ?? 0) : -Number(l.valor ?? 0)), 0);
+
   const invalidar = () => qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
 
   const criar = useMutation({
