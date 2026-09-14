@@ -534,6 +534,122 @@ function DetalhePedido() {
       </div>
 
       <Card className="print:hidden">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+          <CardTitle>Dados do pedido</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setEditPedido({
+                data: venda.data,
+                cliente_nome: venda.cliente_nome ?? "",
+                vendedor: venda.vendedor ?? "",
+                tipo_atendimento: venda.tipo_atendimento,
+                endereco_entrega: venda.endereco_entrega ?? "",
+                valor_frete: String(venda.valor_frete ?? ""),
+                valor_mao_obra: String(venda.valor_mao_obra ?? ""),
+                forma_pagamento: venda.forma_pagamento ?? "",
+                valor_entrada: String(venda.valor_entrada ?? ""),
+                observacoes: venda.observacoes ?? "",
+              })
+            }
+          >
+            <Pencil className="size-4" /> Editar dados
+          </Button>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Data</p>
+            <p className="font-medium">{dataBR(venda.data)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Cliente</p>
+            <p className="font-medium">{venda.cliente_nome ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Vendedor</p>
+            <p className="font-medium">{venda.vendedor ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Frete</p>
+            <p className="font-medium">{brl(venda.valor_frete)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Mão de obra</p>
+            <p className="font-medium">{brl(venda.valor_mao_obra)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="font-medium">{brl(venda.valor_total)}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="print:hidden">
+        <CardHeader>
+          <CardTitle>Itens do pedido</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descrição</TableHead>
+                <TableHead className="text-right">Qtd</TableHead>
+                <TableHead className="text-right">Preço unit.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {itens.map((i) => (
+                <TableRow key={i.id}>
+                  <TableCell>{i.descricao}</TableCell>
+                  <TableCell className="text-right">{i.quantidade}</TableCell>
+                  <TableCell className="text-right">{brl(i.preco_unitario)}</TableCell>
+                  <TableCell className="text-right font-medium">{brl(i.total)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Editar item ${i.descricao}`}
+                        onClick={() =>
+                          setEditItem({
+                            id: i.id,
+                            descricao: i.descricao,
+                            quantidade: String(i.quantidade ?? ""),
+                            preco_unitario: String(i.preco_unitario ?? ""),
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        aria-label={`Remover item ${i.descricao}`}
+                        onClick={() => removerItem.mutate(i.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {itens.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                    Nenhum item neste pedido.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="print:hidden">
         <CardHeader>
           <CardTitle>Contrato / documentos</CardTitle>
         </CardHeader>
