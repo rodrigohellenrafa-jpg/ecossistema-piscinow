@@ -396,6 +396,7 @@ export type Database = {
           observacoes: string | null
           ordem_compra_id: string | null
           parceiro: string | null
+          recorrencia: string
           recorrencia_id: string | null
           status: string
           tipo: string
@@ -420,6 +421,7 @@ export type Database = {
           observacoes?: string | null
           ordem_compra_id?: string | null
           parceiro?: string | null
+          recorrencia?: string
           recorrencia_id?: string | null
           status?: string
           tipo?: string
@@ -444,6 +446,7 @@ export type Database = {
           observacoes?: string | null
           ordem_compra_id?: string | null
           parceiro?: string | null
+          recorrencia?: string
           recorrencia_id?: string | null
           status?: string
           tipo?: string
