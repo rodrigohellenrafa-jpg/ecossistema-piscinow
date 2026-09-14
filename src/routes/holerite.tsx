@@ -475,12 +475,14 @@ function EditarValores({ funcionario }: { funcionario: FuncionarioHolerite }) {
 
   const salvar = useMutation({
     mutationFn: async () => {
-      const patch: Record<string, number> = {};
-      for (const c of CAMPOS) {
+      const num = (c: (typeof CAMPOS)[number]) => {
         const n = Number(String(valores[c.chave] ?? "").replace(",", "."));
         if (!Number.isFinite(n) || n < 0) throw new Error(`Valor inválido em ${c.label}.`);
-        patch[c.chave] = n;
-      }
+        return n;
+      };
+      const patch = Object.fromEntries(CAMPOS.map((c) => [c.chave, num(c)])) as {
+        salario_base: number;
+      };
       const { error } = await supabase.from("funcionarios").update(patch).eq("id", funcionario.id);
       if (error) throw error;
     },
