@@ -625,6 +625,7 @@ function DetalhePedido() {
                   <TableHead className="text-right">Juros</TableHead>
                   <TableHead className="text-right">Cliente paga</TableHead>
                   <TableHead>Situação</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -643,6 +644,27 @@ function DetalhePedido() {
                       <Badge variant={c.pago ? "default" : "secondary"}>
                         {c.pago ? "Pago" : "A receber"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Editar condição de pagamento"
+                        onClick={() =>
+                          setEditCond({
+                            id: c.id,
+                            forma_pagamento: c.forma_pagamento,
+                            bandeira: c.bandeira ?? "",
+                            data_prevista: c.data_prevista ?? "",
+                            parcelas: String(c.parcelas ?? 1),
+                            valor: String(c.valor ?? ""),
+                            acrescimo: String(c.acrescimo ?? ""),
+                            pago: !!c.pago,
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
