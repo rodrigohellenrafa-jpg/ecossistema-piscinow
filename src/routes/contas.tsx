@@ -129,6 +129,25 @@ function proximaData(iso: string, recorrencia: string): string | null {
 const rotuloRecorrencia = (v: string) =>
   RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
 
+/** Próximos vencimentos de uma recorrência: até 12 parcelas, limitadas a 12 meses à frente. */
+function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | null) {
+  if (!recorrencia || recorrencia === "nenhuma") return [];
+  const limite = new Date(`${inicio}T12:00:00`);
+  limite.setMonth(limite.getMonth() + 12);
+  const limiteISO = limite.toISOString().slice(0, 10);
+  const datas: string[] = [];
+  let atual = inicio;
+  for (let i = 0; i < 12; i++) {
+    const prox = proximaData(atual, recorrencia);
+    if (!prox) break;
+    if (prox > limiteISO) break;
+    if (fim && prox > fim) break;
+    datas.push(prox);
+    atual = prox;
+  }
+  return datas;
+}
+
 const PERIODOS = [
   { valor: "todas", rotulo: "Todas" },
   { valor: "hoje", rotulo: "Hoje" },
@@ -390,6 +409,37 @@ function Contas() {
         );
         if (err2) throw err2;
       }
+
+      // Recorrência: já cria os próximos vencimentos para aparecerem na lista.
+      const futuras = ocorrenciasFuturas(
+        form.vencimento,
+        form.recorrencia,
+        form.recorrencia !== "nenhuma" && form.recorrencia_fim ? form.recorrencia_fim : null,
+      );
+      if (futuras.length > 0) {
+        const { error: errFut } = await supabase.from("contas").insert(
+          futuras.map((venc) => ({
+            tipo: form.tipo,
+            descricao: form.descricao.trim(),
+            parceiro: form.parceiro || null,
+            categoria: ratear ? "Rateio" : form.categoria || null,
+            valor: Number(form.valor) || 0,
+            valor_juros: Number(form.valor_juros) || 0,
+            vencimento: venc,
+            status: "aberto",
+            observacoes: form.observacoes || null,
+            obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
+            funcionario_id: parseVinculo(form.vinculo).funcionario_id,
+            cliente_id: parseVinculo(form.vinculo).cliente_id,
+            numero_documento: form.numero_documento || null,
+            recorrencia: form.recorrencia,
+            recorrencia_fim: form.recorrencia_fim || null,
+            tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
+            created_by: uid,
+          })),
+        );
+        if (errFut) throw errFut;
+      }
     },
     onSuccess: () => {
       toast.success(editando ? "Lançamento atualizado!" : "Título lançado!");
@@ -424,7 +474,20 @@ function Contas() {
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
-        if (proxima && (!fimRecorrencia || proxima <= fimRecorrencia)) {
+        const { data: jaExiste } = proxima
+          ? await supabase
+              .from("contas")
+              .select("id")
+              .eq("descricao", conta.descricao)
+              .eq("tipo", conta.tipo)
+              .eq("vencimento", proxima)
+              .limit(1)
+          : { data: [] as { id: string }[] };
+        if (
+          proxima &&
+          (jaExiste ?? []).length === 0 &&
+          (!fimRecorrencia || proxima <= fimRecorrencia)
+        ) {
           const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
           const { error: errRec } = await supabase.from("contas").insert({
             tipo: conta.tipo,
