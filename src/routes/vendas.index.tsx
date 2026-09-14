@@ -92,11 +92,16 @@ function Vendas() {
   const [fim, setFim] = useState("");
   const qc = useQueryClient();
   const validarMestra = useServerFn(validarSenhaMestra);
-  const [alvo, setAlvo] = useState<{ id: string; numero: string | null } | null>(null);
+  const navigate = useNavigate();
+  const [alvo, setAlvo] = useState<{
+    id: string;
+    numero: string | null;
+    acao: "excluir" | "editar";
+  } | null>(null);
   const [senha, setSenha] = useState("");
   const [excluindo, setExcluindo] = useState(false);
 
-  async function confirmarExclusao() {
+  async function confirmarAcao() {
     if (!alvo) return;
     setExcluindo(true);
     try {
@@ -109,6 +114,13 @@ function Vendas() {
         );
         return;
       }
+      if (alvo.acao === "editar") {
+        const id = alvo.id;
+        setAlvo(null);
+        setSenha("");
+        void navigate({ to: "/vendas/$id", params: { id } });
+        return;
+      }
       const { error } = await supabase.from("vendas").delete().eq("id", alvo.id);
       if (error) throw error;
       qc.invalidateQueries({ queryKey: ["vendas"] });
@@ -116,7 +128,7 @@ function Vendas() {
       setAlvo(null);
       setSenha("");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível excluir o pedido.");
+      toast.error(e instanceof Error ? e.message : "Não foi possível concluir a ação.");
     } finally {
       setExcluindo(false);
     }
