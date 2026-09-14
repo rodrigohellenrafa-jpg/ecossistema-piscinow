@@ -80,6 +80,13 @@ const vazio = {
   observacoes: "",
 };
 
+const fornecedorVazio = {
+  nome: "",
+  cnpj: "",
+  telefone: "",
+  email: "",
+};
+
 const RECORRENCIAS: { valor: string; rotulo: string }[] = [
   { valor: "nenhuma", rotulo: "Pagamento único (sem recorrência)" },
   { valor: "diaria", rotulo: "Diária" },
@@ -160,6 +167,9 @@ function Contas() {
   const [catOpen, setCatOpen] = useState(false);
   useAbrirModal("categoria", () => setCatOpen(true));
 
+  const [fornOpen, setFornOpen] = useState(false);
+  const [novoFornecedor, setNovoFornecedor] = useState(fornecedorVazio);
+
   const [ratear, setRatear] = useState(false);
   const [rateio, setRateio] = useState<{ categoria: string; valor: string }[]>([
     { categoria: "", valor: "" },
@@ -202,6 +212,37 @@ function Contas() {
     },
     onError: (e: Error) =>
       toast.error(e.message.includes("duplicate") ? "Categoria já existe." : e.message),
+  });
+
+  const salvarFornecedor = useMutation({
+    mutationFn: async () => {
+      const nome = novoFornecedor.nome.trim();
+      if (!nome) throw new Error("Informe o nome do fornecedor.");
+      const { data: criado, error } = await supabase
+        .from("fornecedores")
+        .insert({
+          nome,
+          cnpj: novoFornecedor.cnpj || null,
+          telefone: novoFornecedor.telefone || null,
+          email: novoFornecedor.email || null,
+          prazo_entrega_dias: 0,
+          ativo: true,
+          created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+        })
+        .select("nome")
+        .single();
+      if (error) throw error;
+      return criado.nome;
+    },
+    onSuccess: (nome) => {
+      toast.success("Fornecedor cadastrado!");
+      setNovoFornecedor(fornecedorVazio);
+      setFornOpen(false);
+      setForm((f) => ({ ...f, parceiro: nome }));
+      qc.invalidateQueries({ queryKey: ["fornecedores"] });
+      qc.invalidateQueries({ queryKey: ["fornecedores-select"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const salvar = useMutation({
@@ -363,18 +404,92 @@ function Contas() {
               </Field>
               <Field label={form.tipo === "pagar" ? "Fornecedor" : "Cliente"}>
                 {form.tipo === "pagar" ? (
-                  <Select value={form.parceiro} onValueChange={set("parceiro")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o fornecedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {fornecedores.map((f) => (
-                        <SelectItem key={f.id} value={f.nome}>
-                          {f.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-1">
+                    <Select value={form.parceiro} onValueChange={set("parceiro")}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o fornecedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fornecedores.map((f) => (
+                          <SelectItem key={f.id} value={f.nome}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Dialog open={fornOpen} onOpenChange={setFornOpen}>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline" size="icon" title="Novo fornecedor">
+                          <Plus />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Novo fornecedor</DialogTitle>
+                          <DialogDescription>
+                            Cadastre o fornecedor rapidamente.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="Nome / Razão social" className="sm:col-span-2">
+                            <Input
+                              value={novoFornecedor.nome}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, nome: e.target.value }))
+                              }
+                              placeholder="Ex.: Light S/A"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  salvarFornecedor.mutate();
+                                }
+                              }}
+                            />
+                          </Field>
+                          <Field label="CNPJ">
+                            <Input
+                              value={novoFornecedor.cnpj}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, cnpj: e.target.value }))
+                              }
+                            />
+                          </Field>
+                          <Field label="Telefone">
+                            <Input
+                              value={novoFornecedor.telefone}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, telefone: e.target.value }))
+                              }
+                            />
+                          </Field>
+                          <Field label="E-mail" className="sm:col-span-2">
+                            <Input
+                              type="email"
+                              value={novoFornecedor.email}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, email: e.target.value }))
+                              }
+                            />
+                          </Field>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setFornOpen(false)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={() => salvarFornecedor.mutate()}
+                            disabled={salvarFornecedor.isPending}
+                          >
+                            Salvar fornecedor
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 ) : (
                   <Input
                     value={form.parceiro}
