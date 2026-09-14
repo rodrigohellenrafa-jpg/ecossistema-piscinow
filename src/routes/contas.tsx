@@ -236,6 +236,7 @@ function Contas() {
           observacoes: form.observacoes || null,
           obra_id: form.obra_id || null,
           numero_documento: form.numero_documento || null,
+          recorrencia: form.recorrencia,
           created_by: uid,
         })
         .select("id")
@@ -276,6 +277,37 @@ function Contas() {
         .update({ status: "pago", data_pagamento: new Date().toISOString().slice(0, 10) })
         .eq("id", id);
       if (error) throw error;
+
+      // Recorrência: gera o próximo vencimento automaticamente
+      const { data: conta } = await supabase
+        .from("contas")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
+        const proxima = proximaData(conta.vencimento, conta.recorrencia);
+        if (proxima) {
+          const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+          const { error: errRec } = await supabase.from("contas").insert({
+            tipo: conta.tipo,
+            descricao: conta.descricao,
+            parceiro: conta.parceiro,
+            cliente_id: conta.cliente_id,
+            categoria: conta.categoria,
+            valor: conta.valor,
+            valor_juros: conta.valor_juros ?? 0,
+            vencimento: proxima,
+            status: "aberto",
+            observacoes: conta.observacoes,
+            obra_id: conta.obra_id,
+            numero_documento: conta.numero_documento,
+            venda_id: conta.venda_id,
+            recorrencia: conta.recorrencia,
+            created_by: uid,
+          });
+          if (errRec) throw errRec;
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Baixa registrada.");
