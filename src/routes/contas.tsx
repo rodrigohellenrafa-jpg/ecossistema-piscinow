@@ -422,6 +422,46 @@ function Contas() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["contas"] }),
   });
 
+  const abrirEdicao = (c: Conta) => {
+    setEditando(c.id);
+    const vinculo = c.obra_id
+      ? `obra:${c.obra_id}`
+      : c.funcionario_id
+        ? `func:${c.funcionario_id}`
+        : c.cliente_id
+          ? `cli:${c.cliente_id}`
+          : "";
+    setForm({
+      obra_id: c.obra_id ?? "",
+      vinculo,
+      numero_documento: c.numero_documento ?? "",
+      tipo: c.tipo,
+      descricao: c.descricao,
+      parceiro: c.parceiro ?? "",
+      categoria: c.categoria === "Rateio" ? "" : (c.categoria ?? ""),
+      valor: String(c.valor ?? 0),
+      valor_juros: String(c.valor_juros ?? 0),
+      vencimento: c.vencimento,
+      recorrencia: c.recorrencia ?? "nenhuma",
+      tipo_despesa: c.tipo_despesa ?? "",
+      observacoes: c.observacoes ?? "",
+    });
+    const linhasExistentes = rateios.filter((r) => r.conta_id === c.id);
+    if (linhasExistentes.length > 0) {
+      setRatear(true);
+      setRateio(
+        linhasExistentes.map((r) => ({ categoria: r.categoria, valor: String(r.valor) })),
+      );
+    } else {
+      setRatear(false);
+      setRateio([
+        { categoria: "", valor: "" },
+        { categoria: "", valor: "" },
+      ]);
+    }
+    setOpen(true);
+  };
+
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const pagar = data.filter((c) => c.tipo === "pagar");
