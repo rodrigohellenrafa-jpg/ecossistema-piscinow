@@ -366,6 +366,36 @@ function Dashboard() {
       </div>
 
 
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ClipboardCheck className="size-4 text-primary" /> Movimentações de hoje
+          </CardTitle>
+          <Badge variant="secondary">{totalAcoesHoje} ações</Badge>
+        </CardHeader>
+        <CardContent>
+          {totalAcoesHoje === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma movimentação registrada hoje ainda.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {atividadeOrdenada
+                .filter((l) => l.total > 0)
+                .map((l) => (
+                  <div
+                    key={l.rotulo}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
+                  >
+                    <span className="truncate text-muted-foreground">{l.rotulo}</span>
+                    <span className="shrink-0 tabular-nums font-semibold">{l.total}</span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
