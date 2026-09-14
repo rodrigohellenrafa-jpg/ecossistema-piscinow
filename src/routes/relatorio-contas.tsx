@@ -250,29 +250,26 @@ function RelatorioContas() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((k) => (
-          <Card
-            key={k.titulo}
-            className="transition-colors hover:border-primary/50 hover:bg-primary/5"
-            asChild
-          >
-            <Link to={k.to}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {k.titulo}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p
-                className={
-                  k.alerta && k.valor > 0
-                    ? "text-2xl font-semibold text-destructive"
-                    : "text-2xl font-semibold"
-                }
-              >
-                {brl(k.valor)}
-              </p>
-            </CardContent>
-          </Card>
+          <Link key={k.titulo} to={k.to} className="block">
+            <Card className="h-full transition-colors hover:border-primary/50 hover:bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {k.titulo}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p
+                  className={
+                    k.alerta && k.valor > 0
+                      ? "text-2xl font-semibold text-destructive"
+                      : "text-2xl font-semibold"
+                  }
+                >
+                  {brl(k.valor)}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 
