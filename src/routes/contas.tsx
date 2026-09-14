@@ -76,8 +76,41 @@ const vazio = {
   valor: "0",
   valor_juros: "0",
   vencimento: "",
+  recorrencia: "nenhuma",
   observacoes: "",
 };
+
+const RECORRENCIAS: { valor: string; rotulo: string }[] = [
+  { valor: "nenhuma", rotulo: "Pagamento único (sem recorrência)" },
+  { valor: "diaria", rotulo: "Diária" },
+  { valor: "semanal", rotulo: "Semanal" },
+  { valor: "quinzenal", rotulo: "Quinzenal" },
+  { valor: "mensal", rotulo: "Mensal" },
+  { valor: "bimestral", rotulo: "Bimestral" },
+  { valor: "trimestral", rotulo: "Trimestral" },
+  { valor: "semestral", rotulo: "Semestral" },
+  { valor: "anual", rotulo: "Anual" },
+];
+
+function proximaData(iso: string, recorrencia: string): string | null {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  switch (recorrencia) {
+    case "diaria": d.setDate(d.getDate() + 1); break;
+    case "semanal": d.setDate(d.getDate() + 7); break;
+    case "quinzenal": d.setDate(d.getDate() + 15); break;
+    case "mensal": d.setMonth(d.getMonth() + 1); break;
+    case "bimestral": d.setMonth(d.getMonth() + 2); break;
+    case "trimestral": d.setMonth(d.getMonth() + 3); break;
+    case "semestral": d.setMonth(d.getMonth() + 6); break;
+    case "anual": d.setFullYear(d.getFullYear() + 1); break;
+    default: return null;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+const rotuloRecorrencia = (v: string) =>
+  RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
 
 function Contas() {
   const qc = useQueryClient();
@@ -203,6 +236,7 @@ function Contas() {
           observacoes: form.observacoes || null,
           obra_id: form.obra_id || null,
           numero_documento: form.numero_documento || null,
+          recorrencia: form.recorrencia,
           created_by: uid,
         })
         .select("id")
@@ -243,6 +277,37 @@ function Contas() {
         .update({ status: "pago", data_pagamento: new Date().toISOString().slice(0, 10) })
         .eq("id", id);
       if (error) throw error;
+
+      // Recorrência: gera o próximo vencimento automaticamente
+      const { data: conta } = await supabase
+        .from("contas")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
+        const proxima = proximaData(conta.vencimento, conta.recorrencia);
+        if (proxima) {
+          const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+          const { error: errRec } = await supabase.from("contas").insert({
+            tipo: conta.tipo,
+            descricao: conta.descricao,
+            parceiro: conta.parceiro,
+            cliente_id: conta.cliente_id,
+            categoria: conta.categoria,
+            valor: conta.valor,
+            valor_juros: conta.valor_juros ?? 0,
+            vencimento: proxima,
+            status: "aberto",
+            observacoes: conta.observacoes,
+            obra_id: conta.obra_id,
+            numero_documento: conta.numero_documento,
+            venda_id: conta.venda_id,
+            recorrencia: conta.recorrencia,
+            created_by: uid,
+          });
+          if (errRec) throw errRec;
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Baixa registrada.");
@@ -397,6 +462,25 @@ function Contas() {
                   onChange={(e) => set("vencimento")(e.target.value)}
                 />
               </Field>
+              <Field label="Recorrência">
+                <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pagamento único" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RECORRENCIAS.map((r) => (
+                      <SelectItem key={r.valor} value={r.valor}>
+                        {r.rotulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.recorrencia !== "nenhuma" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ao dar baixa, o próximo vencimento ({rotuloRecorrencia(form.recorrencia)?.toLowerCase()}) é gerado automaticamente.
+                  </p>
+                )}
+              </Field>
               <div className="rounded-lg border p-3 sm:col-span-2">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -539,6 +623,7 @@ type Conta = {
   valor_juros?: number | null;
   vencimento: string;
   status: string;
+  recorrencia?: string | null;
 };
 
 function Lista({
@@ -581,6 +666,11 @@ function Lista({
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">
                     {c.descricao}
+                    {c.recorrencia && c.recorrencia !== "nenhuma" && (
+                      <Badge variant="outline" className="ml-2 align-middle text-xs font-normal">
+                        {rotuloRecorrencia(c.recorrencia)}
+                      </Badge>
+                    )}
                     {rateios.some((r) => r.conta_id === c.id) && (
                       <span className="mt-1 block text-xs font-normal text-muted-foreground">
                         Rateio:{" "}
