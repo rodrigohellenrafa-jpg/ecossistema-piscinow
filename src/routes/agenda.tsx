@@ -30,10 +30,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 import { supabase } from "@/integrations/supabase/client";
 import { meuTokenAgenda, regenerarTokenAgenda } from "@/lib/agenda.functions";
 import {
-import { useAbrirModal } from "@/hooks/use-abrir-modal";
   enviarAgendaParaGoogle,
   listarAgendasGoogle,
   sincronizarAgendaGoogle,

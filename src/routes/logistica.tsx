@@ -27,9 +27,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAbrirModal } from "@/hooks/use-abrir-modal";
 import { supabase } from "@/integrations/supabase/client";
 import {
-import { useAbrirModal } from "@/hooks/use-abrir-modal";
   addDiasUteis,
   dataBR,
   diasAte,
