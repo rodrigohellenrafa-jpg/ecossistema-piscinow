@@ -850,6 +850,7 @@ function Contas() {
             itens={pagar}
             rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
+            onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
         </TabsContent>
@@ -859,6 +860,7 @@ function Contas() {
             itens={receber}
             rateios={rateios}
             onBaixar={(id) => baixar.mutate(id)}
+            onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
         </TabsContent>
@@ -891,12 +893,14 @@ function Lista({
   itens,
   rateios = [],
   onBaixar,
+  onEditar,
   onExcluir,
 }: {
   titulo: string;
   itens: Conta[];
   rateios?: { conta_id: string; categoria: string; valor: number }[];
   onBaixar: (id: string) => void;
+  onEditar: (c: Conta) => void;
   onExcluir: (id: string) => void;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
