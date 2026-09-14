@@ -697,7 +697,8 @@ function Financeiro() {
                          <SelectItem value="none">Não classificado</SelectItem>
                          <SelectItem value="fixa">Despesa fixa</SelectItem>
                          <SelectItem value="variavel">Despesa variável</SelectItem>
-                         <SelectItem value="operacional">Despesa operacional</SelectItem>
+                          <SelectItem value="operacional">Despesa operacional</SelectItem>
+                          <SelectItem value="pessoal">Despesa pessoal</SelectItem>
                        </SelectContent>
                      </Select>
                    </Field>

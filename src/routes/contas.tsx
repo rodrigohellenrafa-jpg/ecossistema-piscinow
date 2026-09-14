@@ -78,8 +78,16 @@ const vazio = {
   valor_juros: "0",
   vencimento: "",
   recorrencia: "nenhuma",
+  tipo_despesa: "",
   observacoes: "",
 };
+
+const TIPOS_DESPESA = [
+  { valor: "fixa", rotulo: "Despesa fixa" },
+  { valor: "variavel", rotulo: "Despesa variável" },
+  { valor: "operacional", rotulo: "Despesa operacional" },
+  { valor: "pessoal", rotulo: "Despesa pessoal" },
+] as const;
 
 const fornecedorVazio = {
   nome: "",
