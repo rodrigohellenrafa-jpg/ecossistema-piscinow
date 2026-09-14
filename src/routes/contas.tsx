@@ -409,6 +409,7 @@ function Contas() {
             numero_documento: conta.numero_documento,
             venda_id: conta.venda_id,
             recorrencia: conta.recorrencia,
+            recorrencia_fim: fimRecorrencia ?? null,
             tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
             created_by: uid,
           });
@@ -451,6 +452,7 @@ function Contas() {
       valor_juros: String(c.valor_juros ?? 0),
       vencimento: c.vencimento,
       recorrencia: c.recorrencia ?? "nenhuma",
+      recorrencia_fim: c.recorrencia_fim ?? "",
       tipo_despesa: c.tipo_despesa ?? "",
       observacoes: c.observacoes ?? "",
     });
@@ -888,6 +890,7 @@ type Conta = {
   vencimento: string;
   status: string;
   recorrencia?: string | null;
+  recorrencia_fim?: string | null;
   tipo_despesa?: string | null;
   observacoes?: string | null;
   numero_documento?: string | null;
