@@ -159,6 +159,47 @@ function Dashboard() {
     },
   });
 
+  // Movimentações do dia: quantas ações foram registradas hoje em cada módulo.
+  const { data: atividadeHoje = [] } = useQuery({
+    queryKey: ["dash-atividade-hoje"],
+    refetchInterval: 60000,
+    queryFn: async () => {
+      const inicioDia = new Date();
+      inicioDia.setHours(0, 0, 0, 0);
+      const desde = inicioDia.toISOString();
+      const alvos = [
+        { tabela: "vendas", rotulo: "Vendas" },
+        { tabela: "ordens_servico", rotulo: "Ordens de serviço" },
+        { tabela: "obras", rotulo: "Obras" },
+        { tabela: "ordens_compra", rotulo: "Ordens de compra" },
+        { tabela: "notas_compra", rotulo: "Notas de compra" },
+        { tabela: "notas_fiscais", rotulo: "Notas fiscais" },
+        { tabela: "estoque_movimentos", rotulo: "Movimentos de estoque" },
+        { tabela: "contas", rotulo: "Contas a pagar/receber" },
+        { tabela: "lancamentos_financeiros", rotulo: "Lançamentos financeiros" },
+        { tabela: "venda_pagamentos", rotulo: "Pagamentos recebidos" },
+        { tabela: "clientes", rotulo: "Clientes cadastrados" },
+        { tabela: "produtos", rotulo: "Produtos cadastrados" },
+        { tabela: "fornecedores", rotulo: "Fornecedores cadastrados" },
+        { tabela: "agenda_eventos", rotulo: "Compromissos da agenda" },
+      ] as const;
+      const linhas = await Promise.all(
+        alvos.map(async (a) => {
+          const { count, error } = await supabase
+            .from(a.tabela)
+            .select("id", { count: "exact", head: true })
+            .gte("created_at", desde);
+          if (error) return { rotulo: a.rotulo, total: 0 };
+          return { rotulo: a.rotulo, total: count ?? 0 };
+        }),
+      );
+      return linhas;
+    },
+  });
+
+  const totalAcoesHoje = atividadeHoje.reduce((a, l) => a + l.total, 0);
+  const atividadeOrdenada = [...atividadeHoje].sort((a, b) => b.total - a.total);
+
   const ini = inicioMes();
   const n = (v: unknown) => Number(v ?? 0);
   const s = (v: unknown) => String(v ?? "");
@@ -324,6 +365,36 @@ function Dashboard() {
         />
       </div>
 
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ClipboardCheck className="size-4 text-primary" /> Movimentações de hoje
+          </CardTitle>
+          <Badge variant="secondary">{totalAcoesHoje} ações</Badge>
+        </CardHeader>
+        <CardContent>
+          {totalAcoesHoje === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma movimentação registrada hoje ainda.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {atividadeOrdenada
+                .filter((l) => l.total > 0)
+                .map((l) => (
+                  <div
+                    key={l.rotulo}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
+                  >
+                    <span className="truncate text-muted-foreground">{l.rotulo}</span>
+                    <span className="shrink-0 tabular-nums font-semibold">{l.total}</span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
