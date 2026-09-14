@@ -145,6 +145,7 @@ export function SaldosBancarios() {
   });
 
   const total = saldos.reduce((s, c) => s + Number(c.saldo ?? 0), 0);
+  const totalAtual = total + entradasHoje - saidasHoje;
 
   return (
     <Card>
