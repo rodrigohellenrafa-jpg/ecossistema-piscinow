@@ -317,18 +317,31 @@ function Vendas() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label={`Excluir pedido ${v.numero ?? ""}`}
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setSenha("");
-                            setAlvo({ id: v.id, numero: v.numero });
-                          }}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Editar pedido ${v.numero ?? ""}`}
+                            onClick={() => {
+                              setSenha("");
+                              setAlvo({ id: v.id, numero: v.numero, acao: "editar" });
+                            }}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Excluir pedido ${v.numero ?? ""}`}
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setSenha("");
+                              setAlvo({ id: v.id, numero: v.numero, acao: "excluir" });
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
