@@ -39,6 +39,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
+const TIPOS_ATENDIMENTO = [
+  { value: "in", label: "IN · Balcão" },
+  { value: "out", label: "OUT · Serviço externo" },
+];
+
 export const Route = createFileRoute("/vendas/")({
   staticData: { sitemap: false },
   head: () => ({
@@ -101,6 +106,14 @@ function Vendas() {
   const [senha, setSenha] = useState("");
   const [excluindo, setExcluindo] = useState(false);
 
+  const [editTipo, setEditTipo] = useState<{
+    id: string;
+    numero: string | null;
+    tipo_atendimento: string;
+  } | null>(null);
+  const [novoTipo, setNovoTipo] = useState<string>("in");
+  const [salvandoTipo, setSalvandoTipo] = useState(false);
+
   async function confirmarAcao() {
     if (!alvo) return;
     setExcluindo(true);
@@ -160,6 +173,43 @@ function Vendas() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const atualizarTipoAtendimento = useMutation({
+    mutationFn: async ({ id, tipo_atendimento }: { id: string; tipo_atendimento: string }) => {
+      const { error } = await supabase.from("vendas").update({ tipo_atendimento }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success("Tipo de atendimento atualizado.");
+      setEditTipo(null);
+      setNovoTipo("in");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  async function salvarTipoAtendimento() {
+    if (!editTipo || !novoTipo) return;
+    setSalvandoTipo(true);
+    try {
+      const r = await validarMestra({ data: { senha } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      await atualizarTipoAtendimento.mutateAsync({
+        id: editTipo.id,
+        tipo_atendimento: novoTipo,
+      });
+      setSenha("");
+    } finally {
+      setSalvandoTipo(false);
+    }
+  }
 
   const pedidos = useMemo(
     () =>
@@ -304,9 +354,27 @@ function Vendas() {
                       </TableCell>
                       <TableCell>{dataBR(v.data)}</TableCell>
                       <TableCell>
-                        <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
-                          {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Badge variant={v.tipo_atendimento === "out" ? "default" : "outline"}>
+                            {TIPO_LABEL[v.tipo_atendimento] ?? v.tipo_atendimento}
+                          </Badge>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Alterar tipo do pedido ${v.numero ?? ""}`}
+                            onClick={() => {
+                              setSenha("");
+                              setNovoTipo(v.tipo_atendimento || "in");
+                              setEditTipo({
+                                id: v.id,
+                                numero: v.numero,
+                                tipo_atendimento: v.tipo_atendimento || "in",
+                              });
+                            }}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>{v.cliente_nome ?? "—"}</TableCell>
                       <TableCell>{v.vendedor ?? "—"}</TableCell>
@@ -488,6 +556,68 @@ function Vendas() {
               onClick={() => void confirmarAcao()}
             >
               {alvo?.acao === "editar" ? "Abrir para editar" : "Excluir pedido"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editTipo !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditTipo(null);
+            setSenha("");
+            setNovoTipo("in");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar tipo do pedido {editTipo?.numero ?? ""}</DialogTitle>
+            <DialogDescription>
+              Escolha se o pedido é IN (balcão) ou OUT (serviço externo). A alteração exige senha mestra.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={novoTipo} onValueChange={setNovoTipo}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tipo de atendimento" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPOS_ATENDIMENTO.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="password"
+              value={senha}
+              autoComplete="off"
+              placeholder="Senha mestra"
+              onChange={(e) => setSenha(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void salvarTipoAtendimento();
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditTipo(null);
+                setSenha("");
+                setNovoTipo("in");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={salvandoTipo || !senha || novoTipo === editTipo?.tipo_atendimento}
+              onClick={() => void salvarTipoAtendimento()}
+            >
+              Salvar tipo
             </Button>
           </DialogFooter>
         </DialogContent>
