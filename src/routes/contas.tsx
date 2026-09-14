@@ -507,8 +507,9 @@ function Contas() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const pagar = data.filter((c) => c.tipo === "pagar");
-  const receber = data.filter((c) => c.tipo === "receber");
+  const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo));
+  const pagar = filtradas.filter((c) => c.tipo === "pagar");
+  const receber = filtradas.filter((c) => c.tipo === "receber");
   const soma = (l: typeof data) =>
     l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
 
