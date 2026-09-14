@@ -217,14 +217,15 @@ function Vendas() {
 
         <TabsContent value="pedidos" className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi label="Faturamento" value={brl(faturamento)} />
-            <Kpi label="Ticket médio" value={brl(ticketMedio)} />
+            <Kpi label="Faturamento" value={brl(faturamento)} to="/dre" />
+            <Kpi label="Ticket médio" value={brl(ticketMedio)} to="/dre" />
             <Kpi
               label="Margem média"
               value={`${(margemMedia * 100).toFixed(1)}%`}
               tone={margemMedia >= 0.25 ? "positive" : margemMedia < 0.1 ? "negative" : "warning"}
+              to="/dre"
             />
-            <Kpi label="Pedidos em aberto" value={String(emAberto)} />
+            <Kpi label="Pedidos em aberto" value={String(emAberto)} to="/logistica" />
           </div>
 
           <Card>
@@ -334,13 +335,14 @@ function Vendas() {
 
         <TabsContent value="orcamentos" className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi label="Orçamentos abertos" value={String(orcamentos.length)} />
-            <Kpi label="Valor em negociação" value={brl(totalOrcado)} />
-            <Kpi label="Ticket médio" value={brl(ticketOrcamento)} />
+            <Kpi label="Orçamentos abertos" value={String(orcamentos.length)} to="/vendas/orcamentos" />
+            <Kpi label="Valor em negociação" value={brl(totalOrcado)} to="/vendas/orcamentos" />
+            <Kpi label="Ticket médio" value={brl(ticketOrcamento)} to="/vendas/orcamentos" />
             <Kpi
               label="Parados há 15+ dias"
               value={String(antigos)}
               tone={antigos > 0 ? "warning" : "default"}
+              to="/reativacao"
             />
           </div>
 
