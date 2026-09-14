@@ -973,6 +973,14 @@ function Lista({
                     <Button
                       size="icon"
                       variant="ghost"
+                      onClick={() => onEditar(c)}
+                      aria-label="Editar lançamento"
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       onClick={() => onExcluir(c.id)}
                       aria-label="Excluir"
                     >
