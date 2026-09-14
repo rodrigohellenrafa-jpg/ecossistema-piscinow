@@ -97,7 +97,31 @@ type Lancamento = {
   status: string;
   conciliado: boolean;
   observacoes: string | null;
+  recorrencia?: string | null;
 };
+
+const RECORRENCIAS = [
+  { v: "nenhuma", r: "Pagamento único" },
+  { v: "diaria", r: "Diária" },
+  { v: "semanal", r: "Semanal" },
+  { v: "quinzenal", r: "Quinzenal" },
+  { v: "mensal", r: "Mensal" },
+  { v: "bimestral", r: "Bimestral" },
+  { v: "trimestral", r: "Trimestral" },
+  { v: "semestral", r: "Semestral" },
+  { v: "anual", r: "Anual" },
+] as const;
+
+function proximaData(iso: string, recorrencia: string): string {
+  const d = new Date(iso + "T12:00:00");
+  const dias: Record<string, number> = { diaria: 1, semanal: 7, quinzenal: 15 };
+  const meses: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+  if (dias[recorrencia]) d.setDate(d.getDate() + dias[recorrencia]);
+  else if (meses[recorrencia]) d.setMonth(d.getMonth() + meses[recorrencia]);
+  return d.toISOString().slice(0, 10);
+}
+
+const rotuloRecorrencia = (v?: string | null) => RECORRENCIAS.find((r) => r.v === v)?.r ?? null;
 
 const vazio = {
   obra_id: "",
@@ -116,6 +140,7 @@ const vazio = {
   fornecedor_id: "",
   funcionario_id: "",
   tipo_despesa: "",
+  recorrencia: "nenhuma",
   status: "Pendente",
   observacoes: "",
 };
