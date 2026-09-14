@@ -476,7 +476,21 @@ function Contas() {
           <h1 className="text-2xl font-semibold tracking-tight">Contas a Pagar e Receber</h1>
           <p className="text-sm text-muted-foreground">Títulos com vencimento e baixa manual.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) {
+              setEditando(null);
+              setForm(vazio);
+              setRatear(false);
+              setRateio([
+                { categoria: "", valor: "" },
+                { categoria: "", valor: "" },
+              ]);
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus /> Novo lançamento
@@ -484,7 +498,7 @@ function Contas() {
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Novo lançamento</DialogTitle>
+              <DialogTitle>{editando ? "Editar lançamento" : "Novo lançamento"}</DialogTitle>
               <DialogDescription>Conta a pagar ou a receber.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -818,7 +832,7 @@ function Contas() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                {salvar.isPending ? "Salvando…" : "Salvar lançamento"}
+                {salvar.isPending ? "Salvando…" : editando ? "Salvar alterações" : "Salvar lançamento"}
               </Button>
             </DialogFooter>
           </DialogContent>
