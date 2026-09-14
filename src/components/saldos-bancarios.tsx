@@ -178,6 +178,16 @@ export function SaldosBancarios() {
                     <p className="text-xs text-muted-foreground">
                       {s.banco || "—"} · atualizado em {dataBR(s.data_saldo)}
                     </p>
+                    {movimentoConta(s.conta) !== 0 && (
+                      <p className="mt-1 text-xs tabular-nums">
+                        Hoje nesta conta:{" "}
+                        <span className={movimentoConta(s.conta) > 0 ? "text-emerald-500" : "text-destructive"}>
+                          {movimentoConta(s.conta) > 0 ? "+" : "−"}
+                          {brl(Math.abs(movimentoConta(s.conta)))}
+                        </span>{" "}
+                        · saldo {brl(Number(s.saldo ?? 0) + movimentoConta(s.conta))}
+                      </p>
+                    )}
                   </div>
                   <Button
                     size="icon"
