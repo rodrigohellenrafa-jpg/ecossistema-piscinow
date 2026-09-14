@@ -404,18 +404,92 @@ function Contas() {
               </Field>
               <Field label={form.tipo === "pagar" ? "Fornecedor" : "Cliente"}>
                 {form.tipo === "pagar" ? (
-                  <Select value={form.parceiro} onValueChange={set("parceiro")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o fornecedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {fornecedores.map((f) => (
-                        <SelectItem key={f.id} value={f.nome}>
-                          {f.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-1">
+                    <Select value={form.parceiro} onValueChange={set("parceiro")}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o fornecedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fornecedores.map((f) => (
+                          <SelectItem key={f.id} value={f.nome}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Dialog open={fornOpen} onOpenChange={setFornOpen}>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline" size="icon" title="Novo fornecedor">
+                          <Plus />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Novo fornecedor</DialogTitle>
+                          <DialogDescription>
+                            Cadastre o fornecedor rapidamente.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="Nome / Razão social" className="sm:col-span-2">
+                            <Input
+                              value={novoFornecedor.nome}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, nome: e.target.value }))
+                              }
+                              placeholder="Ex.: Light S/A"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  salvarFornecedor.mutate();
+                                }
+                              }}
+                            />
+                          </Field>
+                          <Field label="CNPJ">
+                            <Input
+                              value={novoFornecedor.cnpj}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, cnpj: e.target.value }))
+                              }
+                            />
+                          </Field>
+                          <Field label="Telefone">
+                            <Input
+                              value={novoFornecedor.telefone}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, telefone: e.target.value }))
+                              }
+                            />
+                          </Field>
+                          <Field label="E-mail" className="sm:col-span-2">
+                            <Input
+                              type="email"
+                              value={novoFornecedor.email}
+                              onChange={(e) =>
+                                setNovoFornecedor((f) => ({ ...f, email: e.target.value }))
+                              }
+                            />
+                          </Field>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setFornOpen(false)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={() => salvarFornecedor.mutate()}
+                            disabled={salvarFornecedor.isPending}
+                          >
+                            Salvar fornecedor
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 ) : (
                   <Input
                     value={form.parceiro}
