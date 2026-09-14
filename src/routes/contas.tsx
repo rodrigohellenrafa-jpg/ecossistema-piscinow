@@ -129,6 +129,25 @@ function proximaData(iso: string, recorrencia: string): string | null {
 const rotuloRecorrencia = (v: string) =>
   RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
 
+/** Próximos vencimentos de uma recorrência: até 12 parcelas, limitadas a 12 meses à frente. */
+function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | null) {
+  if (!recorrencia || recorrencia === "nenhuma") return [];
+  const limite = new Date(`${inicio}T12:00:00`);
+  limite.setMonth(limite.getMonth() + 12);
+  const limiteISO = limite.toISOString().slice(0, 10);
+  const datas: string[] = [];
+  let atual = inicio;
+  for (let i = 0; i < 12; i++) {
+    const prox = proximaData(atual, recorrencia);
+    if (!prox) break;
+    if (prox > limiteISO) break;
+    if (fim && prox > fim) break;
+    datas.push(prox);
+    atual = prox;
+  }
+  return datas;
+}
+
 const PERIODOS = [
   { valor: "todas", rotulo: "Todas" },
   { valor: "hoje", rotulo: "Hoje" },
