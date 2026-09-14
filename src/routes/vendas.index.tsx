@@ -39,6 +39,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
+const TIPOS_ATENDIMENTO = [
+  { value: "in", label: "IN · Balcão" },
+  { value: "out", label: "OUT · Serviço externo" },
+];
+
 export const Route = createFileRoute("/vendas/")({
   staticData: { sitemap: false },
   head: () => ({
