@@ -764,14 +764,34 @@ function DetalhePedido() {
                   <TableCell>{p.observacoes ?? "—"}</TableCell>
                   <TableCell className="text-right">{brl(Number(p.valor))}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removerPagamento.mutate(p.id)}
-                      aria-label="Remover pagamento"
-                    >
-                      <Trash2 />
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Editar pagamento"
+                        onClick={() =>
+                          setEditPag({
+                            id: p.id,
+                            data_pagamento: p.data_pagamento,
+                            forma_pagamento: p.forma_pagamento,
+                            conta_bancaria: p.conta_bancaria ?? "",
+                            valor: String(p.valor ?? ""),
+                            observacoes: p.observacoes ?? "",
+                          })
+                        }
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => removerPagamento.mutate(p.id)}
+                        aria-label="Remover pagamento"
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
