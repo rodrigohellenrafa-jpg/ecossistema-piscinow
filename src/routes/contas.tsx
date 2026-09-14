@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
@@ -131,6 +131,7 @@ const rotuloRecorrencia = (v: string) =>
 function Contas() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
 
