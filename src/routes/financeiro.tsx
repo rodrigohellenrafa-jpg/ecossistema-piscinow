@@ -278,6 +278,7 @@ function Financeiro() {
         funcionario_id: vinc.funcionario_id ?? (form.funcionario_id || null),
         cliente_id: vinc.cliente_id,
         tipo_despesa: form.tipo_fluxo === "despesa" && form.tipo_despesa ? form.tipo_despesa : null,
+        recorrencia: form.recorrencia,
         status: form.status,
         observacoes: form.observacoes || null,
         obra_id: vinc.obra_id ?? (form.obra_id || null),
@@ -322,6 +323,38 @@ function Financeiro() {
         .update({ status: "Pago", data_pagamento: hojeISO() })
         .eq("id", id);
       if (error) throw error;
+
+      const { data: orig } = await supabase
+        .from("lancamentos_financeiros")
+        .select("*")
+        .eq("id", id)
+        .single();
+      if (orig && orig.recorrencia && orig.recorrencia !== "nenhuma") {
+        const base = orig.vencimento || orig.data_competencia;
+        const proxima = proximaData(base, orig.recorrencia);
+        const { error: err2 } = await supabase.from("lancamentos_financeiros").insert({
+          tipo_fluxo: orig.tipo_fluxo,
+          categoria: orig.categoria,
+          descricao: orig.descricao,
+          valor: orig.valor,
+          data_competencia: proxima,
+          vencimento: orig.vencimento ? proxima : null,
+          conta_bancaria: orig.conta_bancaria,
+          forma_pagamento: orig.forma_pagamento,
+          venda_id: orig.venda_id,
+          fornecedor_id: orig.fornecedor_id,
+          funcionario_id: orig.funcionario_id,
+          cliente_id: orig.cliente_id,
+          obra_id: orig.obra_id,
+          numero_documento: orig.numero_documento,
+          tipo_despesa: orig.tipo_despesa,
+          recorrencia: orig.recorrencia,
+          status: "Pendente",
+          observacoes: orig.observacoes,
+          created_by: orig.created_by,
+        });
+        if (err2) throw err2;
+      }
     },
     onSuccess: () => {
       toast.success("Lançamento marcado como pago.");
