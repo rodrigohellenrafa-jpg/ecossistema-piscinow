@@ -76,8 +76,41 @@ const vazio = {
   valor: "0",
   valor_juros: "0",
   vencimento: "",
+  recorrencia: "nenhuma",
   observacoes: "",
 };
+
+const RECORRENCIAS: { valor: string; rotulo: string }[] = [
+  { valor: "nenhuma", rotulo: "Pagamento único (sem recorrência)" },
+  { valor: "diaria", rotulo: "Diária" },
+  { valor: "semanal", rotulo: "Semanal" },
+  { valor: "quinzenal", rotulo: "Quinzenal" },
+  { valor: "mensal", rotulo: "Mensal" },
+  { valor: "bimestral", rotulo: "Bimestral" },
+  { valor: "trimestral", rotulo: "Trimestral" },
+  { valor: "semestral", rotulo: "Semestral" },
+  { valor: "anual", rotulo: "Anual" },
+];
+
+function proximaData(iso: string, recorrencia: string): string | null {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  switch (recorrencia) {
+    case "diaria": d.setDate(d.getDate() + 1); break;
+    case "semanal": d.setDate(d.getDate() + 7); break;
+    case "quinzenal": d.setDate(d.getDate() + 15); break;
+    case "mensal": d.setMonth(d.getMonth() + 1); break;
+    case "bimestral": d.setMonth(d.getMonth() + 2); break;
+    case "trimestral": d.setMonth(d.getMonth() + 3); break;
+    case "semestral": d.setMonth(d.getMonth() + 6); break;
+    case "anual": d.setFullYear(d.getFullYear() + 1); break;
+    default: return null;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+const rotuloRecorrencia = (v: string) =>
+  RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
 
 function Contas() {
   const qc = useQueryClient();
@@ -396,6 +429,25 @@ function Contas() {
                   value={form.vencimento}
                   onChange={(e) => set("vencimento")(e.target.value)}
                 />
+              </Field>
+              <Field label="Recorrência">
+                <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pagamento único" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RECORRENCIAS.map((r) => (
+                      <SelectItem key={r.valor} value={r.valor}>
+                        {r.rotulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.recorrencia !== "nenhuma" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ao dar baixa, o próximo vencimento ({rotuloRecorrencia(form.recorrencia)?.toLowerCase()}) é gerado automaticamente.
+                  </p>
+                )}
               </Field>
               <div className="rounded-lg border p-3 sm:col-span-2">
                 <div className="flex items-center justify-between gap-3">
