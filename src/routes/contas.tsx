@@ -273,6 +273,48 @@ function Contas() {
       }
 
       const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+
+      if (editando) {
+        const { error } = await supabase
+          .from("contas")
+          .update({
+            tipo: form.tipo,
+            descricao: form.descricao.trim(),
+            parceiro: form.parceiro || null,
+            categoria: ratear ? "Rateio" : form.categoria || null,
+            valor: Number(form.valor) || 0,
+            valor_juros: Number(form.valor_juros) || 0,
+            vencimento: form.vencimento,
+            observacoes: form.observacoes || null,
+            obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
+            funcionario_id: parseVinculo(form.vinculo).funcionario_id,
+            cliente_id: parseVinculo(form.vinculo).cliente_id,
+            numero_documento: form.numero_documento || null,
+            recorrencia: form.recorrencia,
+            tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
+          })
+          .eq("id", editando);
+        if (error) throw error;
+
+        const { error: errDel } = await supabase
+          .from("conta_rateios")
+          .delete()
+          .eq("conta_id", editando);
+        if (errDel) throw errDel;
+        if (ratear) {
+          const { error: err2 } = await supabase.from("conta_rateios").insert(
+            linhas.map((l) => ({
+              conta_id: editando,
+              categoria: l.categoria,
+              valor: l.valor,
+              created_by: uid,
+            })),
+          );
+          if (err2) throw err2;
+        }
+        return;
+      }
+
       const { data: criada, error } = await supabase
         .from("contas")
         .insert({
