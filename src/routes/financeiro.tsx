@@ -115,6 +115,7 @@ const vazio = {
   venda_id: "",
   fornecedor_id: "",
   funcionario_id: "",
+  tipo_despesa: "",
   status: "Pendente",
   observacoes: "",
 };
@@ -251,6 +252,7 @@ function Financeiro() {
         fornecedor_id: form.fornecedor_id || null,
         funcionario_id: vinc.funcionario_id ?? (form.funcionario_id || null),
         cliente_id: vinc.cliente_id,
+        tipo_despesa: form.tipo_fluxo === "despesa" && form.tipo_despesa ? form.tipo_despesa : null,
         status: form.status,
         observacoes: form.observacoes || null,
         obra_id: vinc.obra_id ?? (form.obra_id || null),
@@ -595,8 +597,26 @@ function Financeiro() {
                       ))}
                     </SelectContent>
                   </Select>
-                </Field>
-                <Field label="Funcionário vinculado">
+                 </Field>
+                 {form.tipo_fluxo === "despesa" && (
+                   <Field label="Tipo de despesa">
+                     <Select
+                       value={form.tipo_despesa || "none"}
+                       onValueChange={(v) => set("tipo_despesa")(v === "none" ? "" : v)}
+                     >
+                       <SelectTrigger>
+                         <SelectValue placeholder="Selecione" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="none">Não classificado</SelectItem>
+                         <SelectItem value="fixa">Despesa fixa</SelectItem>
+                         <SelectItem value="variavel">Despesa variável</SelectItem>
+                         <SelectItem value="operacional">Despesa operacional</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </Field>
+                 )}
+                 <Field label="Funcionário vinculado">
                   <Select
                     value={form.funcionario_id || "none"}
                     onValueChange={(v) => set("funcionario_id")(v === "none" ? "" : v)}
