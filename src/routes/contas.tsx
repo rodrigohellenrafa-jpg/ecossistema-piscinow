@@ -167,6 +167,9 @@ function Contas() {
   const [catOpen, setCatOpen] = useState(false);
   useAbrirModal("categoria", () => setCatOpen(true));
 
+  const [fornOpen, setFornOpen] = useState(false);
+  const [novoFornecedor, setNovoFornecedor] = useState(fornecedorVazio);
+
   const [ratear, setRatear] = useState(false);
   const [rateio, setRateio] = useState<{ categoria: string; valor: string }[]>([
     { categoria: "", valor: "" },
