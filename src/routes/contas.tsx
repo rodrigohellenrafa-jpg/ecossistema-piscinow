@@ -896,6 +896,27 @@ function Contas() {
         </Dialog>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Período:</span>
+        <Select value={periodo} onValueChange={setPeriodo}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIODOS.map((p) => (
+              <SelectItem key={p.valor} value={p.valor}>
+                {p.rotulo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {periodo !== "todas" && (
+          <span className="text-xs text-muted-foreground">
+            Filtrando por data de vencimento: {PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.
+          </span>
+        )}
+      </div>
+
       <Tabs defaultValue="pagar">
         <TabsList>
           <TabsTrigger value="pagar">A pagar ({pagar.length})</TabsTrigger>
