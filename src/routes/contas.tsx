@@ -1072,7 +1072,7 @@ function Lista({
       if (!norm(v).includes(alvo) && !norm(dataBR(v)).includes(alvo)) return false;
     }
     if (fValor) {
-      const alvo = norm(fVencimento && fValor);
+      const alvo = norm(fValor);
       const total = (Number(c.valor) + Number(c.valor_juros ?? 0))
         .toFixed(2)
         .replace(".", ",");
