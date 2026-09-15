@@ -1271,7 +1271,35 @@ function NovoPedido() {
                 ))}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-4">
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <Field label="Tabela de custos do fabricante">
+                  <Select value={modeloTabela} onValueChange={aplicarTabela}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o modelo da tabela" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tabelaFabricante.map((t) => (
+                        <SelectItem key={t.id} value={t.modelo}>
+                          {t.modelo} — {brl(num(t.preco_venda))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Ao escolher o modelo, os custos de casco, filtro, frete, mão de obra e imposto são
+                  preenchidos automaticamente, junto com o preço de venda sugerido. Você pode
+                  ajustar qualquer valor depois.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Custo do casco">
+                  <MoedaInput value={custoCascoFinal} onChange={setCustoCasco} />
+                </Field>
+                <Field label="Custo do filtro">
+                  <MoedaInput value={custoFiltroFinal} onChange={setCustoFiltro} />
+                </Field>
                 <Field label="Custo de frete">
                   <MoedaInput value={custoFrete} onChange={setCustoFrete} />
                 </Field>
