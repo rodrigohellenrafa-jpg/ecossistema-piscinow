@@ -465,7 +465,10 @@ function NovoPedido() {
 
   const casco = produtos.find((p) => p.id === cascoId);
   const filtro = produtos.find((p) => p.id === filtroId);
-  const custoKitBase = num(casco?.preco_custo) + num(filtro?.preco_custo);
+  // Custo informado na tabela do fabricante tem prioridade sobre o cadastro do produto.
+  const custoCascoFinal = custoCasco > 0 ? custoCasco : num(casco?.preco_custo);
+  const custoFiltroFinal = custoFiltro > 0 ? custoFiltro : num(filtro?.preco_custo);
+  const custoKitBase = custoCascoFinal + custoFiltroFinal;
   const custoAcessorios = acessorios.reduce((s, a) => s + a.valor, 0);
   const custoTotalKit = custoKitBase + custoAcessorios + custoFrete + custoMaoObra + impostosKit;
   const margemKit = margem(precoVendaKit, custoTotalKit);
