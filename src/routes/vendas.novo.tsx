@@ -1571,16 +1571,55 @@ function NovoPedido() {
             <CardHeader>
               <CardTitle>Resumo do Kit</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="space-y-2 text-sm">
+              {modeloTabela && (
+                <p className="text-xs text-muted-foreground">Tabela: {modeloTabela}</p>
+              )}
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Casco</span>
+                <span>{brl(custoCascoFinal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Filtro</span>
+                <span>{brl(custoFiltroFinal)}</span>
+              </div>
+              {custoAcessorios > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Acessórios</span>
+                  <span>{brl(custoAcessorios)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Frete</span>
+                <span>{brl(custoFrete)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Mão de obra</span>
+                <span>{brl(custoMaoObra)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Imposto</span>
+                <span>{brl(impostosKit)}</span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted-foreground">Custo total do kit</span>
                 <span className="font-medium">{brl(custoTotalKit)}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Lucro no pedido</span>
+                <span className="font-medium">{brl(precoVendaKit - custoTotalKit)}</span>
+              </div>
+              {lucroSugerido > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Lucro sugerido (fabricante)</span>
+                  <span>{brl(lucroSugerido)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Preço de venda</span>
                 <span className="font-medium">{brl(precoVendaKit)}</span>
               </div>
-              <div className="flex justify-between border-t border-border pt-3">
+              <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted-foreground">Margem bruta</span>
                 <span className={`text-lg font-semibold ${corMargem}`}>{pct(margemKit)}</span>
               </div>
