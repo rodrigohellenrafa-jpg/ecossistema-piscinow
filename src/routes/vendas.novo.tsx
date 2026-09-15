@@ -264,6 +264,22 @@ function NovoPedido() {
     },
   });
 
+  const { data: tabelaFabricante = [] } = useQuery({
+    queryKey: ["tabela-fabricante"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tabela_fabricante")
+        .select(
+          "id, modelo, linha, custo_casco, custo_filtro, frete, instalacao, imposto, lucro, preco_venda",
+        )
+        .eq("ativo", true)
+        .order("modelo");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+
   const { data: numerosExistentes = [] } = useQuery({
     queryKey: ["vendas-numeros"],
     queryFn: async () => {
