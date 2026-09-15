@@ -13,7 +13,7 @@ export function DespesasRecorrentes() {
   const qc = useQueryClient();
   const [form, setForm] = useState({ descricao: '', parceiro: '', categoria: '', valor: '', dia: '5', inicio: hojeISO(), fim: '' });
   const { data = [] } = useQuery({ queryKey: ['despesas-recorrentes'], queryFn: async () => {
-    const result = await supabase.from('despesas_recorrentes').select('*').order('descricao');
+    const result = await supabase.from('despesas_recorrentes').select('*').order('dia_vencimento', { ascending: true }).order('descricao');
     if (result.error) throw result.error; return result.data;
   }});
   const salvar = useMutation({ mutationFn: async () => {
