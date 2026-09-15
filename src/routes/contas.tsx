@@ -1046,10 +1046,51 @@ function Lista({
   onExcluir: (id: string) => void;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
+  const [fDescricao, setFDescricao] = useState("");
+  const [fParceiro, setFParceiro] = useState("");
+  const [fVencimento, setFVencimento] = useState("");
+  const [fValor, setFValor] = useState("");
+  const [fStatus, setFStatus] = useState("todos");
+
+  const dataBR = (iso: string) => {
+    const [a, m, d] = iso.slice(0, 10).split("-");
+    return `${d}/${m}/${a}`;
+  };
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const contem = (campo: string | null | undefined, filtro: string) =>
+    !filtro || norm(campo ?? "").includes(norm(filtro));
+
+  const statusDe = (c: Conta) =>
+    c.status === "pago" ? "pago" : c.vencimento < hoje ? "vencido" : "aberto";
+
+  const visiveis = itens.filter((c) => {
+    if (!contem(c.descricao, fDescricao)) return false;
+    if (!contem(c.parceiro, fParceiro)) return false;
+    if (fVencimento) {
+      const alvo = norm(fVencimento);
+      const v = c.vencimento.slice(0, 10);
+      if (!norm(v).includes(alvo) && !norm(dataBR(v)).includes(alvo)) return false;
+    }
+    if (fValor) {
+      const alvo = norm(fVencimento && fValor);
+      const total = (Number(c.valor) + Number(c.valor_juros ?? 0))
+        .toFixed(2)
+        .replace(".", ",");
+      const parcela = Number(c.valor).toFixed(2).replace(".", ",");
+      if (!norm(total).includes(alvo) && !norm(parcela).includes(alvo)) return false;
+    }
+    if (fStatus !== "todos" && statusDe(c) !== fStatus) return false;
+    return true;
+  });
+
+  const temFiltro = fDescricao || fParceiro || fVencimento || fValor || fStatus !== "todos";
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle>{titulo}</CardTitle>
+        <CardTitle>
+          {titulo}
+          {temFiltro ? ` · ${visiveis.length} resultado(s)` : ""}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
@@ -1064,9 +1105,61 @@ function Lista({
               <TableHead>Status</TableHead>
               <TableHead className="w-36 text-right">Ações</TableHead>
             </TableRow>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="py-1">
+                <Input
+                  value={fDescricao}
+                  onChange={(e) => setFDescricao(e.target.value)}
+                  placeholder="Buscar descrição…"
+                  className="h-8 text-xs font-normal"
+                  aria-label="Filtrar por descrição"
+                />
+              </TableHead>
+              <TableHead className="py-1">
+                <Input
+                  value={fParceiro}
+                  onChange={(e) => setFParceiro(e.target.value)}
+                  placeholder="Buscar fornecedor…"
+                  className="h-8 text-xs font-normal"
+                  aria-label="Filtrar por parceiro"
+                />
+              </TableHead>
+              <TableHead className="py-1">
+                <Input
+                  value={fVencimento}
+                  onChange={(e) => setFVencimento(e.target.value)}
+                  placeholder="Ex.: 09/2026"
+                  className="h-8 text-xs font-normal"
+                  aria-label="Filtrar por vencimento"
+                />
+              </TableHead>
+              <TableHead className="py-1" colSpan={3}>
+                <Input
+                  value={fValor}
+                  onChange={(e) => setFValor(e.target.value)}
+                  placeholder="Buscar valor…"
+                  className="h-8 text-xs font-normal"
+                  aria-label="Filtrar por valor"
+                />
+              </TableHead>
+              <TableHead className="py-1">
+                <Select value={fStatus} onValueChange={setFStatus}>
+                  <SelectTrigger className="h-8 text-xs font-normal" aria-label="Filtrar por status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="aberto">Aberto</SelectItem>
+                    <SelectItem value="vencido">Vencido</SelectItem>
+                    <SelectItem value="pago">Pago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="py-1" />
+            </TableRow>
           </TableHeader>
           <TableBody>
-            {itens.map((c) => {
+            {visiveis.map((c) => {
               const vencido = c.status !== "pago" && c.vencimento < hoje;
               return (
                 <TableRow key={c.id}>
