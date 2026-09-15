@@ -113,13 +113,15 @@ export function SaldosBancarios() {
   const atualizar = useMutation({
     mutationFn: async (s: Saldo) => {
       const e = edits[s.id];
-      const { error } = await supabase
-        .from("saldos_bancarios")
-        .update({
-          saldo: Number(e?.saldo ?? s.saldo) || 0,
-          data_saldo: e?.data_saldo || s.data_saldo,
-        })
-        .eq("id", s.id);
+      const bruto = e?.saldo ?? s.saldo;
+      const saldo = Number(bruto);
+      if (bruto === "" || bruto === null || bruto === undefined || !Number.isFinite(saldo)) {
+        throw new Error("Informe um saldo válido antes de salvar.");
+      }
+      const patch: { saldo: number; data_saldo?: string } = { saldo };
+      const data = e?.data_saldo || s.data_saldo;
+      if (data) patch.data_saldo = data;
+      const { error } = await supabase.from("saldos_bancarios").update(patch).eq("id", s.id);
       if (error) throw error;
     },
     onSuccess: (_d, s) => {
