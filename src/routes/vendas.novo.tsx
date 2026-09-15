@@ -792,34 +792,9 @@ function NovoPedido() {
       // cada condição de pagamento (valor abatido, sem juros), vinculado ao
       // pedido. Editar ou excluir a condição atualiza/remove o título sozinho.
 
-      // 1b-2) Os juros/acréscimo da maquininha viram receita financeira
-      // vinculada ao pedido (não inflam a receita de vendas no DRE).
-      const comJuros = condicoes.filter((c) => acrescimoCondicao(c) > 0);
-      if (comJuros.length > 0) {
-        const { error: erroJuros } = await supabase.from("lancamentos_financeiros").insert(
-          comJuros.map((c) => ({
-            tipo_fluxo: "receita",
-            categoria: "Juros de cartão",
-            descricao: `Juros ${c.forma_pagamento} - Pedido ${numero}${
-              cliente?.nome ? ` - ${cliente.nome}` : ""
-            }`,
-            valor: acrescimoCondicao(c),
-            data_competencia: c.data_prevista || data,
-            vencimento: c.data_prevista || data,
-            data_pagamento: c.pago ? c.data_prevista || data : null,
-            venda_id: venda.id,
-            forma_pagamento: c.forma_pagamento || null,
-            conta_bancaria: c.bandeira || null,
-            status: c.pago ? "pago" : "pendente",
-            conciliado: false,
-            observacoes: `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} - cobrado ${brl(
-              cobradoCondicao(c),
-            )} sobre ${brl(c.valor)}`,
-            created_by: userId,
-          })) as never,
-        );
-        if (erroJuros) throw erroJuros;
-      }
+      // 1b-2) Os juros/acréscimo da maquininha NÃO viram receita: ficam apenas
+      // registrados na condição de pagamento (venda_condicoes.acrescimo) como
+      // informação, sem alimentar o financeiro nem o DRE.
 
 
       // 1c) Condições já pagas viram transações da venda: recalculam saldo,
