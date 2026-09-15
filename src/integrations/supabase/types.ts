@@ -1746,6 +1746,60 @@ export type Database = {
         }
         Relationships: []
       }
+      tabela_fabricante: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          custo_casco: number
+          custo_filtro: number
+          frete: number
+          id: string
+          imposto: number
+          instalacao: number
+          linha: string | null
+          lucro: number
+          modelo: string
+          observacoes: string | null
+          preco_venda: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          custo_casco?: number
+          custo_filtro?: number
+          frete?: number
+          id?: string
+          imposto?: number
+          instalacao?: number
+          linha?: string | null
+          lucro?: number
+          modelo: string
+          observacoes?: string | null
+          preco_venda?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          custo_casco?: number
+          custo_filtro?: number
+          frete?: number
+          id?: string
+          imposto?: number
+          instalacao?: number
+          linha?: string | null
+          lucro?: number
+          modelo?: string
+          observacoes?: string | null
+          preco_venda?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
