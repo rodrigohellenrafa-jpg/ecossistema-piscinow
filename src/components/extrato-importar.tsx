@@ -103,7 +103,7 @@ export function ExtratoImportar({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: contas = [] } = useQuery({
-    queryKey: ["saldos-bancarios"],
+    queryKey: ["saldos-bancarios", "opcoes"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saldos_bancarios")
