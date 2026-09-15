@@ -15,7 +15,9 @@ import {
   YAxis,
 } from "recharts";
 
+import { FluxoColunas } from "@/components/fluxo-colunas";
 import { Kpi, PageHeader } from "@/components/page-header";
+import { SaldosBancarios } from "@/components/saldos-bancarios";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -253,6 +255,8 @@ function FluxoCaixa() {
         />
       </div>
 
+      <SaldosBancarios />
+
       <Card>
         <CardHeader>
           <CardTitle>Evolução mensal e saldo acumulado</CardTitle>
@@ -441,6 +445,8 @@ function FluxoCaixa() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <FluxoColunas />
     </div>
   );
 }
