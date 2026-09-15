@@ -449,6 +449,10 @@ function NovoPedido() {
     setCustoMaoObra(0);
     setImpostosKit(0);
     setPrecoVendaKit(0);
+    setModeloTabela("");
+    setCustoCasco(0);
+    setCustoFiltro(0);
+    setLucroSugerido(0);
     setCondicoes([]);
     toast.success("Rascunho descartado.");
   };
