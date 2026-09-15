@@ -4,7 +4,9 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExpandableCard } from "@/components/expandable-card";
+import { ExtratoImportar } from "@/components/extrato-importar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -148,13 +150,16 @@ export function SaldosBancarios() {
   const totalAtual = total + entradasHoje - saidasHoje;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
+    <ExpandableCard>
+      <CardHeader className="flex-row items-start justify-between space-y-0 pr-12">
         <div>
           <CardTitle>Saldo das contas (informado manualmente)</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             Digite o saldo que o banco mostra hoje. Serve enquanto a conciliação automática não está ligada.
           </p>
+          <div className="mt-2">
+            <ExtratoImportar />
+          </div>
         </div>
         <div className="text-right">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual com o dia de hoje</p>
@@ -282,6 +287,6 @@ export function SaldosBancarios() {
           </Button>
         </div>
       </CardContent>
-    </Card>
+    </ExpandableCard>
   );
 }
