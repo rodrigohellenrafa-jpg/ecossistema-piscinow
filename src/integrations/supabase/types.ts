@@ -610,6 +610,60 @@ export type Database = {
           },
         ]
       }
+      extratos_bancarios: {
+        Row: {
+          banco: string | null
+          conciliado: boolean
+          conta: string
+          created_at: string
+          created_by: string | null
+          data_movimento: string
+          descricao: string
+          documento: string | null
+          id: string
+          observacoes: string | null
+          origem: string
+          saldo: number | null
+          tipo: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          banco?: string | null
+          conciliado?: boolean
+          conta: string
+          created_at?: string
+          created_by?: string | null
+          data_movimento: string
+          descricao: string
+          documento?: string | null
+          id?: string
+          observacoes?: string | null
+          origem?: string
+          saldo?: number | null
+          tipo?: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          banco?: string | null
+          conciliado?: boolean
+          conta?: string
+          created_at?: string
+          created_by?: string | null
+          data_movimento?: string
+          descricao?: string
+          documento?: string | null
+          id?: string
+          observacoes?: string | null
+          origem?: string
+          saldo?: number | null
+          tipo?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: []
+      }
       fiscal_credenciais: {
         Row: {
           ambiente: string
