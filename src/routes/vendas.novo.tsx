@@ -427,6 +427,10 @@ function NovoPedido() {
     custoMaoObra,
     impostosKit,
     precoVendaKit,
+    modeloTabela,
+    custoCasco,
+    custoFiltro,
+    lucroSugerido,
     condicoes,
   ]);
 
