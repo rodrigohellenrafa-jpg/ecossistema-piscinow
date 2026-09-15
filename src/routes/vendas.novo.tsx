@@ -264,6 +264,22 @@ function NovoPedido() {
     },
   });
 
+  const { data: tabelaFabricante = [] } = useQuery({
+    queryKey: ["tabela-fabricante"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tabela_fabricante")
+        .select(
+          "id, modelo, linha, custo_casco, custo_filtro, frete, instalacao, imposto, lucro, preco_venda",
+        )
+        .eq("ativo", true)
+        .order("modelo");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+
   const { data: numerosExistentes = [] } = useQuery({
     queryKey: ["vendas-numeros"],
     queryFn: async () => {
@@ -303,6 +319,24 @@ function NovoPedido() {
   const [custoMaoObra, setCustoMaoObra] = useState(0);
   const [impostosKit, setImpostosKit] = useState(0);
   const [precoVendaKit, setPrecoVendaKit] = useState(0);
+  const [modeloTabela, setModeloTabela] = useState("");
+  const [custoCasco, setCustoCasco] = useState(0);
+  const [custoFiltro, setCustoFiltro] = useState(0);
+  const [lucroSugerido, setLucroSugerido] = useState(0);
+
+  /** Preenche os custos do kit a partir da tabela do fabricante. */
+  function aplicarTabela(modelo: string) {
+    setModeloTabela(modelo);
+    const t = tabelaFabricante.find((x) => x.modelo === modelo);
+    if (!t) return;
+    setCustoCasco(num(t.custo_casco));
+    setCustoFiltro(num(t.custo_filtro));
+    setCustoFrete(num(t.frete));
+    setCustoMaoObra(num(t.instalacao));
+    setImpostosKit(num(t.imposto));
+    setLucroSugerido(num(t.lucro));
+    setPrecoVendaKit(num(t.preco_venda));
+  }
 
   const [condicoes, setCondicoes] = useState<CondicaoLinha[]>([]);
 
@@ -332,6 +366,10 @@ function NovoPedido() {
         if (typeof d.custoMaoObra === "number") setCustoMaoObra(d.custoMaoObra);
         if (typeof d.impostosKit === "number") setImpostosKit(d.impostosKit);
         if (typeof d.precoVendaKit === "number") setPrecoVendaKit(d.precoVendaKit);
+        if (typeof d.modeloTabela === "string") setModeloTabela(d.modeloTabela);
+        if (typeof d.custoCasco === "number") setCustoCasco(d.custoCasco);
+        if (typeof d.custoFiltro === "number") setCustoFiltro(d.custoFiltro);
+        if (typeof d.lucroSugerido === "number") setLucroSugerido(d.lucroSugerido);
         if (Array.isArray(d.condicoes)) setCondicoes(d.condicoes as CondicaoLinha[]);
         const temConteudo =
           (Array.isArray(d.itens) && d.itens.length > 0) ||
@@ -366,6 +404,10 @@ function NovoPedido() {
           custoMaoObra,
           impostosKit,
           precoVendaKit,
+          modeloTabela,
+          custoCasco,
+          custoFiltro,
+          lucroSugerido,
           condicoes,
         }),
       );
@@ -389,6 +431,10 @@ function NovoPedido() {
     custoMaoObra,
     impostosKit,
     precoVendaKit,
+    modeloTabela,
+    custoCasco,
+    custoFiltro,
+    lucroSugerido,
     condicoes,
   ]);
 
@@ -415,6 +461,10 @@ function NovoPedido() {
     setCustoMaoObra(0);
     setImpostosKit(0);
     setPrecoVendaKit(0);
+    setModeloTabela("");
+    setCustoCasco(0);
+    setCustoFiltro(0);
+    setLucroSugerido(0);
     setCondicoes([]);
     toast.success("Rascunho descartado.");
   };
@@ -431,7 +481,10 @@ function NovoPedido() {
 
   const casco = produtos.find((p) => p.id === cascoId);
   const filtro = produtos.find((p) => p.id === filtroId);
-  const custoKitBase = num(casco?.preco_custo) + num(filtro?.preco_custo);
+  // Custo informado na tabela do fabricante tem prioridade sobre o cadastro do produto.
+  const custoCascoFinal = custoCasco > 0 ? custoCasco : num(casco?.preco_custo);
+  const custoFiltroFinal = custoFiltro > 0 ? custoFiltro : num(filtro?.preco_custo);
+  const custoKitBase = custoCascoFinal + custoFiltroFinal;
   const custoAcessorios = acessorios.reduce((s, a) => s + a.valor, 0);
   const custoTotalKit = custoKitBase + custoAcessorios + custoFrete + custoMaoObra + impostosKit;
   const margemKit = margem(precoVendaKit, custoTotalKit);
@@ -1218,7 +1271,35 @@ function NovoPedido() {
                 ))}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-4">
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <Field label="Tabela de custos do fabricante">
+                  <Select value={modeloTabela} onValueChange={aplicarTabela}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o modelo da tabela" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tabelaFabricante.map((t) => (
+                        <SelectItem key={t.id} value={t.modelo}>
+                          {t.modelo} — {brl(num(t.preco_venda))}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Ao escolher o modelo, os custos de casco, filtro, frete, mão de obra e imposto são
+                  preenchidos automaticamente, junto com o preço de venda sugerido. Você pode
+                  ajustar qualquer valor depois.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Custo do casco">
+                  <MoedaInput value={custoCascoFinal} onChange={setCustoCasco} />
+                </Field>
+                <Field label="Custo do filtro">
+                  <MoedaInput value={custoFiltroFinal} onChange={setCustoFiltro} />
+                </Field>
                 <Field label="Custo de frete">
                   <MoedaInput value={custoFrete} onChange={setCustoFrete} />
                 </Field>
@@ -1490,16 +1571,55 @@ function NovoPedido() {
             <CardHeader>
               <CardTitle>Resumo do Kit</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="space-y-2 text-sm">
+              {modeloTabela && (
+                <p className="text-xs text-muted-foreground">Tabela: {modeloTabela}</p>
+              )}
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Casco</span>
+                <span>{brl(custoCascoFinal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Filtro</span>
+                <span>{brl(custoFiltroFinal)}</span>
+              </div>
+              {custoAcessorios > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Acessórios</span>
+                  <span>{brl(custoAcessorios)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Frete</span>
+                <span>{brl(custoFrete)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Mão de obra</span>
+                <span>{brl(custoMaoObra)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Imposto</span>
+                <span>{brl(impostosKit)}</span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted-foreground">Custo total do kit</span>
                 <span className="font-medium">{brl(custoTotalKit)}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Lucro no pedido</span>
+                <span className="font-medium">{brl(precoVendaKit - custoTotalKit)}</span>
+              </div>
+              {lucroSugerido > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Lucro sugerido (fabricante)</span>
+                  <span>{brl(lucroSugerido)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Preço de venda</span>
                 <span className="font-medium">{brl(precoVendaKit)}</span>
               </div>
-              <div className="flex justify-between border-t border-border pt-3">
+              <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted-foreground">Margem bruta</span>
                 <span className={`text-lg font-semibold ${corMargem}`}>{pct(margemKit)}</span>
               </div>
