@@ -28,7 +28,7 @@ export function SaldosBancarios() {
   const [edits, setEdits] = useState<Record<string, { saldo: string; data_saldo: string }>>({});
 
   const { data: saldos = [] } = useQuery({
-    queryKey: ["saldos-bancarios"],
+    queryKey: ["saldos-bancarios", "completo"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saldos_bancarios")
