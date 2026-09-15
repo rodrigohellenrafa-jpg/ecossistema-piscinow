@@ -319,6 +319,24 @@ function NovoPedido() {
   const [custoMaoObra, setCustoMaoObra] = useState(0);
   const [impostosKit, setImpostosKit] = useState(0);
   const [precoVendaKit, setPrecoVendaKit] = useState(0);
+  const [modeloTabela, setModeloTabela] = useState("");
+  const [custoCasco, setCustoCasco] = useState(0);
+  const [custoFiltro, setCustoFiltro] = useState(0);
+  const [lucroSugerido, setLucroSugerido] = useState(0);
+
+  /** Preenche os custos do kit a partir da tabela do fabricante. */
+  function aplicarTabela(modelo: string) {
+    setModeloTabela(modelo);
+    const t = tabelaFabricante.find((x) => x.modelo === modelo);
+    if (!t) return;
+    setCustoCasco(num(t.custo_casco));
+    setCustoFiltro(num(t.custo_filtro));
+    setCustoFrete(num(t.frete));
+    setCustoMaoObra(num(t.instalacao));
+    setImpostosKit(num(t.imposto));
+    setLucroSugerido(num(t.lucro));
+    setPrecoVendaKit(num(t.preco_venda));
+  }
 
   const [condicoes, setCondicoes] = useState<CondicaoLinha[]>([]);
 
