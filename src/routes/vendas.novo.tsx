@@ -366,6 +366,10 @@ function NovoPedido() {
         if (typeof d.custoMaoObra === "number") setCustoMaoObra(d.custoMaoObra);
         if (typeof d.impostosKit === "number") setImpostosKit(d.impostosKit);
         if (typeof d.precoVendaKit === "number") setPrecoVendaKit(d.precoVendaKit);
+        if (typeof d.modeloTabela === "string") setModeloTabela(d.modeloTabela);
+        if (typeof d.custoCasco === "number") setCustoCasco(d.custoCasco);
+        if (typeof d.custoFiltro === "number") setCustoFiltro(d.custoFiltro);
+        if (typeof d.lucroSugerido === "number") setLucroSugerido(d.lucroSugerido);
         if (Array.isArray(d.condicoes)) setCondicoes(d.condicoes as CondicaoLinha[]);
         const temConteudo =
           (Array.isArray(d.itens) && d.itens.length > 0) ||
