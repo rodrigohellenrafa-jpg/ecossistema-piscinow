@@ -79,6 +79,7 @@ const vazio = {
   obra_id: "",
   vinculo: "",
   numero_documento: "",
+  conta_bancaria: "",
   tipo: "pagar",
   descricao: "",
   parceiro: "",
