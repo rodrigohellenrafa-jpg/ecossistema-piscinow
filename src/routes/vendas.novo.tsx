@@ -768,7 +768,10 @@ function NovoPedido() {
           observacoes: observacoes || null,
           prazo_entrega: prazoEntrega || null,
           endereco_instalacao: enderecoInstalacao || null,
-          materiais: { ...materiais, itens_adicionais: materiaisExtras },
+          materiais: {
+            ...materiais,
+            itens_adicionais: materiaisExtras.map(({ nome, quantidade }) => ({ nome, quantidade })),
+          },
           valor_total: valorTotal,
           subtotal_produtos: subtotalProdutos,
           valor_frete: custoFrete,
