@@ -31,6 +31,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
+  const [esqueci, setEsqueci] = useState(false);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -53,6 +54,18 @@ function AuthPage() {
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Conta criada! Verifique seu e-mail se for solicitado.");
+  }
+
+  async function recuperar() {
+    if (!email) return toast.error("Digite seu e-mail para receber o link.");
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    setEsqueci(false);
+    toast.success("Enviamos um link de recuperação para o seu e-mail.");
   }
 
   async function google() {
