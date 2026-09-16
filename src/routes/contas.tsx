@@ -222,6 +222,35 @@ function Contas() {
     },
   });
 
+  const { data: colaboradores = [] } = useQuery({
+    queryKey: ["funcionarios-select-contas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("id, nome, cargo")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; nome: string; cargo: string | null }[];
+    },
+  });
+
+  const { data: clientesSelect = [] } = useQuery({
+    queryKey: ["clientes-select-contas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; nome: string }[];
+    },
+  });
+
+  const [parceiroOpen, setParceiroOpen] = useState(false);
+  const [parceiroBusca, setParceiroBusca] = useState("");
+
   const { data: categorias = [] } = useQuery({
     queryKey: ["categorias-financeiras"],
     queryFn: async () => {
