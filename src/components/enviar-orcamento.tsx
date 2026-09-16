@@ -20,7 +20,15 @@ import { brl, dataBR } from "@/lib/erp";
 type Venda = {
   numero?: string | null;
   data?: string | null;
+  vendedor?: string | null;
+  cliente_nome?: string | null;
   valor_total?: number | string | null;
+  valor_entrada?: number | string | null;
+  saldo_devedor?: number | string | null;
+  parcelas?: number | null;
+  valor_parcela?: number | string | null;
+  forma_pagamento?: string | null;
+  endereco_instalacao?: string | null;
   status_pedido?: string | null;
   prazo_entrega?: string | null;
   observacoes?: string | null;
@@ -28,11 +36,19 @@ type Venda = {
 
 type Cliente = {
   nome?: string | null;
+  documento?: string | null;
   telefone?: string | null;
   email?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  cep?: string | null;
 } | null;
 
 type Item = {
+  sku?: string | null;
   descricao: string;
   quantidade: number;
   preco_unitario: number;
