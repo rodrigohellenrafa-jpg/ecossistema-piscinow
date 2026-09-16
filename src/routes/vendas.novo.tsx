@@ -323,6 +323,8 @@ function NovoPedido() {
   const [custoCasco, setCustoCasco] = useState(0);
   const [custoFiltro, setCustoFiltro] = useState(0);
   const [lucroSugerido, setLucroSugerido] = useState(0);
+  /** Entrada paga pelo cliente no fechamento do pedido. */
+  const [entrada, setEntrada] = useState(0);
 
   /** Preenche os custos do kit a partir da tabela do fabricante. */
   function aplicarTabela(modelo: string) {
@@ -490,16 +492,19 @@ function NovoPedido() {
   const margemKit = margem(precoVendaKit, custoTotalKit);
   const corMargem = margemKit >= 0.25 ? "text-success" : margemKit < 0.1 ? "text-destructive" : "text-warning";
 
-  const custoTotalGeral = custoTotalItens + custoTotalKit;
-  const valorTotal = Number((subtotalProdutos + precoVendaKit).toFixed(2));
+  // A composição do kit é apenas uma prévia de lucro: não entra no total do
+  // pedido nem no custo do pedido (o que vale é o que está nos itens).
+  const custoTotalGeral = custoTotalItens;
+  const valorTotal = Number(subtotalProdutos.toFixed(2));
 
   // Condições de pagamento: cada linha abate um valor do pedido e pode ter
   // parcelas com juros da maquininha (o cliente paga mais do que abate).
   const totalAplicado = condicoes.reduce((s, c) => s + c.valor, 0);
   const totalCobradoCliente = condicoes.reduce((s, c) => s + cobradoCondicao(c), 0);
   const totalJuros = Math.max(0, totalCobradoCliente - totalAplicado);
-  const faltaAlocar = valorTotal - totalAplicado;
-  const valorEntrada = condicoes.filter((c) => c.pago).reduce((s, c) => s + c.valor, 0);
+  const faltaAlocar = valorTotal - totalAplicado - entrada;
+  const valorEntrada =
+    entrada + condicoes.filter((c) => c.pago).reduce((s, c) => s + c.valor, 0);
   const saldoDevedor = Math.max(valorTotal - valorEntrada, 0);
   const pendentes = condicoes.filter((c) => !c.pago);
   const parcelasQtd = Math.max(1, pendentes.reduce((s, c) => s + parcelasNum(c.parcelas), 0));
