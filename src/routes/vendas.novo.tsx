@@ -1040,19 +1040,52 @@ function NovoPedido() {
                 <div className="flex flex-1 items-center gap-3 lg:max-w-2xl">
                   <Field label="Produto" className="flex-1">
                     <div className="relative flex items-center gap-2">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Select value={produtoSel} onValueChange={setProdutoSel}>
-                        <SelectTrigger className="flex-1 bg-muted/50 pl-10">
-                          <SelectValue placeholder="Buscar produto por SKU ou nome..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {produtos.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.codigo ? `${p.codigo} - ${p.nome}` : p.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={produtoAberto} onOpenChange={setProdutoAberto}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={produtoAberto}
+                            className="relative flex-1 justify-start bg-muted/50 pl-10 font-normal"
+                          >
+                            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <span className="truncate text-left">
+                              {produtoSel
+                                ? (() => {
+                                    const p = produtos.find((x) => x.id === produtoSel);
+                                    if (!p) return "Produto selecionado";
+                                    return p.codigo ? `${p.codigo} - ${p.nome}` : p.nome;
+                                  })()
+                                : "Buscar produto por SKU ou nome..."}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[380px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Digite para buscar por SKU ou nome..." />
+                            <CommandList>
+                              <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                              <CommandGroup>
+                                {produtos.map((p) => (
+                                  <CommandItem
+                                    key={p.id}
+                                    value={`${p.codigo ?? ""} ${p.nome}`.toLowerCase()}
+                                    onSelect={() => {
+                                      setProdutoSel(p.id);
+                                      setProdutoAberto(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={`mr-2 size-4 ${produtoSel === p.id ? "opacity-100" : "opacity-0"}`}
+                                    />
+                                    {p.codigo ? `${p.codigo} - ${p.nome}` : p.nome}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <ProdutoRapidoDialog
                         iconOnly
                         onCreated={async (id) => {
