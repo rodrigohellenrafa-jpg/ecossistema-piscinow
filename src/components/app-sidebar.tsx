@@ -62,6 +62,7 @@ const groups: {
     items: [
       { title: "Clientes", url: "/clientes", icon: Users },
       { title: "Produtos & Estoque", url: "/produtos", icon: Package },
+      { title: "Precificação em Massa", url: "/precificacao", icon: Tag },
       { title: "Fornecedores", url: "/fornecedores", icon: Factory },
       { title: "Colaboradores", url: "/funcionarios", icon: Contact },
     ],
