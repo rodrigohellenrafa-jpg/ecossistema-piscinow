@@ -10,8 +10,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
-import formularioPedido from "@/assets/formulario-pedido-venda-splash.pdf.asset.json";
-import formularioPreview from "@/assets/formulario-pedido-preview.png.asset.json";
 
 type Venda = {
   numero: string | null;
@@ -79,51 +77,210 @@ interface Props {
   empresa?: { nome: string; documento?: string; endereco?: string; contato?: string };
 }
 
-export function DocumentosVenda(_props: Props) {
-  const [aberto, setAberto] = useState<null | "pedido" | "contrato">(null);
-  const doc =
-    aberto === "contrato"
-      ? { titulo: "Contrato de venda", url: contratoSplash.url }
-      : { titulo: "Pedido de venda", url: formularioPedido.url };
+const fmt = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const fmtData = (d: string | null | undefined) =>
+  d ? new Date(d + (d.length === 10 ? "T12:00:00" : "")).toLocaleDateString("pt-BR") : "—";
+
+const esc = (s: string | null | undefined) =>
+  (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function materiaisLinhas(materiais: unknown): [string, string][] {
+  if (!materiais || typeof materiais !== "object") return [];
+  const rotulos: Record<string, string> = {
+    areia_m3: "Areia (m³)",
+    cimento_sc: "Cimento (sc)",
+    blocos_un: "Blocos (un)",
+    agua_m3: "Água (m³)",
+    fios_eletrodutos: "Fios/Eletrodutos",
+  };
+  const out: [string, string][] = [];
+  for (const [k, v] of Object.entries(materiais as Record<string, unknown>)) {
+    if (v === null || v === undefined || v === "" || v === 0) continue;
+    out.push([rotulos[k] ?? k, String(v)]);
+  }
+  return out;
+}
+
+function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): string {
+  const endereco = cliente
+    ? [cliente.logradouro, cliente.numero, cliente.bairro, cliente.cidade, cliente.estado, cliente.cep]
+        .filter(Boolean)
+        .join(", ")
+    : "";
+  const mats = materiaisLinhas(venda.materiais);
+  const linhasItens = itens
+    .map(
+      (i) => `<tr>
+        <td>${esc(i.sku)}</td>
+        <td>${esc(i.descricao)}</td>
+        <td class="num">${i.quantidade}</td>
+        <td class="num">${fmt(i.preco_unitario)}</td>
+        <td class="num">${fmt(i.total)}</td>
+      </tr>`
+    )
+    .join("");
+  const linhasCond = condicoes
+    .map(
+      (c) => `<tr>
+        <td>${esc(c.forma_pagamento)}${c.bandeira ? ` (${esc(c.bandeira)})` : ""}</td>
+        <td class="num">${c.parcelas}x</td>
+        <td class="num">${fmt(c.valor_parcela)}</td>
+        <td class="num">${fmt(c.valor_cobrado || c.valor)}</td>
+        <td>${fmtData(c.data_prevista)}</td>
+        <td>${c.pago ? "Pago" : "Pendente"}</td>
+      </tr>`
+    )
+    .join("");
+  const linhasMats = mats.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${esc(v)}</td></tr>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Pedido de venda ${esc(venda.numero ?? "")}</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; margin: 0; }
+  h1 { font-size: 16px; margin: 0; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 6px; border-bottom: 1px solid #999; padding-bottom: 3px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8px; }
+  .empresa { font-size: 11px; color: #333; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  th, td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #eee; font-size: 11px; }
+  .num { text-align: right; white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+  .campo { border-bottom: 1px dotted #999; padding: 2px 0; min-height: 16px; }
+  .rotulo { font-size: 10px; color: #555; text-transform: uppercase; }
+  .totais td { font-weight: bold; }
+  .obs { border: 1px solid #bbb; min-height: 48px; padding: 6px; margin-top: 4px; white-space: pre-wrap; }
+  .declaracao { font-size: 10.5px; color: #333; margin-top: 14px; text-align: justify; }
+  .assinatura { margin-top: 36px; display: flex; justify-content: space-between; gap: 32px; }
+  .assinatura .bloco { flex: 1; text-align: center; }
+  .assinatura .linha { border-top: 1px solid #111; margin-top: 40px; padding-top: 4px; font-size: 11px; }
+  .assinatura img { max-height: 56px; display: block; margin: 0 auto; }
+  .interno { margin-top: 20px; border-top: 1px dashed #999; padding-top: 8px; font-size: 10.5px; color: #444; }
+  @media print { .no-print { display: none; } }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>PEDIDO DE VENDA${venda.numero ? ` Nº ${esc(venda.numero)}` : ""}</h1>
+      <div class="empresa">${esc(empresa?.nome ?? "")}${empresa?.documento ? ` · ${esc(empresa.documento)}` : ""}${empresa?.endereco ? ` · ${esc(empresa.endereco)}` : ""}${empresa?.contato ? ` · ${esc(empresa.contato)}` : ""}</div>
+    </div>
+    <div style="text-align:right">
+      <div>Data: <strong>${fmtData(venda.data)}</strong></div>
+      <div>Vendedor: <strong>${esc(venda.vendedor ?? "—")}</strong></div>
+    </div>
+  </div>
+
+  <h2>Dados do cliente</h2>
+  <div class="grid">
+    <div><span class="rotulo">Nome</span><div class="campo">${esc(cliente?.nome ?? venda.cliente_nome ?? "")}</div></div>
+    <div><span class="rotulo">Documento</span><div class="campo">${esc(cliente?.documento ?? "")}</div></div>
+    <div><span class="rotulo">Telefone</span><div class="campo">${esc(cliente?.telefone ?? "")}</div></div>
+    <div><span class="rotulo">E-mail</span><div class="campo">${esc(cliente?.email ?? "")}</div></div>
+    <div style="grid-column: 1 / -1"><span class="rotulo">Endereço</span><div class="campo">${esc(endereco)}</div></div>
+    <div style="grid-column: 1 / -1"><span class="rotulo">Endereço da obra / instalação</span><div class="campo">${esc(venda.endereco_instalacao ?? cliente?.endereco_obra ?? "")}</div></div>
+    <div><span class="rotulo">Prazo de entrega</span><div class="campo">${esc(venda.prazo_entrega ?? "")}</div></div>
+  </div>
+
+  <h2>Itens do pedido</h2>
+  <table>
+    <thead><tr><th>SKU</th><th>Descrição</th><th class="num">Qtd</th><th class="num">Unitário</th><th class="num">Total</th></tr></thead>
+    <tbody>${linhasItens}</tbody>
+    <tfoot>
+      <tr class="totais"><td colspan="4" class="num">Valor total</td><td class="num">${fmt(venda.valor_total)}</td></tr>
+      <tr><td colspan="4" class="num">Entrada</td><td class="num">${fmt(venda.valor_entrada)}</td></tr>
+      <tr><td colspan="4" class="num">Saldo devedor</td><td class="num">${fmt(venda.saldo_devedor)}</td></tr>
+      <tr><td colspan="4" class="num">Parcelas</td><td class="num">${venda.parcelas}x de ${fmt(venda.valor_parcela)}</td></tr>
+    </tfoot>
+  </table>
+
+  ${condicoes.length ? `<h2>Condições de pagamento</h2>
+  <table>
+    <thead><tr><th>Forma</th><th class="num">Parcelas</th><th class="num">Parcela</th><th class="num">Valor</th><th>Previsão</th><th>Status</th></tr></thead>
+    <tbody>${linhasCond}</tbody>
+  </table>` : ""}
+
+  ${mats.length ? `<h2>Material a ser solicitado</h2>
+  <table>
+    <thead><tr><th>Material</th><th class="num">Quantidade</th></tr></thead>
+    <tbody>${linhasMats}</tbody>
+  </table>` : ""}
+
+  <h2>Observações</h2>
+  <div class="obs">${esc(venda.observacoes ?? "")}</div>
+
+  <p class="declaracao">Declaro ter recebido e conferido as condições deste pedido de venda, ciente dos valores, prazos, itens e condições de pagamento aqui descritos, concordando integralmente com o estabelecido.</p>
+
+  <div class="assinatura">
+    <div class="bloco">
+      ${venda.assinatura_imagem ? `<img src="${esc(venda.assinatura_imagem)}" alt="Assinatura do cliente" />` : ""}
+      <div class="linha">Cliente${venda.assinatura_nome ? `: ${esc(venda.assinatura_nome)}` : ""}${venda.assinatura_documento ? ` · Doc: ${esc(venda.assinatura_documento)}` : ""}</div>
+    </div>
+    <div class="bloco">
+      <div class="linha">${esc(empresa?.nome ?? "Empresa")}</div>
+    </div>
+  </div>
+
+  <div class="interno">
+    Controle interno${venda.assinatura_codigo ? ` · Código de assinatura: ${esc(venda.assinatura_codigo)}` : ""}${venda.assinatura_em ? ` · Assinado em: ${new Date(venda.assinatura_em).toLocaleString("pt-BR")}` : ""}
+  </div>
+
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`;
+}
+
+export function DocumentosVenda(props: Props) {
+  const [contratoAberto, setContratoAberto] = useState(false);
+
+  const imprimirPedido = () => {
+    const w = window.open("", "_blank", "noopener,noreferrer");
+    if (!w) return;
+    w.document.write(htmlPedido(props));
+    w.document.close();
+  };
+
+  const imprimirPedidoEContrato = () => {
+    imprimirPedido();
+    window.open(contratoSplash.url, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <>
-      <Button variant="outline" onClick={() => setAberto("pedido")}>
-        <Printer /> Ver pedido de venda
+      <Button variant="outline" onClick={imprimirPedido}>
+        <Printer /> Imprimir pedido de venda
       </Button>
-      <Button variant="outline" onClick={() => setAberto("contrato")}>
+      <Button variant="outline" onClick={() => setContratoAberto(true)}>
         <FileSignature /> Ver contrato
       </Button>
-      <Button
-        onClick={() => {
-          window.open(formularioPedido.url, "_blank", "noopener,noreferrer");
-          window.open(contratoSplash.url, "_blank", "noopener,noreferrer");
-        }}
-      >
-        <Files /> Abrir pedido + contrato
+      <Button onClick={imprimirPedidoEContrato}>
+        <Files /> Imprimir pedido + contrato
       </Button>
 
-      <Dialog open={aberto !== null} onOpenChange={(o) => !o && setAberto(null)}>
+      <Dialog open={contratoAberto} onOpenChange={setContratoAberto}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>{doc.titulo}</DialogTitle>
-            <DialogDescription className="sr-only">Visualização do documento original de venda.</DialogDescription>
+            <DialogTitle>Contrato de venda</DialogTitle>
+            <DialogDescription className="sr-only">Visualização do contrato original de venda.</DialogDescription>
           </DialogHeader>
-          {aberto === "pedido" ? (
-            <div className="h-[70vh] overflow-auto rounded-md border">
-              <img src={formularioPreview.url} alt="Formulário original de pedido de venda Splash" className="block h-auto w-full" />
-            </div>
-          ) : <object
-            data={doc.url}
+          <object
+            data={contratoSplash.url}
             type="application/pdf"
             className="h-[70vh] w-full rounded-md border"
           >
-            <iframe src={doc.url} title={doc.titulo} className="h-[70vh] w-full" />
-          </object>}
+            <iframe src={contratoSplash.url} title="Contrato de venda" className="h-[70vh] w-full" />
+          </object>
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
-              onClick={() => window.open(doc.url, "_blank", "noopener,noreferrer")}
+              onClick={() => window.open(contratoSplash.url, "_blank", "noopener,noreferrer")}
             >
               <ExternalLink /> Abrir em nova aba
             </Button>
