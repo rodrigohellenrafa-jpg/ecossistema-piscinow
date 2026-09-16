@@ -89,6 +89,10 @@ const fmt = (v: number) =>
 const fmtData = (d: string | null | undefined) =>
   d ? new Date(d + (d.length === 10 ? "T12:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 
+/** URL absoluta do logotipo, para o timbre funcionar dentro do iframe de impressão. */
+const logoUrl = () =>
+  typeof window !== "undefined" ? `${window.location.origin}${logoSplash.url}` : logoSplash.url;
+
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
