@@ -291,11 +291,29 @@ function Vendas() {
         title="Vendas"
         subtitle="Gerencie pedidos e orçamentos em um só lugar."
         actions={
-          <Button asChild>
-            <Link to="/vendas/novo">
-              <Plus /> Novo pedido
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {sel.length > 0 && (
+              <>
+                <Button variant="outline" onClick={() => setSel([])}>
+                  Limpar seleção ({sel.length})
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setSenha("");
+                    setLoteAberto(true);
+                  }}
+                >
+                  <Trash2 /> Excluir {sel.length} selecionado(s)
+                </Button>
+              </>
+            )}
+            <Button asChild>
+              <Link to="/vendas/novo">
+                <Plus /> Novo pedido
+              </Link>
+            </Button>
+          </div>
         }
       />
 
