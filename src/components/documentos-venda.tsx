@@ -311,6 +311,8 @@ function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props)
   .topo { text-align: center; border-bottom: 2px solid #111; padding-bottom: 8px; }
   .topo h1 { font-size: 13px; margin: 0 0 2px; }
   .topo div { font-size: 10px; color: #333; }
+  .topo img { height: 52px; width: auto; display: block; margin: 0 auto 4px; }
+  .rodape-timbre { margin-top: 20px; border-top: 1px solid #111; padding-top: 5px; font-size: 9px; color: #333; text-align: center; }
   h2 { font-size: 12px; text-align: center; margin: 14px 0 8px; text-transform: uppercase; }
   h3 { font-size: 11px; margin: 12px 0 4px; text-transform: uppercase; }
   p { margin: 4px 0; }
