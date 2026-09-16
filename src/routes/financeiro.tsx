@@ -170,6 +170,18 @@ function Financeiro() {
     },
   });
 
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos-bancarios-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("id, conta, banco")
+        .order("conta", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; conta: string; banco: string | null }[];
+    },
+  });
+
   const { data: fornecedores = [] } = useQuery({
     queryKey: ["fornecedores-lite"],
     queryFn: async () => {
@@ -648,11 +660,26 @@ function Financeiro() {
                     onChange={(e) => set("data_pagamento")(e.target.value)}
                   />
                 </Field>
-                <Field label="Conta bancária">
+                <Field
+                  label={
+                    form.tipo_fluxo === "despesa"
+                      ? "De onde o recurso sai (conta)"
+                      : "Onde o recurso entra (conta)"
+                  }
+                >
                   <Input
+                    list="contas-bancarias-financeiro"
                     value={form.conta_bancaria}
                     onChange={(e) => set("conta_bancaria")(e.target.value)}
+                    placeholder="Ex.: Caixa, Itaú c/c 1234, Nubank PJ"
                   />
+                  <datalist id="contas-bancarias-financeiro">
+                    {contasBancarias.map((c) => (
+                      <option key={c.id} value={c.conta}>
+                        {c.banco ?? ""}
+                      </option>
+                    ))}
+                  </datalist>
                 </Field>
                 <Field label="Forma de pagamento">
                   <Select value={form.forma_pagamento} onValueChange={set("forma_pagamento")}>
