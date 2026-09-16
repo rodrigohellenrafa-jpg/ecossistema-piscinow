@@ -90,6 +90,12 @@ interface ItemLinha {
   estoque_atual: number;
 }
 
+interface MaterialExtra {
+  id: string;
+  nome: string;
+  quantidade: string;
+}
+
 interface AcessorioLinha {
   key: string;
   produto_id: string;
@@ -355,8 +361,11 @@ function NovoPedido() {
     agua_m3: "",
     fios_eletrodutos: "",
   });
+  const [materiaisExtras, setMateriaisExtras] = useState<MaterialExtra[]>([]);
   const [materiaisAberto, setMateriaisAberto] = useState(false);
-  const materiaisPreenchidos = Object.values(materiais).filter((v) => v.trim()).length;
+  const materiaisPreenchidos =
+    Object.values(materiais).filter((v) => v.trim()).length +
+    materiaisExtras.filter((item) => item.nome.trim() && item.quantidade.trim()).length;
 
 
   /** Preenche os custos do kit a partir da tabela do fabricante. */
@@ -410,6 +419,7 @@ function NovoPedido() {
         if (typeof d.enderecoInstalacao === "string") setEnderecoInstalacao(d.enderecoInstalacao);
         if (d.materiais && typeof d.materiais === "object")
           setMateriais((prev) => ({ ...prev, ...(d.materiais as Record<string, string>) }));
+        if (Array.isArray(d.materiaisExtras)) setMateriaisExtras(d.materiaisExtras as MaterialExtra[]);
         const temConteudo =
           (Array.isArray(d.itens) && d.itens.length > 0) ||
           Boolean(d.clienteId) ||
@@ -451,6 +461,7 @@ function NovoPedido() {
           prazoEntrega,
           enderecoInstalacao,
           materiais,
+          materiaisExtras,
         }),
       );
     } catch {
@@ -481,6 +492,7 @@ function NovoPedido() {
     prazoEntrega,
     enderecoInstalacao,
     materiais,
+    materiaisExtras,
   ]);
 
   const descartarRascunho = async () => {
@@ -756,7 +768,7 @@ function NovoPedido() {
           observacoes: observacoes || null,
           prazo_entrega: prazoEntrega || null,
           endereco_instalacao: enderecoInstalacao || null,
-          materiais,
+          materiais: { ...materiais, itens_adicionais: materiaisExtras },
           valor_total: valorTotal,
           subtotal_produtos: subtotalProdutos,
           valor_frete: custoFrete,
@@ -1685,6 +1697,66 @@ function NovoPedido() {
                             placeholder="Quantidade"
                           />
                         </Field>
+                      ))}
+                    </div>
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label>Outros materiais</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          title="Adicionar outro material"
+                          aria-label="Adicionar outro material"
+                          onClick={() =>
+                            setMateriaisExtras((prev) => [
+                              ...prev,
+                              { id: crypto.randomUUID(), nome: "", quantidade: "" },
+                            ])
+                          }
+                        >
+                          <Plus />
+                        </Button>
+                      </div>
+                      {materiaisExtras.map((item) => (
+                        <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_8rem_auto] gap-2">
+                          <Input
+                            value={item.nome}
+                            onChange={(e) =>
+                              setMateriaisExtras((prev) =>
+                                prev.map((atual) =>
+                                  atual.id === item.id ? { ...atual, nome: e.target.value } : atual,
+                                ),
+                              )
+                            }
+                            placeholder="Nome do material"
+                            aria-label="Nome do material"
+                          />
+                          <Input
+                            value={item.quantidade}
+                            onChange={(e) =>
+                              setMateriaisExtras((prev) =>
+                                prev.map((atual) =>
+                                  atual.id === item.id ? { ...atual, quantidade: e.target.value } : atual,
+                                ),
+                              )
+                            }
+                            placeholder="Quantidade"
+                            aria-label={`Quantidade de ${item.nome || "material"}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title="Remover material"
+                            aria-label="Remover material"
+                            onClick={() =>
+                              setMateriaisExtras((prev) => prev.filter((atual) => atual.id !== item.id))
+                            }
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
                       ))}
                     </div>
                     <DialogFooter>
