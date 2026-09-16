@@ -115,6 +115,8 @@ function materiaisLinhas(materiais: unknown): [string, string][] {
 }
 
 function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): string {
+  const orcamento = venda.status_pedido === "orcamento";
+  const titulo = orcamento ? "ORÇAMENTO" : "PEDIDO DE VENDA";
   const endereco = cliente
     ? [cliente.logradouro, cliente.numero, cliente.bairro, cliente.cidade, cliente.estado, cliente.cep]
         .filter(Boolean)
