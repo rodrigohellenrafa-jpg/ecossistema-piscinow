@@ -261,6 +261,33 @@
 #documentos-venda .doc-span2 {
   grid-column: span 2;
 }
+#documentos-venda .doc-splash-header {
+  display: grid;
+  grid-template-columns: 90px 1fr 170px;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 2px solid #111;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+#documentos-venda .doc-splash-logo {
+  width: 90px;
+  height: auto;
+}
+#documentos-venda .doc-splash-box {
+  border: 1px solid #e29ab8;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  padding: 6px 10px;
+}
+#documentos-venda .doc-splash-final {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+#documentos-venda .doc-splash-controle {
+  grid-template-columns: repeat(4, 1fr);
+}
 #documentos-venda .doc-table {
   width: 100%;
   border-collapse: collapse;

@@ -23,6 +23,9 @@ type Venda = {
   assinatura_documento?: string | null;
   assinatura_codigo?: string | null;
   assinatura_em?: string | null;
+  prazo_entrega?: string | null;
+  endereco_instalacao?: string | null;
+  materiais?: unknown;
 };
 
 type Cliente = {
@@ -89,6 +92,11 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
   const [modo, setModo] = useState<"pedido" | "contrato" | "ambos" | null>(null);
   const nomeCliente = cliente?.nome ?? venda.cliente_nome ?? "—";
   const docCliente = cliente?.documento ?? "—";
+  const mats = (venda.materiais ?? {}) as Record<string, unknown>;
+  const material = (chave: string) => {
+    const v = mats[chave];
+    return v === undefined || v === null || v === "" ? "—" : String(v);
+  };
 
   useEffect(() => {
     if (!modo) return;
@@ -126,29 +134,72 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
   const documentos = (
     <div id="documentos-venda" className="doc-root">
       {(modo === "pedido" || modo === "ambos") && (
-        <section className="doc-page">
-          {cabecalho("PEDIDO DE VENDA")}
+        <section className="doc-page doc-splash">
+          <header className="doc-splash-header">
+            <img src={logoSplash.url} alt="Splash" className="doc-splash-logo" />
+            <div>
+              <p className="doc-logo">{emp.nome}</p>
+              <p className="doc-mini">
+                Rua Clodomiro Franco de Andrade Junior, 96 - Jd. Leonor - Campinas/SP - CEP 13041-081
+              </p>
+              <p className="doc-mini">Fone: (19) 3272-1000</p>
+              <p className="doc-mini">campinasjardimdotrevo@splashpiscinas.com</p>
+              <p className="doc-mini">facebook.com/splashpiscinascampinasjardimdotrevo</p>
+            </div>
+            <div className="doc-right">
+              <p className="doc-title">QUADRO RESUMO DE CONTRATO DE VENDA</p>
+              <p className="doc-mini">Pedido nº {venda.numero ?? "—"}</p>
+            </div>
+          </header>
 
-          <div className="doc-box">
-            <p className="doc-box-title">Dados do cliente</p>
+          <div className="doc-box doc-splash-box">
             <div className="doc-grid">
               <p>
-                <strong>Nome:</strong> {nomeCliente}
+                <strong>Data do pedido:</strong> {dataBR(venda.data)}
+              </p>
+              <p>
+                <strong>Prazo de entrega:</strong> {venda.prazo_entrega ?? "—"}
+              </p>
+              <p className="doc-span2 doc-mini">
+                A contar deste documento 100% faturado e / ou quitado
+              </p>
+            </div>
+          </div>
+
+          <div className="doc-box doc-splash-box">
+            <div className="doc-grid">
+              <p>
+                <strong>Consultor de vendas:</strong> {venda.vendedor ?? "—"}
+              </p>
+              <p>
+                <strong>E-mail:</strong> {cliente?.email ?? "—"}
+              </p>
+            </div>
+          </div>
+
+          <div className="doc-box doc-splash-box">
+            <div className="doc-grid">
+              <p className="doc-span2">
+                <strong>Nome / Razão Social:</strong> {nomeCliente}
               </p>
               <p>
                 <strong>CPF/CNPJ:</strong> {docCliente}
               </p>
               <p>
-                <strong>Telefone:</strong> {cliente?.telefone ?? "—"}
+                <strong>RG / IE:</strong> ______________________
               </p>
               <p>
-                <strong>E-mail:</strong> {cliente?.email ?? "—"}
+                <strong>Contato 1:</strong> {cliente?.telefone ?? "—"}
+              </p>
+              <p>
+                <strong>Contato 2:</strong> ______________________
               </p>
               <p className="doc-span2">
-                <strong>Endereço / obra:</strong> {enderecoCliente(cliente)}
+                <strong>End. residencial:</strong> {enderecoCliente(cliente)}
               </p>
               <p className="doc-span2">
-                <strong>Vendedor:</strong> {venda.vendedor ?? "—"}
+                <strong>End. instalação:</strong>{" "}
+                {venda.endereco_instalacao || cliente?.endereco_obra || enderecoCliente(cliente)}
               </p>
             </div>
           </div>
@@ -156,10 +207,10 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
           <table className="doc-table doc-itens">
             <thead>
               <tr>
-                <th style={{ width: "12%" }}>Código</th>
-                <th>Descrição do produto / serviço</th>
-                <th style={{ width: "10%" }}>Qtd</th>
-                <th style={{ width: "16%" }}>Valor unit.</th>
+                <th style={{ width: "14%" }}>Código</th>
+                <th>Descrição</th>
+                <th style={{ width: "10%" }}>Qtde</th>
+                <th style={{ width: "16%" }}>$ Unitário</th>
                 <th style={{ width: "16%" }}>Total</th>
               </tr>
             </thead>
@@ -173,7 +224,7 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
                   <td className="doc-right-cell">{brl(i.total)}</td>
                 </tr>
               ))}
-              {Array.from({ length: Math.max(0, 8 - itens.length) }).map((_, idx) => (
+              {Array.from({ length: Math.max(0, 9 - itens.length) }).map((_, idx) => (
                 <tr key={`vazio-${idx}`}>
                   <td>&nbsp;</td>
                   <td />
@@ -182,79 +233,128 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
                   <td />
                 </tr>
               ))}
+              <tr>
+                <td colSpan={4} className="doc-right-cell">
+                  <strong>TOTAL:</strong>
+                </td>
+                <td className="doc-right-cell">
+                  <strong>{brl(venda.valor_total)}</strong>
+                </td>
+              </tr>
             </tbody>
           </table>
 
-          <div className="doc-box">
-            <p className="doc-box-title">Totalização</p>
-            <div className="doc-grid">
-              <p>
-                <strong>Valor total do pedido:</strong> {brl(venda.valor_total)}
-              </p>
-              <p>
-                <strong>Entrada / pago:</strong> {brl(venda.valor_entrada)}
-              </p>
-              <p>
-                <strong>Saldo a pagar:</strong> {brl(venda.saldo_devedor)}
-              </p>
-              <p>
-                <strong>Parcelamento:</strong>{" "}
-                {venda.parcelas > 1
-                  ? `${venda.parcelas}x de ${brl(venda.valor_parcela)}`
-                  : venda.forma_pagamento || "À vista"}
-              </p>
-            </div>
+          <table className="doc-table">
+            <thead>
+              <tr>
+                <th>Entrada</th>
+                <th>Saldo</th>
+                <th>Parcelas</th>
+                <th>Valor</th>
+                <th>Vencimento</th>
+              </tr>
+            </thead>
+            <tbody>
+              {condicoes.length > 0 ? (
+                condicoes.map((c) => (
+                  <tr key={c.id}>
+                    <td className="doc-center">{c.pago ? brl(c.valor) : "—"}</td>
+                    <td className="doc-center">{c.pago ? "—" : brl(c.valor)}</td>
+                    <td className="doc-center">{c.parcelas}x</td>
+                    <td className="doc-center">{brl(c.valor_parcela)}</td>
+                    <td className="doc-center">{c.data_prevista ? dataBR(c.data_prevista) : "—"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="doc-center">{brl(venda.valor_entrada)}</td>
+                  <td className="doc-center">{brl(venda.saldo_devedor)}</td>
+                  <td className="doc-center">{venda.parcelas}x</td>
+                  <td className="doc-center">{brl(venda.valor_parcela)}</td>
+                  <td className="doc-center">—</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          <div className="doc-box doc-splash-box">
+            <p className="doc-box-title">Observações</p>
+            <p>{venda.observacoes || " "}</p>
           </div>
 
-          {condicoes.length > 0 && (
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th>Condição de pagamento</th>
-                  <th style={{ width: "18%" }}>Data</th>
-                  <th style={{ width: "16%" }}>Parcelas</th>
-                  <th style={{ width: "20%" }}>Valor parcela</th>
-                </tr>
-              </thead>
-              <tbody>
-                {condicoes.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      {c.forma_pagamento}
-                      {c.bandeira ? ` · ${c.bandeira}` : ""} {c.pago ? "(pago)" : "(a receber)"}
-                    </td>
-                    <td className="doc-center">{c.data_prevista ? dataBR(c.data_prevista) : "—"}</td>
-                    <td className="doc-center">{c.parcelas}x</td>
-                    <td className="doc-right-cell">{brl(c.valor_parcela)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <table className="doc-table">
+            <thead>
+              <tr>
+                <th>Areia (m³)</th>
+                <th>Cimento (sc)</th>
+                <th>Blocos (un.)</th>
+                <th>Água (m³)</th>
+                <th>Fios e eletrodutos</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="doc-center">{material("areia_m3")}</td>
+                <td className="doc-center">{material("cimento_sc")}</td>
+                <td className="doc-center">{material("blocos_un")}</td>
+                <td className="doc-center">{material("agua_m3")}</td>
+                <td className="doc-center">{material("fios_eletrodutos")}</td>
+              </tr>
+            </tbody>
+          </table>
 
-          {venda.observacoes ? (
-            <div className="doc-box">
-              <p className="doc-box-title">Observações</p>
-              <p>{venda.observacoes}</p>
+          <div className="doc-splash-final">
+            <div className="doc-box doc-splash-box">
+              <p className="doc-mini">
+                Declaro estar ciente das informações acima descritas, e reitero ser minha vontade. Uma vez
+                assinado, em caso de desistência, será cobrada multa por rescisão de 30% do valor do
+                contrato. Reservamo-nos o direito de protestar este documento caso não haja o pagamento ou
+                até mesmo da multa. Por fim, autorizo a cessão total das informações contidas nesse QUADRO
+                RESUMO DE CONTRATO DE VENDA.
+              </p>
             </div>
-          ) : null}
-
-          <div className="doc-assinaturas">
-            <div>
+            <div className="doc-box doc-splash-box">
+              <p className="doc-box-title">Assinatura</p>
               {venda.assinatura_imagem ? (
-                <img src={venda.assinatura_imagem} alt="Assinatura do comprador" className="doc-assinatura-img" />
+                <img
+                  src={venda.assinatura_imagem}
+                  alt="Assinatura do comprador"
+                  className="doc-assinatura-img"
+                />
               ) : null}
               <div className="doc-linha" />
               <p className="doc-mini">
-                Comprador — {venda.assinatura_nome ?? nomeCliente}
+                {venda.assinatura_nome ?? nomeCliente}
                 {venda.assinatura_codigo ? ` · cód. ${venda.assinatura_codigo}` : ""}
               </p>
             </div>
-            <div>
-              <div className="doc-linha" />
-              <p className="doc-mini">Vendedor — {venda.vendedor ?? emp.nome}</p>
+          </div>
+
+          <div className="doc-box doc-splash-box">
+            <p className="doc-box-title">Controle interno</p>
+            <div className="doc-grid doc-splash-controle">
+              {[
+                "Projeto solicitado",
+                "Piscina",
+                "O.S impressa",
+                "Entrega técnica",
+                "Projeto recebido",
+                "Filtro",
+                "O.S liberada",
+                "1ª revisão",
+                "Projeto enviado",
+                "Acessórios",
+                "O.S finalizada",
+                "2ª revisão",
+              ].map((c) => (
+                <p key={c} className="doc-mini">
+                  ☐ {c}
+                </p>
+              ))}
             </div>
           </div>
+
+          <p className="doc-center doc-mini">A MELHOR PISCINA COM O MELHOR PREÇO!</p>
         </section>
       )}
 

@@ -11,6 +11,14 @@ import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { ExpandableCard } from "@/components/expandable-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -326,6 +334,21 @@ function NovoPedido() {
   /** Entrada paga pelo cliente no fechamento do pedido. */
   const [entrada, setEntrada] = useState(0);
 
+  /** Prazo de entrega e endereço de instalação impressos no pedido Splash. */
+  const [prazoEntrega, setPrazoEntrega] = useState("");
+  const [enderecoInstalacao, setEnderecoInstalacao] = useState("");
+  /** Quantidades de material de obra solicitadas ao cliente (item 9 do pedido). */
+  const [materiais, setMateriais] = useState<Record<string, string>>({
+    areia_m3: "",
+    cimento_sc: "",
+    blocos_un: "",
+    agua_m3: "",
+    fios_eletrodutos: "",
+  });
+  const [materiaisAberto, setMateriaisAberto] = useState(false);
+  const materiaisPreenchidos = Object.values(materiais).filter((v) => v.trim()).length;
+
+
   /** Preenche os custos do kit a partir da tabela do fabricante. */
   function aplicarTabela(modelo: string) {
     setModeloTabela(modelo);
@@ -373,6 +396,10 @@ function NovoPedido() {
         if (typeof d.custoFiltro === "number") setCustoFiltro(d.custoFiltro);
         if (typeof d.lucroSugerido === "number") setLucroSugerido(d.lucroSugerido);
         if (Array.isArray(d.condicoes)) setCondicoes(d.condicoes as CondicaoLinha[]);
+        if (typeof d.prazoEntrega === "string") setPrazoEntrega(d.prazoEntrega);
+        if (typeof d.enderecoInstalacao === "string") setEnderecoInstalacao(d.enderecoInstalacao);
+        if (d.materiais && typeof d.materiais === "object")
+          setMateriais((prev) => ({ ...prev, ...(d.materiais as Record<string, string>) }));
         const temConteudo =
           (Array.isArray(d.itens) && d.itens.length > 0) ||
           Boolean(d.clienteId) ||
@@ -411,6 +438,9 @@ function NovoPedido() {
           custoFiltro,
           lucroSugerido,
           condicoes,
+          prazoEntrega,
+          enderecoInstalacao,
+          materiais,
         }),
       );
     } catch {
@@ -438,6 +468,9 @@ function NovoPedido() {
     custoFiltro,
     lucroSugerido,
     condicoes,
+    prazoEntrega,
+    enderecoInstalacao,
+    materiais,
   ]);
 
   const descartarRascunho = async () => {
@@ -711,6 +744,9 @@ function NovoPedido() {
           tipo_atendimento: tipoAtendimento,
 
           observacoes: observacoes || null,
+          prazo_entrega: prazoEntrega || null,
+          endereco_instalacao: enderecoInstalacao || null,
+          materiais,
           valor_total: valorTotal,
           subtotal_produtos: subtotalProdutos,
           valor_frete: custoFrete,
@@ -1553,6 +1589,74 @@ function NovoPedido() {
                   onChange={(e) => setObservacoes(e.target.value)}
                 />
               </Field>
+            </CardContent>
+          </ExpandableCard>
+
+          <ExpandableCard>
+            <CardHeader>
+              <CardTitle>Entrega e material de obra</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Prazo de entrega">
+                  <Input
+                    value={prazoEntrega}
+                    onChange={(e) => setPrazoEntrega(e.target.value)}
+                    placeholder="Ex.: 30 dias após faturamento"
+                  />
+                </Field>
+                <Field label="Endereço de instalação">
+                  <Input
+                    value={enderecoInstalacao}
+                    onChange={(e) => setEnderecoInstalacao(e.target.value)}
+                    placeholder="Se diferente do endereço do cliente"
+                  />
+                </Field>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Dialog open={materiaisAberto} onOpenChange={setMateriaisAberto}>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline">
+                      <Plus /> Material a solicitar
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Material a ser solicitado</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        { chave: "areia_m3", rotulo: "Areia (m³)" },
+                        { chave: "cimento_sc", rotulo: "Cimento (sc)" },
+                        { chave: "blocos_un", rotulo: "Blocos (un.)" },
+                        { chave: "agua_m3", rotulo: "Água (m³)" },
+                        { chave: "fios_eletrodutos", rotulo: "Fios e eletrodutos" },
+                      ].map((m) => (
+                        <Field key={m.chave} label={m.rotulo}>
+                          <Input
+                            value={materiais[m.chave] ?? ""}
+                            onChange={(e) =>
+                              setMateriais((prev) => ({ ...prev, [m.chave]: e.target.value }))
+                            }
+                            placeholder="Quantidade"
+                          />
+                        </Field>
+                      ))}
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" onClick={() => setMateriaisAberto(false)}>
+                        Salvar quantidades
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                <p className="text-sm text-muted-foreground">
+                  {materiaisPreenchidos > 0
+                    ? `${materiaisPreenchidos} item(ns) de material informado(s).`
+                    : "Nenhum material informado ainda."}
+                </p>
+              </div>
             </CardContent>
           </ExpandableCard>
 
