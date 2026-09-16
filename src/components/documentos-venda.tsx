@@ -245,7 +245,7 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
   <div class="assinatura">
     <div class="bloco">
       ${venda.assinatura_imagem ? `<img src="${esc(venda.assinatura_imagem)}" alt="Assinatura do cliente" />` : ""}
-      <div class="linha">Cliente${venda.assinatura_nome ? `: ${esc(venda.assinatura_nome)}` : ""}${venda.assinatura_documento ? ` · Doc: ${esc(venda.assinatura_documento)}` : ""}</div>
+      <div class="linha">${orcamento ? "Aprovação do cliente" : "Cliente"}${venda.assinatura_nome ? `: ${esc(venda.assinatura_nome)}` : ""}${venda.assinatura_documento ? ` · Doc: ${esc(venda.assinatura_documento)}` : ""}</div>
     </div>
     <div class="bloco">
       <div class="linha">${esc(empresa?.nome ?? "Empresa")}</div>
