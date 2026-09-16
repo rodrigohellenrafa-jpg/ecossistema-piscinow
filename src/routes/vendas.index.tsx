@@ -114,6 +114,40 @@ function Vendas() {
   const [novoTipo, setNovoTipo] = useState<string>("in");
   const [salvandoTipo, setSalvandoTipo] = useState(false);
 
+  const [sel, setSel] = useState<string[]>([]);
+  const [loteAberto, setLoteAberto] = useState(false);
+  const [excluindoLote, setExcluindoLote] = useState(false);
+
+  const alternar = (id: string) =>
+    setSel((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  async function excluirSelecionados() {
+    if (sel.length === 0) return;
+    setExcluindoLote(true);
+    try {
+      const r = await validarMestra({ data: { senha } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      const { error } = await supabase.from("vendas").delete().in("id", sel);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success(`${sel.length} pedido(s) excluído(s).`);
+      setSel([]);
+      setSenha("");
+      setLoteAberto(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir os pedidos.");
+    } finally {
+      setExcluindoLote(false);
+    }
+  }
+
   async function confirmarAcao() {
     if (!alvo) return;
     setExcluindo(true);
