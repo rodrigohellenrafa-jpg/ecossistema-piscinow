@@ -245,6 +245,10 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
     </div>
   </div>
 
+  <div class="rodape-timbre">
+    ${esc(CONTRATO_CABECALHO.empresa)} · ${esc(CONTRATO_CABECALHO.documento)} · ${esc(CONTRATO_CABECALHO.endereco)} · ${esc(CONTRATO_CABECALHO.telefone)} · ${esc(CONTRATO_CABECALHO.email)}
+  </div>
+
   <div class="interno">
     Controle interno${venda.assinatura_codigo ? ` · Código de assinatura: ${esc(venda.assinatura_codigo)}` : ""}${venda.assinatura_em ? ` · Assinado em: ${new Date(venda.assinatura_em).toLocaleString("pt-BR")}` : ""}
   </div>
