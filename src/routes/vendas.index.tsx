@@ -617,6 +617,41 @@ function Vendas() {
         </TabsContent>
       </Tabs>
 
+      <Dialog open={loteAberto} onOpenChange={(o) => !o && setLoteAberto(false)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir {sel.length} pedido(s)</DialogTitle>
+            <DialogDescription>
+              Todos os pedidos selecionados serão excluídos. Esta ação não pode ser desfeita.
+              Digite a senha mestra para confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="password"
+            value={senha}
+            autoComplete="off"
+            placeholder="Senha mestra"
+            onChange={(e) => setSenha(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void excluirSelecionados();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoteAberto(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={excluindoLote || !senha}
+              onClick={() => void excluirSelecionados()}
+            >
+              Excluir selecionados
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog open={alvo !== null} onOpenChange={(o) => !o && setAlvo(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
