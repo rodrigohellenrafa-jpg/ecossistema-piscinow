@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, ChevronsUpDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
