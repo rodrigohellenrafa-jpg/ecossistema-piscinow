@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -29,7 +30,7 @@ function isStandalone() {
   );
 }
 
-export function InstallAppButton() {
+export function InstallAppButton({ compact = false }: { compact?: boolean }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIOSHelp, setShowIOSHelp] = useState(false);
   const [installed, setInstalled] = useState(false);
@@ -76,14 +77,21 @@ export function InstallAppButton() {
 
   return (
     <>
-      <button
+      <Button
+        type="button"
         onClick={handleClick}
-        className="flex w-full items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+        size={compact ? "sm" : "default"}
+        className={compact
+          ? "h-9 shrink-0 gap-1.5 px-2.5"
+          : "w-full gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"}
         title="Instalar app no celular"
+        aria-label="Instalar Piscinow no celular"
       >
         <Download className="size-4 shrink-0" />
-        <span className="group-data-[collapsible=icon]:hidden">Instalar no celular</span>
-      </button>
+        <span className={compact ? "text-xs" : "group-data-[collapsible=icon]:hidden"}>
+          {compact ? "Instalar" : "Instalar no celular"}
+        </span>
+      </Button>
 
       <Dialog open={showIOSHelp} onOpenChange={setShowIOSHelp}>
         <DialogContent className="max-w-sm">
