@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { ConciliacaoBancaria } from "@/components/conciliacao-bancaria";
 import { FluxoColunas } from "@/components/fluxo-colunas";
 import { Kpi, PageHeader } from "@/components/page-header";
 import { SaldosBancarios } from "@/components/saldos-bancarios";
@@ -256,6 +257,8 @@ function FluxoCaixa() {
       </div>
 
       <SaldosBancarios />
+
+      <ConciliacaoBancaria />
 
       <Card>
         <CardHeader>
