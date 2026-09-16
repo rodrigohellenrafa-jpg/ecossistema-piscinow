@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileSignature, Printer, Files, ExternalLink } from "lucide-react";
+import { FileSignature, Printer, Files, ExternalLink, Receipt } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
