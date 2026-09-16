@@ -485,7 +485,7 @@ export function DocumentosVenda(props: Props) {
         <FileSignature /> Ver contrato original (PDF)
       </Button>
       <Button onClick={imprimirPedidoEContrato}>
-        <Files /> Imprimir pedido + contrato
+        <Files /> {orcamento ? "Imprimir orçamento + contrato" : "Imprimir pedido + contrato"}
       </Button>
 
       <Dialog open={contratoAberto} onOpenChange={setContratoAberto}>
