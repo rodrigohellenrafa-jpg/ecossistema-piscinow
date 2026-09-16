@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExpandableCard } from "@/components/expandable-card";
+import { EnviarOrcamento } from "@/components/enviar-orcamento";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -224,6 +225,7 @@ function Orcamentos() {
                   <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <EnviarOrcamento venda={v} cliente={null} />
                       <Button
                         size="sm"
                         onClick={() => atualizarStatus.mutate({ id: v.id, status: "aprovado" })}
