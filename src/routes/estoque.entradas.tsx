@@ -335,6 +335,7 @@ function EstoqueEntradas() {
                     <TableHead className="text-right">Efeito no estoque</TableHead>
                     <TableHead>Origem</TableHead>
                     <TableHead>Documento</TableHead>
+                    <TableHead className="w-16 text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
