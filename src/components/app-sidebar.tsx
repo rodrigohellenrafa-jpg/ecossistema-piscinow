@@ -33,11 +33,13 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarFooter,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useRoles, type ACESSO } from "@/hooks/use-role";
+import { InstallAppButton } from "@/components/install-app-button";
 
 type Area = keyof typeof ACESSO;
 
@@ -175,6 +177,11 @@ export function AppSidebar() {
             </SidebarGroup>
           ))}
       </SidebarContent>
+      <SidebarFooter>
+        <div className="px-2 pb-2">
+          <InstallAppButton />
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }
