@@ -10,6 +10,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -113,6 +114,40 @@ function Vendas() {
   } | null>(null);
   const [novoTipo, setNovoTipo] = useState<string>("in");
   const [salvandoTipo, setSalvandoTipo] = useState(false);
+
+  const [sel, setSel] = useState<string[]>([]);
+  const [loteAberto, setLoteAberto] = useState(false);
+  const [excluindoLote, setExcluindoLote] = useState(false);
+
+  const alternar = (id: string) =>
+    setSel((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  async function excluirSelecionados() {
+    if (sel.length === 0) return;
+    setExcluindoLote(true);
+    try {
+      const r = await validarMestra({ data: { senha } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      const { error } = await supabase.from("vendas").delete().in("id", sel);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success(`${sel.length} pedido(s) excluído(s).`);
+      setSel([]);
+      setSenha("");
+      setLoteAberto(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir os pedidos.");
+    } finally {
+      setExcluindoLote(false);
+    }
+  }
 
   async function confirmarAcao() {
     if (!alvo) return;
@@ -256,11 +291,29 @@ function Vendas() {
         title="Vendas"
         subtitle="Gerencie pedidos e orçamentos em um só lugar."
         actions={
-          <Button asChild>
-            <Link to="/vendas/novo">
-              <Plus /> Novo pedido
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {sel.length > 0 && (
+              <>
+                <Button variant="outline" onClick={() => setSel([])}>
+                  Limpar seleção ({sel.length})
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setSenha("");
+                    setLoteAberto(true);
+                  }}
+                >
+                  <Trash2 /> Excluir {sel.length} selecionado(s)
+                </Button>
+              </>
+            )}
+            <Button asChild>
+              <Link to="/vendas/novo">
+                <Plus /> Novo pedido
+              </Link>
+            </Button>
+          </div>
         }
       />
 
@@ -334,6 +387,19 @@ function Vendas() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        aria-label="Selecionar todos os pedidos"
+                        checked={pedidos.length > 0 && pedidos.every((v) => sel.includes(v.id))}
+                        onCheckedChange={(c) =>
+                          setSel((prev) =>
+                            c
+                              ? Array.from(new Set([...prev, ...pedidos.map((v) => v.id)]))
+                              : prev.filter((id) => !pedidos.some((v) => v.id === id)),
+                          )
+                        }
+                      />
+                    </TableHead>
                     <TableHead>Pedido</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -347,6 +413,13 @@ function Vendas() {
                 <TableBody>
                   {pedidos.map((v) => (
                     <TableRow key={v.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={sel.includes(v.id)}
+                          onCheckedChange={() => alternar(v.id)}
+                          aria-label={`Selecionar pedido ${v.numero ?? ""}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <Link to="/vendas/$id" params={{ id: v.id }} className="text-primary hover:underline">
                           {v.numero}
@@ -415,7 +488,7 @@ function Vendas() {
                   ))}
                   {pedidos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                         Nenhum pedido encontrado.
                       </TableCell>
                     </TableRow>
@@ -461,6 +534,19 @@ function Vendas() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        aria-label="Selecionar todos os orçamentos"
+                        checked={orcamentos.length > 0 && orcamentos.every((v) => sel.includes(v.id))}
+                        onCheckedChange={(c) =>
+                          setSel((prev) =>
+                            c
+                              ? Array.from(new Set([...prev, ...orcamentos.map((v) => v.id)]))
+                              : prev.filter((id) => !orcamentos.some((v) => v.id === id)),
+                          )
+                        }
+                      />
+                    </TableHead>
                     <TableHead>Orçamento</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -473,6 +559,13 @@ function Vendas() {
                 <TableBody>
                   {orcamentos.map((v) => (
                     <TableRow key={v.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={sel.includes(v.id)}
+                          onCheckedChange={() => alternar(v.id)}
+                          aria-label={`Selecionar orçamento ${v.numero ?? ""}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <Link
                           to="/vendas/$id"
@@ -512,7 +605,7 @@ function Vendas() {
                   ))}
                   {orcamentos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                         Nenhum orçamento em aberto.
                       </TableCell>
                     </TableRow>
@@ -523,6 +616,41 @@ function Vendas() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={loteAberto} onOpenChange={(o) => !o && setLoteAberto(false)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir {sel.length} pedido(s)</DialogTitle>
+            <DialogDescription>
+              Todos os pedidos selecionados serão excluídos. Esta ação não pode ser desfeita.
+              Digite a senha mestra para confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="password"
+            value={senha}
+            autoComplete="off"
+            placeholder="Senha mestra"
+            onChange={(e) => setSenha(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void excluirSelecionados();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoteAberto(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={excluindoLote || !senha}
+              onClick={() => void excluirSelecionados()}
+            >
+              Excluir selecionados
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <Dialog open={alvo !== null} onOpenChange={(o) => !o && setAlvo(null)}>
         <DialogContent className="sm:max-w-sm">

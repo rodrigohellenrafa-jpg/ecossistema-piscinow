@@ -805,22 +805,33 @@ function NovoPedido() {
       // 1c) Condições já pagas viram transações da venda: recalculam saldo,
       // status do pedido e entram no fluxo de caixa.
       const pagas = condicoes.filter((c) => c.pago && c.valor > 0);
-      if (pagas.length > 0) {
-        const { error: erroPag } = await supabase.from("venda_pagamentos").insert(
-          pagas.map((c) => ({
-            venda_id: venda.id,
-            data_pagamento: c.data_prevista || data,
-            forma_pagamento: c.forma_pagamento || "Dinheiro",
-            valor: c.valor,
-            conta_bancaria: c.bandeira || null,
-            observacoes:
-              parcelasNum(c.parcelas) > 1
-                ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
-                : c.observacoes || "Pagamento no fechamento do pedido",
-
-            created_by: userId,
-          })) as never,
-        );
+      const pagamentos = pagas.map((c) => ({
+        venda_id: venda.id,
+        data_pagamento: c.data_prevista || data,
+        forma_pagamento: c.forma_pagamento || "Dinheiro",
+        valor: c.valor,
+        conta_bancaria: c.bandeira || null,
+        observacoes:
+          parcelasNum(c.parcelas) > 1
+            ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
+            : c.observacoes || "Pagamento no fechamento do pedido",
+        created_by: userId,
+      }));
+      if (entrada > 0) {
+        pagamentos.unshift({
+          venda_id: venda.id,
+          data_pagamento: data,
+          forma_pagamento: condicoes[0]?.forma_pagamento || "Dinheiro",
+          valor: entrada,
+          conta_bancaria: null,
+          observacoes: "Entrada paga no fechamento do pedido",
+          created_by: userId,
+        });
+      }
+      if (pagamentos.length > 0) {
+        const { error: erroPag } = await supabase
+          .from("venda_pagamentos")
+          .insert(pagamentos as never);
         if (erroPag) throw erroPag;
       }
 
@@ -1520,8 +1531,14 @@ function NovoPedido() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Já recebido (condições marcadas como pagas)">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="Entrada paga no fechamento (R$)">
+                  <MoedaInput value={entrada} onChange={setEntrada} />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Valor recebido no ato. Abate do pedido e entra no caixa.
+                  </p>
+                </Field>
+                <Field label="Já recebido (entrada + condições pagas)">
                   <Input value={brl(valorEntrada)} disabled />
                 </Field>
                 <Field label="Saldo devedor">
