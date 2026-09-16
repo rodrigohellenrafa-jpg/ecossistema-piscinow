@@ -152,7 +152,7 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<title>Pedido de venda ${esc(venda.numero ?? "")}</title>
+<title>${titulo} ${esc(venda.numero ?? "")}</title>
 <style>
   @page { size: A4; margin: 14mm; }
   * { box-sizing: border-box; }
