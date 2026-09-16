@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link, useParams } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, FORMAS_PAGAMENTO, STATUS_PEDIDO } from "@/lib/erp";
+import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/vendas/$id")({
@@ -82,8 +84,13 @@ function DetalhePedido() {
   const { id } = useParams({ from: "/vendas/$id" });
   const qc = useQueryClient();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const validarMestra = useServerFn(validarSenhaMestra);
   const [aliquotaIcms, setAliquotaIcms] = useState(18);
   const [pdfLink, setPdfLink] = useState("");
+  const [excluirAberto, setExcluirAberto] = useState(false);
+  const [senhaExcluir, setSenhaExcluir] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
   const [novoPag, setNovoPag] = useState({
     data_pagamento: hoje(),
     forma_pagamento: "Pix",
@@ -91,6 +98,33 @@ function DetalhePedido() {
     valor: "",
     observacoes: "",
   });
+
+  async function excluirRegistro() {
+    setExcluindo(true);
+    try {
+      const r = await validarMestra({ data: { senha: senhaExcluir } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      await supabase.from("venda_pagamentos").delete().eq("venda_id", id);
+      await supabase.from("venda_condicoes").delete().eq("venda_id", id);
+      await supabase.from("venda_itens").delete().eq("venda_id", id);
+      const { error } = await supabase.from("vendas").delete().eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success("Orçamento excluído com sucesso.");
+      navigate({ to: "/vendas" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
 
   const { data: venda } = useQuery({
     queryKey: ["venda", id],
@@ -530,8 +564,52 @@ function DetalhePedido() {
           <Button variant="ghost" onClick={() => window.print()}>
             <Printer /> Espelho fiscal
           </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setExcluirAberto(true)}
+            aria-label={venda.status_pedido === "orcamento" ? "Excluir orçamento" : "Excluir pedido"}
+          >
+            <Trash2 /> {venda.status_pedido === "orcamento" ? "Excluir orçamento" : "Excluir pedido"}
+          </Button>
         </div>
       </div>
+
+      <Dialog open={excluirAberto} onOpenChange={setExcluirAberto}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Excluir {venda.status_pedido === "orcamento" ? "orçamento" : "pedido"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta ação remove o {venda.status_pedido === "orcamento" ? "orçamento" : "pedido"}{" "}
+            <strong>{venda.numero ?? ""}</strong>, seus itens e condições de pagamento. Não pode ser
+            desfeita. Digite a senha mestra para confirmar.
+          </p>
+          <Input
+            type="password"
+            autoComplete="off"
+            placeholder="Senha mestra"
+            value={senhaExcluir}
+            onChange={(e) => setSenhaExcluir(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void excluirRegistro();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirAberto(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void excluirRegistro()}
+              disabled={excluindo || !senhaExcluir}
+            >
+              Excluir definitivamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="print:hidden">
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
