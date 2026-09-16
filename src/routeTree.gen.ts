@@ -14,6 +14,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
 import { Route as ReativacaoRouteImport } from './routes/reativacao'
 import { Route as ProdutosRouteImport } from './routes/produtos'
+import { Route as PrecificacaoRouteImport } from './routes/precificacao'
 import { Route as OrdensCompraRouteImport } from './routes/ordens-compra'
 import { Route as OrdensRouteImport } from './routes/ordens'
 import { Route as NotasCompraRouteImport } from './routes/notas-compra'
@@ -70,6 +71,11 @@ const ReativacaoRoute = ReativacaoRouteImport.update({
 const ProdutosRoute = ProdutosRouteImport.update({
   id: '/produtos',
   path: '/produtos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrecificacaoRoute = PrecificacaoRouteImport.update({
+  id: '/precificacao',
+  path: '/precificacao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdensCompraRoute = OrdensCompraRouteImport.update({
@@ -255,6 +261,7 @@ export interface FileRoutesByFullPath {
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
   '/ordens-compra': typeof OrdensCompraRoute
+  '/precificacao': typeof PrecificacaoRoute
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
@@ -294,6 +301,7 @@ export interface FileRoutesByTo {
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
   '/ordens-compra': typeof OrdensCompraRoute
+  '/precificacao': typeof PrecificacaoRoute
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
@@ -334,6 +342,7 @@ export interface FileRoutesById {
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
   '/ordens-compra': typeof OrdensCompraRoute
+  '/precificacao': typeof PrecificacaoRoute
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
@@ -375,6 +384,7 @@ export interface FileRouteTypes {
     | '/notas-compra'
     | '/ordens'
     | '/ordens-compra'
+    | '/precificacao'
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/notas-compra'
     | '/ordens'
     | '/ordens-compra'
+    | '/precificacao'
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/notas-compra'
     | '/ordens'
     | '/ordens-compra'
+    | '/precificacao'
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
@@ -493,6 +505,7 @@ export interface RootRouteChildren {
   NotasCompraRoute: typeof NotasCompraRoute
   OrdensRoute: typeof OrdensRoute
   OrdensCompraRoute: typeof OrdensCompraRoute
+  PrecificacaoRoute: typeof PrecificacaoRoute
   ProdutosRoute: typeof ProdutosRoute
   ReativacaoRoute: typeof ReativacaoRoute
   RelatorioContasRoute: typeof RelatorioContasRoute
@@ -545,6 +558,13 @@ declare module '@tanstack/react-router' {
       path: '/produtos'
       fullPath: '/produtos'
       preLoaderRoute: typeof ProdutosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/precificacao': {
+      id: '/precificacao'
+      path: '/precificacao'
+      fullPath: '/precificacao'
+      preLoaderRoute: typeof PrecificacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ordens-compra': {
@@ -807,6 +827,7 @@ const rootRouteChildren: RootRouteChildren = {
   NotasCompraRoute: NotasCompraRoute,
   OrdensRoute: OrdensRoute,
   OrdensCompraRoute: OrdensCompraRoute,
+  PrecificacaoRoute: PrecificacaoRoute,
   ProdutosRoute: ProdutosRoute,
   ReativacaoRoute: ReativacaoRoute,
   RelatorioContasRoute: RelatorioContasRoute,
