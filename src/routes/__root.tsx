@@ -16,6 +16,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { SenhaMestra } from "@/components/senha-mestra";
 import { RealtimeSync } from "@/components/realtime-sync";
+import { InstallAppButton } from "@/components/install-app-button";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoles } from "@/hooks/use-role";
 
@@ -114,7 +115,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "icon", href: "/favicon.png", type: "image/png" },
       { rel: "apple-touch-icon", href: "/icone-piscinow-192.png" },
-      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "manifest", href: "/manifest.json" },
     ],
   }),
   shellComponent: RootShell,
@@ -191,9 +192,12 @@ function RootComponent() {
           <div className="flex min-w-0 flex-1 flex-col">
             <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur">
               <SidebarTrigger />
-              <span className="text-sm font-medium text-muted-foreground">
+              <span className="hidden text-sm font-medium text-muted-foreground sm:inline">
                 Splash Jardim do Trevo <span className="text-primary">ERP</span>
               </span>
+              <div className="ml-auto sm:hidden">
+                <InstallAppButton compact />
+              </div>
               <UserBadge />
               <SenhaMestra />
             </header>
