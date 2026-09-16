@@ -204,6 +204,12 @@ export function EnviarOrcamento({
             >
               <Copy /> Copiar
             </Button>
+            <Button variant="outline" disabled={gerando} onClick={() => void baixarPdf()}>
+              <Download /> Baixar PDF
+            </Button>
+            <Button variant="outline" disabled={gerando} onClick={() => void compartilharPdf()}>
+              <Share2 /> Enviar PDF
+            </Button>
             <Button variant="outline" onClick={enviarEmail}>
               <Mail /> Enviar por e-mail
             </Button>
