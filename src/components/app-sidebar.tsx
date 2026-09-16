@@ -23,6 +23,7 @@ import {
   CalendarDays,
   MessageCircle,
   Link2,
+  Gauge,
 } from "lucide-react";
 
 import {
@@ -48,7 +49,10 @@ const groups: {
   {
     label: "Principal",
     area: "cadastros",
-    items: [{ title: "Dashboard", url: "/", icon: LayoutDashboard }],
+    items: [
+      { title: "Dashboard", url: "/", icon: LayoutDashboard },
+      { title: "Indicadores & Autoanálise", url: "/indicadores", icon: Gauge },
+    ],
   },
   {
     label: "Cadastros",
