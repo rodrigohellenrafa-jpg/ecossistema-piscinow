@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Copy, Mail, MessageCircle, Send } from "lucide-react";
+import { Copy, Download, Mail, MessageCircle, Send, Share2 } from "lucide-react";
 import { toast } from "sonner";
+
+import { baixarBlob, gerarOrcamentoPdf } from "@/lib/orcamento-pdf";
 
 import { Button } from "@/components/ui/button";
 import {
