@@ -2138,13 +2138,16 @@ export type Database = {
           custo_total: number
           data: string
           endereco_entrega: string | null
+          endereco_instalacao: string | null
           etiqueta: string | null
           forma_pagamento: string | null
           id: string
+          materiais: Json
           numero: string | null
           observacoes: string | null
           parcelas: number
           pdf_link: string | null
+          prazo_entrega: string | null
           saldo_devedor: number
           status_pagamento: string
           status_pedido: string
@@ -2174,13 +2177,16 @@ export type Database = {
           custo_total?: number
           data?: string
           endereco_entrega?: string | null
+          endereco_instalacao?: string | null
           etiqueta?: string | null
           forma_pagamento?: string | null
           id?: string
+          materiais?: Json
           numero?: string | null
           observacoes?: string | null
           parcelas?: number
           pdf_link?: string | null
+          prazo_entrega?: string | null
           saldo_devedor?: number
           status_pagamento?: string
           status_pedido?: string
@@ -2210,13 +2216,16 @@ export type Database = {
           custo_total?: number
           data?: string
           endereco_entrega?: string | null
+          endereco_instalacao?: string | null
           etiqueta?: string | null
           forma_pagamento?: string | null
           id?: string
+          materiais?: Json
           numero?: string | null
           observacoes?: string | null
           parcelas?: number
           pdf_link?: string | null
+          prazo_entrega?: string | null
           saldo_devedor?: number
           status_pagamento?: string
           status_pedido?: string
