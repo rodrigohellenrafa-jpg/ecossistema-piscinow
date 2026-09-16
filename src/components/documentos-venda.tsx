@@ -237,7 +237,10 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
   <h2>Observações</h2>
   <div class="obs">${esc(venda.observacoes ?? "")}</div>
 
-  <p class="declaracao">Declaro ter recebido e conferido as condições deste pedido de venda, ciente dos valores, prazos, itens e condições de pagamento aqui descritos, concordando integralmente com o estabelecido.</p>
+  ${orcamento
+    ? `<div class="aviso"><strong>Orçamento Nº ${esc(venda.numero ?? "")} — sujeito a aprovação.</strong> Documento sem valor fiscal, válido por 15 dias a partir da data de emissão. Valores, prazos e disponibilidade podem ser revistos após esse período. A aprovação pelo cliente converte este orçamento em pedido de venda.</div>
+  <p class="declaracao">Declaro ter recebido e conferido as condições deste orçamento, ciente dos valores, prazos, itens e condições de pagamento aqui descritos. A execução depende da aprovação abaixo.</p>`
+    : `<p class="declaracao">Declaro ter recebido e conferido as condições deste pedido de venda, ciente dos valores, prazos, itens e condições de pagamento aqui descritos, concordando integralmente com o estabelecido.</p>`}
 
   <div class="assinatura">
     <div class="bloco">
