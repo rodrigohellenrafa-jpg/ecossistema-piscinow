@@ -334,6 +334,21 @@ function NovoPedido() {
   /** Entrada paga pelo cliente no fechamento do pedido. */
   const [entrada, setEntrada] = useState(0);
 
+  /** Prazo de entrega e endereço de instalação impressos no pedido Splash. */
+  const [prazoEntrega, setPrazoEntrega] = useState("");
+  const [enderecoInstalacao, setEnderecoInstalacao] = useState("");
+  /** Quantidades de material de obra solicitadas ao cliente (item 9 do pedido). */
+  const [materiais, setMateriais] = useState<Record<string, string>>({
+    areia_m3: "",
+    cimento_sc: "",
+    blocos_un: "",
+    agua_m3: "",
+    fios_eletrodutos: "",
+  });
+  const [materiaisAberto, setMateriaisAberto] = useState(false);
+  const materiaisPreenchidos = Object.values(materiais).filter((v) => v.trim()).length;
+
+
   /** Preenche os custos do kit a partir da tabela do fabricante. */
   function aplicarTabela(modelo: string) {
     setModeloTabela(modelo);
