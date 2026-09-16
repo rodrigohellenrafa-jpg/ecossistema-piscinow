@@ -468,6 +468,9 @@ function NovoPedido() {
     custoFiltro,
     lucroSugerido,
     condicoes,
+    prazoEntrega,
+    enderecoInstalacao,
+    materiais,
   ]);
 
   const descartarRascunho = async () => {
