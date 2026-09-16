@@ -25,7 +25,7 @@ type Venda = {
   assinatura_em?: string | null;
   prazo_entrega?: string | null;
   endereco_instalacao?: string | null;
-  materiais?: Record<string, unknown> | null;
+  materiais?: unknown;
 };
 
 type Cliente = {
