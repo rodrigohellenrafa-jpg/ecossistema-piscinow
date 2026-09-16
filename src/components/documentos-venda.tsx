@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileSignature, Printer, Files, ExternalLink } from "lucide-react";
+import { FileSignature, Printer, Files, ExternalLink, Receipt } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +38,7 @@ type Venda = {
   endereco_instalacao?: string | null;
   materiais?: unknown;
   status_pedido?: string | null;
+  tipo_atendimento?: string | null;
 };
 
 type Cliente = {
@@ -430,6 +431,83 @@ function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props)
 </html>`;
 }
 
+/** Cupom (não fiscal) de balcão, em bobina 80mm, para vendas IN. */
+function htmlCupom({ venda, cliente, itens, condicoes = [], empresa }: Props): string {
+  const linhas = itens
+    .map(
+      (i) => `<div class="item">
+        <div class="desc">${esc(i.sku ? `${i.sku} ` : "")}${esc(i.descricao)}</div>
+        <div class="ln"><span>${i.quantidade} x ${fmt(i.preco_unitario)}</span><span>${fmt(i.total)}</span></div>
+      </div>`
+    )
+    .join("");
+  const pagtos = condicoes.length
+    ? condicoes
+        .map(
+          (c) =>
+            `<div class="ln"><span>${esc(c.forma_pagamento)}${c.parcelas > 1 ? ` ${c.parcelas}x` : ""}</span><span>${fmt(c.valor_cobrado || c.valor)}</span></div>`
+        )
+        .join("")
+    : `<div class="ln"><span>${esc(venda.forma_pagamento ?? "—")}</span><span>${fmt(venda.valor_total)}</span></div>`;
+  const qtdTotal = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Cupom ${esc(venda.numero ?? "")}</title>
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Courier New", monospace; font-size: 11px; color: #000; margin: 0; width: 72mm; }
+  .c { text-align: center; }
+  .b { font-weight: bold; }
+  img { max-width: 40mm; display: block; margin: 0 auto 4px; }
+  .sep { border-top: 1px dashed #000; margin: 6px 0; }
+  .ln { display: flex; justify-content: space-between; gap: 6px; }
+  .item { margin-bottom: 3px; }
+  .desc { word-break: break-word; }
+  .total { font-size: 15px; font-weight: bold; }
+  .peq { font-size: 9.5px; }
+</style>
+</head>
+<body>
+  <div class="c">
+    <img src="${logoUrl()}" alt="" />
+    <div class="b">${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)}</div>
+    <div class="peq">${esc(CONTRATO_CABECALHO.documento)}</div>
+    <div class="peq">${esc(CONTRATO_CABECALHO.endereco)}</div>
+    <div class="peq">${esc(CONTRATO_CABECALHO.telefone)}</div>
+  </div>
+  <div class="sep"></div>
+  <div class="c b">CUPOM DE VENDA — BALCÃO (IN)</div>
+  <div class="c peq">DOCUMENTO NÃO FISCAL</div>
+  <div class="sep"></div>
+  <div class="ln"><span>Cupom</span><span>${esc(venda.numero ?? "—")}</span></div>
+  <div class="ln"><span>Data</span><span>${fmtData(venda.data)}</span></div>
+  <div class="ln"><span>Operador</span><span>${esc(venda.vendedor ?? "—")}</span></div>
+  <div class="ln"><span>Cliente</span><span>${esc((cliente?.nome ?? venda.cliente_nome ?? "Consumidor").slice(0, 22))}</span></div>
+  ${cliente?.documento ? `<div class="ln"><span>CPF/CNPJ</span><span>${esc(cliente.documento)}</span></div>` : ""}
+  <div class="sep"></div>
+  ${linhas}
+  <div class="sep"></div>
+  <div class="ln"><span>Itens / Qtd</span><span>${itens.length} / ${qtdTotal}</span></div>
+  <div class="ln total"><span>TOTAL</span><span>${fmt(venda.valor_total)}</span></div>
+  ${venda.valor_entrada ? `<div class="ln"><span>Entrada/Pago</span><span>${fmt(venda.valor_entrada)}</span></div>` : ""}
+  ${venda.saldo_devedor ? `<div class="ln"><span>Saldo devedor</span><span>${fmt(venda.saldo_devedor)}</span></div>` : ""}
+  <div class="sep"></div>
+  <div class="b">PAGAMENTO</div>
+  ${pagtos}
+  ${venda.observacoes ? `<div class="sep"></div><div class="peq">Obs.: ${esc(venda.observacoes)}</div>` : ""}
+  <div class="sep"></div>
+  <div class="c peq">Obrigado pela preferência!</div>
+  <div class="c peq">Este cupom não substitui documento fiscal.</div>
+  <div class="c peq">${esc(CONTRATO_CABECALHO.email)}</div>
+  <br />
+</body>
+</html>`;
+}
+
 /** Imprime sem abrir aba nova: usa um iframe oculto na própria página. */
 function imprimirHtml(html: string) {
   const iframe = document.createElement("iframe");
@@ -472,6 +550,21 @@ export function DocumentosVenda(props: Props) {
   };
 
   const orcamento = props.venda.status_pedido === "orcamento";
+  const balcao = props.venda.tipo_atendimento === "in" && !orcamento;
+  const imprimirCupom = () => imprimirHtml(htmlCupom(props));
+
+  if (balcao) {
+    return (
+      <>
+        <Button onClick={imprimirCupom}>
+          <Receipt /> Imprimir cupom
+        </Button>
+        <Button variant="outline" onClick={imprimirPedido}>
+          <Printer /> Imprimir pedido de venda (A4)
+        </Button>
+      </>
+    );
+  }
 
   return (
     <>
@@ -487,6 +580,7 @@ export function DocumentosVenda(props: Props) {
       <Button onClick={imprimirPedidoEContrato}>
         <Files /> {orcamento ? "Imprimir orçamento + contrato" : "Imprimir pedido + contrato"}
       </Button>
+
 
       <Dialog open={contratoAberto} onOpenChange={setContratoAberto}>
         <DialogContent className="max-w-5xl">

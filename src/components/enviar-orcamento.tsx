@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Copy, Mail, MessageCircle, Send } from "lucide-react";
+import { Copy, Download, Mail, MessageCircle, Send, Share2 } from "lucide-react";
 import { toast } from "sonner";
+
+import { baixarBlob, gerarOrcamentoPdf } from "@/lib/orcamento-pdf";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +20,15 @@ import { brl, dataBR } from "@/lib/erp";
 type Venda = {
   numero?: string | null;
   data?: string | null;
+  vendedor?: string | null;
+  cliente_nome?: string | null;
   valor_total?: number | string | null;
+  valor_entrada?: number | string | null;
+  saldo_devedor?: number | string | null;
+  parcelas?: number | null;
+  valor_parcela?: number | string | null;
+  forma_pagamento?: string | null;
+  endereco_instalacao?: string | null;
   status_pedido?: string | null;
   prazo_entrega?: string | null;
   observacoes?: string | null;
@@ -26,11 +36,19 @@ type Venda = {
 
 type Cliente = {
   nome?: string | null;
+  documento?: string | null;
   telefone?: string | null;
   email?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  estado?: string | null;
+  cep?: string | null;
 } | null;
 
 type Item = {
+  sku?: string | null;
   descricao: string;
   quantidade: number;
   preco_unitario: number;
@@ -104,6 +122,46 @@ export function EnviarOrcamento({
     )}&body=${encodeURIComponent(mensagem)}`;
   };
 
+  const [gerando, setGerando] = useState(false);
+
+  const criarPdf = async () => {
+    setGerando(true);
+    try {
+      return await gerarOrcamentoPdf({ venda, cliente, itens, empresa });
+    } finally {
+      setGerando(false);
+    }
+  };
+
+  const baixarPdf = async () => {
+    try {
+      const { blob, nome } = await criarPdf();
+      baixarBlob(blob, nome);
+      toast.success("PDF gerado.");
+    } catch {
+      toast.error("Não foi possível gerar o PDF.");
+    }
+  };
+
+  const compartilharPdf = async () => {
+    try {
+      const { blob, nome } = await criarPdf();
+      const arquivo = new File([blob], nome, { type: "application/pdf" });
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files?: File[] }) => boolean;
+        share?: (data: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+      };
+      if (nav.share && nav.canShare?.({ files: [arquivo] })) {
+        await nav.share({ files: [arquivo], title: assunto, text: mensagem });
+        return;
+      }
+      baixarBlob(blob, nome);
+      toast.info("PDF baixado — anexe no WhatsApp ou no e-mail.");
+    } catch {
+      toast.error("Não foi possível compartilhar o PDF.");
+    }
+  };
+
   return (
     <Dialog open={aberto} onOpenChange={setAberto}>
       <DialogTrigger asChild>
@@ -145,6 +203,12 @@ export function EnviarOrcamento({
               }}
             >
               <Copy /> Copiar
+            </Button>
+            <Button variant="outline" disabled={gerando} onClick={() => void baixarPdf()}>
+              <Download /> Baixar PDF
+            </Button>
+            <Button variant="outline" disabled={gerando} onClick={() => void compartilharPdf()}>
+              <Share2 /> Enviar PDF
             </Button>
             <Button variant="outline" onClick={enviarEmail}>
               <Mail /> Enviar por e-mail
