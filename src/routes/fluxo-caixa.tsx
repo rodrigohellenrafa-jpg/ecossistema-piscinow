@@ -257,6 +257,8 @@ function FluxoCaixa() {
 
       <SaldosBancarios />
 
+      <ConciliacaoBancaria />
+
       <Card>
         <CardHeader>
           <CardTitle>Evolução mensal e saldo acumulado</CardTitle>
