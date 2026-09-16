@@ -1064,6 +1064,24 @@ function Contas() {
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
               <VinculoField value={form.vinculo} onChange={(v: string)=>setForm(f=>({...f,vinculo:v}))} />
               <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
+              <Field
+                label={form.tipo === "pagar" ? "De onde o recurso sai (conta)" : "Onde o recurso entra (conta)"}
+                className="sm:col-span-2"
+              >
+                <Input
+                  list="contas-bancarias-lista"
+                  value={form.conta_bancaria}
+                  onChange={(e) => set("conta_bancaria")(e.target.value)}
+                  placeholder="Ex.: Caixa, Itaú c/c 1234, Nubank PJ"
+                />
+                <datalist id="contas-bancarias-lista">
+                  {contasBancarias.map((c) => (
+                    <option key={c.id} value={c.conta}>
+                      {c.banco ?? ""}
+                    </option>
+                  ))}
+                </datalist>
+              </Field>
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
               <Field label="Observações" className="sm:col-span-2">
                 <Textarea
