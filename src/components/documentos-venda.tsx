@@ -10,6 +10,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
+import {
+  CONTRATO_ANEXO_DRENOS,
+  CONTRATO_CABECALHO,
+  CONTRATO_CLAUSULAS,
+} from "@/lib/contrato-venda";
 
 type Venda = {
   numero: string | null;
@@ -236,6 +241,165 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
 </html>`;
 }
 
+/** Contrato de venda preenchido com os dados do pedido (texto do contrato original). */
+function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props): string {
+  const enderecoCli = cliente
+    ? [cliente.logradouro, cliente.numero, cliente.bairro, cliente.cidade, cliente.estado, cliente.cep]
+        .filter(Boolean)
+        .join(", ")
+    : "";
+  const mats = materiaisLinhas(venda.materiais);
+  const hoje = new Date();
+  const meses = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+
+  const clausulas = CONTRATO_CLAUSULAS.map(
+    (s) =>
+      `<h3>${esc(s.titulo)}</h3>${s.itens.map((i) => `<p>${esc(i)}</p>`).join("")}`
+  ).join("");
+
+  const linhasItens = itens
+    .map(
+      (i) => `<tr>
+        <td>${esc(i.sku)}</td><td>${esc(i.descricao)}</td>
+        <td class="num">${i.quantidade}</td>
+        <td class="num">${fmt(i.preco_unitario)}</td>
+        <td class="num">${fmt(i.total)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const linhasCond = condicoes
+    .map(
+      (c) => `<tr>
+        <td>${esc(c.forma_pagamento)}${c.bandeira ? ` (${esc(c.bandeira)})` : ""}</td>
+        <td class="num">${c.parcelas}x</td>
+        <td class="num">${fmt(c.valor_parcela)}</td>
+        <td class="num">${fmt(c.valor_cobrado || c.valor)}</td>
+        <td>${fmtData(c.data_prevista)}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Contrato de venda ${esc(venda.numero ?? "")}</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 10.5px; color: #111; margin: 0; line-height: 1.45; text-align: justify; }
+  .topo { text-align: center; border-bottom: 2px solid #111; padding-bottom: 8px; }
+  .topo h1 { font-size: 13px; margin: 0 0 2px; }
+  .topo div { font-size: 10px; color: #333; }
+  h2 { font-size: 12px; text-align: center; margin: 14px 0 8px; text-transform: uppercase; }
+  h3 { font-size: 11px; margin: 12px 0 4px; text-transform: uppercase; }
+  p { margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 10px; }
+  th, td { border: 1px solid #bbb; padding: 3px 5px; text-align: left; vertical-align: top; }
+  th { background: #eee; }
+  .num { text-align: right; white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; }
+  .campo { border-bottom: 1px dotted #999; padding: 2px 0; min-height: 15px; }
+  .rotulo { font-size: 9px; color: #555; text-transform: uppercase; }
+  .quadro { border: 1px solid #111; padding: 8px; margin-top: 6px; }
+  .assinaturas { margin-top: 28px; page-break-inside: avoid; }
+  .assinaturas .linha { border-top: 1px solid #111; margin-top: 38px; padding-top: 4px; }
+  .assinaturas img { max-height: 54px; display: block; }
+  .quebra { page-break-before: always; }
+</style>
+</head>
+<body>
+  <div class="topo">
+    <h1>${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)}</h1>
+    <div>${esc(CONTRATO_CABECALHO.documento)} · ${esc(CONTRATO_CABECALHO.telefone)}</div>
+    <div>${esc(CONTRATO_CABECALHO.email)}</div>
+    <div>${esc(CONTRATO_CABECALHO.endereco)}</div>
+  </div>
+
+  <h2>${esc(CONTRATO_CABECALHO.titulo)}</h2>
+  <p>${esc(CONTRATO_CABECALHO.preambulo)}</p>
+
+  <h3>Quadro de contrato de venda</h3>
+  <div class="quadro">
+    <div class="grid">
+      <div><span class="rotulo">Contrato nº</span><div class="campo">${esc(venda.numero ?? "")}</div></div>
+      <div><span class="rotulo">Data</span><div class="campo">${fmtData(venda.data)}</div></div>
+      <div><span class="rotulo">Comprador</span><div class="campo">${esc(cliente?.nome ?? venda.cliente_nome ?? "")}</div></div>
+      <div><span class="rotulo">CPF/CNPJ</span><div class="campo">${esc(cliente?.documento ?? "")}</div></div>
+      <div><span class="rotulo">Telefone</span><div class="campo">${esc(cliente?.telefone ?? "")}</div></div>
+      <div><span class="rotulo">E-mail</span><div class="campo">${esc(cliente?.email ?? "")}</div></div>
+      <div style="grid-column:1/-1"><span class="rotulo">Endereço do comprador</span><div class="campo">${esc(enderecoCli)}</div></div>
+      <div style="grid-column:1/-1"><span class="rotulo">Local da instalação (obra)</span><div class="campo">${esc(venda.endereco_instalacao ?? cliente?.endereco_obra ?? "")}</div></div>
+      <div><span class="rotulo">Prazo de entrega (item 1)</span><div class="campo">${esc(venda.prazo_entrega ?? "")}</div></div>
+      <div><span class="rotulo">Vendedor</span><div class="campo">${esc(venda.vendedor ?? "")}</div></div>
+    </div>
+
+    <h3>Item 6 — Produtos e serviços adquiridos</h3>
+    <table>
+      <thead><tr><th>SKU</th><th>Descrição</th><th class="num">Qtd</th><th class="num">Unitário</th><th class="num">Total</th></tr></thead>
+      <tbody>${linhasItens}</tbody>
+      <tfoot>
+        <tr><td colspan="4" class="num"><strong>Valor total do contrato</strong></td><td class="num"><strong>${fmt(venda.valor_total)}</strong></td></tr>
+        <tr><td colspan="4" class="num">Entrada</td><td class="num">${fmt(venda.valor_entrada)}</td></tr>
+        <tr><td colspan="4" class="num">Saldo devedor</td><td class="num">${fmt(venda.saldo_devedor)}</td></tr>
+      </tfoot>
+    </table>
+
+    <h3>Item 7 — Condição de pagamento</h3>
+    ${condicoes.length
+      ? `<table>
+      <thead><tr><th>Forma</th><th class="num">Parcelas</th><th class="num">Parcela</th><th class="num">Valor</th><th>Previsão</th></tr></thead>
+      <tbody>${linhasCond}</tbody>
+    </table>`
+      : `<p>${esc(venda.forma_pagamento ?? "")} — ${venda.parcelas}x de ${fmt(venda.valor_parcela)}</p>`}
+
+    <h3>Item 8 — Material básico a ser fornecido pelo comprador</h3>
+    ${mats.length
+      ? `<table>
+      <thead><tr><th>Material</th><th class="num">Quantidade</th></tr></thead>
+      <tbody>${mats.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${esc(v)}</td></tr>`).join("")}</tbody>
+    </table>`
+      : `<p>Quantidades a serem informadas pela equipe de instalação, conforme cláusula 8.1.1.</p>`}
+
+    ${venda.observacoes ? `<h3>Observações</h3><p>${esc(venda.observacoes)}</p>` : ""}
+  </div>
+
+  ${clausulas}
+
+  <div class="assinaturas">
+    <h3>Assinaturas</h3>
+    <p>CAMPINAS, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}.</p>
+    <div class="grid" style="gap:0 32px">
+      <div>
+        <div class="linha">EMPRESA VENDEDORA: ${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)}</div>
+      </div>
+      <div>
+        ${venda.assinatura_imagem ? `<img src="${esc(venda.assinatura_imagem)}" alt="Assinatura do comprador" />` : ""}
+        <div class="linha">COMPRADOR(A): ${esc(venda.assinatura_nome ?? cliente?.nome ?? venda.cliente_nome ?? "")}${venda.assinatura_documento ? ` · Doc: ${esc(venda.assinatura_documento)}` : ""}</div>
+      </div>
+    </div>
+    <p style="margin-top:18px"><strong>TESTEMUNHAS</strong> (nome completo e CPF ou RG)</p>
+    <div class="grid" style="gap:0 32px">
+      <div><div class="linha">1) ______________________________</div></div>
+      <div><div class="linha">2) ______________________________</div></div>
+    </div>
+    ${venda.assinatura_codigo || venda.assinatura_em
+      ? `<p style="font-size:9.5px;color:#444;margin-top:12px">Controle interno${venda.assinatura_codigo ? ` · Código de assinatura: ${esc(venda.assinatura_codigo)}` : ""}${venda.assinatura_em ? ` · Assinado em: ${new Date(venda.assinatura_em).toLocaleString("pt-BR")}` : ""}</p>`
+      : ""}
+  </div>
+
+  <div class="quebra">
+    <h3>${esc(CONTRATO_ANEXO_DRENOS[0])}</h3>
+    ${CONTRATO_ANEXO_DRENOS.slice(1).map((p) => `<p>${esc(p)}</p>`).join("")}
+  </div>
+</body>
+</html>`;
+}
+
 /** Imprime sem abrir aba nova: usa um iframe oculto na própria página. */
 function imprimirHtml(html: string) {
   const iframe = document.createElement("iframe");
@@ -270,10 +434,11 @@ export function DocumentosVenda(props: Props) {
   const [contratoAberto, setContratoAberto] = useState(false);
 
   const imprimirPedido = () => imprimirHtml(htmlPedido(props));
+  const imprimirContrato = () => imprimirHtml(htmlContrato(props));
 
   const imprimirPedidoEContrato = () => {
     imprimirPedido();
-    window.open(contratoSplash.url, "_blank", "noopener,noreferrer");
+    window.setTimeout(imprimirContrato, 1200);
   };
 
   return (
@@ -281,8 +446,11 @@ export function DocumentosVenda(props: Props) {
       <Button variant="outline" onClick={imprimirPedido}>
         <Printer /> Imprimir pedido de venda
       </Button>
+      <Button variant="outline" onClick={imprimirContrato}>
+        <FileSignature /> Imprimir contrato preenchido
+      </Button>
       <Button variant="outline" onClick={() => setContratoAberto(true)}>
-        <FileSignature /> Ver contrato
+        <FileSignature /> Ver contrato original (PDF)
       </Button>
       <Button onClick={imprimirPedidoEContrato}>
         <Files /> Imprimir pedido + contrato
