@@ -1592,7 +1592,10 @@ function NovoPedido() {
             </CardContent>
           </ExpandableCard>
 
-          <ExpandableCard title="Entrega e material de obra">
+          <ExpandableCard>
+            <CardHeader>
+              <CardTitle>Entrega e material de obra</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Prazo de entrega">
