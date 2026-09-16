@@ -7,9 +7,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
 import formularioPedido from "@/assets/formulario-pedido-venda-splash.pdf.asset.json";
+import formularioPreview from "@/assets/formulario-pedido-preview.png.asset.json";
 
 type Venda = {
   numero: string | null;
@@ -105,14 +107,19 @@ export function DocumentosVenda(_props: Props) {
         <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>{doc.titulo}</DialogTitle>
+            <DialogDescription className="sr-only">Visualização do documento original de venda.</DialogDescription>
           </DialogHeader>
-          <object
+          {aberto === "pedido" ? (
+            <div className="h-[70vh] overflow-auto rounded-md border">
+              <img src={formularioPreview.url} alt="Formulário original de pedido de venda Splash" className="block h-auto w-full" />
+            </div>
+          ) : <object
             data={doc.url}
             type="application/pdf"
             className="h-[70vh] w-full rounded-md border"
           >
             <iframe src={doc.url} title={doc.titulo} className="h-[70vh] w-full" />
-          </object>
+          </object>}
           <div className="flex justify-end gap-2">
             <Button
               variant="outline"
