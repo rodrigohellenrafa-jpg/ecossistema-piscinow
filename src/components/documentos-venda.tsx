@@ -434,10 +434,11 @@ export function DocumentosVenda(props: Props) {
   const [contratoAberto, setContratoAberto] = useState(false);
 
   const imprimirPedido = () => imprimirHtml(htmlPedido(props));
+  const imprimirContrato = () => imprimirHtml(htmlContrato(props));
 
   const imprimirPedidoEContrato = () => {
     imprimirPedido();
-    window.open(contratoSplash.url, "_blank", "noopener,noreferrer");
+    window.setTimeout(imprimirContrato, 1200);
   };
 
   return (
@@ -445,8 +446,11 @@ export function DocumentosVenda(props: Props) {
       <Button variant="outline" onClick={imprimirPedido}>
         <Printer /> Imprimir pedido de venda
       </Button>
+      <Button variant="outline" onClick={imprimirContrato}>
+        <FileSignature /> Imprimir contrato preenchido
+      </Button>
       <Button variant="outline" onClick={() => setContratoAberto(true)}>
-        <FileSignature /> Ver contrato
+        <FileSignature /> Ver contrato original (PDF)
       </Button>
       <Button onClick={imprimirPedidoEContrato}>
         <Files /> Imprimir pedido + contrato
