@@ -174,6 +174,14 @@ function UserBadge() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Instalação PWA indisponível neste navegador.
+      });
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <RealtimeSync />
