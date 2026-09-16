@@ -153,7 +153,10 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
   h1 { font-size: 16px; margin: 0; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 6px; border-bottom: 1px solid #999; padding-bottom: 3px; }
   .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8px; }
+  .head .marca { display: flex; align-items: center; gap: 10px; }
+  .head .marca img { height: 46px; width: auto; }
   .empresa { font-size: 11px; color: #333; margin-top: 2px; }
+  .rodape-timbre { margin-top: 18px; border-top: 1px solid #111; padding-top: 5px; font-size: 9.5px; color: #333; text-align: center; }
   table { width: 100%; border-collapse: collapse; margin-top: 4px; }
   th, td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; }
   th { background: #eee; font-size: 11px; }
