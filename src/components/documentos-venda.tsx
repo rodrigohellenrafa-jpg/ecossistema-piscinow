@@ -1,6 +1,13 @@
-import { FileSignature, Printer, Files } from "lucide-react";
+import { useState } from "react";
+import { FileSignature, Printer, Files, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
 import formularioPedido from "@/assets/formulario-pedido-venda-splash.pdf.asset.json";
 
@@ -71,30 +78,51 @@ interface Props {
 }
 
 export function DocumentosVenda(_props: Props) {
-  const abrirPedido = () => {
-    window.open(formularioPedido.url, "_blank", "noopener,noreferrer");
-  };
-
-  const abrirContrato = () => {
-    window.open(contratoSplash.url, "_blank", "noopener,noreferrer");
-  };
-
-  const imprimirPedidoEContrato = () => {
-    abrirContrato();
-    abrirPedido();
-  };
+  const [aberto, setAberto] = useState<null | "pedido" | "contrato">(null);
+  const doc =
+    aberto === "contrato"
+      ? { titulo: "Contrato de venda", url: contratoSplash.url }
+      : { titulo: "Pedido de venda", url: formularioPedido.url };
 
   return (
     <>
-      <Button variant="outline" onClick={abrirPedido}>
-        <Printer /> Abrir pedido em PDF
+      <Button variant="outline" onClick={() => setAberto("pedido")}>
+        <Printer /> Ver pedido de venda
       </Button>
-      <Button variant="outline" onClick={abrirContrato}>
-        <FileSignature /> Abrir contrato em PDF
+      <Button variant="outline" onClick={() => setAberto("contrato")}>
+        <FileSignature /> Ver contrato
       </Button>
-      <Button onClick={imprimirPedidoEContrato}>
+      <Button
+        onClick={() => {
+          window.open(formularioPedido.url, "_blank", "noopener,noreferrer");
+          window.open(contratoSplash.url, "_blank", "noopener,noreferrer");
+        }}
+      >
         <Files /> Abrir pedido + contrato
       </Button>
+
+      <Dialog open={aberto !== null} onOpenChange={(o) => !o && setAberto(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{doc.titulo}</DialogTitle>
+          </DialogHeader>
+          <object
+            data={doc.url}
+            type="application/pdf"
+            className="h-[70vh] w-full rounded-md border"
+          >
+            <iframe src={doc.url} title={doc.titulo} className="h-[70vh] w-full" />
+          </object>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => window.open(doc.url, "_blank", "noopener,noreferrer")}
+            >
+              <ExternalLink /> Abrir em nova aba
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
