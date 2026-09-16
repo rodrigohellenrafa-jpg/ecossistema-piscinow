@@ -744,6 +744,9 @@ function NovoPedido() {
           tipo_atendimento: tipoAtendimento,
 
           observacoes: observacoes || null,
+          prazo_entrega: prazoEntrega || null,
+          endereco_instalacao: enderecoInstalacao || null,
+          materiais,
           valor_total: valorTotal,
           subtotal_produtos: subtotalProdutos,
           valor_frete: custoFrete,
