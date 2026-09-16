@@ -189,6 +189,19 @@ function EstoqueEntradas() {
     qc.invalidateQueries({ queryKey: ["produtos"] });
   };
 
+  const excluirMovimento = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("estoque_movimentos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Movimentação excluída");
+      qc.invalidateQueries({ queryKey: ["estoque_movimentos"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
