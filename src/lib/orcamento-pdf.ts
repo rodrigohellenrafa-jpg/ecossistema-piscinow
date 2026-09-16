@@ -103,7 +103,7 @@ export async function gerarOrcamentoPdf({
   doc.text(`Vendedor: ${venda.vendedor ?? "—"}`, R, y + 8, { align: "right" });
 
   y += 22;
-  doc.setDrawColor(20).setLineWidth(0.5).line(L, y, R, y);
+  doc.setDrawColor(20, 20, 20).setLineWidth(0.5).line(L, y, R, y);
   y += 7;
 
   const secao = (t: string) => {
@@ -164,7 +164,7 @@ export async function gerarOrcamentoPdf({
   // Itens
   secao("Itens");
   const colX = { desc: L + 2, qtd: 126, unit: 156, tot: R - 2 };
-  doc.setFillColor(235).rect(L, y - 4, R - L, 6, "F");
+  doc.setFillColor(235, 235, 235).rect(L, y - 4, R - L, 6, "F");
   doc.setFont("helvetica", "bold");
   doc.text("Descrição", colX.desc, y);
   doc.text("Qtd", colX.qtd, y, { align: "right" });
@@ -185,11 +185,11 @@ export async function gerarOrcamentoPdf({
     doc.text(brl(it.preco_unitario), colX.unit, y, { align: "right" });
     doc.text(brl(it.total), colX.tot, y, { align: "right" });
     y += Math.max(5, linhas.length * 4.4) + 1;
-    doc.setDrawColor(210).setLineWidth(0.1).line(L, y - 2.5, R, y - 2.5);
+    doc.setDrawColor(210, 210, 210).setLineWidth(0.1).line(L, y - 2.5, R, y - 2.5);
   }
 
   y += 2;
-  doc.setDrawColor(20).setLineWidth(0.3).line(L, y, R, y);
+  doc.setDrawColor(20, 20, 20).setLineWidth(0.3).line(L, y, R, y);
   y += 6;
   doc.setFont("helvetica", "bold").setFontSize(11);
   doc.text("Valor total", 150, y, { align: "right" });
@@ -238,7 +238,7 @@ export async function gerarOrcamentoPdf({
       `Orçamento Nº ${venda.numero ?? ""} — sujeito a aprovação. Documento sem valor fiscal, válido por 15 dias a partir da data de emissão. Valores, prazos e disponibilidade podem ser revistos após esse período. A aprovação pelo cliente converte este orçamento em pedido de venda.`,
       R - L - 6,
     ) as string[];
-    doc.setDrawColor(20).setLineWidth(0.3).rect(L, y - 4, R - L, aviso.length * 4.4 + 6);
+    doc.setDrawColor(20, 20, 20).setLineWidth(0.3).rect(L, y - 4, R - L, aviso.length * 4.4 + 6);
     doc.text(aviso, L + 3, y);
     y += aviso.length * 4.4 + 10;
   }
@@ -248,7 +248,7 @@ export async function gerarOrcamentoPdf({
     y = 30;
   }
   y = Math.max(y, 250);
-  doc.setDrawColor(20).line(L, y, L + 75, y);
+  doc.setDrawColor(20, 20, 20).line(L, y, L + 75, y);
   doc.line(R - 75, y, R, y);
   doc.setFontSize(8);
   doc.text(orcamento ? "Aprovação do cliente" : "Cliente", L, y + 4);
@@ -257,7 +257,7 @@ export async function gerarOrcamentoPdf({
   const total = doc.getNumberOfPages();
   for (let p = 1; p <= total; p++) {
     doc.setPage(p);
-    doc.setFontSize(7.5).setTextColor(90);
+    doc.setFontSize(7.5).setTextColor(90, 90, 90);
     doc.text(
       `${CONTRATO_CABECALHO.empresa} · ${CONTRATO_CABECALHO.documento} · ${CONTRATO_CABECALHO.telefone} · ${CONTRATO_CABECALHO.email}`,
       105,
@@ -265,7 +265,7 @@ export async function gerarOrcamentoPdf({
       { align: "center" },
     );
     doc.text(`Página ${p} de ${total}`, R, 288, { align: "right" });
-    doc.setTextColor(0);
+    doc.setTextColor(0, 0, 0);
   }
 
   const nome = `${orcamento ? "orcamento" : "pedido"}-${(venda.numero ?? "sn").toString().replace(/\W+/g, "-")}.pdf`;
