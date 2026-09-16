@@ -399,7 +399,7 @@ function Ordens() {
             </div>
             <DialogFooter>
               <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                Criar OS
+                {editando ? "Salvar alterações" : "Criar OS"}
               </Button>
             </DialogFooter>
           </DialogContent>
