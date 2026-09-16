@@ -471,10 +471,12 @@ export function DocumentosVenda(props: Props) {
     window.setTimeout(imprimirContrato, 1200);
   };
 
+  const orcamento = props.venda.status_pedido === "orcamento";
+
   return (
     <>
       <Button variant="outline" onClick={imprimirPedido}>
-        <Printer /> Imprimir pedido de venda
+        <Printer /> {orcamento ? "Imprimir orçamento" : "Imprimir pedido de venda"}
       </Button>
       <Button variant="outline" onClick={imprimirContrato}>
         <FileSignature /> Imprimir contrato preenchido
