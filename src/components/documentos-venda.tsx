@@ -38,6 +38,7 @@ type Venda = {
   endereco_instalacao?: string | null;
   materiais?: unknown;
   status_pedido?: string | null;
+  tipo_atendimento?: string | null;
 };
 
 type Cliente = {
