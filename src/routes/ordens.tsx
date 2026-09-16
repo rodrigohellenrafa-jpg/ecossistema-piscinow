@@ -102,7 +102,12 @@ function Ordens() {
   const [registro, setRegistro] = useState<{id:string; materiais:string; horas:string} | null>(null);
   const [gravando, setGravando] = useState(false);
   const [open, setOpen] = useState(false);
-  useAbrirModal("novo", () => setOpen(true));
+  const [editando, setEditando] = useState<string | null>(null);
+  useAbrirModal("novo", () => {
+    setEditando(null);
+    setForm(vazio);
+    setOpen(true);
+  });
   const [form, setForm] = useState(vazio);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");
