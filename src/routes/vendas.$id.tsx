@@ -84,8 +84,13 @@ function DetalhePedido() {
   const { id } = useParams({ from: "/vendas/$id" });
   const qc = useQueryClient();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const validarMestra = useServerFn(validarSenhaMestra);
   const [aliquotaIcms, setAliquotaIcms] = useState(18);
   const [pdfLink, setPdfLink] = useState("");
+  const [excluirAberto, setExcluirAberto] = useState(false);
+  const [senhaExcluir, setSenhaExcluir] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
   const [novoPag, setNovoPag] = useState({
     data_pagamento: hoje(),
     forma_pagamento: "Pix",
@@ -93,6 +98,33 @@ function DetalhePedido() {
     valor: "",
     observacoes: "",
   });
+
+  async function excluirRegistro() {
+    setExcluindo(true);
+    try {
+      const r = await validarMestra({ data: { senha: senhaExcluir } });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "nao_configurada"
+            ? "A senha mestra ainda não foi cadastrada."
+            : "Senha mestra incorreta.",
+        );
+        return;
+      }
+      await supabase.from("venda_pagamentos").delete().eq("venda_id", id);
+      await supabase.from("venda_condicoes").delete().eq("venda_id", id);
+      await supabase.from("venda_itens").delete().eq("venda_id", id);
+      const { error } = await supabase.from("vendas").delete().eq("id", id);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      toast.success("Orçamento excluído com sucesso.");
+      navigate({ to: "/vendas" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
 
   const { data: venda } = useQuery({
     queryKey: ["venda", id],
