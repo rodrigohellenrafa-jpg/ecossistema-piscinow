@@ -37,6 +37,7 @@ type Venda = {
   prazo_entrega?: string | null;
   endereco_instalacao?: string | null;
   materiais?: unknown;
+  status_pedido?: string | null;
 };
 
 type Cliente = {
