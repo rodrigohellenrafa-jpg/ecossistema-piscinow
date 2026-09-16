@@ -10,6 +10,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -368,6 +369,19 @@ function Vendas() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        aria-label="Selecionar todos os pedidos"
+                        checked={pedidos.length > 0 && pedidos.every((v) => sel.includes(v.id))}
+                        onCheckedChange={(c) =>
+                          setSel((prev) =>
+                            c
+                              ? Array.from(new Set([...prev, ...pedidos.map((v) => v.id)]))
+                              : prev.filter((id) => !pedidos.some((v) => v.id === id)),
+                          )
+                        }
+                      />
+                    </TableHead>
                     <TableHead>Pedido</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -381,6 +395,13 @@ function Vendas() {
                 <TableBody>
                   {pedidos.map((v) => (
                     <TableRow key={v.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={sel.includes(v.id)}
+                          onCheckedChange={() => alternar(v.id)}
+                          aria-label={`Selecionar pedido ${v.numero ?? ""}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <Link to="/vendas/$id" params={{ id: v.id }} className="text-primary hover:underline">
                           {v.numero}
@@ -449,7 +470,7 @@ function Vendas() {
                   ))}
                   {pedidos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                         Nenhum pedido encontrado.
                       </TableCell>
                     </TableRow>
@@ -495,6 +516,19 @@ function Vendas() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        aria-label="Selecionar todos os orçamentos"
+                        checked={orcamentos.length > 0 && orcamentos.every((v) => sel.includes(v.id))}
+                        onCheckedChange={(c) =>
+                          setSel((prev) =>
+                            c
+                              ? Array.from(new Set([...prev, ...orcamentos.map((v) => v.id)]))
+                              : prev.filter((id) => !orcamentos.some((v) => v.id === id)),
+                          )
+                        }
+                      />
+                    </TableHead>
                     <TableHead>Orçamento</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -507,6 +541,13 @@ function Vendas() {
                 <TableBody>
                   {orcamentos.map((v) => (
                     <TableRow key={v.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={sel.includes(v.id)}
+                          onCheckedChange={() => alternar(v.id)}
+                          aria-label={`Selecionar orçamento ${v.numero ?? ""}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <Link
                           to="/vendas/$id"
@@ -546,7 +587,7 @@ function Vendas() {
                   ))}
                   {orcamentos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                         Nenhum orçamento em aberto.
                       </TableCell>
                     </TableRow>
