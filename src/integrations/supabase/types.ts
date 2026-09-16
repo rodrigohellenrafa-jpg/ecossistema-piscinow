@@ -614,13 +614,17 @@ export type Database = {
         Row: {
           banco: string | null
           conciliado: boolean
+          conciliado_em: string | null
+          conciliado_por: string | null
           conta: string
+          conta_id: string | null
           created_at: string
           created_by: string | null
           data_movimento: string
           descricao: string
           documento: string | null
           id: string
+          lancamento_id: string | null
           observacoes: string | null
           origem: string
           saldo: number | null
@@ -631,13 +635,17 @@ export type Database = {
         Insert: {
           banco?: string | null
           conciliado?: boolean
+          conciliado_em?: string | null
+          conciliado_por?: string | null
           conta: string
+          conta_id?: string | null
           created_at?: string
           created_by?: string | null
           data_movimento: string
           descricao: string
           documento?: string | null
           id?: string
+          lancamento_id?: string | null
           observacoes?: string | null
           origem?: string
           saldo?: number | null
@@ -648,13 +656,17 @@ export type Database = {
         Update: {
           banco?: string | null
           conciliado?: boolean
+          conciliado_em?: string | null
+          conciliado_por?: string | null
           conta?: string
+          conta_id?: string | null
           created_at?: string
           created_by?: string | null
           data_movimento?: string
           descricao?: string
           documento?: string | null
           id?: string
+          lancamento_id?: string | null
           observacoes?: string | null
           origem?: string
           saldo?: number | null
@@ -662,7 +674,22 @@ export type Database = {
           updated_at?: string
           valor?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "extratos_bancarios_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extratos_bancarios_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "lancamentos_financeiros"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fiscal_credenciais: {
         Row: {
