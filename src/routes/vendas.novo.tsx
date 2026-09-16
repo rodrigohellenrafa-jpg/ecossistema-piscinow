@@ -1592,6 +1592,71 @@ function NovoPedido() {
             </CardContent>
           </ExpandableCard>
 
+          <ExpandableCard title="Entrega e material de obra">
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Prazo de entrega">
+                  <Input
+                    value={prazoEntrega}
+                    onChange={(e) => setPrazoEntrega(e.target.value)}
+                    placeholder="Ex.: 30 dias após faturamento"
+                  />
+                </Field>
+                <Field label="Endereço de instalação">
+                  <Input
+                    value={enderecoInstalacao}
+                    onChange={(e) => setEnderecoInstalacao(e.target.value)}
+                    placeholder="Se diferente do endereço do cliente"
+                  />
+                </Field>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Dialog open={materiaisAberto} onOpenChange={setMateriaisAberto}>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline">
+                      <Plus /> Material a solicitar
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Material a ser solicitado</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        { chave: "areia_m3", rotulo: "Areia (m³)" },
+                        { chave: "cimento_sc", rotulo: "Cimento (sc)" },
+                        { chave: "blocos_un", rotulo: "Blocos (un.)" },
+                        { chave: "agua_m3", rotulo: "Água (m³)" },
+                        { chave: "fios_eletrodutos", rotulo: "Fios e eletrodutos" },
+                      ].map((m) => (
+                        <Field key={m.chave} label={m.rotulo}>
+                          <Input
+                            value={materiais[m.chave] ?? ""}
+                            onChange={(e) =>
+                              setMateriais((prev) => ({ ...prev, [m.chave]: e.target.value }))
+                            }
+                            placeholder="Quantidade"
+                          />
+                        </Field>
+                      ))}
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" onClick={() => setMateriaisAberto(false)}>
+                        Salvar quantidades
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                <p className="text-sm text-muted-foreground">
+                  {materiaisPreenchidos > 0
+                    ? `${materiaisPreenchidos} item(ns) de material informado(s).`
+                    : "Nenhum material informado ainda."}
+                </p>
+              </div>
+            </CardContent>
+          </ExpandableCard>
+
           <div className="flex justify-end">
             <Button size="lg" onClick={() => salvar.mutate()} disabled={salvar.isPending}>
               Salvar pedido
