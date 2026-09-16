@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 import {
   CONTRATO_ANEXO_DRENOS,
   CONTRATO_CABECALHO,
