@@ -438,6 +438,9 @@ function NovoPedido() {
           custoFiltro,
           lucroSugerido,
           condicoes,
+          prazoEntrega,
+          enderecoInstalacao,
+          materiais,
         }),
       );
     } catch {
