@@ -428,6 +428,7 @@ function Contas() {
           funcionario_id: parseVinculo(form.vinculo).funcionario_id,
           cliente_id: parseVinculo(form.vinculo).cliente_id,
           numero_documento: form.numero_documento || null,
+          conta_bancaria: form.conta_bancaria || null,
           recorrencia: form.recorrencia,
           recorrencia_fim:
             form.recorrencia !== "nenhuma" && form.recorrencia_fim ? form.recorrencia_fim : null,
