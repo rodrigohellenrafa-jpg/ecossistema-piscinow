@@ -415,6 +415,10 @@ function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props)
     <h3>${esc(CONTRATO_ANEXO_DRENOS[0])}</h3>
     ${CONTRATO_ANEXO_DRENOS.slice(1).map((p) => `<p>${esc(p)}</p>`).join("")}
   </div>
+
+  <div class="rodape-timbre">
+    ${esc(CONTRATO_CABECALHO.empresa)} · ${esc(CONTRATO_CABECALHO.documento)} · ${esc(CONTRATO_CABECALHO.endereco)} · ${esc(CONTRATO_CABECALHO.telefone)} · ${esc(CONTRATO_CABECALHO.email)}
+  </div>
 </body>
 </html>`;
 }
