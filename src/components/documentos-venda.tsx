@@ -92,6 +92,11 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
   const [modo, setModo] = useState<"pedido" | "contrato" | "ambos" | null>(null);
   const nomeCliente = cliente?.nome ?? venda.cliente_nome ?? "—";
   const docCliente = cliente?.documento ?? "—";
+  const mats = (venda.materiais ?? {}) as Record<string, unknown>;
+  const material = (chave: string) => {
+    const v = mats[chave];
+    return v === undefined || v === null || v === "" ? "—" : String(v);
+  };
 
   useEffect(() => {
     if (!modo) return;
