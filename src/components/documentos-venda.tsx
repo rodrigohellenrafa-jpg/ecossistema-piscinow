@@ -5,6 +5,7 @@ import { FileSignature, Printer, Files } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { brl, dataBR } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
+import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
 
 type Venda = {
   numero: string | null;
@@ -84,12 +85,9 @@ const enderecoCliente = (c: Cliente) =>
   [c?.logradouro, c?.numero, c?.bairro, c?.cidade, c?.estado, c?.cep].filter(Boolean).join(", ") ||
   "—";
 
-const hojeExtenso = () =>
-  new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-
 export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa }: Props) {
   const emp = { ...EMPRESA_PADRAO, ...(empresa ?? {}) };
-  const [modo, setModo] = useState<"pedido" | "contrato" | "ambos" | null>(null);
+  const [modo, setModo] = useState<"pedido" | null>(null);
   const nomeCliente = cliente?.nome ?? venda.cliente_nome ?? "—";
   const docCliente = cliente?.documento ?? "—";
   const mats = (venda.materiais ?? {}) as Record<string, unknown>;
@@ -114,26 +112,18 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
     };
   }, [modo]);
 
-  const cabecalho = (titulo: string) => (
-    <header className="doc-header">
-      <div>
-        <img src={logoSplash.url} alt="Splash Jardim do Trevo" className="mb-1 h-24 w-auto" />
-        <p className="doc-logo">{emp.nome}</p>
-        <p className="doc-mini">{emp.endereco}</p>
-        <p className="doc-mini">{emp.documento}</p>
-        {emp.contato ? <p className="doc-mini">{emp.contato}</p> : null}
-      </div>
-      <div className="doc-right">
-        <p className="doc-title">{titulo}</p>
-        <p className="doc-mini">Nº {venda.numero ?? "—"}</p>
-        <p className="doc-mini">Emissão: {dataBR(venda.data)}</p>
-      </div>
-    </header>
-  );
+  const abrirContrato = () => {
+    window.open(contratoSplash.url, "_blank", "noopener,noreferrer");
+  };
+
+  const imprimirPedidoEContrato = () => {
+    abrirContrato();
+    setModo("pedido");
+  };
 
   const documentos = (
     <div id="documentos-venda" className="doc-root">
-      {(modo === "pedido" || modo === "ambos") && (
+      {modo === "pedido" && (
         <section className="doc-page doc-splash">
           <header className="doc-splash-header">
             <img src={logoSplash.url} alt="Splash" className="doc-splash-logo" />
@@ -358,107 +348,6 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
         </section>
       )}
 
-      {(modo === "contrato" || modo === "ambos") && (
-        <section className="doc-page doc-contrato">
-          {cabecalho("CONTRATO DE COMPRA E VENDA")}
-
-          <p className="doc-p">
-            <strong>CONTRATADA:</strong> {emp.nome}, {emp.documento}, doravante denominada VENDEDORA.
-          </p>
-          <p className="doc-p">
-            <strong>CONTRATANTE:</strong> {nomeCliente}, inscrito(a) no CPF/CNPJ sob o nº {docCliente},
-            residente/estabelecido(a) em {enderecoCliente(cliente)}, telefone {cliente?.telefone ?? "—"},
-            doravante denominado(a) COMPRADOR(A).
-          </p>
-
-          <p className="doc-clausula">CLÁUSULA 1ª — DO OBJETO</p>
-          <p className="doc-p">
-            O presente contrato tem por objeto o fornecimento, pela VENDEDORA ao COMPRADOR, dos produtos e
-            serviços discriminados no Pedido de Venda nº {venda.numero ?? "—"}, emitido em {dataBR(venda.data)},
-            a saber:
-          </p>
-          <table className="doc-table doc-itens">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th style={{ width: "10%" }}>Qtd</th>
-                <th style={{ width: "18%" }}>Valor unit.</th>
-                <th style={{ width: "18%" }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.map((i) => (
-                <tr key={i.id}>
-                  <td>{i.descricao}</td>
-                  <td className="doc-center">{i.quantidade}</td>
-                  <td className="doc-right-cell">{brl(i.preco_unitario)}</td>
-                  <td className="doc-right-cell">{brl(i.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <p className="doc-clausula">CLÁUSULA 2ª — DO PREÇO E FORMA DE PAGAMENTO</p>
-          <p className="doc-p">
-            O valor total ajustado é de <strong>{brl(venda.valor_total)}</strong>, sendo{" "}
-            {brl(venda.valor_entrada)} a título de entrada e o saldo de {brl(venda.saldo_devedor)} pago
-            {venda.parcelas > 1
-              ? ` em ${venda.parcelas} parcelas de ${brl(venda.valor_parcela)}`
-              : ` conforme condição ${venda.forma_pagamento ?? "acordada"}`}
-            . As condições registradas no pedido integram este contrato para todos os fins, inclusive eventuais
-            acréscimos de operadora de cartão suportados pelo COMPRADOR.
-          </p>
-
-          <p className="doc-clausula">CLÁUSULA 3ª — DA ENTREGA E EXECUÇÃO</p>
-          <p className="doc-p">
-            A entrega dos produtos e a execução dos serviços ocorrerão no endereço indicado pelo COMPRADOR,
-            após a confirmação do pagamento da entrada e mediante local preparado e com acesso adequado para
-            equipamentos e equipe. Atrasos causados por condições do local, clima ou terceiros prorrogam
-            automaticamente os prazos, sem ônus para a VENDEDORA.
-          </p>
-
-          <p className="doc-clausula">CLÁUSULA 4ª — DA GARANTIA</p>
-          <p className="doc-p">
-            Os produtos possuem a garantia legal e a garantia oferecida por seus respectivos fabricantes. A
-            garantia não cobre danos decorrentes de uso indevido, falta de manutenção, alterações feitas por
-            terceiros ou eventos da natureza.
-          </p>
-
-          <p className="doc-clausula">CLÁUSULA 5ª — DA RESCISÃO</p>
-          <p className="doc-p">
-            O descumprimento de qualquer cláusula faculta à parte prejudicada a rescisão do contrato. Em caso
-            de desistência do COMPRADOR após o início da produção ou execução, serão descontados os custos já
-            incorridos pela VENDEDORA.
-          </p>
-
-          <p className="doc-clausula">CLÁUSULA 6ª — DO FORO</p>
-          <p className="doc-p">
-            As partes elegem o foro da comarca da sede da VENDEDORA para dirimir questões oriundas deste
-            contrato, com renúncia a qualquer outro, por mais privilegiado que seja.
-          </p>
-
-          <p className="doc-p">
-            E, por estarem justas e contratadas, as partes assinam o presente instrumento em duas vias de igual
-            teor. {hojeExtenso()}.
-          </p>
-
-          <div className="doc-assinaturas">
-            <div>
-              {venda.assinatura_imagem ? (
-                <img src={venda.assinatura_imagem} alt="Assinatura do cliente" className="doc-assinatura-img" />
-              ) : null}
-              <div className="doc-linha" />
-              <p className="doc-mini">{venda.assinatura_nome ?? nomeCliente} — COMPRADOR(A)</p>
-              <p className="doc-mini">CPF/CNPJ: {venda.assinatura_documento ?? docCliente}</p>
-            </div>
-            <div>
-              <div className="doc-linha" />
-              <p className="doc-mini">{emp.nome} — VENDEDORA</p>
-              <p className="doc-mini">{emp.documento}</p>
-            </div>
-          </div>
-        </section>
-      )}
     </div>
   );
 
@@ -467,10 +356,10 @@ export function DocumentosVenda({ venda, cliente, itens, condicoes = [], empresa
       <Button variant="outline" onClick={() => setModo("pedido")}>
         <Printer /> Imprimir pedido
       </Button>
-      <Button variant="outline" onClick={() => setModo("contrato")}>
-        <FileSignature /> Imprimir contrato
+      <Button variant="outline" onClick={abrirContrato}>
+        <FileSignature /> Abrir contrato em PDF
       </Button>
-      <Button onClick={() => setModo("ambos")}>
+      <Button onClick={imprimirPedidoEContrato}>
         <Files /> Imprimir / Gerar PDF (pedido + contrato)
       </Button>
       {modo && typeof document !== "undefined" ? createPortal(documentos, document.body) : null}
