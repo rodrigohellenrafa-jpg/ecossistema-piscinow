@@ -361,6 +361,21 @@ function EstoqueEntradas() {
                         </TableCell>
                         <TableCell>{m.origem ?? "—"}</TableCell>
                         <TableCell>{m.documento ?? "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Excluir movimentação"
+                            title="Excluir movimentação"
+                            disabled={excluirMovimento.isPending}
+                            onClick={() => {
+                              if (confirm("Excluir esta movimentação de estoque?"))
+                                excluirMovimento.mutate(m.id);
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
