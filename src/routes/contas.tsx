@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, ChevronsUpDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
@@ -19,7 +19,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -212,6 +221,35 @@ function Contas() {
       return data as Tables<"fornecedores">[];
     },
   });
+
+  const { data: colaboradores = [] } = useQuery({
+    queryKey: ["funcionarios-select-contas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("id, nome, cargo")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; nome: string; cargo: string | null }[];
+    },
+  });
+
+  const { data: clientesSelect = [] } = useQuery({
+    queryKey: ["clientes-select-contas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, nome")
+        .eq("ativo", true)
+        .order("nome", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; nome: string }[];
+    },
+  });
+
+  const [parceiroOpen, setParceiroOpen] = useState(false);
+  const [parceiroBusca, setParceiroBusca] = useState("");
 
   const { data: categorias = [] } = useQuery({
     queryKey: ["categorias-financeiras"],
@@ -621,21 +659,90 @@ function Contas() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label={form.tipo === "pagar" ? "Fornecedor" : "Cliente"}>
+              <Field label={form.tipo === "pagar" ? "Beneficiário (quem será pago)" : "Cliente"}>
                 {form.tipo === "pagar" ? (
                   <div className="flex gap-1">
-                    <Select value={form.parceiro} onValueChange={set("parceiro")}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o fornecedor" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fornecedores.map((f) => (
-                          <SelectItem key={f.id} value={f.nome}>
-                            {f.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={parceiroOpen} onOpenChange={setParceiroOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          role="combobox"
+                          className="w-full justify-between font-normal"
+                        >
+                          <span className={form.parceiro ? "" : "text-muted-foreground"}>
+                            {form.parceiro || "Fornecedor, colaborador, cliente ou pessoa"}
+                          </span>
+                          <ChevronsUpDown className="opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <Command>
+                          <CommandInput
+                            placeholder="Digite o nome…"
+                            value={parceiroBusca}
+                            onValueChange={setParceiroBusca}
+                          />
+                          <CommandList>
+                            <CommandEmpty>Nenhum cadastro encontrado.</CommandEmpty>
+                            {parceiroBusca.trim() && (
+                              <CommandGroup heading="Pessoa / contato avulso">
+                                <CommandItem
+                                  value={`usar-${parceiroBusca}`}
+                                  onSelect={() => {
+                                    set("parceiro")(parceiroBusca.trim());
+                                    setParceiroOpen(false);
+                                  }}
+                                >
+                                  <Plus /> Usar “{parceiroBusca.trim()}”
+                                </CommandItem>
+                              </CommandGroup>
+                            )}
+                            {[
+                              { titulo: "Fornecedores", itens: fornecedores.map((f) => ({ id: f.id, nome: f.nome, extra: "" })) },
+                              {
+                                titulo: "Colaboradores",
+                                itens: colaboradores.map((c) => ({
+                                  id: c.id,
+                                  nome: c.nome,
+                                  extra: c.cargo ?? "",
+                                })),
+                              },
+                              { titulo: "Clientes", itens: clientesSelect.map((c) => ({ id: c.id, nome: c.nome, extra: "" })) },
+                            ]
+                              .filter((g) => g.itens.length > 0)
+                              .map((grupo) => (
+                                <CommandGroup key={grupo.titulo} heading={grupo.titulo}>
+                                  {grupo.itens.map((i) => (
+                                    <CommandItem
+                                      key={`${grupo.titulo}-${i.id}`}
+                                      value={`${i.nome} ${i.extra}`.toLowerCase()}
+                                      onSelect={() => {
+                                        set("parceiro")(i.nome);
+                                        setParceiroOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={
+                                          form.parceiro === i.nome
+                                            ? "text-emerald-600"
+                                            : "opacity-0"
+                                        }
+                                      />
+                                      <span className="truncate">{i.nome}</span>
+                                      {i.extra && (
+                                        <span className="ml-auto text-xs text-muted-foreground">
+                                          {i.extra}
+                                        </span>
+                                      )}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              ))}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <Dialog open={fornOpen} onOpenChange={setFornOpen}>
                       <DialogTrigger asChild>
                         <Button type="button" variant="outline" size="icon" title="Novo fornecedor">
