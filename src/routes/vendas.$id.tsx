@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { DocumentosVenda } from "@/components/documentos-venda";
+import { EnviarOrcamento } from "@/components/enviar-orcamento";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
@@ -554,6 +555,7 @@ function DetalhePedido() {
             clienteDocumento={cliente?.documento ?? null}
             invalidar={[["venda", id]]}
           />
+          <EnviarOrcamento venda={venda} cliente={cliente ?? null} itens={itens} />
           <DocumentosVenda
             venda={venda}
             cliente={cliente ?? null}
