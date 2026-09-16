@@ -188,7 +188,7 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
     <div class="marca">
       <img src="${logoUrl()}" alt="Logotipo" />
       <div>
-      <h1>PEDIDO DE VENDA${venda.numero ? ` Nº ${esc(venda.numero)}` : ""}</h1>
+      <h1>${titulo}${venda.numero ? ` Nº ${esc(venda.numero)}` : ""}</h1>
       <div class="empresa">${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)} · ${esc(CONTRATO_CABECALHO.documento)}</div>
       <div class="empresa">${esc(CONTRATO_CABECALHO.endereco)} · ${esc(CONTRATO_CABECALHO.telefone)} · ${esc(CONTRATO_CABECALHO.email)}</div>
       </div>
