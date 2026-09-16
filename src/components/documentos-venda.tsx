@@ -37,6 +37,7 @@ type Venda = {
   prazo_entrega?: string | null;
   endereco_instalacao?: string | null;
   materiais?: unknown;
+  status_pedido?: string | null;
 };
 
 type Cliente = {
@@ -114,6 +115,8 @@ function materiaisLinhas(materiais: unknown): [string, string][] {
 }
 
 function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): string {
+  const orcamento = venda.status_pedido === "orcamento";
+  const titulo = orcamento ? "ORÇAMENTO" : "PEDIDO DE VENDA";
   const endereco = cliente
     ? [cliente.logradouro, cliente.numero, cliente.bairro, cliente.cidade, cliente.estado, cliente.cep]
         .filter(Boolean)
@@ -149,7 +152,7 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<title>Pedido de venda ${esc(venda.numero ?? "")}</title>
+<title>${titulo} ${esc(venda.numero ?? "")}</title>
 <style>
   @page { size: A4; margin: 14mm; }
   * { box-sizing: border-box; }
@@ -176,6 +179,7 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
   .assinatura .linha { border-top: 1px solid #111; margin-top: 40px; padding-top: 4px; font-size: 11px; }
   .assinatura img { max-height: 56px; display: block; margin: 0 auto; }
   .interno { margin-top: 20px; border-top: 1px dashed #999; padding-top: 8px; font-size: 10.5px; color: #444; }
+  .aviso { margin-top: 10px; border: 1px solid #111; padding: 6px 8px; font-size: 10.5px; }
   @media print { .no-print { display: none; } }
 </style>
 </head>
@@ -184,7 +188,7 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
     <div class="marca">
       <img src="${logoUrl()}" alt="Logotipo" />
       <div>
-      <h1>PEDIDO DE VENDA${venda.numero ? ` Nº ${esc(venda.numero)}` : ""}</h1>
+      <h1>${titulo}${venda.numero ? ` Nº ${esc(venda.numero)}` : ""}</h1>
       <div class="empresa">${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)} · ${esc(CONTRATO_CABECALHO.documento)}</div>
       <div class="empresa">${esc(CONTRATO_CABECALHO.endereco)} · ${esc(CONTRATO_CABECALHO.telefone)} · ${esc(CONTRATO_CABECALHO.email)}</div>
       </div>
@@ -233,12 +237,15 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
   <h2>Observações</h2>
   <div class="obs">${esc(venda.observacoes ?? "")}</div>
 
-  <p class="declaracao">Declaro ter recebido e conferido as condições deste pedido de venda, ciente dos valores, prazos, itens e condições de pagamento aqui descritos, concordando integralmente com o estabelecido.</p>
+  ${orcamento
+    ? `<div class="aviso"><strong>Orçamento Nº ${esc(venda.numero ?? "")} — sujeito a aprovação.</strong> Documento sem valor fiscal, válido por 15 dias a partir da data de emissão. Valores, prazos e disponibilidade podem ser revistos após esse período. A aprovação pelo cliente converte este orçamento em pedido de venda.</div>
+  <p class="declaracao">Declaro ter recebido e conferido as condições deste orçamento, ciente dos valores, prazos, itens e condições de pagamento aqui descritos. A execução depende da aprovação abaixo.</p>`
+    : `<p class="declaracao">Declaro ter recebido e conferido as condições deste pedido de venda, ciente dos valores, prazos, itens e condições de pagamento aqui descritos, concordando integralmente com o estabelecido.</p>`}
 
   <div class="assinatura">
     <div class="bloco">
       ${venda.assinatura_imagem ? `<img src="${esc(venda.assinatura_imagem)}" alt="Assinatura do cliente" />` : ""}
-      <div class="linha">Cliente${venda.assinatura_nome ? `: ${esc(venda.assinatura_nome)}` : ""}${venda.assinatura_documento ? ` · Doc: ${esc(venda.assinatura_documento)}` : ""}</div>
+      <div class="linha">${orcamento ? "Aprovação do cliente" : "Cliente"}${venda.assinatura_nome ? `: ${esc(venda.assinatura_nome)}` : ""}${venda.assinatura_documento ? ` · Doc: ${esc(venda.assinatura_documento)}` : ""}</div>
     </div>
     <div class="bloco">
       <div class="linha">${esc(empresa?.nome ?? "Empresa")}</div>
@@ -464,10 +471,12 @@ export function DocumentosVenda(props: Props) {
     window.setTimeout(imprimirContrato, 1200);
   };
 
+  const orcamento = props.venda.status_pedido === "orcamento";
+
   return (
     <>
       <Button variant="outline" onClick={imprimirPedido}>
-        <Printer /> Imprimir pedido de venda
+        <Printer /> {orcamento ? "Imprimir orçamento" : "Imprimir pedido de venda"}
       </Button>
       <Button variant="outline" onClick={imprimirContrato}>
         <FileSignature /> Imprimir contrato preenchido
@@ -476,7 +485,7 @@ export function DocumentosVenda(props: Props) {
         <FileSignature /> Ver contrato original (PDF)
       </Button>
       <Button onClick={imprimirPedidoEContrato}>
-        <Files /> Imprimir pedido + contrato
+        <Files /> {orcamento ? "Imprimir orçamento + contrato" : "Imprimir pedido + contrato"}
       </Button>
 
       <Dialog open={contratoAberto} onOpenChange={setContratoAberto}>
