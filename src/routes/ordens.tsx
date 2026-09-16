@@ -297,15 +297,24 @@ function Ordens() {
               <FileText /> Formulário de OS
             </Link>
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(v) => {
+              setOpen(v);
+              if (!v) {
+                setEditando(null);
+                setForm(vazio);
+              }
+            }}
+          >
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => { setEditando(null); setForm(vazio); }}>
               <Plus /> Nova OS
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Nova ordem de serviço</DialogTitle>
+              <DialogTitle>{editando ? "Editar ordem de serviço" : "Nova ordem de serviço"}</DialogTitle>
               <DialogDescription>Vincule cliente, serviço, prazo e responsável.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
