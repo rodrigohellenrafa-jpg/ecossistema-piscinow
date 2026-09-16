@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ClienteRapidoDialog } from "@/components/cliente-rapido-dialog";
@@ -20,6 +20,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ExpandableCard } from "@/components/expandable-card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -319,6 +328,7 @@ function NovoPedido() {
   const [descontoInputs, setDescontoInputs] = useState<Record<string, string>>({});
   const [descontoPctInputs, setDescontoPctInputs] = useState<Record<string, string>>({});
   const [produtoSel, setProdutoSel] = useState("");
+  const [produtoAberto, setProdutoAberto] = useState(false);
 
   const [cascoId, setCascoId] = useState("");
   const [filtroId, setFiltroId] = useState("");
