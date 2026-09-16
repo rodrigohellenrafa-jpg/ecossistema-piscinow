@@ -23,6 +23,9 @@ type Venda = {
   assinatura_documento?: string | null;
   assinatura_codigo?: string | null;
   assinatura_em?: string | null;
+  prazo_entrega?: string | null;
+  endereco_instalacao?: string | null;
+  materiais?: Record<string, unknown> | null;
 };
 
 type Cliente = {
