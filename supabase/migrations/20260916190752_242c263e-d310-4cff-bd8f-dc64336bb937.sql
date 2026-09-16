@@ -1,0 +1,1 @@
+ALTER TABLE public.contas ADD COLUMN IF NOT EXISTS conta_bancaria text;

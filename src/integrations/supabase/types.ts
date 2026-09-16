@@ -386,6 +386,7 @@ export type Database = {
           cliente_id: string | null
           competencia_recorrencia: string | null
           condicao_id: string | null
+          conta_bancaria: string | null
           created_at: string
           created_by: string | null
           data_pagamento: string | null
@@ -414,6 +415,7 @@ export type Database = {
           cliente_id?: string | null
           competencia_recorrencia?: string | null
           condicao_id?: string | null
+          conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
@@ -442,6 +444,7 @@ export type Database = {
           cliente_id?: string | null
           competencia_recorrencia?: string | null
           condicao_id?: string | null
+          conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
           data_pagamento?: string | null
