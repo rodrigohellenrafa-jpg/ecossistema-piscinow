@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
+import logoSplash from "@/assets/logo-splash.png.asset.json";
 import {
   CONTRATO_ANEXO_DRENOS,
   CONTRATO_CABECALHO,
@@ -88,6 +89,10 @@ const fmt = (v: number) =>
 const fmtData = (d: string | null | undefined) =>
   d ? new Date(d + (d.length === 10 ? "T12:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 
+/** URL absoluta do logotipo, para o timbre funcionar dentro do iframe de impressão. */
+const logoUrl = () =>
+  typeof window !== "undefined" ? `${window.location.origin}${logoSplash.url}` : logoSplash.url;
+
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -152,7 +157,10 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
   h1 { font-size: 16px; margin: 0; }
   h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 6px; border-bottom: 1px solid #999; padding-bottom: 3px; }
   .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111; padding-bottom: 8px; }
+  .head .marca { display: flex; align-items: center; gap: 10px; }
+  .head .marca img { height: 46px; width: auto; }
   .empresa { font-size: 11px; color: #333; margin-top: 2px; }
+  .rodape-timbre { margin-top: 18px; border-top: 1px solid #111; padding-top: 5px; font-size: 9.5px; color: #333; text-align: center; }
   table { width: 100%; border-collapse: collapse; margin-top: 4px; }
   th, td { border: 1px solid #bbb; padding: 4px 6px; text-align: left; vertical-align: top; }
   th { background: #eee; font-size: 11px; }
@@ -173,9 +181,13 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
 </head>
 <body>
   <div class="head">
-    <div>
+    <div class="marca">
+      <img src="${logoUrl()}" alt="Logotipo" />
+      <div>
       <h1>PEDIDO DE VENDA${venda.numero ? ` Nº ${esc(venda.numero)}` : ""}</h1>
-      <div class="empresa">${esc(empresa?.nome ?? "")}${empresa?.documento ? ` · ${esc(empresa.documento)}` : ""}${empresa?.endereco ? ` · ${esc(empresa.endereco)}` : ""}${empresa?.contato ? ` · ${esc(empresa.contato)}` : ""}</div>
+      <div class="empresa">${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)} · ${esc(CONTRATO_CABECALHO.documento)}</div>
+      <div class="empresa">${esc(CONTRATO_CABECALHO.endereco)} · ${esc(CONTRATO_CABECALHO.telefone)} · ${esc(CONTRATO_CABECALHO.email)}</div>
+      </div>
     </div>
     <div style="text-align:right">
       <div>Data: <strong>${fmtData(venda.data)}</strong></div>
@@ -231,6 +243,10 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
     <div class="bloco">
       <div class="linha">${esc(empresa?.nome ?? "Empresa")}</div>
     </div>
+  </div>
+
+  <div class="rodape-timbre">
+    ${esc(CONTRATO_CABECALHO.empresa)} · ${esc(CONTRATO_CABECALHO.documento)} · ${esc(CONTRATO_CABECALHO.endereco)} · ${esc(CONTRATO_CABECALHO.telefone)} · ${esc(CONTRATO_CABECALHO.email)}
   </div>
 
   <div class="interno">
@@ -295,6 +311,8 @@ function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props)
   .topo { text-align: center; border-bottom: 2px solid #111; padding-bottom: 8px; }
   .topo h1 { font-size: 13px; margin: 0 0 2px; }
   .topo div { font-size: 10px; color: #333; }
+  .topo img { height: 52px; width: auto; display: block; margin: 0 auto 4px; }
+  .rodape-timbre { margin-top: 20px; border-top: 1px solid #111; padding-top: 5px; font-size: 9px; color: #333; text-align: center; }
   h2 { font-size: 12px; text-align: center; margin: 14px 0 8px; text-transform: uppercase; }
   h3 { font-size: 11px; margin: 12px 0 4px; text-transform: uppercase; }
   p { margin: 4px 0; }
@@ -314,6 +332,7 @@ function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props)
 </head>
 <body>
   <div class="topo">
+    <img src="${logoUrl()}" alt="Logotipo" />
     <h1>${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)}</h1>
     <div>${esc(CONTRATO_CABECALHO.documento)} · ${esc(CONTRATO_CABECALHO.telefone)}</div>
     <div>${esc(CONTRATO_CABECALHO.email)}</div>
@@ -395,6 +414,10 @@ function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props)
   <div class="quebra">
     <h3>${esc(CONTRATO_ANEXO_DRENOS[0])}</h3>
     ${CONTRATO_ANEXO_DRENOS.slice(1).map((p) => `<p>${esc(p)}</p>`).join("")}
+  </div>
+
+  <div class="rodape-timbre">
+    ${esc(CONTRATO_CABECALHO.empresa)} · ${esc(CONTRATO_CABECALHO.documento)} · ${esc(CONTRATO_CABECALHO.endereco)} · ${esc(CONTRATO_CABECALHO.telefone)} · ${esc(CONTRATO_CABECALHO.email)}
   </div>
 </body>
 </html>`;
