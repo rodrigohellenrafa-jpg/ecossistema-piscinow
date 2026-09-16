@@ -110,6 +110,13 @@ function AuthPage() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   Entrar
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => setEsqueci(true)}
+                  className="w-full text-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                >
+                  Esqueci minha senha
+                </button>
               </form>
             </TabsContent>
             <TabsContent value="signup">
