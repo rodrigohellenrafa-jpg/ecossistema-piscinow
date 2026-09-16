@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownCircle, ArrowUpCircle, FileInput } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, FileInput, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -189,6 +189,19 @@ function EstoqueEntradas() {
     qc.invalidateQueries({ queryKey: ["produtos"] });
   };
 
+  const excluirMovimento = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("estoque_movimentos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Movimentação excluída");
+      qc.invalidateQueries({ queryKey: ["estoque_movimentos"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -322,6 +335,7 @@ function EstoqueEntradas() {
                     <TableHead className="text-right">Efeito no estoque</TableHead>
                     <TableHead>Origem</TableHead>
                     <TableHead>Documento</TableHead>
+                    <TableHead className="w-16 text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -347,6 +361,21 @@ function EstoqueEntradas() {
                         </TableCell>
                         <TableCell>{m.origem ?? "—"}</TableCell>
                         <TableCell>{m.documento ?? "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Excluir movimentação"
+                            title="Excluir movimentação"
+                            disabled={excluirMovimento.isPending}
+                            onClick={() => {
+                              if (confirm("Excluir esta movimentação de estoque?"))
+                                excluirMovimento.mutate(m.id);
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}

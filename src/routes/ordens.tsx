@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Hammer, Plus, FileText } from "lucide-react";
+import { Hammer, Plus, FileText, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
@@ -102,7 +102,12 @@ function Ordens() {
   const [registro, setRegistro] = useState<{id:string; materiais:string; horas:string} | null>(null);
   const [gravando, setGravando] = useState(false);
   const [open, setOpen] = useState(false);
-  useAbrirModal("novo", () => setOpen(true));
+  const [editando, setEditando] = useState<string | null>(null);
+  useAbrirModal("novo", () => {
+    setEditando(null);
+    setForm(vazio);
+    setOpen(true);
+  });
   const [form, setForm] = useState(vazio);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");
@@ -158,7 +163,7 @@ function Ordens() {
       if (!form.cliente_id) throw new Error("Selecione o cliente.");
       if (!form.tipo_servico.trim()) throw new Error("Informe o tipo de serviço.");
       const cliente = clientes.find((c) => c.id === form.cliente_id);
-      const { error } = await supabase.from("ordens_servico").insert({
+      const payload = {
         numero: form.numero || `OS-${Date.now().toString().slice(-6)}`,
         cliente_id: form.cliente_id,
         cliente_nome: cliente?.nome ?? null,
@@ -169,14 +174,51 @@ function Ordens() {
         prioridade: form.prioridade,
         data_agendada: form.data_agendada || null,
         valor: Number(form.valor) || 0,
-        created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
-      });
+      };
+      if (editando) {
+        const { error } = await supabase.from("ordens_servico").update(payload).eq("id", editando);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("ordens_servico").insert({
+          ...payload,
+          created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success(editando ? "Ordem de serviço atualizada!" : "Ordem de serviço criada!");
+      setForm(vazio);
+      setEditando(null);
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["ordens"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const abrirEdicao = (o: (typeof data)[number]) => {
+    setEditando(o.id);
+    setForm({
+      numero: o.numero ?? "",
+      cliente_id: o.cliente_id ?? "",
+      tipo_servico: o.tipo_servico ?? "",
+      descricao: o.descricao ?? "",
+      responsavel: o.responsavel ?? "",
+      status: o.status ?? "orcamento",
+      prioridade: o.prioridade ?? "media",
+      data_agendada: o.data_agendada ?? "",
+      valor: String(o.valor ?? 0),
+    });
+    setOpen(true);
+  };
+
+  const excluir = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ordens_servico").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Ordem de serviço criada!");
-      setForm(vazio);
-      setOpen(false);
+      toast.success("Ordem de serviço excluída.");
       qc.invalidateQueries({ queryKey: ["ordens"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -255,15 +297,24 @@ function Ordens() {
               <FileText /> Formulário de OS
             </Link>
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog
+            open={open}
+            onOpenChange={(v) => {
+              setOpen(v);
+              if (!v) {
+                setEditando(null);
+                setForm(vazio);
+              }
+            }}
+          >
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => { setEditando(null); setForm(vazio); }}>
               <Plus /> Nova OS
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Nova ordem de serviço</DialogTitle>
+              <DialogTitle>{editando ? "Editar ordem de serviço" : "Nova ordem de serviço"}</DialogTitle>
               <DialogDescription>Vincule cliente, serviço, prazo e responsável.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -348,7 +399,7 @@ function Ordens() {
             </div>
             <DialogFooter>
               <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                Criar OS
+                {editando ? "Salvar alterações" : "Criar OS"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -454,6 +505,27 @@ function Ordens() {
                         clienteNome={o.cliente_nome}
                         invalidar={[["ordens"], ["ordens-servico"]]}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Editar OS ${o.numero ?? ""}`}
+                        title="Editar"
+                        onClick={() => abrirEdicao(o)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Excluir OS ${o.numero ?? ""}`}
+                        title="Excluir"
+                        disabled={excluir.isPending}
+                        onClick={() => {
+                          if (confirm(`Excluir a ordem de serviço ${o.numero ?? ""}?`)) excluir.mutate(o.id);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
