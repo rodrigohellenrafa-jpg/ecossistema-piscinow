@@ -505,6 +505,27 @@ function Ordens() {
                         clienteNome={o.cliente_nome}
                         invalidar={[["ordens"], ["ordens-servico"]]}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Editar OS ${o.numero ?? ""}`}
+                        title="Editar"
+                        onClick={() => abrirEdicao(o)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Excluir OS ${o.numero ?? ""}`}
+                        title="Excluir"
+                        disabled={excluir.isPending}
+                        onClick={() => {
+                          if (confirm(`Excluir a ordem de serviço ${o.numero ?? ""}?`)) excluir.mutate(o.id);
+                        }}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
