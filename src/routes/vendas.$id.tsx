@@ -564,8 +564,52 @@ function DetalhePedido() {
           <Button variant="ghost" onClick={() => window.print()}>
             <Printer /> Espelho fiscal
           </Button>
+          <Button
+            variant="destructive"
+            onClick={() => setExcluirAberto(true)}
+            aria-label={venda.status_pedido === "orcamento" ? "Excluir orçamento" : "Excluir pedido"}
+          >
+            <Trash2 /> {venda.status_pedido === "orcamento" ? "Excluir orçamento" : "Excluir pedido"}
+          </Button>
         </div>
       </div>
+
+      <Dialog open={excluirAberto} onOpenChange={setExcluirAberto}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Excluir {venda.status_pedido === "orcamento" ? "orçamento" : "pedido"}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta ação remove o {venda.status_pedido === "orcamento" ? "orçamento" : "pedido"}{" "}
+            <strong>{venda.numero ?? ""}</strong>, seus itens e condições de pagamento. Não pode ser
+            desfeita. Digite a senha mestra para confirmar.
+          </p>
+          <Input
+            type="password"
+            autoComplete="off"
+            placeholder="Senha mestra"
+            value={senhaExcluir}
+            onChange={(e) => setSenhaExcluir(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void excluirRegistro();
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcluirAberto(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void excluirRegistro()}
+              disabled={excluindo || !senhaExcluir}
+            >
+              Excluir definitivamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="print:hidden">
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
