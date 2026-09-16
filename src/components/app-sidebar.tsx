@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Users,
   Package,
+  Tag,
   Truck,
   ShoppingCart,
   Wallet,
