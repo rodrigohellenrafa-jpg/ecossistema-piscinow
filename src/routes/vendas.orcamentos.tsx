@@ -8,7 +8,8 @@ import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExpandableCard } from "@/components/expandable-card";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -146,7 +147,7 @@ function Orcamentos() {
         />
       </div>
 
-      <Card>
+      <ExpandableCard>
         <CardHeader className="gap-3">
           <CardTitle>Propostas</CardTitle>
           <div className="relative max-w-sm">
@@ -250,7 +251,7 @@ function Orcamentos() {
             </TableBody>
           </Table>
         </CardContent>
-      </Card>
+      </ExpandableCard>
     </div>
   );
 }

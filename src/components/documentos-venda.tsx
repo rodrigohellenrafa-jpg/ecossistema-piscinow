@@ -232,20 +232,44 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
     Controle interno${venda.assinatura_codigo ? ` · Código de assinatura: ${esc(venda.assinatura_codigo)}` : ""}${venda.assinatura_em ? ` · Assinado em: ${new Date(venda.assinatura_em).toLocaleString("pt-BR")}` : ""}
   </div>
 
-  <script>window.onload = () => window.print();</script>
 </body>
 </html>`;
+}
+
+/** Imprime sem abrir aba nova: usa um iframe oculto na própria página. */
+function imprimirHtml(html: string) {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument;
+  if (!doc) {
+    iframe.remove();
+    return;
+  }
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const disparar = () => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    window.setTimeout(() => iframe.remove(), 60000);
+  };
+  if (doc.readyState === "complete") window.setTimeout(disparar, 150);
+  else iframe.onload = () => window.setTimeout(disparar, 150);
 }
 
 export function DocumentosVenda(props: Props) {
   const [contratoAberto, setContratoAberto] = useState(false);
 
-  const imprimirPedido = () => {
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    if (!w) return;
-    w.document.write(htmlPedido(props));
-    w.document.close();
-  };
+  const imprimirPedido = () => imprimirHtml(htmlPedido(props));
 
   const imprimirPedidoEContrato = () => {
     imprimirPedido();
