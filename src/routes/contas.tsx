@@ -579,6 +579,7 @@ function Contas() {
       obra_id: c.obra_id ?? "",
       vinculo,
       numero_documento: c.numero_documento ?? "",
+      conta_bancaria: (c as { conta_bancaria?: string | null }).conta_bancaria ?? "",
       tipo: c.tipo,
       descricao: c.descricao,
       parceiro: c.parceiro ?? "",
