@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Hammer, Plus, FileText } from "lucide-react";
+import { Hammer, Plus, FileText, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
