@@ -170,6 +170,18 @@ function Financeiro() {
     },
   });
 
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos-bancarios-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("id, conta, banco")
+        .order("conta", { ascending: true });
+      if (error) throw error;
+      return data as { id: string; conta: string; banco: string | null }[];
+    },
+  });
+
   const { data: fornecedores = [] } = useQuery({
     queryKey: ["fornecedores-lite"],
     queryFn: async () => {
