@@ -550,6 +550,21 @@ export function DocumentosVenda(props: Props) {
   };
 
   const orcamento = props.venda.status_pedido === "orcamento";
+  const balcao = props.venda.tipo_atendimento === "in" && !orcamento;
+  const imprimirCupom = () => imprimirHtml(htmlCupom(props));
+
+  if (balcao) {
+    return (
+      <>
+        <Button onClick={imprimirCupom}>
+          <Receipt /> Imprimir cupom
+        </Button>
+        <Button variant="outline" onClick={imprimirPedido}>
+          <Printer /> Imprimir pedido de venda (A4)
+        </Button>
+      </>
+    );
+  }
 
   return (
     <>
@@ -565,6 +580,7 @@ export function DocumentosVenda(props: Props) {
       <Button onClick={imprimirPedidoEContrato}>
         <Files /> {orcamento ? "Imprimir orçamento + contrato" : "Imprimir pedido + contrato"}
       </Button>
+
 
       <Dialog open={contratoAberto} onOpenChange={setContratoAberto}>
         <DialogContent className="max-w-5xl">
