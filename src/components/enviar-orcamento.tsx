@@ -122,6 +122,46 @@ export function EnviarOrcamento({
     )}&body=${encodeURIComponent(mensagem)}`;
   };
 
+  const [gerando, setGerando] = useState(false);
+
+  const criarPdf = async () => {
+    setGerando(true);
+    try {
+      return await gerarOrcamentoPdf({ venda, cliente, itens, empresa });
+    } finally {
+      setGerando(false);
+    }
+  };
+
+  const baixarPdf = async () => {
+    try {
+      const { blob, nome } = await criarPdf();
+      baixarBlob(blob, nome);
+      toast.success("PDF gerado.");
+    } catch {
+      toast.error("Não foi possível gerar o PDF.");
+    }
+  };
+
+  const compartilharPdf = async () => {
+    try {
+      const { blob, nome } = await criarPdf();
+      const arquivo = new File([blob], nome, { type: "application/pdf" });
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files?: File[] }) => boolean;
+        share?: (data: { files?: File[]; title?: string; text?: string }) => Promise<void>;
+      };
+      if (nav.share && nav.canShare?.({ files: [arquivo] })) {
+        await nav.share({ files: [arquivo], title: assunto, text: mensagem });
+        return;
+      }
+      baixarBlob(blob, nome);
+      toast.info("PDF baixado — anexe no WhatsApp ou no e-mail.");
+    } catch {
+      toast.error("Não foi possível compartilhar o PDF.");
+    }
+  };
+
   return (
     <Dialog open={aberto} onOpenChange={setAberto}>
       <DialogTrigger asChild>
