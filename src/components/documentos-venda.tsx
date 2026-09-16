@@ -332,6 +332,7 @@ function htmlContrato({ venda, cliente, itens, condicoes = [], empresa }: Props)
 </head>
 <body>
   <div class="topo">
+    <img src="${logoUrl()}" alt="Logotipo" />
     <h1>${esc(empresa?.nome ?? CONTRATO_CABECALHO.empresa)}</h1>
     <div>${esc(CONTRATO_CABECALHO.documento)} · ${esc(CONTRATO_CABECALHO.telefone)}</div>
     <div>${esc(CONTRATO_CABECALHO.email)}</div>
