@@ -396,6 +396,10 @@ function NovoPedido() {
         if (typeof d.custoFiltro === "number") setCustoFiltro(d.custoFiltro);
         if (typeof d.lucroSugerido === "number") setLucroSugerido(d.lucroSugerido);
         if (Array.isArray(d.condicoes)) setCondicoes(d.condicoes as CondicaoLinha[]);
+        if (typeof d.prazoEntrega === "string") setPrazoEntrega(d.prazoEntrega);
+        if (typeof d.enderecoInstalacao === "string") setEnderecoInstalacao(d.enderecoInstalacao);
+        if (d.materiais && typeof d.materiais === "object")
+          setMateriais((prev) => ({ ...prev, ...(d.materiais as Record<string, string>) }));
         const temConteudo =
           (Array.isArray(d.itens) && d.itens.length > 0) ||
           Boolean(d.clienteId) ||
