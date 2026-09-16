@@ -179,6 +179,7 @@ function htmlPedido({ venda, cliente, itens, condicoes = [], empresa }: Props): 
   .assinatura .linha { border-top: 1px solid #111; margin-top: 40px; padding-top: 4px; font-size: 11px; }
   .assinatura img { max-height: 56px; display: block; margin: 0 auto; }
   .interno { margin-top: 20px; border-top: 1px dashed #999; padding-top: 8px; font-size: 10.5px; color: #444; }
+  .aviso { margin-top: 10px; border: 1px solid #111; padding: 6px 8px; font-size: 10.5px; }
   @media print { .no-print { display: none; } }
 </style>
 </head>
