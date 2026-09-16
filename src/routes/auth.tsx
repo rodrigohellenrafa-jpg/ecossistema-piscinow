@@ -8,6 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
@@ -31,6 +39,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
+  const [esqueci, setEsqueci] = useState(false);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -53,6 +62,18 @@ function AuthPage() {
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Conta criada! Verifique seu e-mail se for solicitado.");
+  }
+
+  async function recuperar() {
+    if (!email) return toast.error("Digite seu e-mail para receber o link.");
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    setEsqueci(false);
+    toast.success("Enviamos um link de recuperação para o seu e-mail.");
   }
 
   async function google() {
@@ -97,6 +118,13 @@ function AuthPage() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   Entrar
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => setEsqueci(true)}
+                  className="w-full text-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                >
+                  Esqueci minha senha
+                </button>
               </form>
             </TabsContent>
             <TabsContent value="signup">
@@ -113,6 +141,41 @@ function AuthPage() {
               </form>
             </TabsContent>
           </Tabs>
+
+          <Dialog open={esqueci} onOpenChange={setEsqueci}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Recuperar senha</DialogTitle>
+                <DialogDescription>
+                  Informe seu e-mail e enviaremos um link para criar uma nova senha.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5">
+                <Label htmlFor="email-recuperar">E-mail</Label>
+                <Input
+                  id="email-recuperar"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="voce@empresa.com"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void recuperar();
+                    }
+                  }}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEsqueci(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={recuperar} disabled={loading}>
+                  Enviar link
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>

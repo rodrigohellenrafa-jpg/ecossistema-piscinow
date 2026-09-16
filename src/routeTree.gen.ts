@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
 import { Route as ReativacaoRouteImport } from './routes/reativacao'
 import { Route as ProdutosRouteImport } from './routes/produtos'
@@ -48,6 +49,11 @@ import { Route as ApiPublicAgendaTokenRouteImport } from './routes/api/public/ag
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RelatorioContasRoute = RelatorioContasRouteImport.update({
@@ -245,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
@@ -282,6 +289,7 @@ export interface FileRoutesByTo {
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
@@ -320,6 +328,7 @@ export interface FileRoutesById {
   '/produtos': typeof ProdutosRoute
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
@@ -359,6 +368,7 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
+    | '/reset-password'
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
@@ -396,6 +406,7 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
+    | '/reset-password'
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
@@ -433,6 +444,7 @@ export interface FileRouteTypes {
     | '/produtos'
     | '/reativacao'
     | '/relatorio-contas'
+    | '/reset-password'
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
@@ -471,6 +483,7 @@ export interface RootRouteChildren {
   ProdutosRoute: typeof ProdutosRoute
   ReativacaoRoute: typeof ReativacaoRoute
   RelatorioContasRoute: typeof RelatorioContasRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   EstoqueEntradasRoute: typeof EstoqueEntradasRoute
   EstoqueInventarioRoute: typeof EstoqueInventarioRoute
@@ -491,6 +504,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/relatorio-contas': {
@@ -769,6 +789,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProdutosRoute: ProdutosRoute,
   ReativacaoRoute: ReativacaoRoute,
   RelatorioContasRoute: RelatorioContasRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   EstoqueEntradasRoute: EstoqueEntradasRoute,
   EstoqueInventarioRoute: EstoqueInventarioRoute,
