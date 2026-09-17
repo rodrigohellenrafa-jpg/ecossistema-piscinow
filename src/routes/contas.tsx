@@ -1563,7 +1563,7 @@ function Lista({
             })}
             {visiveis.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                   {itens.length === 0
                     ? "Nenhum título lançado."
                     : "Nenhum título encontrado com esses filtros."}
