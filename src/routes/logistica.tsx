@@ -82,6 +82,10 @@ type Obra = {
   os_instalacao: string | null;
   os_logistica: string | null;
   os_acabamento: string | null;
+  escavacao_inicio: string | null;
+  escavacao_fim: string | null;
+  instalacao_inicio: string | null;
+  instalacao_fim: string | null;
   status_geral: string;
   etapa_escavacao: string;
   etapa_base: string;
