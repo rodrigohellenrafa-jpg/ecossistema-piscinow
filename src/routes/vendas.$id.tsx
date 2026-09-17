@@ -190,13 +190,15 @@ function DetalhePedido() {
 
 
   const { data: parcelas = [] } = useQuery({
-    queryKey: ["venda-parcelas", venda?.numero],
-    enabled: !!venda?.numero,
+    queryKey: ["venda-parcelas", id],
     queryFn: async () => {
+      // Todos os títulos a receber desta venda, independentemente do status
+      // (aberto, pendente ou pago) — vinculados por venda_id, não pela descrição.
       const { data, error } = await supabase
         .from("contas")
         .select("*")
-        .ilike("descricao", `Pedido ${venda!.numero} -%`)
+        .eq("venda_id", id)
+        .eq("tipo", "receber")
         .order("vencimento");
       if (error) throw error;
       return data;
