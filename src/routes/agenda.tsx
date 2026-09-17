@@ -191,9 +191,8 @@ function Agenda() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral, board_os_id, instalacao_inicio, escavacao_inicio")
-        .eq("selecionada", true)
-        .not("data_limite", "is", null);
+        .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral, board_os_id, instalacao_inicio, escavacao_inicio, instalacao_fim, escavacao_fim")
+        .eq("selecionada", true);
       if (error) throw error;
       return data;
     },
@@ -252,19 +251,29 @@ function Agenda() {
     }
 
     for (const ob of obras) {
-      lista.push({
-        id: `obra-${ob.id}`,
-        origem: "obra",
-        titulo: `Obra ${ob.numero ?? ""} · ${ob.tipo_servico}`,
-        detalhe: ob.cliente_nome ? `Cliente: ${ob.cliente_nome}` : null,
-        local: ob.endereco_obra,
-        quando: String(ob.instalacao_inicio ?? ob.escavacao_inicio ?? ob.data_limite),
-        hora: null,
-        responsavelId: null,
-        responsavelNome: ob.responsavel,
-        tipo: "trabalho",
-        status: ob.status_geral,
-      });
+      const etapas = [
+        ["escavacao_inicio", "Início da escavação", ob.escavacao_inicio],
+        ["escavacao_fim", "Término da escavação", ob.escavacao_fim],
+        ["instalacao_inicio", "Início da instalação", ob.instalacao_inicio],
+        ["instalacao_fim", "Término da instalação", ob.instalacao_fim],
+        ["limite", "Prazo limite", ob.data_limite],
+      ];
+      for (const [chave, titulo, data] of etapas) {
+        if (!data) continue;
+        lista.push({
+          id: `obra-${ob.id}-${chave}`,
+          origem: "obra",
+          titulo: `${ob.numero ?? "Obra"} · ${titulo}`,
+          detalhe: [ob.cliente_nome, ob.tipo_servico].filter(Boolean).join(" · "),
+          local: ob.endereco_obra,
+          quando: data,
+          hora: null,
+          responsavelId: null,
+          responsavelNome: ob.responsavel,
+          tipo: "trabalho",
+          status: ob.status_geral,
+        });
+      }
     }
 
     return lista.sort((a, b) => (a.quando + (a.hora ?? "")).localeCompare(b.quando + (b.hora ?? "")));

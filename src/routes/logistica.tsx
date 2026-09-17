@@ -1,3 +1,4 @@
+import { DataObraPicker } from "@/components/data-obra-picker";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -232,7 +233,11 @@ function FlightBoard() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["obras"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["obras"] });
+      qc.invalidateQueries({ queryKey: ["agenda-obras"] });
+      toast.success("Data atualizada no Flight Board e na Agenda da Equipe.");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -618,59 +623,15 @@ function FlightBoard() {
                         </div>
 
                         <div className="flex items-center justify-center gap-1">
-                          <Input
-                            type="date"
-                            className="h-8 text-xs"
-                            value={obra.escavacao_inicio ?? ""}
-                            onChange={(e) =>
-                              salvarDatas.mutate({
-                                id: obra.id,
-                                campo: "escavacao_inicio",
-                                valor: e.target.value,
-                              })
-                            }
-                          />
+                          <DataObraPicker label={`Início da escavação · ${obra.numero}`} disabled={salvarDatas.isPending} value={obra.escavacao_inicio ?? ""} onChange={(valor) => salvarDatas.mutate({ id: obra.id, campo: "escavacao_inicio", valor })} />
                           <span className="text-xs text-muted-foreground">→</span>
-                          <Input
-                            type="date"
-                            className="h-8 text-xs"
-                            value={obra.escavacao_fim ?? ""}
-                            onChange={(e) =>
-                              salvarDatas.mutate({
-                                id: obra.id,
-                                campo: "escavacao_fim",
-                                valor: e.target.value,
-                              })
-                            }
-                          />
+                          <DataObraPicker label={`Término da escavação · ${obra.numero}`} disabled={salvarDatas.isPending} value={obra.escavacao_fim ?? ""} onChange={(valor) => salvarDatas.mutate({ id: obra.id, campo: "escavacao_fim", valor })} />
                         </div>
 
                         <div className="flex items-center justify-center gap-1">
-                          <Input
-                            type="date"
-                            className="h-8 text-xs"
-                            value={obra.instalacao_inicio ?? ""}
-                            onChange={(e) =>
-                              salvarDatas.mutate({
-                                id: obra.id,
-                                campo: "instalacao_inicio",
-                                valor: e.target.value,
-                              })
-                            }
-                          />
+                          <DataObraPicker label={`Início da instalação · ${obra.numero}`} disabled={salvarDatas.isPending} value={obra.instalacao_inicio ?? ""} onChange={(valor) => salvarDatas.mutate({ id: obra.id, campo: "instalacao_inicio", valor })} />
                           <span className="text-xs text-muted-foreground">→</span>
-                          <Input
-                            type="date"
-                            className="h-8 text-xs"
-                            value={obra.instalacao_fim ?? ""}
-                            onChange={(e) =>
-                              salvarDatas.mutate({
-                                id: obra.id,
-                                campo: "instalacao_fim",
-                                valor: e.target.value,
-                              })
-                            }
-                          />
+                          <DataObraPicker label={`Término da instalação · ${obra.numero}`} disabled={salvarDatas.isPending} value={obra.instalacao_fim ?? ""} onChange={(valor) => salvarDatas.mutate({ id: obra.id, campo: "instalacao_fim", valor })} />
                         </div>
 
                         <div className={`text-center text-xs font-medium tabular-nums ${dataTone}`}>
