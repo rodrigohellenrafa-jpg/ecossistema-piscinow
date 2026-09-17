@@ -1244,6 +1244,7 @@ export type Database = {
       }
       obras: {
         Row: {
+          board_os_id: string | null
           cliente_id: string | null
           cliente_nome: string | null
           created_at: string
@@ -1275,12 +1276,14 @@ export type Database = {
           os_logistica: string | null
           prazo_dias: number
           responsavel: string | null
+          selecionada: boolean
           status_geral: string
           tipo_servico: string
           updated_at: string
           venda_id: string | null
         }
         Insert: {
+          board_os_id?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
@@ -1312,12 +1315,14 @@ export type Database = {
           os_logistica?: string | null
           prazo_dias?: number
           responsavel?: string | null
+          selecionada?: boolean
           status_geral?: string
           tipo_servico?: string
           updated_at?: string
           venda_id?: string | null
         }
         Update: {
+          board_os_id?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           created_at?: string
@@ -1349,12 +1354,20 @@ export type Database = {
           os_logistica?: string | null
           prazo_dias?: number
           responsavel?: string | null
+          selecionada?: boolean
           status_geral?: string
           tipo_servico?: string
           updated_at?: string
           venda_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "obras_board_os_id_fkey"
+            columns: ["board_os_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "obras_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -2397,6 +2410,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      selecionar_obra_board: {
+        Args: { p_obra?: string; p_selecionada?: boolean; p_venda?: string }
+        Returns: string
+      }
+      selecionar_obra_board_interno: {
+        Args: { p_obra: string; p_selecionada: boolean; p_venda: string }
+        Returns: string
       }
       tem_area: { Args: { _area: string; _uid: string }; Returns: boolean }
       tem_area_any: {

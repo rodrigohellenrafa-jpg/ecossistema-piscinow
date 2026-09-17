@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Waves } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,13 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [esqueci, setEsqueci] = useState(false);
 
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) void navigate({ to: "/agenda" });
+    });
+    return () => data.subscription.unsubscribe();
+  }, [navigate]);
+
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -48,7 +55,7 @@ function AuthPage() {
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Bem-vindo de volta!");
-    navigate({ to: "/" });
+    navigate({ to: "/agenda" });
   }
 
   async function cadastrar(e: React.FormEvent) {
@@ -78,11 +85,11 @@ function AuthPage() {
 
   async function google() {
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: `${window.location.origin}/auth`,
     });
     if (result.error) return toast.error("Não foi possível entrar com o Google.");
     if (result.redirected) return;
-    navigate({ to: "/" });
+    navigate({ to: "/agenda" });
   }
 
   return (

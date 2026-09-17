@@ -190,7 +190,8 @@ function Agenda() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral")
+        .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral, board_os_id, instalacao_inicio, escavacao_inicio")
+        .eq("selecionada", true)
         .not("data_limite", "is", null);
       if (error) throw error;
       return data;
@@ -233,6 +234,7 @@ function Agenda() {
     }
 
     for (const o of ordens) {
+      if (obras.some((ob) => ob.board_os_id === o.id)) continue;
       lista.push({
         id: `os-${o.id}`,
         origem: "os",
@@ -255,7 +257,7 @@ function Agenda() {
         titulo: `Obra ${ob.numero ?? ""} · ${ob.tipo_servico}`,
         detalhe: ob.cliente_nome ? `Cliente: ${ob.cliente_nome}` : null,
         local: ob.endereco_obra,
-        quando: String(ob.data_limite),
+        quando: String(ob.instalacao_inicio ?? ob.escavacao_inicio ?? ob.data_limite),
         hora: null,
         responsavelId: null,
         responsavelNome: ob.responsavel,
