@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { DocumentosVenda } from "@/components/documentos-venda";
 import { EnviarOrcamento } from "@/components/enviar-orcamento";
+import { HistoricoVenda } from "@/components/historico-venda";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
@@ -1208,6 +1209,12 @@ function DetalhePedido() {
           )}
         </div>
       </div>
+
+      <HistoricoVenda
+        vendaId={id}
+        clienteId={venda.cliente_id ?? null}
+        clienteNome={venda.cliente_nome ?? null}
+      />
 
       <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
         <DialogContent className="sm:max-w-2xl">

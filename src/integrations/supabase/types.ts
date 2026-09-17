@@ -1952,6 +1952,112 @@ export type Database = {
           },
         ]
       }
+      venda_historico: {
+        Row: {
+          cliente_id: string | null
+          conta_id: string | null
+          created_at: string
+          created_by: string | null
+          data: string
+          descricao: string
+          id: string
+          lancamento_id: string | null
+          natureza: string
+          obra_id: string | null
+          observacoes: string | null
+          ordem_id: string | null
+          proxima_data: string | null
+          recorrencia: string
+          tipo: string
+          updated_at: string
+          valor: number
+          venda_id: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          conta_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao: string
+          id?: string
+          lancamento_id?: string | null
+          natureza?: string
+          obra_id?: string | null
+          observacoes?: string | null
+          ordem_id?: string | null
+          proxima_data?: string | null
+          recorrencia?: string
+          tipo?: string
+          updated_at?: string
+          valor?: number
+          venda_id?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          conta_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao?: string
+          id?: string
+          lancamento_id?: string | null
+          natureza?: string
+          obra_id?: string | null
+          observacoes?: string | null
+          ordem_id?: string | null
+          proxima_data?: string | null
+          recorrencia?: string
+          tipo?: string
+          updated_at?: string
+          valor?: number
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_historico_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_historico_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_historico_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "lancamentos_financeiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_historico_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_historico_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_historico_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venda_itens: {
         Row: {
           created_at: string

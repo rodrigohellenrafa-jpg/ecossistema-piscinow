@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Pencil, Plus, Search, Trash2 } from "lucide-react";
@@ -386,6 +386,8 @@ function NovoPedido() {
 
   // ----- Rascunho automático: mantém o pedido em andamento ao trocar de tela -----
   const [rascunhoPronto, setRascunhoPronto] = useState(false);
+  /** Depois de concluir a venda o rascunho não volta a ser gravado. */
+  const finalizadoRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -433,7 +435,7 @@ function NovoPedido() {
   }, []);
 
   useEffect(() => {
-    if (!rascunhoPronto) return;
+    if (!rascunhoPronto || finalizadoRef.current) return;
     try {
       localStorage.setItem(
         RASCUNHO_KEY,
@@ -495,15 +497,8 @@ function NovoPedido() {
     materiaisExtras,
   ]);
 
-  const descartarRascunho = async () => {
-    localStorage.removeItem(RASCUNHO_KEY);
-    localStorage.removeItem(RASCUNHO_VENDA_KEY);
-    if (rascunhoVendaId) {
-      await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
-      await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
-      setRascunhoVendaId(null);
-      queryClient.invalidateQueries({ queryKey: ["vendas"] });
-    }
+  /** Zera todos os campos da tela (usado ao descartar e após concluir a venda). */
+  const limparCampos = () => {
     setData(hojeISO());
     setTipoAtendimento("in");
     setClienteId("");
@@ -523,6 +518,29 @@ function NovoPedido() {
     setCustoFiltro(0);
     setLucroSugerido(0);
     setCondicoes([]);
+    setEntrada(0);
+    setPrazoEntrega("");
+    setEnderecoInstalacao("");
+    setMateriais({
+      areia_m3: "",
+      cimento_sc: "",
+      blocos_un: "",
+      agua_m3: "",
+      fios_eletrodutos: "",
+    });
+    setMateriaisExtras([]);
+  };
+
+  const descartarRascunho = async () => {
+    localStorage.removeItem(RASCUNHO_KEY);
+    localStorage.removeItem(RASCUNHO_VENDA_KEY);
+    if (rascunhoVendaId) {
+      await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
+      await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
+      setRascunhoVendaId(null);
+      queryClient.invalidateQueries({ queryKey: ["vendas"] });
+    }
+    limparCampos();
     toast.success("Rascunho descartado.");
   };
 
@@ -943,6 +961,10 @@ function NovoPedido() {
           `Itens sem saldo: ordem(ns) de compra ${roteamento.ordensCriadas.join(", ")} gerada(s) sob encomenda.`,
         );
       }
+      // Venda concluída: impede o autosave de regravar e limpa a tela.
+      finalizadoRef.current = true;
+      setRascunhoVendaId(null);
+      limparCampos();
       try {
         localStorage.removeItem(RASCUNHO_KEY);
         localStorage.removeItem(RASCUNHO_VENDA_KEY);
