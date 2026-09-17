@@ -739,7 +739,7 @@ function NovoPedido() {
   const removerAcessorio = (key: string) => setAcessorios((prev) => prev.filter((a) => a.key !== key));
 
   const salvar = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (modo: "pedido" | "venda" = "pedido") => {
       if (!clienteId) throw new Error("Selecione o cliente.");
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
@@ -780,7 +780,7 @@ function NovoPedido() {
           vendedor_id: null,
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
-          status_pedido: "orcamento",
+          status_pedido: modo === "venda" ? "aprovado" : "orcamento",
           tipo_atendimento: tipoAtendimento,
 
           observacoes: observacoes || null,
@@ -938,6 +938,35 @@ function NovoPedido() {
         aviso = "Pedido salvo, mas a baixa de estoque não pôde ser feita com o seu acesso.";
       }
 
+      // 2b) Venda confirmada: se o total não foi saldado por completo, o que
+      // restou vira título em Contas a Receber automaticamente. As condições de
+      // pagamento já geram os próprios títulos (trigger), então aqui só entra o
+      // valor que ficou sem nenhuma condição e sem entrada.
+      let contaReceber = 0;
+      if (modo === "venda") {
+        const semCobertura = Number((valorTotal - entrada - totalAplicado).toFixed(2));
+        if (semCobertura > 0.01) {
+          const { error: erroConta } = await supabase.from("contas").insert({
+            tipo: "receber",
+            descricao: `Pedido ${numero} — saldo a receber`,
+            parceiro: cliente?.nome ?? null,
+            cliente_id: clienteId,
+            venda_id: venda.id,
+            categoria: "Vendas",
+            valor: semCobertura,
+            vencimento: data,
+            status: "aberto",
+            observacoes: "Gerado automaticamente ao confirmar a venda (saldo não quitado).",
+            created_by: userId,
+          });
+          if (erroConta) {
+            aviso = "Venda salva, mas o título em Contas a Receber não pôde ser gerado com o seu acesso.";
+          } else {
+            contaReceber = semCobertura;
+          }
+        }
+      }
+
       // 3) Serviço externo (OUT): abre a ordem de serviço do pedido.
       if (tipoAtendimento === "out") {
         const { error } = await supabase.from("ordens_servico").insert({
@@ -958,15 +987,22 @@ function NovoPedido() {
         }
       }
 
-      return { id: venda.id as string, roteamento, aviso };
+      return { id: venda.id as string, roteamento, aviso, contaReceber, modo };
     },
-    onSuccess: ({ id, roteamento, aviso }) => {
+    onSuccess: ({ id, roteamento, aviso, contaReceber, modo }) => {
 
       toast.success(
-        tipoAtendimento === "in"
-          ? "Pedido de balcão registrado e financeiro lançado!"
-          : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
+        modo === "venda"
+          ? "Venda confirmada e financeiro lançado!"
+          : tipoAtendimento === "in"
+            ? "Pedido de balcão registrado e financeiro lançado!"
+            : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
       );
+      if (contaReceber > 0) {
+        toast.warning(
+          `Saldo de ${brl(contaReceber)} não quitado: título gerado em Contas a Receber.`,
+        );
+      }
       if (roteamento.baixados > 0) {
         toast.success(`Estoque baixado em ${roteamento.baixados} item(ns).`);
       }
@@ -1816,11 +1852,23 @@ function NovoPedido() {
             </CardContent>
           </ExpandableCard>
 
-          <div className="flex justify-end">
-            <Button size="lg" onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => salvar.mutate("pedido")}
+              disabled={salvar.isPending}
+            >
               Salvar pedido
             </Button>
+            <Button size="lg" onClick={() => salvar.mutate("venda")} disabled={salvar.isPending}>
+              Vender
+            </Button>
           </div>
+          <p className="text-right text-xs text-muted-foreground">
+            "Vender" confirma a venda; se o total não for quitado, o saldo vira título em Contas a
+            Receber automaticamente.
+          </p>
         </div>
 
         <div className="space-y-4">
