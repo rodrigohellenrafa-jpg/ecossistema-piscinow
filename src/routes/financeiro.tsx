@@ -1,3 +1,4 @@
+import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -452,6 +453,8 @@ function Financeiro() {
         title="Fluxo de Caixa"
         subtitle="Lançamentos financeiros, evolução mensal e conciliação bancária."
         actions={
+          <>
+          <LancarEmLote destino="financeiro" />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -767,6 +770,7 @@ function Financeiro() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </>
         }
       />
 

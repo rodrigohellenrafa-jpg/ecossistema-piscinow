@@ -1,3 +1,4 @@
+import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -696,6 +697,7 @@ function Contas() {
           <h1 className="text-2xl font-semibold tracking-tight">Contas a Pagar e Receber</h1>
           <p className="text-sm text-muted-foreground">Títulos com vencimento e baixa manual.</p>
         </div>
+        <LancarEmLote destino="contas" />
         <Dialog
           open={open}
           onOpenChange={(v) => {
