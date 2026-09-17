@@ -1195,7 +1195,9 @@ function DetalhePedido() {
                   <TableCell>{idx + 1}</TableCell>
                   <TableCell>{dataBR(p.vencimento)}</TableCell>
                   <TableCell>
-                    <Badge variant={p.status === "pago" ? "default" : "secondary"}>{p.status}</Badge>
+                    <Badge variant={p.status === "pago" ? "default" : "secondary"}>
+                      {p.status === "pago" ? "Pago" : p.status === "pago_parcial" ? "Pago parcial" : "Aberto"}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">{brl(p.valor)}</TableCell>
                 </TableRow>
