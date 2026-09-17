@@ -1,0 +1,1 @@
+ALTER FUNCTION public.selecionar_obra_board(uuid,uuid,boolean) SECURITY INVOKER;
