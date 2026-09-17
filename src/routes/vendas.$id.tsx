@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Printer, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
@@ -346,6 +346,9 @@ function DetalhePedido() {
     qc.invalidateQueries({ queryKey: ["venda", id] });
     qc.invalidateQueries({ queryKey: ["venda-itens", id] });
     qc.invalidateQueries({ queryKey: ["venda-condicoes", id] });
+    qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
+    qc.invalidateQueries({ queryKey: ["venda-parcelas"] });
+    qc.invalidateQueries({ queryKey: ["contas"] });
     qc.invalidateQueries({ queryKey: ["vendas"] });
   };
 
@@ -354,11 +357,44 @@ function DetalhePedido() {
     const subtotal = (its ?? []).reduce((s, i) => s + Number(i.total ?? 0), 0);
     const f = frete ?? Number(venda?.valor_frete ?? 0);
     const m = maoObra ?? Number(venda?.valor_mao_obra ?? 0);
+    const total = Number((subtotal + f + m).toFixed(2));
+
+    // O que já foi pago define o novo saldo devedor e o status de pagamento,
+    // para que o card de pagamentos acompanhe qualquer mudança nos itens.
+    const { data: pags } = await supabase
+      .from("venda_pagamentos")
+      .select("valor")
+      .eq("venda_id", id);
+    const pago = (pags ?? []).reduce((s, p) => s + Number(p.valor ?? 0), 0);
+    const saldo = Math.max(Number((total - pago).toFixed(2)), 0);
+
     const { error } = await supabase
       .from("vendas")
-      .update({ subtotal_produtos: subtotal, valor_total: subtotal + f + m })
+      .update({
+        subtotal_produtos: subtotal,
+        valor_total: total,
+        valor_entrada: pago,
+        saldo_devedor: saldo,
+        status_pagamento: pago <= 0 ? "pendente" : saldo <= 0.005 ? "pago" : "parcial",
+      })
       .eq("id", id);
     if (error) throw error;
+
+    // Título automático de Contas a Receber acompanha o novo saldo.
+    const { data: titulos } = await supabase
+      .from("contas")
+      .select("id, status")
+      .eq("venda_id", id)
+      .eq("tipo", "receber")
+      .is("condicao_id", null);
+    const titulo = (titulos ?? []).find((t) => t.status !== "pago");
+    if (titulo) {
+      if (saldo > 0.009) {
+        await supabase.from("contas").update({ valor: saldo }).eq("id", titulo.id);
+      } else {
+        await supabase.from("contas").delete().eq("id", titulo.id);
+      }
+    }
   }
 
   const salvarPedido = useMutation({
@@ -1217,12 +1253,12 @@ function DetalhePedido() {
       />
 
       <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar dados do pedido</DialogTitle>
           </DialogHeader>
           {editPedido && (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid flex-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
               <Field label="Data">
                 <Input
                   type="date"
@@ -1307,12 +1343,16 @@ function DetalhePedido() {
               </Field>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-border pt-3">
             <Button variant="outline" onClick={() => setEditPedido(null)}>
               Cancelar
             </Button>
-            <Button onClick={() => salvarPedido.mutate()} disabled={salvarPedido.isPending}>
-              Salvar alterações
+            <Button
+              size="lg"
+              onClick={() => salvarPedido.mutate()}
+              disabled={salvarPedido.isPending}
+            >
+              <Save /> Salvar edições
             </Button>
           </DialogFooter>
         </DialogContent>
