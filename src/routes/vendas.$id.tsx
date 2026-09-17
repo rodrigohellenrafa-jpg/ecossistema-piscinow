@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { DocumentosVenda } from "@/components/documentos-venda";
 import { EnviarOrcamento } from "@/components/enviar-orcamento";
+import { HistoricoVenda } from "@/components/historico-venda";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
