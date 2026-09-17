@@ -386,6 +386,8 @@ function NovoPedido() {
 
   // ----- Rascunho automático: mantém o pedido em andamento ao trocar de tela -----
   const [rascunhoPronto, setRascunhoPronto] = useState(false);
+  /** Depois de concluir a venda o rascunho não volta a ser gravado. */
+  const finalizadoRef = useRef(false);
 
   useEffect(() => {
     try {
