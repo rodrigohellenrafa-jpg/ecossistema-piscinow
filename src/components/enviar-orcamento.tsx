@@ -222,6 +222,9 @@ export function EnviarOrcamento({
             <Button variant="outline" onClick={enviarEmail}>
               <Mail /> Enviar por e-mail
             </Button>
+            <Button variant="outline" onClick={copiarLinkWhats}>
+              <Link2 /> Copiar link do WhatsApp
+            </Button>
             <Button onClick={enviarWhats}>
               <MessageCircle /> Enviar no WhatsApp
             </Button>
