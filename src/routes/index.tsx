@@ -146,6 +146,48 @@ function Dashboard() {
     },
   });
 
+  // Saldos das contas bancárias: pega o registro mais recente de cada conta
+  // e atualiza em tempo real quando qualquer saldo muda.
+  const { data: saldosContas = [] } = useQuery({
+    queryKey: ["dash-saldos-bancarios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("id, conta, banco, saldo, data_saldo")
+        .order("data_saldo", { ascending: false });
+      if (error) throw error;
+      const porConta = new Map<string, { conta: string; banco: string | null; saldo: number }>();
+      for (const r of (data ?? []) as {
+        conta: string;
+        banco: string | null;
+        saldo: number | string;
+      }[]) {
+        if (!porConta.has(r.conta)) {
+          porConta.set(r.conta, { conta: r.conta, banco: r.banco, saldo: Number(r.saldo) });
+        }
+      }
+      return [...porConta.values()];
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("dash-saldos-bancarios")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "saldos_bancarios" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["dash-saldos-bancarios"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
+  const saldoTotalContas = saldosContas.reduce((a, c) => a + c.saldo, 0);
+
   const { data: notasCompra = [] } = useQuery({
     queryKey: ["dash-notas-compra"],
     queryFn: async () => {
