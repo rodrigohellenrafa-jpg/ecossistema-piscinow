@@ -585,6 +585,28 @@ function Contas() {
         if (error) throw error;
       }
 
+      // Atualiza o saldo da conta bancária de origem/destino: soma no
+      // recebimento, subtrai no pagamento.
+      const nomeConta = (conta as { conta_bancaria?: string | null }).conta_bancaria;
+      if (nomeConta) {
+        const { data: saldoRow } = await supabase
+          .from("saldos_bancarios")
+          .select("id, saldo")
+          .eq("conta", nomeConta)
+          .order("data_saldo", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (saldoRow) {
+          const ajuste = conta.tipo === "receber" ? valorPago : -valorPago;
+          const novoSaldo = Number((Number(saldoRow.saldo) + ajuste).toFixed(2));
+          const { error: errSaldoBanco } = await supabase
+            .from("saldos_bancarios")
+            .update({ saldo: novoSaldo })
+            .eq("id", saldoRow.id);
+          if (errSaldoBanco) throw errSaldoBanco;
+        }
+      }
+
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
@@ -628,8 +650,10 @@ function Contas() {
       }
     },
     onSuccess: () => {
-      toast.success("Baixa registrada.");
+      toast.success("Baixa registrada e saldo da conta atualizado.");
       qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
   });
 
@@ -687,7 +711,8 @@ function Contas() {
 
   const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo));
   const pagar = filtradas.filter((c) => c.tipo === "pagar");
-  const receber = filtradas.filter((c) => c.tipo === "receber");
+  // A receber: mostra apenas títulos em aberto; os baixados saem da tela.
+  const receber = filtradas.filter((c) => c.tipo === "receber" && c.status !== "pago");
   const soma = (l: typeof data) =>
     l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
 
