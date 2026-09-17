@@ -632,6 +632,81 @@ function FlightBoard() {
         })}
       </div>
 
+      {/* Serviços Out: pedidos de serviço externo e suas ordens de serviço */}
+      <div className="rounded-xl border border-border bg-card/50">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">Serviços Out</span>
+            <Badge variant="secondary">{servicosOut.length}</Badge>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            Pedidos externos com ordem de serviço e obra no board
+          </span>
+        </div>
+
+        {servicosOut.length === 0 && (
+          <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+            Nenhum serviço externo registrado.
+          </p>
+        )}
+
+        <div className="divide-y divide-border">
+          {servicosOut.map((s) => (
+            <div
+              key={s.id}
+              className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to="/vendas/$id"
+                    params={{ id: s.id }}
+                    className="font-bold text-primary hover:underline"
+                  >
+                    {s.numero ?? "—"}
+                  </Link>
+                  <span className="truncate font-medium">{s.cliente_nome ?? "—"}</span>
+                  {s.os && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {s.os.numero ?? "OS"}
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {dataBR(s.data)}
+                  {s.os?.tipo_servico ? ` · ${s.os.tipo_servico}` : ""}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {s.obra ? (
+                  <>
+                    <Badge variant="secondary">{s.obra.status_geral}</Badge>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/obras/$id" params={{ id: s.obra.id }}>
+                        Abrir obra {s.obra.numero ?? ""}
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => enviarParaBoard.mutate(s)}
+                    disabled={enviarParaBoard.isPending}
+                  >
+                    Enviar para o Flight Board
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/ordens">Ordens de serviço</Link>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+
       {/* Histórico / recorrência do cliente */}
       <Dialog open={!!historico} onOpenChange={(v) => !v && setHistorico(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
