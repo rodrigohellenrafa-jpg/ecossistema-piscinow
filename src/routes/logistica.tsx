@@ -567,16 +567,17 @@ function FlightBoard() {
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[1100px]">
+                <div className="min-w-[1400px]">
                   {/* Header */}
-                  <div className="grid grid-cols-12 gap-2 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <div className="col-span-1">Obra</div>
-                    <div className="col-span-3">Cliente</div>
-                    <div className="col-span-3 text-center">Início / Término</div>
-                    <div className="col-span-1 text-center">Limite</div>
-                    <div className="col-span-1">O.S.</div>
-                    <div className="col-span-2">Status</div>
-                    <div className="col-span-1 text-right">Ações</div>
+                  <div className={`${GRID_OBRA} border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`}>
+                    <div>Obra</div>
+                    <div>Cliente</div>
+                    <div className="text-center">Escavação (início / término)</div>
+                    <div className="text-center">Instalação (início / término)</div>
+                    <div className="text-center">Limite</div>
+                    <div>O.S.</div>
+                    <div>Status</div>
+                    <div className="text-right">Ações</div>
                   </div>
 
                   {col.itens.length === 0 && (
