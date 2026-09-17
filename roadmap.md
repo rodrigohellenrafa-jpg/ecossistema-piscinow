@@ -20,4 +20,4 @@ Validação: páginas autenticadas abriram sem erros; testes de gravação, foto
 ## Lançamentos em lote e ordem do painel
 - [x] Adicionar formulário de lançamento em lote em Contas e Lançamentos financeiros.
 - [x] Ordenar obras selecionadas antes dos registros não selecionados.
-- [ ] Verificar abertura e validação dos novos formulários.
+- [x] Verificar abertura, adição de linhas e validação dos dois formulários; sem gravação de dados de teste.
