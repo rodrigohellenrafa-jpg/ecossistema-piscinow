@@ -184,7 +184,12 @@ export function EnviarOrcamento({
   const criarPdf = async () => {
     setGerando(true);
     try {
-      return await gerarOrcamentoPdf({ venda, cliente, itens, empresa });
+      return await gerarOrcamentoPdf({
+        venda,
+        cliente: clienteFinal,
+        itens: itensFinal,
+        empresa,
+      });
     } finally {
       setGerando(false);
     }
@@ -194,9 +199,21 @@ export function EnviarOrcamento({
     try {
       const { blob, nome } = await criarPdf();
       baixarBlob(blob, nome);
-      toast.success("PDF gerado.");
+      toast.success(`PDF salvo na pasta de downloads: ${nome}`);
     } catch {
       toast.error("Não foi possível gerar o PDF.");
+    }
+  };
+
+  const abrirPdf = async () => {
+    try {
+      const { blob } = await criarPdf();
+      const url = URL.createObjectURL(blob);
+      const janela = window.open(url, "_blank", "noopener");
+      if (!janela) toast.info("Libere os pop-ups para visualizar o PDF nesta aba.");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast.error("Não foi possível abrir o PDF.");
     }
   };
 
