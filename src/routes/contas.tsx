@@ -1,3 +1,4 @@
+import { ExpandableCard } from "@/components/expandable-card";
 import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -1199,6 +1200,7 @@ function Contas() {
         </TabsContent>
         <TabsContent value="receber">
           <Lista
+            expansivel
             titulo={`Em aberto: ${brl(soma(receber))}`}
             itens={receber}
             rateios={rateios}
@@ -1353,6 +1355,7 @@ type Conta = {
 };
 
 function Lista({
+  expansivel = false,
   titulo,
   itens,
   rateios = [],
@@ -1360,6 +1363,7 @@ function Lista({
   onEditar,
   onExcluir,
 }: {
+  expansivel?: boolean;
   titulo: string;
   itens: Conta[];
   rateios?: { conta_id: string; categoria: string; valor: number }[];
@@ -1405,10 +1409,12 @@ function Lista({
     return true;
   });
 
+  const Container = expansivel ? ExpandableCard : Card;
+  const acoesFixas = expansivel ? "sticky right-0 z-10 bg-card" : "";
   const temFiltro = fDescricao || fParceiro || fVencimento || fValor || fStatus !== "todos";
   return (
-    <Card className="mt-4">
-      <CardHeader>
+    <Container className="mt-4">
+      <CardHeader className="pr-12">
         <CardTitle>
           {titulo}
           {temFiltro ? ` · ${visiveis.length} resultado(s)` : ""}
@@ -1426,7 +1432,7 @@ function Lista({
               <TableHead className="text-right">Total do título</TableHead>
               <TableHead className="text-right">Valor pago</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-36 text-right">Ações</TableHead>
+              <TableHead className={`w-36 text-right ${acoesFixas}`}>Ações</TableHead>
             </TableRow>
             <TableRow className="hover:bg-transparent">
               <TableHead className="py-1">
@@ -1478,7 +1484,7 @@ function Lista({
                   </SelectContent>
                 </Select>
               </TableHead>
-              <TableHead className="py-1" />
+              <TableHead className={`py-1 ${acoesFixas}`} />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1531,7 +1537,7 @@ function Lista({
                       {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="flex justify-end gap-1">
+                  <TableCell className={`text-right ${acoesFixas}`}><div className="flex justify-end gap-1">
                     {c.status !== "pago" && (
                       <Button
                         size="icon"
@@ -1546,6 +1552,7 @@ function Lista({
                       size="icon"
                       variant="ghost"
                       onClick={() => onEditar(c)}
+                      title="Editar lançamento"
                       aria-label="Editar lançamento"
                     >
                       <Pencil className="size-4" />
@@ -1555,11 +1562,12 @@ function Lista({
                       variant="ghost"
                       className="text-destructive hover:text-destructive"
                       onClick={() => onExcluir(c.id)}
+                      title="Excluir lançamento"
                       aria-label="Excluir"
                     >
                       <Trash2 className="size-4" />
                     </Button>
-                  </TableCell>
+                  </div></TableCell>
                 </TableRow>
               );
             })}
@@ -1575,6 +1583,6 @@ function Lista({
           </TableBody>
         </Table>
       </CardContent>
-    </Card>
+    </Container>
   );
 }
