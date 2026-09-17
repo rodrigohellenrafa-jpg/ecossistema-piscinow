@@ -1020,9 +1020,9 @@ function NovoPedido() {
         }
       }
 
-      return { id: venda.id as string, roteamento, aviso, contaReceber, modo };
+      return { id: venda.id as string, roteamento, aviso, contaReceber, modo, obraCriada };
     },
-    onSuccess: ({ id, roteamento, aviso, contaReceber, modo }) => {
+    onSuccess: ({ id, roteamento, aviso, contaReceber, modo, obraCriada }) => {
 
       toast.success(
         modo === "venda"
@@ -1031,6 +1031,10 @@ function NovoPedido() {
             ? "Pedido de balcão registrado e financeiro lançado!"
             : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
       );
+      if (obraCriada) {
+        toast.success("Serviço externo enviado para o Flight Board.");
+        queryClient.invalidateQueries({ queryKey: ["obras"] });
+      }
       if (contaReceber > 0) {
         toast.warning(
           `Saldo de ${brl(contaReceber)} não quitado: título gerado em Contas a Receber.`,
