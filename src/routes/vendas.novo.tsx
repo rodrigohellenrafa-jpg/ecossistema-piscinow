@@ -975,6 +975,8 @@ function NovoPedido() {
           `Itens sem saldo: ordem(ns) de compra ${roteamento.ordensCriadas.join(", ")} gerada(s) sob encomenda.`,
         );
       }
+      if (aviso) toast.warning(aviso);
+
       // Venda concluída: impede o autosave de regravar e limpa a tela.
       finalizadoRef.current = true;
       setRascunhoVendaId(null);
