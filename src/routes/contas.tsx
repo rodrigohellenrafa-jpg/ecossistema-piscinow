@@ -197,6 +197,7 @@ function Contas() {
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
   const [periodo, setPeriodo] = useState("todas");
+  const [baixando, setBaixando] = useState<Conta | null>(null);
 
   const { data = [] } = useQuery({
     queryKey: ["contas"],
@@ -512,19 +513,76 @@ function Contas() {
   });
 
   const baixar = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("contas")
-        .update({ status: "pago", data_pagamento: new Date().toISOString().slice(0, 10) })
-        .eq("id", id);
-      if (error) throw error;
+    mutationFn: async ({
+      id,
+      valorPago,
+      dataPagamento,
+      modo,
+    }: {
+      id: string;
+      valorPago: number;
+      dataPagamento: string;
+      modo: "quitar" | "saldo";
+    }) => {
+      const { data: conta } = await supabase.from("contas").select("*").eq("id", id).single();
+      if (!conta) throw new Error("Título não encontrado.");
 
-      // Recorrência: gera o próximo vencimento automaticamente
-      const { data: conta } = await supabase
-        .from("contas")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const total = Number(conta.valor) + Number(conta.valor_juros ?? 0);
+      const diferenca = Number((total - valorPago).toFixed(2));
+      const uidBaixa = (await supabase.auth.getUser()).data.user?.id ?? null;
+
+      if (diferenca > 0.009 && modo === "saldo") {
+        // Paga em parte agora: o título original fica com o valor pago e o
+        // restante vira um novo título em aberto.
+        const jurosOriginais = Number(conta.valor_juros ?? 0);
+        const jurosPagos = Math.min(jurosOriginais, valorPago);
+        const { error: errParcial } = await supabase
+          .from("contas")
+          .update({
+            status: "pago",
+            data_pagamento: dataPagamento,
+            valor: Number((valorPago - jurosPagos).toFixed(2)),
+            valor_juros: jurosPagos,
+            valor_pago: valorPago,
+            valor_desconto: 0,
+          })
+          .eq("id", id);
+        if (errParcial) throw errParcial;
+
+        const { error: errSaldo } = await supabase.from("contas").insert({
+          tipo: conta.tipo,
+          descricao: `${conta.descricao} (saldo)`,
+          parceiro: conta.parceiro,
+          cliente_id: conta.cliente_id,
+          funcionario_id: (conta as { funcionario_id?: string | null }).funcionario_id ?? null,
+          categoria: conta.categoria,
+          valor: diferenca,
+          valor_juros: 0,
+          vencimento: conta.vencimento,
+          status: "aberto",
+          observacoes: conta.observacoes,
+          obra_id: conta.obra_id,
+          numero_documento: conta.numero_documento,
+          venda_id: conta.venda_id,
+          conta_bancaria: (conta as { conta_bancaria?: string | null }).conta_bancaria ?? null,
+          recorrencia: "nenhuma",
+          tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
+          created_by: uidBaixa,
+        });
+        if (errSaldo) throw errSaldo;
+      } else {
+        const { error } = await supabase
+          .from("contas")
+          .update({
+            status: "pago",
+            data_pagamento: dataPagamento,
+            valor_pago: valorPago,
+            valor_desconto: diferenca > 0.009 ? diferenca : 0,
+          })
+          .eq("id", id);
+        if (error) throw error;
+      }
+
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
@@ -1132,7 +1190,7 @@ function Contas() {
             titulo={`Em aberto: ${brl(soma(pagar))}`}
             itens={pagar}
             rateios={rateios}
-            onBaixar={(id) => baixar.mutate(id)}
+            onBaixar={setBaixando}
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
@@ -1142,13 +1200,131 @@ function Contas() {
             titulo={`Em aberto: ${brl(soma(receber))}`}
             itens={receber}
             rateios={rateios}
-            onBaixar={(id) => baixar.mutate(id)}
+            onBaixar={setBaixando}
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
         </TabsContent>
       </Tabs>
+
+      <BaixaDialog
+        conta={baixando}
+        pendente={baixar.isPending}
+        onFechar={() => setBaixando(null)}
+        onConfirmar={(p) => baixar.mutate(p, { onSuccess: () => setBaixando(null) })}
+      />
     </div>
+  );
+}
+
+/** Modal de baixa: separa o valor do título do valor realmente pago. */
+function BaixaDialog({
+  conta,
+  pendente,
+  onFechar,
+  onConfirmar,
+}: {
+  conta: Conta | null;
+  pendente: boolean;
+  onFechar: () => void;
+  onConfirmar: (p: {
+    id: string;
+    valorPago: number;
+    dataPagamento: string;
+    modo: "quitar" | "saldo";
+  }) => void;
+}) {
+  const total = conta ? Number(conta.valor) + Number(conta.valor_juros ?? 0) : 0;
+  const [valorPago, setValorPago] = useState("");
+  const [dataPagamento, setDataPagamento] = useState("");
+  const [modo, setModo] = useState<"quitar" | "saldo">("quitar");
+
+  const aberto = !!conta;
+  const chave = conta?.id ?? "";
+  const [ultima, setUltima] = useState("");
+  if (aberto && chave !== ultima) {
+    setUltima(chave);
+    setValorPago(total.toFixed(2));
+    setDataPagamento(new Date().toISOString().slice(0, 10));
+    setModo("quitar");
+  }
+
+  const pago = Number(String(valorPago).replace(",", ".")) || 0;
+  const diferenca = Number((total - pago).toFixed(2));
+  const recebe = conta?.tipo === "receber";
+
+  return (
+    <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{recebe ? "Registrar recebimento" : "Registrar pagamento"}</DialogTitle>
+          <DialogDescription>{conta?.descricao}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Valor do título (boleto)">
+            <Input value={brl(total)} readOnly className="bg-muted" />
+          </Field>
+          <Field label={recebe ? "Valor recebido" : "Valor pago"}>
+            <Input
+              inputMode="decimal"
+              value={valorPago}
+              onChange={(e) => setValorPago(e.target.value)}
+              autoFocus
+            />
+          </Field>
+          <Field label={recebe ? "Data do recebimento" : "Data do pagamento"}>
+            <Input
+              type="date"
+              value={dataPagamento}
+              onChange={(e) => setDataPagamento(e.target.value)}
+            />
+          </Field>
+          <div className="flex items-end text-sm">
+            {diferenca > 0.009 ? (
+              <span className="text-destructive">Faltam {brl(diferenca)}</span>
+            ) : diferenca < -0.009 ? (
+              <span className="text-muted-foreground">
+                Pago {brl(Math.abs(diferenca))} a mais que o título
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Valor integral</span>
+            )}
+          </div>
+          {diferenca > 0.009 && (
+            <div className="sm:col-span-2">
+              <Field label="O que fazer com a diferença">
+                <Select value={modo} onValueChange={(v) => setModo(v as "quitar" | "saldo")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="quitar">
+                      Quitar o título (desconto/abatimento de {brl(diferenca)})
+                    </SelectItem>
+                    <SelectItem value="saldo">
+                      Deixar {brl(diferenca)} em aberto como novo título
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={pendente || pago <= 0 || !dataPagamento}
+            onClick={() =>
+              conta && onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo })
+            }
+          >
+            Confirmar baixa
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1160,6 +1336,8 @@ type Conta = {
   categoria: string | null;
   valor: number;
   valor_juros?: number | null;
+  valor_pago?: number | null;
+  valor_desconto?: number | null;
   vencimento: string;
   status: string;
   recorrencia?: string | null;
@@ -1183,7 +1361,7 @@ function Lista({
   titulo: string;
   itens: Conta[];
   rateios?: { conta_id: string; categoria: string; valor: number }[];
-  onBaixar: (id: string) => void;
+  onBaixar: (c: Conta) => void;
   onEditar: (c: Conta) => void;
   onExcluir: (id: string) => void;
 }) {
@@ -1243,7 +1421,8 @@ function Lista({
               <TableHead>Vencimento</TableHead>
               <TableHead className="text-right">Parcela</TableHead>
               <TableHead className="text-right">Juros</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Total do título</TableHead>
+              <TableHead className="text-right">Valor pago</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-36 text-right">Ações</TableHead>
             </TableRow>
@@ -1275,7 +1454,7 @@ function Lista({
                   aria-label="Filtrar por vencimento"
                 />
               </TableHead>
-              <TableHead className="py-1" colSpan={3}>
+              <TableHead className="py-1" colSpan={4}>
                 <Input
                   value={fValor}
                   onChange={(e) => setFValor(e.target.value)}
@@ -1331,6 +1510,20 @@ function Lista({
                   <TableCell className="text-right font-medium">
                     {brl(Number(c.valor) + Number(c.valor_juros ?? 0))}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {c.status === "pago" ? (
+                      <>
+                        {brl(Number(c.valor_pago ?? 0))}
+                        {Number(c.valor_desconto ?? 0) > 0.009 && (
+                          <span className="block text-xs text-muted-foreground">
+                            desconto {brl(Number(c.valor_desconto))}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={c.status === "pago" ? "secondary" : vencido ? "destructive" : "outline"}>
                       {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
@@ -1341,7 +1534,7 @@ function Lista({
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => onBaixar(c.id)}
+                        onClick={() => onBaixar(c)}
                         aria-label="Dar baixa"
                       >
                         <CheckCircle2 className="size-4" />
@@ -1370,7 +1563,7 @@ function Lista({
             })}
             {visiveis.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                   {itens.length === 0
                     ? "Nenhum título lançado."
                     : "Nenhum título encontrado com esses filtros."}

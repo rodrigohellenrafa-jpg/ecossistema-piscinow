@@ -406,7 +406,9 @@ export type Database = {
           tipo_despesa: string | null
           updated_at: string
           valor: number
+          valor_desconto: number
           valor_juros: number
+          valor_pago: number
           vencimento: string
           venda_id: string | null
         }
@@ -435,7 +437,9 @@ export type Database = {
           tipo_despesa?: string | null
           updated_at?: string
           valor?: number
+          valor_desconto?: number
           valor_juros?: number
+          valor_pago?: number
           vencimento?: string
           venda_id?: string | null
         }
@@ -464,7 +468,9 @@ export type Database = {
           tipo_despesa?: string | null
           updated_at?: string
           valor?: number
+          valor_desconto?: number
           valor_juros?: number
+          valor_pago?: number
           vencimento?: string
           venda_id?: string | null
         }
