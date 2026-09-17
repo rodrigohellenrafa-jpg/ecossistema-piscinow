@@ -28,7 +28,7 @@ export function LancarEmLote({ destino }: { destino: "contas" | "financeiro" }) 
       const uid = data.user.id;
       const resultado = destino === "contas"
         ? await supabase.from("contas").insert(linhas.map((l) => ({ tipo, descricao: l.descricao.trim(), valor: Number(l.valor), vencimento: l.data, parceiro: l.parceiro.trim() || null, categoria: l.categoria.trim() || null, conta_bancaria: l.conta.trim() || null, status: "aberto", recorrencia: "nenhuma", created_by: uid })))
-        : await supabase.from("lancamentos_financeiros").insert(linhas.map((l) => ({ tipo_fluxo: tipo === "pagar" ? "despesa" : "receita", descricao: l.descricao.trim(), valor: Number(l.valor), data_competencia: l.data, vencimento: l.data, categoria: l.categoria.trim(), conta_bancaria: l.conta.trim() || null, status: "pendente", recorrencia: "nenhuma", created_by: uid })));
+        : await supabase.from("lancamentos_financeiros").insert(linhas.map((l) => ({ tipo_fluxo: tipo === "pagar" ? "despesa" : "receita", descricao: l.descricao.trim(), valor: Number(l.valor), data_competencia: l.data, vencimento: l.data, categoria: l.categoria.trim(), conta_bancaria: l.conta.trim() || null, status: "Pendente", recorrencia: "nenhuma", created_by: uid })));
       if (resultado.error) throw resultado.error;
     },
     onSuccess: () => { toast.success(`${linhas.length} lançamentos salvos.`); setOpen(false); setLinhas([]); qc.invalidateQueries({ queryKey: [destino === "contas" ? "contas" : "lancamentos_financeiros"] }); },
