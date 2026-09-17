@@ -1253,6 +1253,8 @@ export type Database = {
           data_pedido: string
           data_termino: string | null
           endereco_obra: string | null
+          escavacao_fim: string | null
+          escavacao_inicio: string | null
           etapa_aquecimento: string
           etapa_base: string
           etapa_casa_maquinas: string
@@ -1264,6 +1266,8 @@ export type Database = {
           etapa_nivel: string
           etapa_tubulacao: string
           id: string
+          instalacao_fim: string | null
+          instalacao_inicio: string | null
           numero: string | null
           observacoes: string | null
           os_acabamento: string | null
@@ -1286,6 +1290,8 @@ export type Database = {
           data_pedido?: string
           data_termino?: string | null
           endereco_obra?: string | null
+          escavacao_fim?: string | null
+          escavacao_inicio?: string | null
           etapa_aquecimento?: string
           etapa_base?: string
           etapa_casa_maquinas?: string
@@ -1297,6 +1303,8 @@ export type Database = {
           etapa_nivel?: string
           etapa_tubulacao?: string
           id?: string
+          instalacao_fim?: string | null
+          instalacao_inicio?: string | null
           numero?: string | null
           observacoes?: string | null
           os_acabamento?: string | null
@@ -1319,6 +1327,8 @@ export type Database = {
           data_pedido?: string
           data_termino?: string | null
           endereco_obra?: string | null
+          escavacao_fim?: string | null
+          escavacao_inicio?: string | null
           etapa_aquecimento?: string
           etapa_base?: string
           etapa_casa_maquinas?: string
@@ -1330,6 +1340,8 @@ export type Database = {
           etapa_nivel?: string
           etapa_tubulacao?: string
           id?: string
+          instalacao_fim?: string | null
+          instalacao_inicio?: string | null
           numero?: string | null
           observacoes?: string | null
           os_acabamento?: string | null

@@ -82,6 +82,10 @@ type Obra = {
   os_instalacao: string | null;
   os_logistica: string | null;
   os_acabamento: string | null;
+  escavacao_inicio: string | null;
+  escavacao_fim: string | null;
+  instalacao_inicio: string | null;
+  instalacao_fim: string | null;
   status_geral: string;
   etapa_escavacao: string;
   etapa_base: string;
@@ -96,6 +100,10 @@ type Obra = {
 };
 
 const TIPOS_SERVICO = ["Instalação Nova", "Reforma", "Manutenção"] as const;
+
+/** Colunas da linha da obra: obra, cliente, escavação, instalação, limite, OS, status, ações. */
+const GRID_OBRA =
+  "grid gap-2 grid-cols-[84px_minmax(180px,1fr)_280px_280px_92px_96px_156px_80px]";
 
 const vazio = {
   venda_id: "",
@@ -201,16 +209,18 @@ function FlightBoard() {
       valor,
     }: {
       id: string;
-      campo: "data_inicio" | "data_termino";
+      campo:
+        | "data_inicio"
+        | "data_termino"
+        | "escavacao_inicio"
+        | "escavacao_fim"
+        | "instalacao_inicio"
+        | "instalacao_fim";
       valor: string;
     }) => {
       const { error } = await supabase
         .from("obras")
-        .update(
-          (campo === "data_inicio"
-            ? { data_inicio: valor || null }
-            : { data_termino: valor || null }),
-        )
+        .update({ [campo]: valor || null } as Record<string, never>)
         .eq("id", id);
       if (error) throw error;
     },
@@ -263,6 +273,8 @@ function FlightBoard() {
         data_pedido: dataPedido,
         data_inicio: form.data_inicio || null,
         data_termino: form.data_termino || null,
+        escavacao_inicio: form.data_inicio || null,
+        instalacao_fim: form.data_termino || null,
         prazo_dias: prazoDias,
         data_limite: dataLimite,
         responsavel: form.responsavel || null,
@@ -561,16 +573,17 @@ function FlightBoard() {
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[1100px]">
+                <div className="min-w-[1400px]">
                   {/* Header */}
-                  <div className="grid grid-cols-12 gap-2 border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <div className="col-span-1">Obra</div>
-                    <div className="col-span-3">Cliente</div>
-                    <div className="col-span-3 text-center">Início / Término</div>
-                    <div className="col-span-1 text-center">Limite</div>
-                    <div className="col-span-1">O.S.</div>
-                    <div className="col-span-2">Status</div>
-                    <div className="col-span-1 text-right">Ações</div>
+                  <div className={`${GRID_OBRA} border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`}>
+                    <div>Obra</div>
+                    <div>Cliente</div>
+                    <div className="text-center">Escavação (início / término)</div>
+                    <div className="text-center">Instalação (início / término)</div>
+                    <div className="text-center">Limite</div>
+                    <div>O.S.</div>
+                    <div>Status</div>
+                    <div className="text-right">Ações</div>
                   </div>
 
                   {col.itens.length === 0 && (
@@ -597,9 +610,9 @@ function FlightBoard() {
                     return (
                       <div
                         key={obra.id}
-                        className="group grid grid-cols-12 items-center gap-2 border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-primary/5"
+                        className={`group ${GRID_OBRA} items-center border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-primary/5`}
                       >
-                        <div className="col-span-1">
+                        <div>
                           <Link
                             to="/obras/$id"
                             params={{ id: obra.id }}
@@ -609,7 +622,7 @@ function FlightBoard() {
                           </Link>
                         </div>
 
-                        <div className="col-span-3 min-w-0">
+                        <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate font-medium">{obra.cliente_nome ?? "—"}</span>
                             <button
@@ -633,15 +646,15 @@ function FlightBoard() {
                           </div>
                         </div>
 
-                        <div className="col-span-3 flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1">
                           <Input
                             type="date"
                             className="h-8 text-xs"
-                            value={obra.data_inicio ?? ""}
+                            value={obra.escavacao_inicio ?? ""}
                             onChange={(e) =>
                               salvarDatas.mutate({
                                 id: obra.id,
-                                campo: "data_inicio",
+                                campo: "escavacao_inicio",
                                 valor: e.target.value,
                               })
                             }
@@ -650,25 +663,53 @@ function FlightBoard() {
                           <Input
                             type="date"
                             className="h-8 text-xs"
-                            value={obra.data_termino ?? ""}
+                            value={obra.escavacao_fim ?? ""}
                             onChange={(e) =>
                               salvarDatas.mutate({
                                 id: obra.id,
-                                campo: "data_termino",
+                                campo: "escavacao_fim",
                                 valor: e.target.value,
                               })
                             }
                           />
                         </div>
 
-                        <div className={`col-span-1 text-center text-xs font-medium tabular-nums ${dataTone}`}>
+                        <div className="flex items-center justify-center gap-1">
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.instalacao_inicio ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "instalacao_inicio",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground">→</span>
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.instalacao_fim ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "instalacao_fim",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className={`text-center text-xs font-medium tabular-nums ${dataTone}`}>
                           {dataBR(obra.data_limite)}
                           {d !== null && (atrasada || proximo) && (
                             <span className="ml-1 text-[10px] font-bold">({d}d)</span>
                           )}
                         </div>
 
-                        <div className="col-span-1 flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {obra.os_instalacao && (
                             <Badge variant="outline" className="text-[10px]">
                               {obra.os_instalacao}
@@ -676,7 +717,7 @@ function FlightBoard() {
                           )}
                         </div>
 
-                        <div className="col-span-2 space-y-1.5">
+                        <div className="space-y-1.5">
                           <Select
                             value={obra.status_geral}
                             onValueChange={(status) => mudarStatus.mutate({ id: obra.id, status })}
@@ -700,7 +741,7 @@ function FlightBoard() {
                           </div>
                         </div>
 
-                        <div className="col-span-1 flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                             <Link to="/obras/$id" params={{ id: obra.id }}>
                               <Pencil className="size-4" />
