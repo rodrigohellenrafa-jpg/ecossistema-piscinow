@@ -938,6 +938,35 @@ function NovoPedido() {
         aviso = "Pedido salvo, mas a baixa de estoque não pôde ser feita com o seu acesso.";
       }
 
+      // 2b) Venda confirmada: se o total não foi saldado por completo, o que
+      // restou vira título em Contas a Receber automaticamente. As condições de
+      // pagamento já geram os próprios títulos (trigger), então aqui só entra o
+      // valor que ficou sem nenhuma condição e sem entrada.
+      let contaReceber = 0;
+      if (modo === "venda") {
+        const semCobertura = Number((valorTotal - entrada - totalAplicado).toFixed(2));
+        if (semCobertura > 0.01) {
+          const { error: erroConta } = await supabase.from("contas").insert({
+            tipo: "receber",
+            descricao: `Pedido ${numero} — saldo a receber`,
+            parceiro: cliente?.nome ?? null,
+            cliente_id: clienteId,
+            venda_id: venda.id,
+            categoria: "Vendas",
+            valor: semCobertura,
+            vencimento: data,
+            status: "aberto",
+            observacoes: "Gerado automaticamente ao confirmar a venda (saldo não quitado).",
+            created_by: userId,
+          });
+          if (erroConta) {
+            aviso = "Venda salva, mas o título em Contas a Receber não pôde ser gerado com o seu acesso.";
+          } else {
+            contaReceber = semCobertura;
+          }
+        }
+      }
+
       // 3) Serviço externo (OUT): abre a ordem de serviço do pedido.
       if (tipoAtendimento === "out") {
         const { error } = await supabase.from("ordens_servico").insert({
