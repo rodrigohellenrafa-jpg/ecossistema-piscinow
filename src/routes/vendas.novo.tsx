@@ -1852,11 +1852,23 @@ function NovoPedido() {
             </CardContent>
           </ExpandableCard>
 
-          <div className="flex justify-end">
-            <Button size="lg" onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => salvar.mutate("pedido")}
+              disabled={salvar.isPending}
+            >
               Salvar pedido
             </Button>
+            <Button size="lg" onClick={() => salvar.mutate("venda")} disabled={salvar.isPending}>
+              Vender
+            </Button>
           </div>
+          <p className="text-right text-xs text-muted-foreground">
+            "Vender" confirma a venda; se o total não for quitado, o saldo vira título em Contas a
+            Receber automaticamente.
+          </p>
         </div>
 
         <div className="space-y-4">
