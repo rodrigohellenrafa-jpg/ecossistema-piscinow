@@ -715,7 +715,7 @@ function FlightBoard() {
                           )}
                         </div>
 
-                        <div className="col-span-2 space-y-1.5">
+                        <div className="space-y-1.5">
                           <Select
                             value={obra.status_geral}
                             onValueChange={(status) => mudarStatus.mutate({ id: obra.id, status })}
