@@ -915,17 +915,28 @@ function NovoPedido() {
       }
 
       // 2) Estoque: baixa o que tem saldo, encomenda automaticamente o que falta.
-      const roteamento = await rotearEstoque(
-        ctx,
-        itens.map((i) => ({
-          produto_id: i.produto_id,
-          sku: i.sku,
-          descricao: i.descricao,
-          quantidade: i.quantidade,
-          preco_unitario: i.preco_unitario,
-          custo_unitario: i.custo_unitario,
-        })),
-      );
+      // Falhas aqui não podem derrubar a venda já gravada.
+      let roteamento: Awaited<ReturnType<typeof rotearEstoque>> = {
+        baixados: 0,
+        encomendados: 0,
+        ordensCriadas: [],
+      };
+      let aviso: string | null = null;
+      try {
+        roteamento = await rotearEstoque(
+          ctx,
+          itens.map((i) => ({
+            produto_id: i.produto_id,
+            sku: i.sku,
+            descricao: i.descricao,
+            quantidade: i.quantidade,
+            preco_unitario: i.preco_unitario,
+            custo_unitario: i.custo_unitario,
+          })),
+        );
+      } catch {
+        aviso = "Pedido salvo, mas a baixa de estoque não pôde ser feita com o seu acesso.";
+      }
 
       // 3) Serviço externo (OUT): abre a ordem de serviço do pedido.
       if (tipoAtendimento === "out") {
@@ -942,12 +953,15 @@ function NovoPedido() {
           valor: custoMaoObra,
           created_by: userId,
         });
-        if (error) throw error;
+        if (error) {
+          aviso = "Pedido salvo, mas a ordem de serviço não pôde ser aberta com o seu acesso.";
+        }
       }
 
-      return { id: venda.id as string, roteamento };
+      return { id: venda.id as string, roteamento, aviso };
     },
-    onSuccess: ({ id, roteamento }) => {
+    onSuccess: ({ id, roteamento, aviso }) => {
+
       toast.success(
         tipoAtendimento === "in"
           ? "Pedido de balcão registrado e financeiro lançado!"
@@ -1877,9 +1891,12 @@ function NovoPedido() {
                 <span>{brl(subtotalProdutos)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Kit piscina</span>
+                <span className="text-muted-foreground">
+                  Kit piscina (prévia — não soma ao total)
+                </span>
                 <span>{brl(precoVendaKit)}</span>
               </div>
+
               <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
                 <span>Total</span>
                 <span>{brl(valorTotal)}</span>
