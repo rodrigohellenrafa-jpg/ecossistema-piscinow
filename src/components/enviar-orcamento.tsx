@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Download, Mail, MessageCircle, Send, Share2 } from "lucide-react";
+import { Copy, Download, Link2, Mail, MessageCircle, Send, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { baixarBlob, gerarOrcamentoPdf } from "@/lib/orcamento-pdf";
@@ -98,18 +98,27 @@ export function EnviarOrcamento({
 
   const assunto = `${rotulo} Nº ${venda.numero ?? ""} — ${empresa}`;
 
+  /** Monta o link do WhatsApp já com a mensagem pronta. */
+  const linkWhats = () => {
+    const fone = soDigitos(telefone);
+    const texto = encodeURIComponent(mensagem);
+    if (fone.length < 10) return `https://wa.me/?text=${texto}`;
+    const numero = fone.length <= 11 ? `55${fone}` : fone;
+    return `https://wa.me/${numero}?text=${texto}`;
+  };
+
   const enviarWhats = () => {
     const fone = soDigitos(telefone);
     if (fone.length < 10) {
       toast.error("Informe um telefone válido com DDD.");
       return;
     }
-    const numero = fone.length <= 11 ? `55${fone}` : fone;
-    window.open(
-      `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`,
-      "_blank",
-      "noopener",
-    );
+    window.open(linkWhats(), "_blank", "noopener");
+  };
+
+  const copiarLinkWhats = () => {
+    void navigator.clipboard.writeText(linkWhats());
+    toast.success("Link do WhatsApp copiado — é só colar onde quiser.");
   };
 
   const enviarEmail = () => {
@@ -212,6 +221,9 @@ export function EnviarOrcamento({
             </Button>
             <Button variant="outline" onClick={enviarEmail}>
               <Mail /> Enviar por e-mail
+            </Button>
+            <Button variant="outline" onClick={copiarLinkWhats}>
+              <Link2 /> Copiar link do WhatsApp
             </Button>
             <Button onClick={enviarWhats}>
               <MessageCircle /> Enviar no WhatsApp

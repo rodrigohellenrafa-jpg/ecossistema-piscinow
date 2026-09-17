@@ -1,0 +1,42 @@
+import type { ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
+import { ShieldAlert } from "lucide-react";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRoles } from "@/hooks/use-role";
+import { areaDaRota, ROTAS_LIVRES } from "@/lib/acesso-rotas";
+
+/** Bloqueia a página quando o perfil do usuário não tem acesso à área. */
+export function AreaGuard({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { pode, loading } = useRoles();
+
+  if (ROTAS_LIVRES.includes(pathname)) return <>{children}</>;
+
+  const area = areaDaRota(pathname);
+  if (!area) return <>{children}</>;
+
+  if (loading) {
+    return <p className="p-6 text-sm text-muted-foreground">Carregando permissões…</p>;
+  }
+
+  if (!pode(area)) {
+    return (
+      <div className="mx-auto max-w-md py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="size-5 text-destructive" /> Acesso restrito
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>Seu perfil não tem permissão para abrir esta página.</p>
+            <p>Peça ao administrador para liberar o acesso em Controle de Acesso.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
