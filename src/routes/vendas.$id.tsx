@@ -1343,12 +1343,16 @@ function DetalhePedido() {
               </Field>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-border pt-3">
             <Button variant="outline" onClick={() => setEditPedido(null)}>
               Cancelar
             </Button>
-            <Button onClick={() => salvarPedido.mutate()} disabled={salvarPedido.isPending}>
-              Salvar alterações
+            <Button
+              size="lg"
+              onClick={() => salvarPedido.mutate()}
+              disabled={salvarPedido.isPending}
+            >
+              <Save /> Salvar edições
             </Button>
           </DialogFooter>
         </DialogContent>
