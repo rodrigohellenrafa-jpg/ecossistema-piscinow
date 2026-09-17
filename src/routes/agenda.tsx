@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { CalendarDays, Copy, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+import { AgendaCalendario, dataLocal } from "@/components/agenda-calendario";
 import { Field } from "@/components/field";
 import { PageHeader, Kpi } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -224,7 +225,7 @@ function Agenda() {
           .filter(Boolean)
           .join(" · "),
         local: e.local,
-        quando: d.toISOString().slice(0, 10),
+        quando: dataLocal(d),
         hora: e.dia_inteiro ? null : d.toTimeString().slice(0, 5),
         responsavelId: e.responsavel_id,
         responsavelNome: e.responsavel_nome,
@@ -482,6 +483,8 @@ function Agenda() {
         <Kpi label="Sob sua responsabilidade" value={String(kpis.meus)} tone="positive" to="/ordens" />
         <Kpi label="Total no período" value={String(kpis.total)} to="/logistica" />
       </div>
+
+      <AgendaCalendario itens={itens} ehMeu={(item) => ehMeu(itens.find((i) => i.id === item.id) as Item)} />
 
       <Card>
         <CardHeader>
