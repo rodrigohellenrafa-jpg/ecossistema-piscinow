@@ -354,11 +354,44 @@ function DetalhePedido() {
     const subtotal = (its ?? []).reduce((s, i) => s + Number(i.total ?? 0), 0);
     const f = frete ?? Number(venda?.valor_frete ?? 0);
     const m = maoObra ?? Number(venda?.valor_mao_obra ?? 0);
+    const total = Number((subtotal + f + m).toFixed(2));
+
+    // O que já foi pago define o novo saldo devedor e o status de pagamento,
+    // para que o card de pagamentos acompanhe qualquer mudança nos itens.
+    const { data: pags } = await supabase
+      .from("venda_pagamentos")
+      .select("valor")
+      .eq("venda_id", id);
+    const pago = (pags ?? []).reduce((s, p) => s + Number(p.valor ?? 0), 0);
+    const saldo = Math.max(Number((total - pago).toFixed(2)), 0);
+
     const { error } = await supabase
       .from("vendas")
-      .update({ subtotal_produtos: subtotal, valor_total: subtotal + f + m })
+      .update({
+        subtotal_produtos: subtotal,
+        valor_total: total,
+        valor_entrada: pago,
+        saldo_devedor: saldo,
+        status_pagamento: pago <= 0 ? "pendente" : saldo <= 0.005 ? "pago" : "parcial",
+      })
       .eq("id", id);
     if (error) throw error;
+
+    // Título automático de Contas a Receber acompanha o novo saldo.
+    const { data: titulos } = await supabase
+      .from("contas")
+      .select("id, status")
+      .eq("venda_id", id)
+      .eq("tipo", "receber")
+      .is("condicao_id", null);
+    const titulo = (titulos ?? []).find((t) => t.status !== "pago");
+    if (titulo) {
+      if (saldo > 0.009) {
+        await supabase.from("contas").update({ valor: saldo }).eq("id", titulo.id);
+      } else {
+        await supabase.from("contas").delete().eq("id", titulo.id);
+      }
+    }
   }
 
   const salvarPedido = useMutation({
