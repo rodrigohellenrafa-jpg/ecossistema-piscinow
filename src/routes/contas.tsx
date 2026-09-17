@@ -1454,7 +1454,7 @@ function Lista({
                   aria-label="Filtrar por vencimento"
                 />
               </TableHead>
-              <TableHead className="py-1" colSpan={3}>
+              <TableHead className="py-1" colSpan={4}>
                 <Input
                   value={fValor}
                   onChange={(e) => setFValor(e.target.value)}
