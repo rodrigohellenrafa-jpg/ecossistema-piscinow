@@ -959,6 +959,10 @@ function NovoPedido() {
           `Itens sem saldo: ordem(ns) de compra ${roteamento.ordensCriadas.join(", ")} gerada(s) sob encomenda.`,
         );
       }
+      // Venda concluída: impede o autosave de regravar e limpa a tela.
+      finalizadoRef.current = true;
+      setRascunhoVendaId(null);
+      limparCampos();
       try {
         localStorage.removeItem(RASCUNHO_KEY);
         localStorage.removeItem(RASCUNHO_VENDA_KEY);
