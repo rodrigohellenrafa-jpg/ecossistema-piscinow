@@ -285,6 +285,9 @@ export function EnviarOrcamento({
             >
               <Copy /> Copiar
             </Button>
+            <Button variant="outline" disabled={gerando} onClick={() => void abrirPdf()}>
+              <FileText /> Ver PDF
+            </Button>
             <Button variant="outline" disabled={gerando} onClick={() => void baixarPdf()}>
               <Download /> Baixar PDF
             </Button>
