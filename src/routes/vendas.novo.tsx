@@ -987,15 +987,22 @@ function NovoPedido() {
         }
       }
 
-      return { id: venda.id as string, roteamento, aviso };
+      return { id: venda.id as string, roteamento, aviso, contaReceber, modo };
     },
-    onSuccess: ({ id, roteamento, aviso }) => {
+    onSuccess: ({ id, roteamento, aviso, contaReceber, modo }) => {
 
       toast.success(
-        tipoAtendimento === "in"
-          ? "Pedido de balcão registrado e financeiro lançado!"
-          : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
+        modo === "venda"
+          ? "Venda confirmada e financeiro lançado!"
+          : tipoAtendimento === "in"
+            ? "Pedido de balcão registrado e financeiro lançado!"
+            : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
       );
+      if (contaReceber > 0) {
+        toast.warning(
+          `Saldo de ${brl(contaReceber)} não quitado: título gerado em Contas a Receber.`,
+        );
+      }
       if (roteamento.baixados > 0) {
         toast.success(`Estoque baixado em ${roteamento.baixados} item(ns).`);
       }
