@@ -346,6 +346,9 @@ function DetalhePedido() {
     qc.invalidateQueries({ queryKey: ["venda", id] });
     qc.invalidateQueries({ queryKey: ["venda-itens", id] });
     qc.invalidateQueries({ queryKey: ["venda-condicoes", id] });
+    qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
+    qc.invalidateQueries({ queryKey: ["venda-parcelas"] });
+    qc.invalidateQueries({ queryKey: ["contas"] });
     qc.invalidateQueries({ queryKey: ["vendas"] });
   };
 
