@@ -620,7 +620,7 @@ function FlightBoard() {
                           </Link>
                         </div>
 
-                        <div className="col-span-3 min-w-0">
+                        <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate font-medium">{obra.cliente_nome ?? "—"}</span>
                             <button
@@ -644,15 +644,15 @@ function FlightBoard() {
                           </div>
                         </div>
 
-                        <div className="col-span-3 flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1">
                           <Input
                             type="date"
                             className="h-8 text-xs"
-                            value={obra.data_inicio ?? ""}
+                            value={obra.escavacao_inicio ?? ""}
                             onChange={(e) =>
                               salvarDatas.mutate({
                                 id: obra.id,
-                                campo: "data_inicio",
+                                campo: "escavacao_inicio",
                                 valor: e.target.value,
                               })
                             }
@@ -661,18 +661,46 @@ function FlightBoard() {
                           <Input
                             type="date"
                             className="h-8 text-xs"
-                            value={obra.data_termino ?? ""}
+                            value={obra.escavacao_fim ?? ""}
                             onChange={(e) =>
                               salvarDatas.mutate({
                                 id: obra.id,
-                                campo: "data_termino",
+                                campo: "escavacao_fim",
                                 valor: e.target.value,
                               })
                             }
                           />
                         </div>
 
-                        <div className={`col-span-1 text-center text-xs font-medium tabular-nums ${dataTone}`}>
+                        <div className="flex items-center justify-center gap-1">
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.instalacao_inicio ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "instalacao_inicio",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground">→</span>
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={obra.instalacao_fim ?? ""}
+                            onChange={(e) =>
+                              salvarDatas.mutate({
+                                id: obra.id,
+                                campo: "instalacao_fim",
+                                valor: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className={`text-center text-xs font-medium tabular-nums ${dataTone}`}>
                           {dataBR(obra.data_limite)}
                           {d !== null && (atrasada || proximo) && (
                             <span className="ml-1 text-[10px] font-bold">({d}d)</span>
