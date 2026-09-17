@@ -739,7 +739,7 @@ function FlightBoard() {
                           </div>
                         </div>
 
-                        <div className="col-span-1 flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                             <Link to="/obras/$id" params={{ id: obra.id }}>
                               <Pencil className="size-4" />
