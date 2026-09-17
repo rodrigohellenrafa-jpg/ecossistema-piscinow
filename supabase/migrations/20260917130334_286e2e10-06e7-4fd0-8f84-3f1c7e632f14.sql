@@ -1,0 +1,4 @@
+CREATE POLICY estoque_movimentos_inserir_venda ON public.estoque_movimentos FOR INSERT TO authenticated WITH CHECK (public.tem_area(auth.uid(), 'vendas'));
+CREATE POLICY ordens_compra_inserir_venda ON public.ordens_compra FOR INSERT TO authenticated WITH CHECK (public.tem_area(auth.uid(), 'vendas'));
+CREATE POLICY ordem_compra_itens_inserir_venda ON public.ordem_compra_itens FOR INSERT TO authenticated WITH CHECK (public.tem_area(auth.uid(), 'vendas'));
+CREATE POLICY ordens_servico_inserir_venda ON public.ordens_servico FOR INSERT TO authenticated WITH CHECK (public.tem_area(auth.uid(), 'vendas'));
