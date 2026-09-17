@@ -1421,7 +1421,8 @@ function Lista({
               <TableHead>Vencimento</TableHead>
               <TableHead className="text-right">Parcela</TableHead>
               <TableHead className="text-right">Juros</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Total do título</TableHead>
+              <TableHead className="text-right">Valor pago</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-36 text-right">Ações</TableHead>
             </TableRow>
