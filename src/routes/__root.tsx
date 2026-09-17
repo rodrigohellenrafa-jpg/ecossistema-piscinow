@@ -203,7 +203,9 @@ function RootComponent() {
             </header>
             <main className="flex-1 p-4 md:p-6">
               {/* Required: nested routes render here. */}
-              <Outlet />
+              <AreaGuard>
+                <Outlet />
+              </AreaGuard>
             </main>
           </div>
         </div>
