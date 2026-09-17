@@ -512,19 +512,76 @@ function Contas() {
   });
 
   const baixar = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("contas")
-        .update({ status: "pago", data_pagamento: new Date().toISOString().slice(0, 10) })
-        .eq("id", id);
-      if (error) throw error;
+    mutationFn: async ({
+      id,
+      valorPago,
+      dataPagamento,
+      modo,
+    }: {
+      id: string;
+      valorPago: number;
+      dataPagamento: string;
+      modo: "quitar" | "saldo";
+    }) => {
+      const { data: conta } = await supabase.from("contas").select("*").eq("id", id).single();
+      if (!conta) throw new Error("Título não encontrado.");
 
-      // Recorrência: gera o próximo vencimento automaticamente
-      const { data: conta } = await supabase
-        .from("contas")
-        .select("*")
-        .eq("id", id)
-        .single();
+      const total = Number(conta.valor) + Number(conta.valor_juros ?? 0);
+      const diferenca = Number((total - valorPago).toFixed(2));
+      const uidBaixa = (await supabase.auth.getUser()).data.user?.id ?? null;
+
+      if (diferenca > 0.009 && modo === "saldo") {
+        // Paga em parte agora: o título original fica com o valor pago e o
+        // restante vira um novo título em aberto.
+        const jurosOriginais = Number(conta.valor_juros ?? 0);
+        const jurosPagos = Math.min(jurosOriginais, valorPago);
+        const { error: errParcial } = await supabase
+          .from("contas")
+          .update({
+            status: "pago",
+            data_pagamento: dataPagamento,
+            valor: Number((valorPago - jurosPagos).toFixed(2)),
+            valor_juros: jurosPagos,
+            valor_pago: valorPago,
+            valor_desconto: 0,
+          })
+          .eq("id", id);
+        if (errParcial) throw errParcial;
+
+        const { error: errSaldo } = await supabase.from("contas").insert({
+          tipo: conta.tipo,
+          descricao: `${conta.descricao} (saldo)`,
+          parceiro: conta.parceiro,
+          cliente_id: conta.cliente_id,
+          funcionario_id: (conta as { funcionario_id?: string | null }).funcionario_id ?? null,
+          categoria: conta.categoria,
+          valor: diferenca,
+          valor_juros: 0,
+          vencimento: conta.vencimento,
+          status: "aberto",
+          observacoes: conta.observacoes,
+          obra_id: conta.obra_id,
+          numero_documento: conta.numero_documento,
+          venda_id: conta.venda_id,
+          conta_bancaria: (conta as { conta_bancaria?: string | null }).conta_bancaria ?? null,
+          recorrencia: "nenhuma",
+          tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
+          created_by: uidBaixa,
+        });
+        if (errSaldo) throw errSaldo;
+      } else {
+        const { error } = await supabase
+          .from("contas")
+          .update({
+            status: "pago",
+            data_pagamento: dataPagamento,
+            valor_pago: valorPago,
+            valor_desconto: diferenca > 0.009 ? diferenca : 0,
+          })
+          .eq("id", id);
+        if (error) throw error;
+      }
+
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
