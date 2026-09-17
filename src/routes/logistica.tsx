@@ -707,7 +707,7 @@ function FlightBoard() {
                           )}
                         </div>
 
-                        <div className="col-span-1 flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {obra.os_instalacao && (
                             <Badge variant="outline" className="text-[10px]">
                               {obra.os_instalacao}
