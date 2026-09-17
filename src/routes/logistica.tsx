@@ -101,6 +101,10 @@ type Obra = {
 
 const TIPOS_SERVICO = ["Instalação Nova", "Reforma", "Manutenção"] as const;
 
+/** Colunas da linha da obra: obra, cliente, escavação, instalação, limite, OS, status, ações. */
+const GRID_OBRA =
+  "grid gap-2 grid-cols-[84px_minmax(180px,1fr)_280px_280px_92px_96px_156px_80px]";
+
 const vazio = {
   venda_id: "",
   cliente_id: "",
