@@ -273,6 +273,8 @@ function FlightBoard() {
         data_pedido: dataPedido,
         data_inicio: form.data_inicio || null,
         data_termino: form.data_termino || null,
+        escavacao_inicio: form.data_inicio || null,
+        instalacao_fim: form.data_termino || null,
         prazo_dias: prazoDias,
         data_limite: dataLimite,
         responsavel: form.responsavel || null,
