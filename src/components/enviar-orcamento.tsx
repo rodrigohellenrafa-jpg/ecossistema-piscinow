@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Download, Mail, MessageCircle, Send, Share2 } from "lucide-react";
+import { Copy, Download, Link2, Mail, MessageCircle, Send, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { baixarBlob, gerarOrcamentoPdf } from "@/lib/orcamento-pdf";
