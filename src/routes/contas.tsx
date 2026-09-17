@@ -1517,7 +1517,7 @@ function Lista({
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => onBaixar(c.id)}
+                        onClick={() => onBaixar(c)}
                         aria-label="Dar baixa"
                       >
                         <CheckCircle2 className="size-4" />
