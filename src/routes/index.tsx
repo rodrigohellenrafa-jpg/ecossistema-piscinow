@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ClipboardCheck,
+  Landmark,
   ShoppingCart,
   TrendingUp,
   Wallet,
@@ -145,6 +146,48 @@ function Dashboard() {
       return data as Record<string, unknown>[];
     },
   });
+
+  // Saldos das contas bancárias: pega o registro mais recente de cada conta
+  // e atualiza em tempo real quando qualquer saldo muda.
+  const { data: saldosContas = [] } = useQuery({
+    queryKey: ["dash-saldos-bancarios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("id, conta, banco, saldo, data_saldo")
+        .order("data_saldo", { ascending: false });
+      if (error) throw error;
+      const porConta = new Map<string, { conta: string; banco: string | null; saldo: number }>();
+      for (const r of (data ?? []) as {
+        conta: string;
+        banco: string | null;
+        saldo: number | string;
+      }[]) {
+        if (!porConta.has(r.conta)) {
+          porConta.set(r.conta, { conta: r.conta, banco: r.banco, saldo: Number(r.saldo) });
+        }
+      }
+      return [...porConta.values()];
+    },
+  });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("dash-saldos-bancarios")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "saldos_bancarios" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["dash-saldos-bancarios"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
+  const saldoTotalContas = saldosContas.reduce((a, c) => a + c.saldo, 0);
 
   const { data: notasCompra = [] } = useQuery({
     queryKey: ["dash-notas-compra"],
@@ -365,6 +408,50 @@ function Dashboard() {
         />
       </div>
 
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Landmark className="size-4 text-primary" /> Saldo nas contas
+          </CardTitle>
+          <Badge
+            variant="secondary"
+            className={saldoTotalContas >= 0 ? "" : "text-destructive"}
+          >
+            Total: {brl(saldoTotalContas)}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          {saldosContas.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma conta bancária cadastrada ainda. Cadastre os saldos em Fluxo de Caixa.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {saldosContas.map((c) => (
+                <div
+                  key={c.conta}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{c.conta}</p>
+                    {c.banco ? (
+                      <p className="truncate text-xs text-muted-foreground">{c.banco}</p>
+                    ) : null}
+                  </div>
+                  <span
+                    className={`shrink-0 tabular-nums font-semibold ${
+                      c.saldo >= 0 ? "text-emerald-600" : "text-destructive"
+                    }`}
+                  >
+                    {brl(c.saldo)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
