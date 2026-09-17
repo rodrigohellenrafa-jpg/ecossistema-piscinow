@@ -18,6 +18,8 @@ import { Field } from "@/components/field";
 import { brl, dataBR } from "@/lib/erp";
 
 type Venda = {
+  id?: string | null;
+  cliente_id?: string | null;
   numero?: string | null;
   data?: string | null;
   vendedor?: string | null;
@@ -71,11 +73,45 @@ export function EnviarOrcamento({
   const orcamento = venda.status_pedido === "orcamento";
   const rotulo = orcamento ? "Orçamento" : "Pedido de venda";
 
+  const [aberto, setAberto] = useState(false);
+
+  // Quando a tela de origem não passou cliente/itens (lista de orçamentos),
+  // buscamos os dados ao abrir para a mensagem e o PDF saírem completos.
+  const { data: extra } = useQuery({
+    queryKey: ["enviar-orcamento", venda.id],
+    enabled: aberto && !!venda.id && (!cliente || itens.length === 0),
+    queryFn: async () => {
+      const [itensRes, clienteRes] = await Promise.all([
+        supabase
+          .from("venda_itens")
+          .select("sku, descricao, quantidade, preco_unitario, total")
+          .eq("venda_id", venda.id!),
+        venda.cliente_id
+          ? supabase
+              .from("clientes")
+              .select(
+                "nome, documento, telefone, email, logradouro, numero, bairro, cidade, estado, cep",
+              )
+              .eq("id", venda.cliente_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+      if (itensRes.error) throw itensRes.error;
+      return {
+        itens: (itensRes.data ?? []) as Item[],
+        cliente: (clienteRes.data ?? null) as Cliente,
+      };
+    },
+  });
+
+  const clienteFinal: Cliente = cliente ?? extra?.cliente ?? null;
+  const itensFinal: Item[] = itens.length ? itens : extra?.itens ?? [];
+
   const textoPadrao = [
-    `Olá${cliente?.nome ? ` ${cliente.nome.split(" ")[0]}` : ""}! Segue o ${rotulo.toLowerCase()} Nº ${venda.numero ?? ""} da ${empresa}.`,
+    `Olá${clienteFinal?.nome ? ` ${clienteFinal.nome.split(" ")[0]}` : ""}! Segue o ${rotulo.toLowerCase()} Nº ${venda.numero ?? ""} da ${empresa}.`,
     venda.data ? `Data: ${dataBR(venda.data)}` : "",
     "",
-    ...itens.map(
+    ...itensFinal.map(
       (i) =>
         `• ${i.descricao} — ${i.quantidade} x ${brl(Number(i.preco_unitario))} = ${brl(Number(i.total))}`,
     ),
@@ -91,10 +127,19 @@ export function EnviarOrcamento({
     .filter((l) => l !== undefined)
     .join("\n");
 
-  const [aberto, setAberto] = useState(false);
-  const [telefone, setTelefone] = useState(cliente?.telefone ?? "");
-  const [email, setEmail] = useState(cliente?.email ?? "");
+  const [telefone, setTelefone] = useState(clienteFinal?.telefone ?? "");
+  const [email, setEmail] = useState(clienteFinal?.email ?? "");
   const [mensagem, setMensagem] = useState(textoPadrao);
+  const [editado, setEditado] = useState(false);
+
+  useEffect(() => {
+    if (!editado) setMensagem(textoPadrao);
+  }, [textoPadrao, editado]);
+
+  useEffect(() => {
+    if (clienteFinal?.telefone) setTelefone((t) => t || clienteFinal.telefone!);
+    if (clienteFinal?.email) setEmail((e) => e || clienteFinal.email!);
+  }, [clienteFinal?.telefone, clienteFinal?.email]);
 
   const assunto = `${rotulo} Nº ${venda.numero ?? ""} — ${empresa}`;
 
