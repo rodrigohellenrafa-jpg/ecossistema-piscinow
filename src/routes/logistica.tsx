@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, Pencil, Plus, Trash2 } from "lucide-react";
+import { Clock3, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -105,6 +105,13 @@ const TIPOS_SERVICO = ["Instalação Nova", "Reforma", "Manutenção"] as const;
 const GRID_OBRA =
   "grid gap-2 grid-cols-[84px_minmax(180px,1fr)_280px_280px_92px_96px_156px_80px]";
 
+const STATUS_TONE: Record<string, string> = {
+  Agendado: "text-status-scheduled",
+  "Em Execução": "text-status-running",
+  Pausado: "text-status-paused",
+  Concluído: "text-status-done",
+};
+
 const vazio = {
   venda_id: "",
   cliente_id: "",
@@ -123,6 +130,7 @@ function progresso(obra: Obra) {
 
 function FlightBoard() {
   const qc = useQueryClient();
+  const [agora, setAgora] = useState<Date | null>(null);
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
@@ -165,14 +173,11 @@ function FlightBoard() {
     },
   });
 
-  const porStatus = useMemo(
-    () =>
-      STATUS_OBRA.map((status) => ({
-        status,
-        itens: obras.filter((o) => o.status_geral === status),
-      })),
-    [obras],
-  );
+  useEffect(() => {
+    setAgora(new Date());
+    const timer = window.setInterval(() => setAgora(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const kpis = useMemo(() => {
     const ativas = obras.filter((o) => o.status_geral !== "Concluído").length;
@@ -554,28 +559,29 @@ function FlightBoard() {
         <Kpi label="Prazo médio" value={`${kpis.prazoMedio} dias`} to="/ordens" />
       </div>
 
-      <div className="space-y-6">
-        {porStatus.map((col) => {
-          const concluido = col.status === "Concluído";
-          return (
-            <div
-              key={col.status}
-              className="rounded-xl border border-border bg-card/50"
-            >
-              <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{col.status}</span>
-                  <Badge variant="secondary">{col.itens.length}</Badge>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {concluido ? "Finalizadas" : "Em andamento"}
-                </span>
-              </div>
+      <section className="overflow-hidden rounded-lg border-2 border-flight-grid bg-flight-panel shadow-xl">
+        <div className="flex items-center justify-between border-b-2 border-flight-grid px-4 py-3 sm:px-5">
+          <div>
+            <div className="flex items-center gap-2 text-lg font-bold uppercase text-flight-heading">
+              <span className="flex size-8 items-center justify-center rounded bg-primary text-primary-foreground">FB</span>
+              Operações
+            </div>
+            <p className="mt-1 text-xs uppercase text-muted-foreground">Obras e serviços programados</p>
+          </div>
+          <div className="text-right text-flight-heading">
+            <div className="flex items-center justify-end gap-2 text-xl font-semibold tabular-nums sm:text-2xl">
+              <Clock3 className="size-5 text-primary" />
+              {agora ? agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
+            </div>
+            <div className="text-[10px] uppercase text-muted-foreground">
+              {agora ? agora.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" }) : ""}
+            </div>
+          </div>
+        </div>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[1400px]">
-                  {/* Header */}
-                  <div className={`${GRID_OBRA} border-b border-border bg-muted/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground`}>
+        <div className="overflow-x-auto">
+          <div className="min-w-[1400px]">
+            <div className={`${GRID_OBRA} border-b border-flight-grid bg-flight-row-a px-4 py-2 text-[10px] font-bold uppercase text-flight-heading`}>
                     <div>Obra</div>
                     <div>Cliente</div>
                     <div className="text-center">Escavação (início / término)</div>
@@ -584,15 +590,13 @@ function FlightBoard() {
                     <div>O.S.</div>
                     <div>Status</div>
                     <div className="text-right">Ações</div>
-                  </div>
+            </div>
 
-                  {col.itens.length === 0 && (
-                    <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-                      Sem obras neste status
-                    </p>
-                  )}
+            {obras.length === 0 && (
+              <p className="px-4 py-8 text-center text-xs text-muted-foreground">Nenhuma obra registrada.</p>
+            )}
 
-                  {col.itens.map((obra) => {
+            {obras.map((obra, index) => {
                     const d = diasAte(obra.data_limite);
                     const atrasada = d !== null && d < 0 && obra.status_geral !== "Concluído";
                     const proximo = d !== null && d >= 0 && d <= 3 && obra.status_geral !== "Concluído";
@@ -610,7 +614,7 @@ function FlightBoard() {
                     return (
                       <div
                         key={obra.id}
-                        className={`group ${GRID_OBRA} items-center border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-primary/5`}
+                        className={`group ${GRID_OBRA} items-center border-b border-flight-grid px-4 py-3 text-sm last:border-b-0 ${index % 2 === 0 ? "bg-flight-row-a" : "bg-flight-row-b"} hover:bg-accent`}
                       >
                         <div>
                           <Link
@@ -625,7 +629,9 @@ function FlightBoard() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate font-medium">{obra.cliente_nome ?? "—"}</span>
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               type="button"
                               title="Histórico do cliente"
                               onClick={() =>
@@ -634,11 +640,11 @@ function FlightBoard() {
                                   nome: obra.cliente_nome ?? "—",
                                 })
                               }
-                              className="flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:text-primary"
+                              className="h-6 shrink-0 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-primary"
                             >
                               <History className="size-3" />
                               {recorrencia}
-                            </button>
+                            </Button>
                           </div>
                           <div className="truncate text-xs text-muted-foreground">
                             {obra.tipo_servico}
@@ -722,7 +728,7 @@ function FlightBoard() {
                             value={obra.status_geral}
                             onValueChange={(status) => mudarStatus.mutate({ id: obra.id, status })}
                           >
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className={`h-8 border-flight-grid bg-flight-panel text-xs font-bold uppercase ${STATUS_TONE[obra.status_geral] ?? "text-foreground"}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -758,18 +764,14 @@ function FlightBoard() {
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          );
-        })}
-      </div>
+            })}
+          </div>
+        </div>
+      </section>
 
       {/* Serviços Out: pedidos de serviço externo e suas ordens de serviço */}
-      <div className="rounded-xl border border-border bg-card/50">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+      <div className="overflow-hidden rounded-lg border-2 border-flight-grid bg-flight-panel">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-flight-grid bg-flight-row-a px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">Serviços Out</span>
             <Badge variant="secondary">{servicosOut.length}</Badge>
@@ -785,11 +787,11 @@ function FlightBoard() {
           </p>
         )}
 
-        <div className="divide-y divide-border">
-          {servicosOut.map((s) => (
+        <div>
+          {servicosOut.map((s, index) => (
             <div
               key={s.id}
-              className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+              className={`flex flex-col gap-2 border-b border-flight-grid px-4 py-3 text-sm last:border-b-0 sm:flex-row sm:items-center sm:justify-between ${index % 2 === 0 ? "bg-flight-row-a" : "bg-flight-row-b"}`}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -816,7 +818,7 @@ function FlightBoard() {
               <div className="flex flex-wrap items-center gap-2">
                 {s.obra ? (
                   <>
-                    <Badge variant="secondary">{s.obra.status_geral}</Badge>
+                    <Badge variant="outline" className={`font-bold uppercase ${STATUS_TONE[s.obra.status_geral] ?? "text-foreground"}`}>{s.obra.status_geral}</Badge>
                     <Button variant="outline" size="sm" asChild>
                       <Link to="/obras/$id" params={{ id: s.obra.id }}>
                         Abrir obra {s.obra.numero ?? ""}
