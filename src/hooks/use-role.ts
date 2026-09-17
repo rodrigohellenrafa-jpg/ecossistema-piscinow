@@ -34,8 +34,8 @@ export function useRoles() {
     },
   });
 
-  // Sem papel atribuído o usuário opera como administrador (setup inicial).
-  const base: Perfil[] = roles.length ? roles : ["admin"];
+  // Sem papel atribuído o usuário não enxerga nada até um admin liberar.
+  const base: Perfil[] = roles;
   // Modo mestre destravado neste aparelho: enxerga e opera tudo.
   const efetivos: Perfil[] = mestre ? ["admin", ...base.filter((r) => r !== "admin")] : base;
 
