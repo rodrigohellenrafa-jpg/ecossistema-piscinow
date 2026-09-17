@@ -205,16 +205,18 @@ function FlightBoard() {
       valor,
     }: {
       id: string;
-      campo: "data_inicio" | "data_termino";
+      campo:
+        | "data_inicio"
+        | "data_termino"
+        | "escavacao_inicio"
+        | "escavacao_fim"
+        | "instalacao_inicio"
+        | "instalacao_fim";
       valor: string;
     }) => {
       const { error } = await supabase
         .from("obras")
-        .update(
-          (campo === "data_inicio"
-            ? { data_inicio: valor || null }
-            : { data_termino: valor || null }),
-        )
+        .update({ [campo]: valor || null } as Record<string, never>)
         .eq("id", id);
       if (error) throw error;
     },
