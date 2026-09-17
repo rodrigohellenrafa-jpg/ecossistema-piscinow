@@ -739,7 +739,7 @@ function NovoPedido() {
   const removerAcessorio = (key: string) => setAcessorios((prev) => prev.filter((a) => a.key !== key));
 
   const salvar = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (modo: "pedido" | "venda" = "pedido") => {
       if (!clienteId) throw new Error("Selecione o cliente.");
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
