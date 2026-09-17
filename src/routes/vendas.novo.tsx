@@ -495,15 +495,8 @@ function NovoPedido() {
     materiaisExtras,
   ]);
 
-  const descartarRascunho = async () => {
-    localStorage.removeItem(RASCUNHO_KEY);
-    localStorage.removeItem(RASCUNHO_VENDA_KEY);
-    if (rascunhoVendaId) {
-      await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
-      await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
-      setRascunhoVendaId(null);
-      queryClient.invalidateQueries({ queryKey: ["vendas"] });
-    }
+  /** Zera todos os campos da tela (usado ao descartar e após concluir a venda). */
+  const limparCampos = () => {
     setData(hojeISO());
     setTipoAtendimento("in");
     setClienteId("");
