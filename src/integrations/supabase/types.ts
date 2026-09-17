@@ -2380,6 +2380,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      tem_area: { Args: { _area: string; _uid: string }; Returns: boolean }
+      tem_area_any: {
+        Args: { _areas: string[]; _uid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:
