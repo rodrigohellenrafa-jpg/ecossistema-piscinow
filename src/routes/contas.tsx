@@ -1336,6 +1336,8 @@ type Conta = {
   categoria: string | null;
   valor: number;
   valor_juros?: number | null;
+  valor_pago?: number | null;
+  valor_desconto?: number | null;
   vencimento: string;
   status: string;
   recorrencia?: string | null;
