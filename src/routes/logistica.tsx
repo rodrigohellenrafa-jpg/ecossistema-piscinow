@@ -392,7 +392,7 @@ function FlightBoard() {
   const selecionar = useMutation({
     mutationFn: async ({ venda, obra, marcado }: { venda: string | null; obra: string | null; marcado: boolean }) => {
       const { error } = await supabase.rpc("selecionar_obra_board", {
-        p_venda: venda, p_obra: obra, p_selecionada: marcado,
+        p_venda: venda ?? undefined, p_obra: obra ?? undefined, p_selecionada: marcado,
       });
       if (error) throw error;
     },
