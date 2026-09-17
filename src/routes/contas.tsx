@@ -1190,7 +1190,7 @@ function Contas() {
             titulo={`Em aberto: ${brl(soma(pagar))}`}
             itens={pagar}
             rateios={rateios}
-            onBaixar={(id) => baixar.mutate(id)}
+            onBaixar={setBaixando}
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
@@ -1200,13 +1200,131 @@ function Contas() {
             titulo={`Em aberto: ${brl(soma(receber))}`}
             itens={receber}
             rateios={rateios}
-            onBaixar={(id) => baixar.mutate(id)}
+            onBaixar={setBaixando}
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
           />
         </TabsContent>
       </Tabs>
+
+      <BaixaDialog
+        conta={baixando}
+        pendente={baixar.isPending}
+        onFechar={() => setBaixando(null)}
+        onConfirmar={(p) => baixar.mutate(p, { onSuccess: () => setBaixando(null) })}
+      />
     </div>
+  );
+}
+
+/** Modal de baixa: separa o valor do título do valor realmente pago. */
+function BaixaDialog({
+  conta,
+  pendente,
+  onFechar,
+  onConfirmar,
+}: {
+  conta: Conta | null;
+  pendente: boolean;
+  onFechar: () => void;
+  onConfirmar: (p: {
+    id: string;
+    valorPago: number;
+    dataPagamento: string;
+    modo: "quitar" | "saldo";
+  }) => void;
+}) {
+  const total = conta ? Number(conta.valor) + Number(conta.valor_juros ?? 0) : 0;
+  const [valorPago, setValorPago] = useState("");
+  const [dataPagamento, setDataPagamento] = useState("");
+  const [modo, setModo] = useState<"quitar" | "saldo">("quitar");
+
+  const aberto = !!conta;
+  const chave = conta?.id ?? "";
+  const [ultima, setUltima] = useState("");
+  if (aberto && chave !== ultima) {
+    setUltima(chave);
+    setValorPago(total.toFixed(2));
+    setDataPagamento(new Date().toISOString().slice(0, 10));
+    setModo("quitar");
+  }
+
+  const pago = Number(String(valorPago).replace(",", ".")) || 0;
+  const diferenca = Number((total - pago).toFixed(2));
+  const recebe = conta?.tipo === "receber";
+
+  return (
+    <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{recebe ? "Registrar recebimento" : "Registrar pagamento"}</DialogTitle>
+          <DialogDescription>{conta?.descricao}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Valor do título (boleto)">
+            <Input value={brl(total)} readOnly className="bg-muted" />
+          </Field>
+          <Field label={recebe ? "Valor recebido" : "Valor pago"}>
+            <Input
+              inputMode="decimal"
+              value={valorPago}
+              onChange={(e) => setValorPago(e.target.value)}
+              autoFocus
+            />
+          </Field>
+          <Field label={recebe ? "Data do recebimento" : "Data do pagamento"}>
+            <Input
+              type="date"
+              value={dataPagamento}
+              onChange={(e) => setDataPagamento(e.target.value)}
+            />
+          </Field>
+          <div className="flex items-end text-sm">
+            {diferenca > 0.009 ? (
+              <span className="text-destructive">Faltam {brl(diferenca)}</span>
+            ) : diferenca < -0.009 ? (
+              <span className="text-muted-foreground">
+                Pago {brl(Math.abs(diferenca))} a mais que o título
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Valor integral</span>
+            )}
+          </div>
+          {diferenca > 0.009 && (
+            <div className="sm:col-span-2">
+              <Field label="O que fazer com a diferença">
+                <Select value={modo} onValueChange={(v) => setModo(v as "quitar" | "saldo")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="quitar">
+                      Quitar o título (desconto/abatimento de {brl(diferenca)})
+                    </SelectItem>
+                    <SelectItem value="saldo">
+                      Deixar {brl(diferenca)} em aberto como novo título
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={pendente || pago <= 0 || !dataPagamento}
+            onClick={() =>
+              conta && onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo })
+            }
+          >
+            Confirmar baixa
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
