@@ -938,12 +938,13 @@ function NovoPedido() {
         aviso = "Pedido salvo, mas a baixa de estoque não pôde ser feita com o seu acesso.";
       }
 
-      // 2b) Venda confirmada: se o total não foi saldado por completo, o que
-      // restou vira título em Contas a Receber automaticamente. As condições de
-      // pagamento já geram os próprios títulos (trigger), então aqui só entra o
-      // valor que ficou sem nenhuma condição e sem entrada.
+      // 2b) Pagamento parcial: o que faltou virar dinheiro entra como título em
+      // Contas a Receber, qualquer que seja o serviço, a categoria ou a forma de
+      // pagamento. As condições de pagamento em aberto já geram os próprios
+      // títulos (trigger), então aqui entra só o que ficou sem cobertura.
       let contaReceber = 0;
-      if (modo === "venda") {
+      const houvePagamento = entrada > 0 || pagas.length > 0;
+      if (modo === "venda" || houvePagamento) {
         const semCobertura = Number((valorTotal - entrada - totalAplicado).toFixed(2));
         if (semCobertura > 0.01) {
           const { error: erroConta } = await supabase.from("contas").insert({
@@ -956,7 +957,7 @@ function NovoPedido() {
             valor: semCobertura,
             vencimento: data,
             status: "aberto",
-            observacoes: "Gerado automaticamente ao confirmar a venda (saldo não quitado).",
+            observacoes: "Gerado automaticamente: pagamento parcial (total do pedido menos o valor pago).",
             created_by: userId,
           });
           if (erroConta) {
@@ -967,17 +968,20 @@ function NovoPedido() {
         }
       }
 
-      // 3) Serviço externo (OUT): abre a ordem de serviço do pedido.
+      // 3) Serviço externo (OUT): abre a ordem de serviço do pedido e coloca a
+      // obra correspondente no Flight Board.
+      let obraCriada = false;
       if (tipoAtendimento === "out") {
+        const tipoServico = cascoId ? "Instalação de piscina" : "Serviço externo";
         const { error } = await supabase.from("ordens_servico").insert({
           numero: `OS-${numero}`,
           venda_id: venda.id,
           cliente_id: clienteId,
           cliente_nome: cliente?.nome ?? null,
-          tipo_servico: cascoId ? "Instalação de piscina" : "Serviço externo",
+          tipo_servico: tipoServico,
           descricao: `Serviço externo referente ao pedido ${numero}.`,
           responsavel: vendedor?.nome ?? null,
-          status: "orcamento",
+          status: modo === "venda" ? "aprovado" : "orcamento",
           prioridade: "media",
           valor: custoMaoObra,
           created_by: userId,
@@ -985,11 +989,40 @@ function NovoPedido() {
         if (error) {
           aviso = "Pedido salvo, mas a ordem de serviço não pôde ser aberta com o seu acesso.";
         }
+
+        try {
+          const { data: obrasAtuais } = await supabase
+            .from("obras")
+            .select("id, numero, os_instalacao, os_logistica, os_acabamento, venda_id");
+          const lista = obrasAtuais ?? [];
+          const jaExiste = lista.some((o) => o.venda_id === venda.id);
+          if (!jaExiste) {
+            const { error: erroObra } = await supabase.from("obras").insert({
+              venda_id: venda.id,
+              cliente_id: clienteId,
+              cliente_nome: cliente?.nome ?? null,
+              numero: proximoCodigo("OBRA", lista.map((o) => o.numero)),
+              tipo_servico: tipoServico,
+              data_pedido: data,
+              prazo_dias: 30,
+              responsavel: vendedor?.nome ?? null,
+              endereco_obra: enderecoInstalacao || null,
+              os_instalacao: `OS-${numero}`,
+              os_logistica: proximoCodigo("OL", lista.map((o) => o.os_logistica)),
+              os_acabamento: proximoCodigo("OS-03", lista.map((o) => o.os_acabamento)),
+              status_geral: "Agendado",
+              created_by: userId,
+            });
+            if (!erroObra) obraCriada = true;
+          }
+        } catch {
+          /* obra no Flight Board é best-effort */
+        }
       }
 
-      return { id: venda.id as string, roteamento, aviso, contaReceber, modo };
+      return { id: venda.id as string, roteamento, aviso, contaReceber, modo, obraCriada };
     },
-    onSuccess: ({ id, roteamento, aviso, contaReceber, modo }) => {
+    onSuccess: ({ id, roteamento, aviso, contaReceber, modo, obraCriada }) => {
 
       toast.success(
         modo === "venda"
@@ -998,6 +1031,10 @@ function NovoPedido() {
             ? "Pedido de balcão registrado e financeiro lançado!"
             : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
       );
+      if (obraCriada) {
+        toast.success("Serviço externo enviado para o Flight Board.");
+        queryClient.invalidateQueries({ queryKey: ["obras"] });
+      }
       if (contaReceber > 0) {
         toast.warning(
           `Saldo de ${brl(contaReceber)} não quitado: título gerado em Contas a Receber.`,
