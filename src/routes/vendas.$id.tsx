@@ -1253,12 +1253,12 @@ function DetalhePedido() {
       />
 
       <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar dados do pedido</DialogTitle>
           </DialogHeader>
           {editPedido && (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid flex-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
               <Field label="Data">
                 <Input
                   type="date"
