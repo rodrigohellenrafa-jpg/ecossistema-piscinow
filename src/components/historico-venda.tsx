@@ -115,18 +115,21 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome }: Props) {
   });
 
   const { data: lancamentos = [] } = useQuery({
-    queryKey: ["historico-venda", vendaId],
+    queryKey: ["historico-venda", vendaId, clienteId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("venda_historico")
-        .select("*")
-        .eq("venda_id", vendaId)
-        .order("data")
-        .order("created_at");
+      // Mostra o histórico do pedido e também o do cliente (lançamentos
+      // financeiros vinculados apenas ao cliente, sem pedido).
+      const filtro = clienteId
+        ? `venda_id.eq.${vendaId},and(venda_id.is.null,cliente_id.eq.${clienteId})`
+        : null;
+      let q = supabase.from("venda_historico").select("*");
+      q = filtro ? q.or(filtro) : q.eq("venda_id", vendaId);
+      const { data, error } = await q.order("data").order("created_at");
       if (error) throw error;
       return data;
     },
   });
+
 
   const salvar = useMutation({
     mutationFn: async () => {
