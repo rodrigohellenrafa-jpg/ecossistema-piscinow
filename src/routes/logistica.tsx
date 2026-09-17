@@ -106,10 +106,10 @@ const GRID_OBRA =
   "grid gap-2 grid-cols-[84px_minmax(180px,1fr)_280px_280px_92px_96px_156px_80px]";
 
 const STATUS_TONE: Record<string, string> = {
-  Agendado: "text-status-scheduled",
-  "Em Execução": "text-status-running",
-  Pausado: "text-status-paused",
-  Concluído: "text-status-done",
+  Agendado: "border-status-scheduled/60 bg-status-scheduled/10 text-status-scheduled",
+  "Em Execução": "border-status-running/60 bg-status-running/10 text-status-running",
+  Pausado: "border-status-paused/60 bg-status-paused/10 text-status-paused",
+  Concluído: "border-status-done/60 bg-status-done/10 text-status-done",
 };
 
 const vazio = {
@@ -733,7 +733,7 @@ function FlightBoard() {
                             </SelectTrigger>
                             <SelectContent>
                               {STATUS_OBRA.map((s) => (
-                                <SelectItem key={s} value={s}>
+                                 <SelectItem key={s} value={s} className={`font-semibold ${STATUS_TONE[s]}`}>
                                   {s}
                                 </SelectItem>
                               ))}
