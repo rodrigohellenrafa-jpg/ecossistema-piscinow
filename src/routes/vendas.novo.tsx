@@ -516,6 +516,29 @@ function NovoPedido() {
     setCustoFiltro(0);
     setLucroSugerido(0);
     setCondicoes([]);
+    setEntrada(0);
+    setPrazoEntrega("");
+    setEnderecoInstalacao("");
+    setMateriais({
+      areia_m3: "",
+      cimento_sc: "",
+      blocos_un: "",
+      agua_m3: "",
+      fios_eletrodutos: "",
+    });
+    setMateriaisExtras([]);
+  };
+
+  const descartarRascunho = async () => {
+    localStorage.removeItem(RASCUNHO_KEY);
+    localStorage.removeItem(RASCUNHO_VENDA_KEY);
+    if (rascunhoVendaId) {
+      await supabase.from("venda_itens").delete().eq("venda_id", rascunhoVendaId);
+      await supabase.from("vendas").delete().eq("id", rascunhoVendaId);
+      setRascunhoVendaId(null);
+      queryClient.invalidateQueries({ queryKey: ["vendas"] });
+    }
+    limparCampos();
     toast.success("Rascunho descartado.");
   };
 
