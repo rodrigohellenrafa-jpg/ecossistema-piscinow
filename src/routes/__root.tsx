@@ -19,6 +19,7 @@ import { RealtimeSync } from "@/components/realtime-sync";
 import { InstallAppButton } from "@/components/install-app-button";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoles } from "@/hooks/use-role";
+import { AreaGuard } from "@/components/area-guard";
 
 function NotFoundComponent() {
   return (
