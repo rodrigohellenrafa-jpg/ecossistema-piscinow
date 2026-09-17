@@ -197,6 +197,7 @@ function Contas() {
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
   const [periodo, setPeriodo] = useState("todas");
+  const [baixando, setBaixando] = useState<Conta | null>(null);
 
   const { data = [] } = useQuery({
     queryKey: ["contas"],
