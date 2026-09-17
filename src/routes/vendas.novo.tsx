@@ -780,7 +780,7 @@ function NovoPedido() {
           vendedor_id: null,
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
-          status_pedido: "orcamento",
+          status_pedido: modo === "venda" ? "aprovado" : "orcamento",
           tipo_atendimento: tipoAtendimento,
 
           observacoes: observacoes || null,
