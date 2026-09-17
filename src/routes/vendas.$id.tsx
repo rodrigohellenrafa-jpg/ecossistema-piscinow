@@ -1210,6 +1210,12 @@ function DetalhePedido() {
         </div>
       </div>
 
+      <HistoricoVenda
+        vendaId={id}
+        clienteId={venda.cliente_id ?? null}
+        clienteNome={venda.cliente_nome ?? null}
+      />
+
       <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
