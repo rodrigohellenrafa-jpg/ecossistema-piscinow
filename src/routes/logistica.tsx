@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock3, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ExpandableCard } from "@/components/expandable-card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/field";
 import { PageHeader, Kpi } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -66,6 +68,7 @@ export const Route = createFileRoute("/logistica")({
 });
 
 type Obra = {
+  selecionada: boolean;
   id: string;
   numero: string | null;
   venda_id: string | null;
@@ -103,7 +106,7 @@ const TIPOS_SERVICO = ["Instalação Nova", "Reforma", "Manutenção"] as const;
 
 /** Colunas da linha da obra: obra, cliente, escavação, instalação, limite, OS, status, ações. */
 const GRID_OBRA =
-  "grid gap-2 grid-cols-[84px_minmax(180px,1fr)_280px_280px_92px_96px_156px_80px]";
+  "grid gap-2 grid-cols-[32px_84px_minmax(180px,1fr)_280px_280px_92px_96px_156px_80px]";
 
 const STATUS_TONE: Record<string, string> = {
   Agendado: "border-status-scheduled/60 bg-status-scheduled/10 text-status-scheduled",
@@ -386,55 +389,16 @@ function FlightBoard() {
 
   type ServicoOut = (typeof servicosOut)[number];
 
-  const enviarParaBoard = useMutation({
-    mutationFn: async (s: ServicoOut) => {
-      const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
-      const tipoServico = s.os?.tipo_servico ?? "Serviço externo";
-
-      let osNumero = s.os?.numero ?? null;
-      if (!s.os) {
-        const { data: novaOS, error: erroOS } = await supabase
-          .from("ordens_servico")
-          .insert({
-            numero: `OS-${s.numero ?? Date.now().toString().slice(-6)}`,
-            venda_id: s.id,
-            cliente_id: s.cliente_id,
-            cliente_nome: s.cliente_nome,
-            tipo_servico: tipoServico,
-            descricao: `Serviço externo referente ao pedido ${s.numero ?? ""}.`,
-            status: "aprovado",
-            prioridade: "media",
-            valor: Number(s.valor_mao_obra ?? 0),
-            created_by: userId,
-          })
-          .select("numero")
-          .single();
-        if (erroOS) throw erroOS;
-        osNumero = novaOS?.numero ?? null;
-      }
-
-      const dataPedido = s.data ?? hojeISO();
-      const { error } = await supabase.from("obras").insert({
-        venda_id: s.id,
-        cliente_id: s.cliente_id,
-        cliente_nome: s.cliente_nome,
-        numero: proximoCodigo("OBRA", obras.map((o) => o.numero)),
-        tipo_servico: tipoServico,
-        data_pedido: dataPedido,
-        prazo_dias: 30,
-        data_limite: addDiasUteis(dataPedido, 30),
-        os_instalacao: osNumero,
-        os_logistica: proximoCodigo("OL", obras.map((o) => o.os_logistica)),
-        os_acabamento: proximoCodigo("OS-03", obras.map((o) => o.os_acabamento)),
-        status_geral: "Agendado",
-        created_by: userId,
+  const selecionar = useMutation({
+    mutationFn: async ({ venda, obra, marcado }: { venda: string | null; obra: string | null; marcado: boolean }) => {
+      const { error } = await supabase.rpc("selecionar_obra_board", {
+        p_venda: venda, p_obra: obra, p_selecionada: marcado,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Serviço externo incluído no Flight Board.");
-      qc.invalidateQueries({ queryKey: ["obras"] });
-      qc.invalidateQueries({ queryKey: ["os-vinculadas"] });
+      for (const key of ["obras", "os-vinculadas", "agenda-obras", "agenda-ordens"]) qc.invalidateQueries({ queryKey: [key] });
+      toast.success("Seleção salva no Flight Board.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -559,7 +523,7 @@ function FlightBoard() {
         <Kpi label="Prazo médio" value={`${kpis.prazoMedio} dias`} to="/ordens" />
       </div>
 
-      <section className="overflow-hidden rounded-lg border-2 border-flight-grid bg-flight-panel shadow-xl">
+      <ExpandableCard className="gap-0 overflow-hidden rounded-lg border-2 border-flight-grid bg-flight-panel py-0 shadow-xl">
         <div className="flex items-center justify-between border-b-2 border-flight-grid px-4 py-3 sm:px-5">
           <div>
             <div className="flex items-center gap-2 text-lg font-bold uppercase text-flight-heading">
@@ -568,7 +532,7 @@ function FlightBoard() {
             </div>
             <p className="mt-1 text-xs uppercase text-muted-foreground">Obras e serviços programados</p>
           </div>
-          <div className="text-right text-flight-heading">
+          <div className="pr-8 text-right text-flight-heading">
             <div className="flex items-center justify-end gap-2 text-xl font-semibold tabular-nums sm:text-2xl">
               <Clock3 className="size-5 text-primary" />
               {agora ? agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
@@ -582,7 +546,7 @@ function FlightBoard() {
         <div className="overflow-x-auto">
           <div className="min-w-[1400px]">
             <div className={`${GRID_OBRA} border-b border-flight-grid bg-flight-row-a px-4 py-2 text-[10px] font-bold uppercase text-flight-heading`}>
-                    <div>Obra</div>
+                    <div></div><div>Obra / Venda</div>
                     <div>Cliente</div>
                     <div className="text-center">Escavação (início / término)</div>
                     <div className="text-center">Instalação (início / término)</div>
@@ -616,13 +580,14 @@ function FlightBoard() {
                         key={obra.id}
                         className={`group ${GRID_OBRA} items-center border-b border-flight-grid px-4 py-3 text-sm last:border-b-0 ${index % 2 === 0 ? "bg-flight-row-a" : "bg-flight-row-b"} hover:bg-accent`}
                       >
+                        <Checkbox aria-label={`Selecionar obra ${obra.numero}`} checked={obra.selecionada} disabled={selecionar.isPending || !obra.venda_id} onCheckedChange={(v) => selecionar.mutate({ venda: obra.venda_id, obra: obra.id, marcado: v === true })} />
                         <div>
                           <Link
                             to="/obras/$id"
                             params={{ id: obra.id }}
                             className="font-bold text-primary hover:underline"
                           >
-                            {obra.numero ?? "—"}
+                            {obra.selecionada ? obra.numero : vendasOut.find((v) => v.id === obra.venda_id)?.numero ?? obra.numero}
                           </Link>
                         </div>
 
@@ -716,7 +681,7 @@ function FlightBoard() {
                         </div>
 
                         <div className="flex flex-wrap gap-1">
-                          {obra.os_instalacao && (
+                          {obra.selecionada && obra.os_instalacao && (
                             <Badge variant="outline" className="text-[10px]">
                               {obra.os_instalacao}
                             </Badge>
@@ -765,84 +730,19 @@ function FlightBoard() {
                       </div>
                     );
             })}
+            {servicosOut.filter((s) => !s.obra).map((s, index) => (
+              <div key={s.id} className={`${GRID_OBRA} items-center border-b border-flight-grid px-4 py-3 text-sm ${(obras.length + index) % 2 === 0 ? "bg-flight-row-a" : "bg-flight-row-b"}`}>
+                <Checkbox aria-label={`Selecionar pedido ${s.numero}`} checked={false} disabled={selecionar.isPending} onCheckedChange={(v) => selecionar.mutate({ venda: s.id, obra: null, marcado: v === true })} />
+                <Link to="/vendas/$id" params={{ id: s.id }} className="font-bold text-primary hover:underline">{s.numero}</Link>
+                <div className="truncate">{s.cliente_nome}</div>
+                <div className="text-center text-muted-foreground">—</div><div className="text-center text-muted-foreground">—</div><div className="text-center">—</div><div>—</div>
+                <Badge variant="outline">{s.status_pedido}</Badge>
+                <Button asChild variant="ghost" size="icon" title="Abrir pedido"><Link to="/vendas/$id" params={{ id: s.id }}><Pencil className="size-4" /></Link></Button>
+              </div>
+            ))}
           </div>
         </div>
-      </section>
-
-      {/* Serviços Out: pedidos de serviço externo e suas ordens de serviço */}
-      <div className="overflow-hidden rounded-lg border-2 border-flight-grid bg-flight-panel">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-flight-grid bg-flight-row-a px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">Serviços Out</span>
-            <Badge variant="secondary">{servicosOut.length}</Badge>
-          </div>
-          <span className="text-xs text-muted-foreground">
-            Pedidos externos com ordem de serviço e obra no board
-          </span>
-        </div>
-
-        {servicosOut.length === 0 && (
-          <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-            Nenhum serviço externo registrado.
-          </p>
-        )}
-
-        <div>
-          {servicosOut.map((s, index) => (
-            <div
-              key={s.id}
-              className={`flex flex-col gap-2 border-b border-flight-grid px-4 py-3 text-sm last:border-b-0 sm:flex-row sm:items-center sm:justify-between ${index % 2 === 0 ? "bg-flight-row-a" : "bg-flight-row-b"}`}
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link
-                    to="/vendas/$id"
-                    params={{ id: s.id }}
-                    className="font-bold text-primary hover:underline"
-                  >
-                    {s.numero ?? "—"}
-                  </Link>
-                  <span className="truncate font-medium">{s.cliente_nome ?? "—"}</span>
-                  {s.os && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {s.os.numero ?? "OS"}
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {dataBR(s.data)}
-                  {s.os?.tipo_servico ? ` · ${s.os.tipo_servico}` : ""}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {s.obra ? (
-                  <>
-                    <Badge variant="outline" className={`font-bold uppercase ${STATUS_TONE[s.obra.status_geral] ?? "text-foreground"}`}>{s.obra.status_geral}</Badge>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to="/obras/$id" params={{ id: s.obra.id }}>
-                        Abrir obra {s.obra.numero ?? ""}
-                      </Link>
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => enviarParaBoard.mutate(s)}
-                    disabled={enviarParaBoard.isPending}
-                  >
-                    Enviar para o Flight Board
-                  </Button>
-                )}
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/ordens">Ordens de serviço</Link>
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      </ExpandableCard>
 
       {/* Histórico / recorrência do cliente */}
       <Dialog open={!!historico} onOpenChange={(v) => !v && setHistorico(null)}>

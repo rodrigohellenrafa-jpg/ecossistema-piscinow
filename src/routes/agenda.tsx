@@ -191,6 +191,7 @@ function Agenda() {
       const { data, error } = await supabase
         .from("obras")
         .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral")
+        .eq("selecionada", true)
         .not("data_limite", "is", null);
       if (error) throw error;
       return data;
