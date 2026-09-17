@@ -266,7 +266,14 @@ export function EnviarOrcamento({
             </Field>
           </div>
           <Field label="Mensagem">
-            <Textarea rows={10} value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
+            <Textarea
+              rows={10}
+              value={mensagem}
+              onChange={(e) => {
+                setEditado(true);
+                setMensagem(e.target.value);
+              }}
+            />
           </Field>
           <div className="flex flex-wrap justify-end gap-2">
             <Button
