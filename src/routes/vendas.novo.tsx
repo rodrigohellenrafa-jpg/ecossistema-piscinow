@@ -435,7 +435,7 @@ function NovoPedido() {
   }, []);
 
   useEffect(() => {
-    if (!rascunhoPronto) return;
+    if (!rascunhoPronto || finalizadoRef.current) return;
     try {
       localStorage.setItem(
         RASCUNHO_KEY,
