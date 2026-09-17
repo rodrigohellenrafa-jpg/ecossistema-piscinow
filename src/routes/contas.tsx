@@ -1359,7 +1359,7 @@ function Lista({
   titulo: string;
   itens: Conta[];
   rateios?: { conta_id: string; categoria: string; valor: number }[];
-  onBaixar: (id: string) => void;
+  onBaixar: (c: Conta) => void;
   onEditar: (c: Conta) => void;
   onExcluir: (id: string) => void;
 }) {
