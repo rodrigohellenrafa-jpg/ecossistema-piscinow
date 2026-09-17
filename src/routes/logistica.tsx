@@ -328,6 +328,100 @@ function FlightBoard() {
     [obras, historico],
   );
 
+  // ----- Serviços Out: pedidos externos, suas OS e a obra no board -----
+  const { data: vendasOut = [] } = useQuery({
+    queryKey: ["vendas-out"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("id, numero, data, cliente_id, cliente_nome, valor_mao_obra, status_pedido")
+        .eq("tipo_atendimento", "out")
+        .order("data", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: osVinculadas = [] } = useQuery({
+    queryKey: ["os-vinculadas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordens_servico")
+        .select("id, numero, venda_id, tipo_servico, status")
+        .not("venda_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const servicosOut = useMemo(
+    () =>
+      vendasOut.map((v) => ({
+        ...v,
+        os: osVinculadas.find((o) => o.venda_id === v.id) ?? null,
+        obra: obras.find((o) => o.venda_id === v.id) ?? null,
+      })),
+    [vendasOut, osVinculadas, obras],
+  );
+
+  type ServicoOut = (typeof servicosOut)[number];
+
+  const enviarParaBoard = useMutation({
+    mutationFn: async (s: ServicoOut) => {
+      const userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+      const tipoServico = s.os?.tipo_servico ?? "Serviço externo";
+
+      let osNumero = s.os?.numero ?? null;
+      if (!s.os) {
+        const { data: novaOS, error: erroOS } = await supabase
+          .from("ordens_servico")
+          .insert({
+            numero: `OS-${s.numero ?? Date.now().toString().slice(-6)}`,
+            venda_id: s.id,
+            cliente_id: s.cliente_id,
+            cliente_nome: s.cliente_nome,
+            tipo_servico: tipoServico,
+            descricao: `Serviço externo referente ao pedido ${s.numero ?? ""}.`,
+            status: "aprovado",
+            prioridade: "media",
+            valor: Number(s.valor_mao_obra ?? 0),
+            created_by: userId,
+          })
+          .select("numero")
+          .single();
+        if (erroOS) throw erroOS;
+        osNumero = novaOS?.numero ?? null;
+      }
+
+      const dataPedido = s.data ?? hojeISO();
+      const { error } = await supabase.from("obras").insert({
+        venda_id: s.id,
+        cliente_id: s.cliente_id,
+        cliente_nome: s.cliente_nome,
+        numero: proximoCodigo("OBRA", obras.map((o) => o.numero)),
+        tipo_servico: tipoServico,
+        data_pedido: dataPedido,
+        prazo_dias: 30,
+        data_limite: addDiasUteis(dataPedido, 30),
+        os_instalacao: osNumero,
+        os_logistica: proximoCodigo("OL", obras.map((o) => o.os_logistica)),
+        os_acabamento: proximoCodigo("OS-03", obras.map((o) => o.os_acabamento)),
+        status_geral: "Agendado",
+        created_by: userId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Serviço externo incluído no Flight Board.");
+      qc.invalidateQueries({ queryKey: ["obras"] });
+      qc.invalidateQueries({ queryKey: ["os-vinculadas"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
 
