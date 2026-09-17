@@ -968,57 +968,9 @@ function NovoPedido() {
         }
       }
 
-      // 3) Serviço externo (OUT): abre a ordem de serviço do pedido e coloca a
-      // obra correspondente no Flight Board.
-      let obraCriada = false;
-      if (tipoAtendimento === "out") {
-        const tipoServico = cascoId ? "Instalação de piscina" : "Serviço externo";
-        const { error } = await supabase.from("ordens_servico").insert({
-          numero: `OS-${numero}`,
-          venda_id: venda.id,
-          cliente_id: clienteId,
-          cliente_nome: cliente?.nome ?? null,
-          tipo_servico: tipoServico,
-          descricao: `Serviço externo referente ao pedido ${numero}.`,
-          responsavel: vendedor?.nome ?? null,
-          status: modo === "venda" ? "aprovado" : "orcamento",
-          prioridade: "media",
-          valor: custoMaoObra,
-          created_by: userId,
-        });
-        if (error) {
-          aviso = "Pedido salvo, mas a ordem de serviço não pôde ser aberta com o seu acesso.";
-        }
-
-        try {
-          const { data: obrasAtuais } = await supabase
-            .from("obras")
-            .select("id, numero, os_instalacao, os_logistica, os_acabamento, venda_id");
-          const lista = obrasAtuais ?? [];
-          const jaExiste = lista.some((o) => o.venda_id === venda.id);
-          if (!jaExiste) {
-            const { error: erroObra } = await supabase.from("obras").insert({
-              venda_id: venda.id,
-              cliente_id: clienteId,
-              cliente_nome: cliente?.nome ?? null,
-              numero: proximoCodigo("OBRA", lista.map((o) => o.numero)),
-              tipo_servico: tipoServico,
-              data_pedido: data,
-              prazo_dias: 30,
-              responsavel: vendedor?.nome ?? null,
-              endereco_obra: enderecoInstalacao || null,
-              os_instalacao: `OS-${numero}`,
-              os_logistica: proximoCodigo("OL", lista.map((o) => o.os_logistica)),
-              os_acabamento: proximoCodigo("OS-03", lista.map((o) => o.os_acabamento)),
-              status_geral: "Agendado",
-              created_by: userId,
-            });
-            if (!erroObra) obraCriada = true;
-          }
-        } catch {
-          /* obra no Flight Board é best-effort */
-        }
-      }
+      // Obras e O.S. são criadas somente pela seleção no Flight Board.
+      const obraCriada = false;
+      queryClient.invalidateQueries({ queryKey: ["vendas-out"] });
 
       return { id: venda.id as string, roteamento, aviso, contaReceber, modo, obraCriada };
     },
@@ -1029,7 +981,7 @@ function NovoPedido() {
           ? "Venda confirmada e financeiro lançado!"
           : tipoAtendimento === "in"
             ? "Pedido de balcão registrado e financeiro lançado!"
-            : "Pedido registrado, ordem de serviço aberta e financeiro lançado!",
+            : "Pedido registrado e financeiro lançado!",
       );
       if (obraCriada) {
         toast.success("Serviço externo enviado para o Flight Board.");

@@ -11,7 +11,6 @@ const MAPA: { prefixo: string; area: Area }[] = [
   { prefixo: "/funcionarios", area: "rh" },
   { prefixo: "/vendas", area: "vendas" },
   { prefixo: "/reativacao", area: "vendas" },
-  { prefixo: "/agenda", area: "logistica" },
   { prefixo: "/logistica", area: "logistica" },
   { prefixo: "/ordens-compra", area: "compras" },
   { prefixo: "/ordens", area: "logistica" },
