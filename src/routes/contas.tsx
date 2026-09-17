@@ -1507,6 +1507,20 @@ function Lista({
                   <TableCell className="text-right font-medium">
                     {brl(Number(c.valor) + Number(c.valor_juros ?? 0))}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {c.status === "pago" ? (
+                      <>
+                        {brl(Number(c.valor_pago ?? 0))}
+                        {Number(c.valor_desconto ?? 0) > 0.009 && (
+                          <span className="block text-xs text-muted-foreground">
+                            desconto {brl(Number(c.valor_desconto))}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={c.status === "pago" ? "secondary" : vencido ? "destructive" : "outline"}>
                       {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
