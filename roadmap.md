@@ -11,3 +11,8 @@
 
 Entregas parciais: expansão de modais, períodos do DRE, recorrências mensais, vínculo financeiro à obra/documento, busca de OS e registro de materiais/horas.
 Validação: páginas autenticadas abriram sem erros; testes de gravação, fotos, clima e demais itens ainda pendentes.
+
+## Flight Board unificado
+- [ ] Unificar linhas com seleção persistente, expansão e O.S. ao marcar.
+- [ ] Suspender criação automática na venda; abrir Agenda após login e refletir obras selecionadas.
+- [ ] Verificar painel e seleção.
