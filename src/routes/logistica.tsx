@@ -560,7 +560,7 @@ function FlightBoard() {
               <p className="px-4 py-8 text-center text-xs text-muted-foreground">Nenhuma obra registrada.</p>
             )}
 
-            {obras.map((obra, index) => {
+            {[...obras].sort((a, b) => Number(b.selecionada) - Number(a.selecionada)).map((obra, index) => {
                     const d = diasAte(obra.data_limite);
                     const atrasada = d !== null && d < 0 && obra.status_geral !== "Concluído";
                     const proximo = d !== null && d >= 0 && d <= 3 && obra.status_geral !== "Concluído";
