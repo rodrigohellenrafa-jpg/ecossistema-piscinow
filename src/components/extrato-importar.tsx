@@ -147,21 +147,64 @@ export function ExtratoImportar({
       if (linhas.length === 0) throw new Error("Nenhuma linha válida para importar.");
       const banco = contas.find((c) => c.conta === conta)?.banco ?? null;
       const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("extratos_bancarios").upsert(
-        linhas.map((l) => ({
-          ...l,
-          conta,
-          banco,
-          origem: "importado",
-          created_by: auth.user?.id ?? null,
-        })),
-        { onConflict: "conta,data_movimento,valor,descricao", ignoreDuplicates: true },
-      );
-      if (error) throw error;
+
+      // Movimentos repetidos no mesmo dia são legítimos (duas tarifas iguais, por
+      // exemplo). Só é ignorado o que já foi importado antes: comparamos quantas
+      // vezes cada linha existe na conta contra quantas vezes ela vem na planilha.
+      const datas = Array.from(new Set(linhas.map((l) => l.data_movimento)));
+      const { data: existentes, error: erroLer } = await supabase
+        .from("extratos_bancarios")
+        .select("data_movimento, descricao, valor")
+        .eq("conta", conta)
+        .in("data_movimento", datas);
+      if (erroLer) throw erroLer;
+
+      const chave = (d: string, desc: string, v: number) =>
+        `${d}|${desc.trim().toLowerCase()}|${Number(v).toFixed(2)}`;
+      const jaExiste = new Map<string, number>();
+      for (const e of existentes ?? []) {
+        const k = chave(e.data_movimento, e.descricao, Number(e.valor));
+        jaExiste.set(k, (jaExiste.get(k) ?? 0) + 1);
+      }
+
+      const novas: Linha[] = [];
+      let ignoradas = 0;
+      for (const l of linhas) {
+        const k = chave(l.data_movimento, l.descricao, l.valor);
+        const restante = jaExiste.get(k) ?? 0;
+        if (restante > 0) {
+          jaExiste.set(k, restante - 1);
+          ignoradas++;
+          continue;
+        }
+        novas.push(l);
+      }
+
+      if (novas.length > 0) {
+        const { error } = await supabase.from("extratos_bancarios").insert(
+          novas.map((l) => ({
+            ...l,
+            conta,
+            banco,
+            origem: "importado",
+            created_by: auth.user?.id ?? null,
+          })),
+        );
+        if (error) throw error;
+      }
+      return { importadas: novas.length, ignoradas };
     },
-    onSuccess: () => {
+    onSuccess: ({ importadas, ignoradas }) => {
       qc.invalidateQueries({ queryKey: ["extratos-bancarios"] });
-      toast.success(`${linhas.length} movimentos importados.`);
+      if (importadas === 0) {
+        toast.info("Nenhum movimento novo: todas as linhas já estavam importadas.");
+      } else {
+        toast.success(
+          ignoradas > 0
+            ? `${importadas} movimentos importados. ${ignoradas} já existiam e foram ignorados.`
+            : `${importadas} movimentos importados.`,
+        );
+      }
       setLinhas([]);
       setArquivo("");
       setOpen(false);
