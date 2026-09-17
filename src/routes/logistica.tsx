@@ -608,9 +608,9 @@ function FlightBoard() {
                     return (
                       <div
                         key={obra.id}
-                        className="group grid grid-cols-12 items-center gap-2 border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-primary/5"
+                        className={`group ${GRID_OBRA} items-center border-b border-border px-4 py-3 text-sm last:border-b-0 hover:bg-primary/5`}
                       >
-                        <div className="col-span-1">
+                        <div>
                           <Link
                             to="/obras/$id"
                             params={{ id: obra.id }}
