@@ -884,6 +884,7 @@ function NovoPedido() {
             data_prevista: c.data_prevista || data,
             pago: c.pago,
             bandeira: c.bandeira || null,
+            conta_bancaria: c.conta_bancaria || null,
             observacoes: c.observacoes || null,
             created_by: userId,
           })) as never,
