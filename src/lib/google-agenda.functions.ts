@@ -195,22 +195,25 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
       ),
     ).map((email) => ({ email }));
 
+    const qEventos = supabaseAdmin
+      .from("agenda_eventos")
+      .select("id, titulo, descricao, local, inicio, fim, dia_inteiro, cliente_nome, responsavel_nome, google_event_id")
+      .neq("status", "cancelado")
+      .gte("inicio", desde);
+    const qOrdens = supabaseAdmin
+      .from("ordens_servico")
+      .select("id, numero, tipo_servico, descricao, cliente_nome, data_agendada, responsavel, status")
+      .not("data_agendada", "is", null)
+      .gte("data_agendada", desdeDia);
+    const qObras = supabaseAdmin
+      .from("obras")
+      .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral")
+      .not("data_limite", "is", null)
+      .gte("data_limite", desdeDia);
     const [{ data: eventos }, { data: ordens }, { data: obras }] = await Promise.all([
-      supabaseAdmin
-        .from("agenda_eventos")
-        .select("id, titulo, descricao, local, inicio, fim, dia_inteiro, cliente_nome, responsavel_nome, google_event_id")
-        .neq("status", "cancelado")
-        .gte("inicio", desde),
-      supabaseAdmin
-        .from("ordens_servico")
-        .select("id, numero, tipo_servico, descricao, cliente_nome, data_agendada, responsavel, status")
-        .not("data_agendada", "is", null)
-        .gte("data_agendada", desdeDia),
-      supabaseAdmin
-        .from("obras")
-        .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral")
-        .not("data_limite", "is", null)
-        .gte("data_limite", desdeDia),
+      buscaEventos ? (evIds?.length ? qEventos.in("id", evIds) : qEventos) : Promise.resolve({ data: [] }),
+      buscaOs ? (osIds?.length ? qOrdens.in("id", osIds) : qOrdens) : Promise.resolve({ data: [] }),
+      buscaObras ? (obraIds?.length ? qObras.in("id", obraIds) : qObras) : Promise.resolve({ data: [] }),
     ]);
 
     let enviados = 0;
