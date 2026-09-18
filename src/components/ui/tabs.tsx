@@ -1,9 +1,23 @@
 import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 
+import { useRouterState } from "@tanstack/react-router";
+import { useRoles } from "@/hooks/use-role";
+import { ABAS } from "@/lib/telas";
+
 import { cn } from "@/lib/utils";
 
-const Tabs = TabsPrimitive.Root;
+function Tabs(props: React.ComponentProps<typeof TabsPrimitive.Root>) {
+ const path=useRouterState({select:s=>s.location.pathname}); const {podeTela}=useRoles();
+ const map=ABAS[path]; const allowed=map?Object.keys(map).filter(k=>podeTela(map[k])):null;
+ const [local,setLocal]=React.useState(props.defaultValue);
+ const requested=props.value??local;
+ const value=allowed && (!requested || !allowed.includes(requested))?allowed[0]:requested;
+ React.useEffect(()=>{if(props.value!==undefined && value && props.value!==value) props.onValueChange?.(value);},[value,props.value,props.onValueChange]);
+ return <TabsPrimitive.Root {...props} value={value} onValueChange={v=>{setLocal(v);props.onValueChange?.(v);}} />;
+}
+function useTabAllowed(value:string){const path=useRouterState({select:s=>s.location.pathname});const {podeTela}=useRoles();const key=ABAS[path]?.[value];return !key || podeTela(key);}
+
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
@@ -23,7 +37,7 @@ TabsList.displayName = TabsPrimitive.List.displayName;
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
+>(({ className, ...props }, ref) => { const allowed=useTabAllowed(props.value); return allowed ? (
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -32,13 +46,13 @@ const TabsTrigger = React.forwardRef<
     )}
     {...props}
   />
-));
+) : null; });
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
+>(({ className, ...props }, ref) => { const allowed=useTabAllowed(props.value); return allowed ? (
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
@@ -47,7 +61,7 @@ const TabsContent = React.forwardRef<
     )}
     {...props}
   />
-));
+) : null; });
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };

@@ -17,7 +17,7 @@ async function verificar(senha:string) {
  const original=process.env['MASTER_PASSWORD'];
  return !!original && timingSafeEqual(createHash('sha256').update(senha).digest(),createHash('sha256').update(original).digest());
 }
-export const validarSenhaMestra=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator(z.object({senha:z.string().min(1).max(256)})).handler(async({data})=> (await verificar(data.senha)) ? {ok:true as const} : {ok:false as const,motivo:'invalida' as const});
+export const validarSenhaMestra=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator(z.object({senha:z.string().min(1).max(256)})).handler(async({data})=> (await verificar(data.senha)) ? {ok:true as const} : {ok:false as const,motivo:'invalida' as 'invalida' | 'nao_configurada'});
 export const alterarSenhaMestra=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator(z.object({atual:z.string().min(1).max(256),nova:z.string().min(10).max(256),confirmacao:z.string()}).refine(d=>d.nova===d.confirmacao,'As senhas não conferem.')).handler(async({data,context})=>{
  const {data:admin,error}=await context.supabase.rpc('has_role',{_user_id:context.userId,_role:'admin'});
  if(error || !admin) throw new Error('Somente administradores podem alterar a senha mestra.');
