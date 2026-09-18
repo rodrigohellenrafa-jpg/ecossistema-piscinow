@@ -1019,8 +1019,59 @@ function OrdensCompra() {
                   </TableBody>
                 </Table>
               </div>
+
+              {g.produtos.length > 0 && (
+                <div className="mt-6 space-y-2">
+                  <p className="text-sm font-semibold">Produtos deste fornecedor por pedido</p>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Pedido</TableHead>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Produto</TableHead>
+                          <TableHead>O.C.</TableHead>
+                          <TableHead className="text-right">Qtd</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {g.produtos.map((p) => (
+                          <TableRow
+                            key={p.id}
+                            className="cursor-pointer"
+                            onClick={() => setDetalheId(p.ordemId)}
+                          >
+                            <TableCell>
+                              <Badge variant={p.pedido === "Estoque" ? "secondary" : "outline"}>
+                                {p.pedido}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{p.cliente}</TableCell>
+                            <TableCell className="font-medium">
+                              {p.descricao}
+                              {p.codigo ? (
+                                <span className="ml-2 font-mono text-xs text-muted-foreground">
+                                  {p.codigo}
+                                </span>
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {p.ordemNumero ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {p.quantidade} {p.unidade}
+                            </TableCell>
+                            <TableCell className="text-right">{brl(p.total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
             </CardContent>
-          </Card>
+          </ExpandableCard>
         ))
       )}
 
