@@ -1,4 +1,5 @@
 import { LancarEmLote } from "@/components/lancar-em-lote";
+import { ajustarSaldoConta, sinalFluxo } from "@/lib/saldo-conta";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
