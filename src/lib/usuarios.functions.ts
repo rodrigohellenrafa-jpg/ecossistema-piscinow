@@ -11,7 +11,7 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
     _user_id: context.userId,
     _role: "admin",
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(msgAuth(error.message));
   if (!data) throw new Error("Somente administradores podem gerenciar usuários.");
 }
 
@@ -236,14 +236,14 @@ export const definirPapeis = createServerFn({ method: "POST" })
         .from("user_roles")
         .delete()
         .in("id", remover.map((r: { id: string }) => r.id));
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(msgAuth(error.message));
     }
 
     if (inserir.length > 0) {
       const { error } = await db
         .from("user_roles")
         .insert(inserir.map((role) => ({ user_id: data.userId, role })));
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(msgAuth(error.message));
     }
 
     await db
@@ -275,13 +275,29 @@ export const removerUsuario = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+/** Traduz mensagens do provedor de autenticação para português. */
+function msgAuth(m: string) {
+  const t = m.toLowerCase();
+  if (t.includes("weak") || t.includes("easy to guess"))
+    return "Senha muito fraca ou fácil de adivinhar. Use ao menos 8 caracteres, misturando letras, números e símbolos.";
+  if (t.includes("should be at least"))
+    return "A senha é curta demais. Use ao menos 8 caracteres.";
+  if (t.includes("already registered") || t.includes("already been registered"))
+    return "Já existe um usuário com este e-mail.";
+  if (t.includes("invalid email")) return "E-mail inválido.";
+  return m;
+}
+
 export const redefinirSenha = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { userId: string; senha: string }) => {
     const userId = String(input?.userId ?? "").trim();
     const senha = String(input?.senha ?? "").trim();
     if (!userId) throw new Error("Usuário inválido.");
-    if (senha.length < 6) throw new Error("A senha deve ter ao menos 6 caracteres.");
+    if (senha.length < 8) throw new Error("A senha deve ter ao menos 8 caracteres.");
+    if (/^[0-9]+$/.test(senha) || /^[a-zA-Z]+$/.test(senha))
+      throw new Error("Use letras, números e ao menos um símbolo na senha.");
     return { userId, senha };
   })
   .handler(async ({ data, context }) => {
@@ -289,7 +305,7 @@ export const redefinirSenha = createServerFn({ method: "POST" })
     const db = await admin();
 
     const { error } = await db.auth.admin.updateUserById(data.userId, { password: data.senha });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(msgAuth(error.message));
 
     return { ok: true };
   });
