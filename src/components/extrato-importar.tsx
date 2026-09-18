@@ -361,7 +361,7 @@ export function ExtratoImportar({
                 onChange={(e) => setUsarSaldo(e.target.checked)}
               />
               <span>
-                Atualizar o saldo desta conta para <strong>{brl(saldoArquivo.saldo)}</strong>
+                Sincronizar saldo final da conta para <strong>{brl(saldoArquivo.saldo)}</strong>
                 {saldoArquivo.data ? ` (saldo do banco em ${dataBR(saldoArquivo.data)})` : ""}
               </span>
             </label>
