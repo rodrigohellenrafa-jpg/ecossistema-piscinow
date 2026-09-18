@@ -1573,6 +1573,18 @@ function NovoPedido() {
                       />
                     </Field>
 
+                    <Field label="Para qual conta vai o recurso">
+                      <Input
+                        className="text-white"
+                        list="contas-bancarias-opcoes"
+                        placeholder="Selecione ou digite a conta"
+                        value={c.conta_bancaria}
+                        onChange={(e) =>
+                          atualizarCondicao(c.key, { conta_bancaria: e.target.value })
+                        }
+                      />
+                    </Field>
+
                     <Field label="Data">
                       <Input
                         type="date"
