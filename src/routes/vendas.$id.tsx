@@ -500,7 +500,8 @@ function DetalhePedido() {
           valor_cobrado: cobrado,
           valor_parcela: cobrado / parcelas,
           pago: editCond.pago,
-        })
+          conta_bancaria: editCond.conta_bancaria || null,
+        } as never)
         .eq("id", editCond.id);
       if (error) throw error;
     },
@@ -917,6 +918,8 @@ function DetalhePedido() {
                             valor: String(c.valor ?? ""),
                             acrescimo: String(c.acrescimo ?? ""),
                             pago: !!c.pago,
+                            conta_bancaria:
+                              (c as { conta_bancaria?: string | null }).conta_bancaria ?? "",
                           })
                         }
                       >
