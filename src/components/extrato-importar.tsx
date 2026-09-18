@@ -161,9 +161,21 @@ export function ExtratoImportar({
 
   const ler = async (file: File) => {
     setArquivo(file.name);
+    setSaldoArquivo(null);
     try {
+      if (/\.ofx$/i.test(file.name)) {
+        const texto = await file.text();
+        const r = lerOFX(texto);
+        setLinhas(r.linhas);
+        if (r.saldo !== null) setSaldoArquivo({ saldo: r.saldo, data: r.dataSaldo });
+        if (r.linhas.length === 0) {
+          toast.error("Não encontrei movimentos neste arquivo OFX.");
+        }
+        return;
+      }
       let registros: Record<string, unknown>[] = [];
       if (/\.csv$/i.test(file.name)) {
+
         const texto = await file.text();
         const r = Papa.parse<Record<string, unknown>>(texto, {
           header: true,
