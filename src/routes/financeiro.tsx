@@ -442,7 +442,7 @@ function Financeiro() {
     0,
   );
   const realizado = doMes
-    .filter((l) => l.status === "Pago")
+    .filter((l) => l.status?.toLowerCase() === "pago")
     .reduce((s, l) => s + (l.tipo_fluxo === "receita" ? Number(l.valor) : -Number(l.valor)), 0);
 
   const grafico = useMemo(() => {
@@ -966,7 +966,7 @@ function Financeiro() {
                           {brl(l.valor)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={l.status === "Pago" ? "secondary" : l.status === "Cancelado" ? "outline" : "default"}>
+                          <Badge variant={l.status?.toLowerCase() === "pago" ? "secondary" : l.status === "Cancelado" ? "outline" : "default"}>
                             {l.status}
                           </Badge>
                         </TableCell>

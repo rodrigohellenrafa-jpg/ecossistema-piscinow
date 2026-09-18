@@ -91,7 +91,7 @@ export function SaldosBancarios() {
   });
 
   const valorBaixado = (c: typeof contasHoje[number]) => Number(c.valor_pago) || Math.max(0, Number(c.valor) + Number(c.valor_juros) - Number(c.valor_desconto));
-  const ehEntrada = (t: string) => t === "receber" || t === "entrada" || t === "receita";
+  const ehEntrada = (t: string) => ["receber", "entrada", "receita"].includes(t.toLowerCase());
 
   const entradasHoje =
     contasHoje.filter((c) => ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
