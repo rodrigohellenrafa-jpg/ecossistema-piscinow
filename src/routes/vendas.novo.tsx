@@ -980,35 +980,7 @@ function NovoPedido() {
           .insert(pagamentos as never);
         if (erroPag) throw erroPag;
 
-        // Crédito em tempo real: soma o valor recebido no saldo da conta
-        // escolhida (entrada e condições já pagas). Best-effort.
-        try {
-          const creditos = new Map<string, number>();
-          if (entrada > 0 && contaEntrada.trim())
-            creditos.set(contaEntrada.trim(), (creditos.get(contaEntrada.trim()) ?? 0) + entrada);
-          for (const c of pagas) {
-            const nome = (c.conta_bancaria || "").trim();
-            if (nome) creditos.set(nome, (creditos.get(nome) ?? 0) + c.valor);
-          }
-          for (const [nome, valor] of creditos) {
-            const { data: saldoRow } = await supabase
-              .from("saldos_bancarios")
-              .select("id, saldo")
-              .eq("conta", nome)
-              .order("data_saldo", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (saldoRow) {
-              await supabase
-                .from("saldos_bancarios")
-                .update({ saldo: Number((Number(saldoRow.saldo) + valor).toFixed(2)) })
-                .eq("id", saldoRow.id);
-            }
-          }
-          queryClient.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-        } catch {
-          /* saldo da conta é atualizado como puder */
-        }
+        queryClient.invalidateQueries({ queryKey: ["saldos-bancarios"] });
       }
 
       // 2) Estoque: baixa o que tem saldo, encomenda automaticamente o que falta.

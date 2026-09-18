@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,16 +29,35 @@ export function SaldosBancarios() {
 
   const { data: saldos = [] } = useQuery({
     queryKey: ["saldos-bancarios", "completo"],
+    refetchInterval: 5000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saldos_bancarios")
         .select("*")
-        .order("conta", { ascending: true });
+        .order("data_saldo", { ascending: false }).order("updated_at", { ascending: false });
       if (error) throw error;
-      return data as Saldo[];
+      return [...new Map<string, Saldo>((data as Saldo[]).map((s): [string, Saldo] => [s.conta.trim().toLowerCase(), s]).reverse()).values()];
     },
   });
 
+  useEffect(() => {
+    const refresh = () => {
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-contas-hoje"] });
+      qc.invalidateQueries({ queryKey: ["saldos-lancamentos-hoje"] });
+    };
+    const channel = supabase.channel("painel-saldos")
+      .on("postgres_changes", { event: "*", schema: "public", table: "saldos_bancarios" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "contas" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "lancamentos_financeiros" }, refresh).subscribe();
+    const unsubscribe = qc.getQueryCache().subscribe((event) => {
+      if (event.type === "updated" && event.action.type === "invalidate" && ["contas", "lancamentos_financeiros", "saldos-bancarios"].includes(String(event.query.queryKey[0]))) {
+        qc.invalidateQueries({ queryKey: ["saldos-contas-hoje"] });
+        qc.invalidateQueries({ queryKey: ["saldos-lancamentos-hoje"] });
+      }
+    });
+    return () => { unsubscribe(); void supabase.removeChannel(channel); };
+  }, [qc]);
   const hoje = hojeISO();
 
   /** Títulos baixados hoje em Contas a pagar/receber. */
@@ -47,13 +66,13 @@ export function SaldosBancarios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("tipo, valor, valor_juros, status, data_pagamento")
-        .eq("status", "pago")
+        .select("tipo, valor, valor_pago, valor_desconto, valor_juros, conta_bancaria, status, data_pagamento")
+        .in("status", ["pago", "pago_parcial"])
         .eq("data_pagamento", hoje);
       if (error) throw error;
-      return data as { tipo: string; valor: number; valor_juros: number | null }[];
+      return data as { tipo: string; valor: number; valor_juros: number | null; valor_pago: number; valor_desconto: number; conta_bancaria: string | null }[];
     },
-    refetchInterval: 60_000,
+    refetchInterval: 5000,
   });
 
   /** Lançamentos financeiros quitados hoje. */
@@ -68,22 +87,24 @@ export function SaldosBancarios() {
       if (error) throw error;
       return data as { tipo_fluxo: string; valor: number; conta_bancaria: string | null }[];
     },
-    refetchInterval: 60_000,
+    refetchInterval: 5000,
   });
 
+  const valorBaixado = (c: typeof contasHoje[number]) => Number(c.valor_pago) || Math.max(0, Number(c.valor) + Number(c.valor_juros) - Number(c.valor_desconto));
   const ehEntrada = (t: string) => t === "receber" || t === "entrada" || t === "receita";
 
   const entradasHoje =
-    contasHoje.filter((c) => ehEntrada(c.tipo)).reduce((s, c) => s + Number(c.valor ?? 0) + Number(c.valor_juros ?? 0), 0) +
+    contasHoje.filter((c) => ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
     lancHoje.filter((l) => ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
 
   const saidasHoje =
-    contasHoje.filter((c) => !ehEntrada(c.tipo)).reduce((s, c) => s + Number(c.valor ?? 0) + Number(c.valor_juros ?? 0), 0) +
+    contasHoje.filter((c) => !ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
     lancHoje.filter((l) => !ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
 
   /** Movimento do dia já identificado com a conta bancária informada. */
   const movimentoConta = (conta: string) =>
-    lancHoje
+    contasHoje.filter((c) => (c.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
+      .reduce((s, c) => s + (ehEntrada(c.tipo) ? 1 : -1) * valorBaixado(c), 0) + lancHoje
       .filter((l) => (l.conta_bancaria ?? "").trim() === conta.trim())
       .reduce((s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor ?? 0) : -Number(l.valor ?? 0)), 0);
 
@@ -149,15 +170,15 @@ export function SaldosBancarios() {
   });
 
   const total = saldos.reduce((s, c) => s + Number(c.saldo ?? 0), 0);
-  const totalAtual = total + entradasHoje - saidasHoje;
+  const totalAtual = total;
 
   return (
     <ExpandableCard>
       <CardHeader className="flex-row items-start justify-between space-y-0 pr-12">
         <div>
-          <CardTitle>Saldo das contas (informado manualmente)</CardTitle>
+          <CardTitle>Saldo das contas</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
-            Digite o saldo que o banco mostra hoje. Serve enquanto a conciliação automática não está ligada.
+            Saldo registrado por conta bancária.
           </p>
           <div className="mt-2">
             <ExtratoImportar />
@@ -167,7 +188,7 @@ export function SaldosBancarios() {
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual com o dia de hoje</p>
           <p className="text-xl font-semibold tabular-nums">{brl(totalAtual)}</p>
           <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-            Informado {brl(total)} · recebido hoje <span className="text-emerald-500">+{brl(entradasHoje)}</span> · pago
+            Total {brl(total)} · recebido hoje <span className="text-emerald-500">+{brl(entradasHoje)}</span> · pago
             hoje <span className="text-destructive">−{brl(saidasHoje)}</span>
           </p>
         </div>
@@ -192,7 +213,7 @@ export function SaldosBancarios() {
                           {movimentoConta(s.conta) > 0 ? "+" : "−"}
                           {brl(Math.abs(movimentoConta(s.conta)))}
                         </span>{" "}
-                        · saldo {brl(Number(s.saldo ?? 0) + movimentoConta(s.conta))}
+                        · saldo {brl(Number(s.saldo ?? 0))}
                       </p>
                     )}
                   </div>

@@ -585,28 +585,6 @@ function Contas() {
         if (error) throw error;
       }
 
-      // Atualiza o saldo da conta bancária de origem/destino: soma no
-      // recebimento, subtrai no pagamento.
-      const nomeConta = (conta as { conta_bancaria?: string | null }).conta_bancaria;
-      if (nomeConta) {
-        const { data: saldoRow } = await supabase
-          .from("saldos_bancarios")
-          .select("id, saldo")
-          .eq("conta", nomeConta)
-          .order("data_saldo", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (saldoRow) {
-          const ajuste = conta.tipo === "receber" ? valorPago : -valorPago;
-          const novoSaldo = Number((Number(saldoRow.saldo) + ajuste).toFixed(2));
-          const { error: errSaldoBanco } = await supabase
-            .from("saldos_bancarios")
-            .update({ saldo: novoSaldo })
-            .eq("id", saldoRow.id);
-          if (errSaldoBanco) throw errSaldoBanco;
-        }
-      }
-
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const proxima = proximaData(conta.vencimento, conta.recorrencia);
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
