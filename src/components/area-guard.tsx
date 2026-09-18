@@ -3,20 +3,25 @@ import { useRouterState } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/hooks/use-auth";
 import { useRoles } from "@/hooks/use-role";
 
 
 /** Bloqueia a página quando o perfil do usuário não tem acesso à área. */
 export function AreaGuard({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { session, loading: authLoading } = useAuth();
   const { podeRota, loading } = useRoles();
 
   if (["/auth", "/reset-password", "/sitemap.xml"].includes(pathname)) return <>{children}</>;
 
-
-  if (loading) {
+  if (authLoading || loading) {
     return <p className="p-6 text-sm text-muted-foreground">Carregando permissões…</p>;
   }
+
+  // A autenticação precisa ser oferecida antes da verificação de telas.
+  // Cada rota privada renderiza RequireAuth, que exibe o botão Entrar.
+  if (!session) return <>{children}</>;
 
   if (!podeRota(pathname)) {
     return (
