@@ -311,9 +311,27 @@ function OrdensCompra() {
     [ordens, filtroStatus],
   );
 
+  /** Produto comprado, com a ordem e o pedido de venda vinculados. */
+  type LinhaProduto = {
+    id: string;
+    ordemId: string;
+    ordemNumero: string | null;
+    descricao: string;
+    codigo: string | null;
+    unidade: string;
+    quantidade: number;
+    total: number;
+    pedido: string;
+    cliente: string;
+  };
+
   /** Ordens agrupadas por fornecedor (e não por pedido). */
   const gruposFornecedor = useMemo(() => {
-    const mapa = new Map<string, { chave: string; nome: string; ordens: Ordem[]; total: number }>();
+    const mapa = new Map<
+      string,
+      { chave: string; nome: string; ordens: Ordem[]; total: number; produtos: LinhaProduto[] }
+    >();
+    const ordemPorId = new Map(ordensFiltradas.map((o) => [o.id, o]));
     for (const o of ordensFiltradas) {
       const chave = o.fornecedor_id ?? "sem-fornecedor";
       const grupo =
@@ -323,13 +341,38 @@ function OrdensCompra() {
           nome: o.fornecedor_nome ?? "Fornecedor não definido",
           ordens: [] as Ordem[],
           total: 0,
+          produtos: [] as LinhaProduto[],
         };
       grupo.ordens.push(o);
       grupo.total += Number(o.valor_total ?? 0);
       mapa.set(chave, grupo);
     }
+    for (const it of itensTodos) {
+      const ordem = ordemPorId.get(it.ordem_id);
+      if (!ordem) continue;
+      const grupo = mapa.get(ordem.fornecedor_id ?? "sem-fornecedor");
+      if (!grupo) continue;
+      const venda = it.venda_id ? vendaPorId.get(it.venda_id) : undefined;
+      grupo.produtos.push({
+        id: it.id,
+        ordemId: ordem.id,
+        ordemNumero: ordem.numero,
+        descricao: it.descricao,
+        codigo: it.codigo,
+        unidade: it.unidade,
+        quantidade: Number(it.quantidade ?? 0),
+        total: Number(it.total ?? 0),
+        pedido: venda?.numero ?? "Estoque",
+        cliente: it.cliente_nome ?? venda?.cliente_nome ?? "—",
+      });
+    }
+    for (const g of mapa.values()) {
+      g.produtos.sort(
+        (a, b) => a.pedido.localeCompare(b.pedido) || a.descricao.localeCompare(b.descricao),
+      );
+    }
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [ordensFiltradas]);
+  }, [ordensFiltradas, itensTodos, vendaPorId]);
 
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
   const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
