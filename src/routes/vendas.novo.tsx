@@ -909,7 +909,7 @@ function NovoPedido() {
         data_pagamento: c.data_prevista || data,
         forma_pagamento: c.forma_pagamento || "Dinheiro",
         valor: c.valor,
-        conta_bancaria: c.bandeira || null,
+        conta_bancaria: c.conta_bancaria || null,
         observacoes:
           parcelasNum(c.parcelas) > 1
             ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
@@ -922,7 +922,7 @@ function NovoPedido() {
           data_pagamento: data,
           forma_pagamento: condicoes[0]?.forma_pagamento || "Dinheiro",
           valor: entrada,
-          conta_bancaria: null,
+          conta_bancaria: contaEntrada || null,
           observacoes: "Entrada paga no fechamento do pedido",
           created_by: userId,
         });
@@ -932,6 +932,36 @@ function NovoPedido() {
           .from("venda_pagamentos")
           .insert(pagamentos as never);
         if (erroPag) throw erroPag;
+
+        // Crédito em tempo real: soma o valor recebido no saldo da conta
+        // escolhida (entrada e condições já pagas). Best-effort.
+        try {
+          const creditos = new Map<string, number>();
+          if (entrada > 0 && contaEntrada.trim())
+            creditos.set(contaEntrada.trim(), (creditos.get(contaEntrada.trim()) ?? 0) + entrada);
+          for (const c of pagas) {
+            const nome = (c.conta_bancaria || "").trim();
+            if (nome) creditos.set(nome, (creditos.get(nome) ?? 0) + c.valor);
+          }
+          for (const [nome, valor] of creditos) {
+            const { data: saldoRow } = await supabase
+              .from("saldos_bancarios")
+              .select("id, saldo")
+              .eq("conta", nome)
+              .order("data_saldo", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (saldoRow) {
+              await supabase
+                .from("saldos_bancarios")
+                .update({ saldo: Number((Number(saldoRow.saldo) + valor).toFixed(2)) })
+                .eq("id", saldoRow.id);
+            }
+          }
+          queryClient.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+        } catch {
+          /* saldo da conta é atualizado como puder */
+        }
       }
 
       // 2) Estoque: baixa o que tem saldo, encomenda automaticamente o que falta.
