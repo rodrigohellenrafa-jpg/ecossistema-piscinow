@@ -141,6 +141,10 @@ export function ExtratoImportar({
   const [conta, setConta] = useState(contaInicial ?? "");
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [arquivo, setArquivo] = useState("");
+  const [saldoArquivo, setSaldoArquivo] = useState<{ saldo: number; data: string | null } | null>(
+    null,
+  );
+  const [usarSaldo, setUsarSaldo] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: contas = [] } = useQuery({
