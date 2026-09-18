@@ -25,4 +25,5 @@ Validação: páginas autenticadas abriram sem erros; testes de gravação, foto
 ## Saldos bancários
 - [x] Centralizar movimentos pagos e estornos no saldo da conta.
 - [x] Remover soma duplicada e atualizar painel e resumo diário.
-- [ ] Validar transações e orientar uso do OFX.
+- [x] Validar entrada, edição, troca de conta, exclusão e baixa com desconto em transação revertida; painel verificado.
+- [x] Orientar OFX como referência para reconciliar saldos históricos sem reaplicar movimentos antigos.
