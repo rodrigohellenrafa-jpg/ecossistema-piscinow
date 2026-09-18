@@ -576,6 +576,16 @@ function DetalhePedido() {
   );
   const statusPag = totalPago <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
 
+  // Base de custo: custos dos itens + custos do kit (casco, filtro, frete, mão
+  // de obra e impostos). Serve apenas para apurar lucro/prejuízo da venda.
+  const custoItens = Number(
+    itens.reduce((s, i) => s + Number(i.custo_unitario ?? 0) * Number(i.quantidade ?? 0), 0).toFixed(2),
+  );
+  const custoKit = Number(Number(kit?.custo_total_kit ?? 0).toFixed(2));
+  const custoTotalVenda = Number((custoItens + custoKit).toFixed(2));
+  const lucroVenda = Number((totalVenda - custoTotalVenda).toFixed(2));
+  const margemVenda = totalVenda > 0 ? lucroVenda / totalVenda : 0;
+
   if (!venda) {
     return <p className="text-muted-foreground">Carregando pedido...</p>;
   }
