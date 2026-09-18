@@ -661,18 +661,26 @@ function Agenda() {
                       meu ? "border-primary bg-primary/5" : "border-border"
                     }`}
                   >
-                    <div className="min-w-0">
-                      <p
-                        className={`truncate text-sm ${meu ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-                      >
-                        {i.hora ? `${i.hora} · ` : "Dia inteiro · "}
-                        {i.titulo}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {[i.responsavelNome ?? "sem responsável", i.detalhe, i.local]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <Checkbox
+                        className="mt-0.5 shrink-0"
+                        checked={selecionados.has(i.id)}
+                        onCheckedChange={(v) => alternar(i.id, !!v)}
+                        aria-label={`Selecionar ${i.titulo}`}
+                      />
+                      <div className="min-w-0">
+                        <p
+                          className={`truncate text-sm ${meu ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                        >
+                          {i.hora ? `${i.hora} · ` : "Dia inteiro · "}
+                          {i.titulo}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[i.responsavelNome ?? "sem responsável", i.detalhe, i.local]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {meu && <Badge>Você</Badge>}
