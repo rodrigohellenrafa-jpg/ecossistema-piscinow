@@ -1,4 +1,5 @@
 import { LancarEmLote } from "@/components/lancar-em-lote";
+import { ajustarSaldoConta, sinalFluxo } from "@/lib/saldo-conta";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -302,6 +303,14 @@ function Financeiro() {
         .single();
       if (error) throw error;
 
+      // Lançamento já pago move o saldo da conta informada na hora.
+      if (form.status === "Pago") {
+        await ajustarSaldoConta(
+          form.conta_bancaria,
+          sinalFluxo(form.tipo_fluxo) * (Number(form.valor) || 0),
+        );
+      }
+
       if (ratear && criado) {
         const { error: err2 } = await supabase.from("lancamento_rateios").insert(
           linhas.map((l) => ({
@@ -325,23 +334,33 @@ function Financeiro() {
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
       qc.invalidateQueries({ queryKey: ["lancamento-rateios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const marcarPago = useMutation({
     mutationFn: async (id: string) => {
+      const { data: orig } = await supabase
+        .from("lancamentos_financeiros")
+        .select("*")
+        .eq("id", id)
+        .single();
+
       const { error } = await supabase
         .from("lancamentos_financeiros")
         .update({ status: "Pago", data_pagamento: hojeISO() })
         .eq("id", id);
       if (error) throw error;
 
-      const { data: orig } = await supabase
-        .from("lancamentos_financeiros")
-        .select("*")
-        .eq("id", id)
-        .single();
+      // Entrada soma e saída subtrai do saldo da conta informada.
+      if (orig) {
+        await ajustarSaldoConta(
+          orig.conta_bancaria,
+          sinalFluxo(orig.tipo_fluxo) * Number(orig.valor ?? 0),
+        );
+      }
+
       if (orig && orig.recorrencia && orig.recorrencia !== "nenhuma") {
         const base = orig.vencimento || orig.data_competencia;
         const proxima = proximaData(base, orig.recorrencia);
@@ -370,9 +389,11 @@ function Financeiro() {
       }
     },
     onSuccess: () => {
-      toast.success("Lançamento marcado como pago.");
+      toast.success("Lançamento pago e saldo da conta atualizado.");
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const toggleConciliado = useMutation({
@@ -388,13 +409,29 @@ function Financeiro() {
 
   const excluir = useMutation({
     mutationFn: async (id: string) => {
+      const { data: orig } = await supabase
+        .from("lancamentos_financeiros")
+        .select("tipo_fluxo, valor, status, conta_bancaria")
+        .eq("id", id)
+        .maybeSingle();
+
       const { error } = await supabase.from("lancamentos_financeiros").delete().eq("id", id);
       if (error) throw error;
+
+      // Estorna o saldo quando o lançamento excluído já estava pago.
+      if (orig && orig.status === "Pago") {
+        await ajustarSaldoConta(
+          orig.conta_bancaria,
+          -sinalFluxo(orig.tipo_fluxo) * Number(orig.valor ?? 0),
+        );
+      }
     },
     onSuccess: () => {
       toast.success("Lançamento excluído.");
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
