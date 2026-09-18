@@ -962,7 +962,7 @@ function DetalhePedido() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">
-                Abatido em condições (multipartido)
+                Abatido em condições a receber (multipartido)
               </p>
               <p className="font-medium">{brl(totalCondicoes)}</p>
             </div>
