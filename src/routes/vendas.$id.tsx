@@ -1466,6 +1466,21 @@ function DetalhePedido() {
                   onChange={(e) => setEditCond({ ...editCond, bandeira: e.target.value })}
                 />
               </Field>
+              <Field label="Para qual conta vai o recurso">
+                <Input
+                  list="contas-bancarias-opcoes"
+                  placeholder="Selecione ou digite a conta"
+                  value={editCond.conta_bancaria}
+                  onChange={(e) =>
+                    setEditCond({ ...editCond, conta_bancaria: e.target.value })
+                  }
+                />
+              </Field>
+              <datalist id="contas-bancarias-opcoes">
+                {contasBancarias.map((nome) => (
+                  <option key={nome} value={nome} />
+                ))}
+              </datalist>
               <Field label="Data prevista">
                 <Input
                   type="date"
