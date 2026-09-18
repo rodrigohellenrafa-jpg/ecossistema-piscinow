@@ -147,6 +147,7 @@ type Item = {
   total: number;
   cliente_id: string | null;
   cliente_nome: string | null;
+  venda_id?: string | null;
 };
 
 type Fornecedor = {
