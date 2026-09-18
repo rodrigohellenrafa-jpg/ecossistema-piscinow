@@ -1620,19 +1620,6 @@ function NovoPedido() {
 
                   <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.4fr)_minmax(200px,1fr)_minmax(180px,0.8fr)]">
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <Field label="Valor desta condição">
-                        <MoedaInput
-                          value={c.valor}
-                          onChange={(valor) => {
-                            const parcelas = parcelasNum(c.parcelas);
-                            const juros = acrescimoCondicao(c);
-                            atualizarCondicao(c.key, {
-                              valor,
-                              valor_parcela: (valor + juros) / parcelas,
-                            });
-                          }}
-                        />
-                      </Field>
                       <Field label="Parcelas">
                         <Input
                           type="text"
@@ -1659,6 +1646,19 @@ function NovoPedido() {
                         <MoedaInput
                           value={c.valor_parcela}
                           onChange={(valor_parcela) => atualizarCondicao(c.key, { valor_parcela })}
+                        />
+                      </Field>
+                      <Field label="Valor abatido">
+                        <MoedaInput
+                          value={c.valor}
+                          onChange={(valor) => {
+                            const parcelas = parcelasNum(c.parcelas);
+                            const juros = acrescimoCondicao(c);
+                            atualizarCondicao(c.key, {
+                              valor,
+                              valor_parcela: (valor + juros) / parcelas,
+                            });
+                          }}
                         />
                       </Field>
                     </div>
