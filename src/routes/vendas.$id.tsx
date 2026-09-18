@@ -39,7 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, FORMAS_PAGAMENTO, STATUS_PEDIDO } from "@/lib/erp";
+import { brl, dataBR, FORMAS_PAGAMENTO, pct, STATUS_PEDIDO } from "@/lib/erp";
 import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -152,6 +152,7 @@ function DetalhePedido() {
         descricao: string;
         quantidade: number;
         preco_unitario: number;
+        custo_unitario: number | null;
         total: number;
         produtos: { ncm: string | null; cst: string | null; cfop: string | null; unidade: string | null } | null;
       }>;
@@ -538,38 +539,29 @@ function DetalhePedido() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const linhas = useMemo(() => {
-    const itensGrade = itens.map((i) => ({
-      cod: i.sku ?? "—",
-      descricao: i.descricao,
-      ncm: i.produtos?.ncm ?? "—",
-      cst: i.produtos?.cst ?? "—",
-      cfop: i.produtos?.cfop ?? "—",
-      un: i.produtos?.unidade ?? "UN",
-      qtd: i.quantidade,
-      vlrUnit: i.preco_unitario,
-      vlrTotal: i.total,
-    }));
-    if (kit && kit.preco_venda_kit > 0) {
-      itensGrade.push({
-        cod: "KIT",
-        descricao: "Kit Piscina (casco + filtro + acessórios)",
-        ncm: "—",
-        cst: "—",
-        cfop: "—",
-        un: "UN",
-        qtd: 1,
-        vlrUnit: kit.preco_venda_kit,
-        vlrTotal: kit.preco_venda_kit,
-      });
-    }
-    return itensGrade;
-  }, [itens, kit]);
+  // O kit de piscina nunca entra na grade nem na base de cálculo: é apenas
+  // referência de custo para apurar lucro da venda.
+  const linhas = useMemo(
+    () =>
+      itens.map((i) => ({
+        cod: i.sku ?? "—",
+        descricao: i.descricao,
+        ncm: i.produtos?.ncm ?? "—",
+        cst: i.produtos?.cst ?? "—",
+        cfop: i.produtos?.cfop ?? "—",
+        un: i.produtos?.unidade ?? "UN",
+        qtd: i.quantidade,
+        vlrUnit: i.preco_unitario,
+        vlrTotal: i.total,
+      })),
+    [itens],
+  );
 
   const baseIcms = linhas.reduce((s, l) => s + l.vlrTotal, 0);
   const valorIcms = baseIcms * (aliquotaIcms / 100);
   const baseIcmsSt = 0;
   const valorIcmsSt = 0;
+
 
   const totalPago = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
   // O valor total da venda é sempre a soma dos itens do pedido.
@@ -583,6 +575,16 @@ function DetalhePedido() {
     0,
   );
   const statusPag = totalPago <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
+
+  // Base de custo: custos dos itens + custos do kit (casco, filtro, frete, mão
+  // de obra e impostos). Serve apenas para apurar lucro/prejuízo da venda.
+  const custoItens = Number(
+    itens.reduce((s, i) => s + Number(i.custo_unitario ?? 0) * Number(i.quantidade ?? 0), 0).toFixed(2),
+  );
+  const custoKit = Number(Number(kit?.custo_total_kit ?? 0).toFixed(2));
+  const custoTotalVenda = Number((custoItens + custoKit).toFixed(2));
+  const lucroVenda = Number((totalVenda - custoTotalVenda).toFixed(2));
+  const margemVenda = totalVenda > 0 ? lucroVenda / totalVenda : 0;
 
   if (!venda) {
     return <p className="text-muted-foreground">Carregando pedido...</p>;
@@ -1204,9 +1206,50 @@ function DetalhePedido() {
           </div>
           <div className="sm:col-span-2">
             <p className="text-xs text-muted-foreground">Valor total do pedido</p>
-            <p className="text-lg font-semibold">{brl(venda.valor_total)}</p>
+            <p className="text-lg font-semibold">{brl(totalVenda)}</p>
           </div>
         </div>
+
+        <div className="mb-6 grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-4 print:hidden">
+          <div className="sm:col-span-4">
+            <p className="font-semibold">Resultado da venda</p>
+            <p className="text-xs text-muted-foreground">
+              O kit de piscina não entra no pedido nem na base de cálculo — os números abaixo são
+              apenas base de custo para apurar lucro ou prejuízo.
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Receita (itens do pedido)</p>
+            <p className="font-medium">{brl(totalVenda)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Custo dos itens</p>
+            <p className="font-medium">{brl(custoItens)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Custo do kit (referência)</p>
+            <p className="font-medium">{brl(custoKit)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Custo total</p>
+            <p className="font-medium">{brl(custoTotalVenda)}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs text-muted-foreground">
+              {lucroVenda >= 0 ? "Lucro da venda" : "Prejuízo da venda"}
+            </p>
+            <p className={`text-lg font-semibold ${lucroVenda >= 0 ? "text-success" : "text-destructive"}`}>
+              {brl(lucroVenda)}
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs text-muted-foreground">Margem</p>
+            <p className={`text-lg font-semibold ${lucroVenda >= 0 ? "text-success" : "text-destructive"}`}>
+              {pct(margemVenda)}
+            </p>
+          </div>
+        </div>
+
 
         <div>
           <p className="mb-2 font-semibold">Condição de pagamento</p>
