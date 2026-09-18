@@ -67,10 +67,10 @@ export function SaldosBancarios() {
       const { data, error } = await supabase
         .from("contas")
         .select("tipo, valor, valor_pago, valor_desconto, valor_juros, conta_bancaria, status, data_pagamento")
-        .in("status", ["pago", "pago_parcial"])
         .eq("data_pagamento", hoje);
       if (error) throw error;
-      return data as { tipo: string; valor: number; valor_juros: number | null; valor_pago: number; valor_desconto: number; conta_bancaria: string | null }[];
+      return (data as { tipo: string; valor: number; valor_juros: number | null; valor_pago: number; valor_desconto: number; conta_bancaria: string | null; status: string }[])
+        .filter((c) => ["pago", "pago_parcial"].includes(c.status.toLowerCase()));
     },
     refetchInterval: 5000,
   });
@@ -82,16 +82,16 @@ export function SaldosBancarios() {
       const { data, error } = await supabase
         .from("lancamentos_financeiros")
         .select("tipo_fluxo, valor, conta_bancaria, status, data_pagamento")
-        .eq("status", "Pago")
         .eq("data_pagamento", hoje);
       if (error) throw error;
-      return data as { tipo_fluxo: string; valor: number; conta_bancaria: string | null }[];
+      return (data as { tipo_fluxo: string; valor: number; conta_bancaria: string | null; status: string }[])
+        .filter((l) => ["pago", "pago_parcial"].includes(l.status.toLowerCase()));
     },
     refetchInterval: 5000,
   });
 
   const valorBaixado = (c: typeof contasHoje[number]) => Number(c.valor_pago) || Math.max(0, Number(c.valor) + Number(c.valor_juros) - Number(c.valor_desconto));
-  const ehEntrada = (t: string) => t === "receber" || t === "entrada" || t === "receita";
+  const ehEntrada = (t: string) => ["receber", "entrada", "receita"].includes(t.toLowerCase());
 
   const entradasHoje =
     contasHoje.filter((c) => ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
@@ -105,7 +105,7 @@ export function SaldosBancarios() {
   const movimentoConta = (conta: string) =>
     contasHoje.filter((c) => (c.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
       .reduce((s, c) => s + (ehEntrada(c.tipo) ? 1 : -1) * valorBaixado(c), 0) + lancHoje
-      .filter((l) => (l.conta_bancaria ?? "").trim() === conta.trim())
+      .filter((l) => (l.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
       .reduce((s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor ?? 0) : -Number(l.valor ?? 0)), 0);
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
@@ -170,7 +170,21 @@ export function SaldosBancarios() {
   });
 
   const total = saldos.reduce((s, c) => s + Number(c.saldo ?? 0), 0);
-  const totalAtual = total;
+  const contasMovimentadasHoje = new Set(
+    [...contasHoje, ...lancHoje]
+      .map((m) => (m.conta_bancaria ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const saldosComMovimentoHoje = saldos.filter((s) =>
+    contasMovimentadasHoje.has(s.conta.trim().toLowerCase()),
+  );
+  const totalAtual = (saldosComMovimentoHoje.length > 0 ? saldosComMovimentoHoje : saldos)
+    .reduce((s, c) => s + Number(c.saldo ?? 0), 0);
+  const contextoSaldo = saldosComMovimentoHoje.length === 1
+    ? saldosComMovimentoHoje[0]?.conta
+    : saldosComMovimentoHoje.length > 1
+      ? `${saldosComMovimentoHoje.length} contas movimentadas hoje`
+      : "todas as contas";
 
   return (
     <ExpandableCard>
@@ -185,10 +199,10 @@ export function SaldosBancarios() {
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual com o dia de hoje</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual · {contextoSaldo}</p>
           <p className="text-xl font-semibold tabular-nums">{brl(totalAtual)}</p>
           <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-            Total {brl(total)} · recebido hoje <span className="text-emerald-500">+{brl(entradasHoje)}</span> · pago
+            Todas as contas {brl(total)} · recebido hoje <span className="text-emerald-500">+{brl(entradasHoje)}</span> · pago
             hoje <span className="text-destructive">−{brl(saidasHoje)}</span>
           </p>
         </div>

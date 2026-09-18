@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { hojeISO } from "@/lib/erp";
 import { brl, dataBR, num } from "@/lib/erp";
 
 type Linha = {
@@ -257,7 +258,7 @@ export function ExtratoImportar({
             .from("saldos_bancarios")
             .update({
               saldo: saldoArquivo.saldo,
-              data_saldo: saldoArquivo.data ?? new Date().toISOString().slice(0, 10),
+              data_saldo: saldoArquivo.data ?? hojeISO(),
             })
             .eq("id", alvo.id);
           if (error) throw error;
@@ -361,7 +362,7 @@ export function ExtratoImportar({
                 onChange={(e) => setUsarSaldo(e.target.checked)}
               />
               <span>
-                Atualizar o saldo desta conta para <strong>{brl(saldoArquivo.saldo)}</strong>
+                Sincronizar saldo final da conta para <strong>{brl(saldoArquivo.saldo)}</strong>
                 {saldoArquivo.data ? ` (saldo do banco em ${dataBR(saldoArquivo.data)})` : ""}
               </span>
             </label>
