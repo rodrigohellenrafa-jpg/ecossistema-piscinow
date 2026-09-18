@@ -39,7 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, FORMAS_PAGAMENTO, STATUS_PEDIDO } from "@/lib/erp";
+import { brl, dataBR, FORMAS_PAGAMENTO, pct, STATUS_PEDIDO } from "@/lib/erp";
 import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { useAuth } from "@/hooks/use-auth";
 
