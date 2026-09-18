@@ -560,6 +560,7 @@ function FlightBoard() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </>
         }
       />
 
