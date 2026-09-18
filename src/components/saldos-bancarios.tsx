@@ -36,7 +36,7 @@ export function SaldosBancarios() {
         .select("*")
         .order("data_saldo", { ascending: false }).order("updated_at", { ascending: false });
       if (error) throw error;
-      return [...new Map((data as Saldo[]).map((s) => [s.conta.trim().toLowerCase(), s]).reverse()).values()];
+      return [...new Map<string, Saldo>((data as Saldo[]).map((s): [string, Saldo] => [s.conta.trim().toLowerCase(), s]).reverse()).values()];
     },
   });
 
