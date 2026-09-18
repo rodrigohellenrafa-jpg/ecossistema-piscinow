@@ -187,6 +187,8 @@ interface CondicaoLinha {
   pago: boolean;
   bandeira: string;
   observacoes: string;
+  /** Conta bancária em que o recurso dessa condição entra. */
+  conta_bancaria: string;
 }
 
 
@@ -312,6 +314,19 @@ function NovoPedido() {
     },
   });
 
+  /** Contas bancárias cadastradas (para escolher onde o recurso entra). */
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos-bancarios", "contas-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("conta")
+        .order("conta", { ascending: true });
+      if (error) throw error;
+      return (data as { conta: string }[]).map((c) => c.conta);
+    },
+  });
+
   const numero = useMemo(() => proximoCodigo("VEN", numerosExistentes), [numerosExistentes]);
 
   const [data, setData] = useState(hojeISO());
@@ -349,6 +364,8 @@ function NovoPedido() {
   const [lucroSugerido, setLucroSugerido] = useState(0);
   /** Entrada paga pelo cliente no fechamento do pedido. */
   const [entrada, setEntrada] = useState(0);
+  /** Conta bancária em que a entrada paga no fechamento entra. */
+  const [contaEntrada, setContaEntrada] = useState("");
 
   /** Prazo de entrega e endereço de instalação impressos no pedido Splash. */
   const [prazoEntrega, setPrazoEntrega] = useState("");
@@ -519,6 +536,7 @@ function NovoPedido() {
     setLucroSugerido(0);
     setCondicoes([]);
     setEntrada(0);
+    setContaEntrada("");
     setPrazoEntrega("");
     setEnderecoInstalacao("");
     setMateriais({
@@ -691,6 +709,7 @@ function NovoPedido() {
         pago: false,
         bandeira: "",
         observacoes: "",
+        conta_bancaria: "",
       },
     ]);
   };
@@ -865,6 +884,7 @@ function NovoPedido() {
             data_prevista: c.data_prevista || data,
             pago: c.pago,
             bandeira: c.bandeira || null,
+            conta_bancaria: c.conta_bancaria || null,
             observacoes: c.observacoes || null,
             created_by: userId,
           })) as never,
@@ -889,7 +909,7 @@ function NovoPedido() {
         data_pagamento: c.data_prevista || data,
         forma_pagamento: c.forma_pagamento || "Dinheiro",
         valor: c.valor,
-        conta_bancaria: c.bandeira || null,
+        conta_bancaria: c.conta_bancaria || null,
         observacoes:
           parcelasNum(c.parcelas) > 1
             ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
@@ -902,7 +922,7 @@ function NovoPedido() {
           data_pagamento: data,
           forma_pagamento: condicoes[0]?.forma_pagamento || "Dinheiro",
           valor: entrada,
-          conta_bancaria: null,
+          conta_bancaria: contaEntrada || null,
           observacoes: "Entrada paga no fechamento do pedido",
           created_by: userId,
         });
@@ -912,6 +932,36 @@ function NovoPedido() {
           .from("venda_pagamentos")
           .insert(pagamentos as never);
         if (erroPag) throw erroPag;
+
+        // Crédito em tempo real: soma o valor recebido no saldo da conta
+        // escolhida (entrada e condições já pagas). Best-effort.
+        try {
+          const creditos = new Map<string, number>();
+          if (entrada > 0 && contaEntrada.trim())
+            creditos.set(contaEntrada.trim(), (creditos.get(contaEntrada.trim()) ?? 0) + entrada);
+          for (const c of pagas) {
+            const nome = (c.conta_bancaria || "").trim();
+            if (nome) creditos.set(nome, (creditos.get(nome) ?? 0) + c.valor);
+          }
+          for (const [nome, valor] of creditos) {
+            const { data: saldoRow } = await supabase
+              .from("saldos_bancarios")
+              .select("id, saldo")
+              .eq("conta", nome)
+              .order("data_saldo", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (saldoRow) {
+              await supabase
+                .from("saldos_bancarios")
+                .update({ saldo: Number((Number(saldoRow.saldo) + valor).toFixed(2)) })
+                .eq("id", saldoRow.id);
+            }
+          }
+          queryClient.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+        } catch {
+          /* saldo da conta é atualizado como puder */
+        }
       }
 
       // 2) Estoque: baixa o que tem saldo, encomenda automaticamente o que falta.
@@ -1523,6 +1573,18 @@ function NovoPedido() {
                       />
                     </Field>
 
+                    <Field label="Para qual conta vai o recurso">
+                      <Input
+                        className="text-white"
+                        list="contas-bancarias-opcoes"
+                        placeholder="Selecione ou digite a conta"
+                        value={c.conta_bancaria}
+                        onChange={(e) =>
+                          atualizarCondicao(c.key, { conta_bancaria: e.target.value })
+                        }
+                      />
+                    </Field>
+
                     <Field label="Data">
                       <Input
                         type="date"
@@ -1688,12 +1750,21 @@ function NovoPedido() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Entrada paga no fechamento (R$)">
                   <MoedaInput value={entrada} onChange={setEntrada} />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Valor recebido no ato. Abate do pedido e entra no caixa.
                   </p>
+                </Field>
+                <Field label="Conta que recebe a entrada">
+                  <Input
+                    className="text-white"
+                    list="contas-bancarias-opcoes"
+                    placeholder="Selecione ou digite a conta"
+                    value={contaEntrada}
+                    onChange={(e) => setContaEntrada(e.target.value)}
+                  />
                 </Field>
                 <Field label="Já recebido (entrada + condições pagas)">
                   <Input value={brl(valorEntrada)} disabled />
@@ -1702,6 +1773,12 @@ function NovoPedido() {
                   <Input value={brl(saldoDevedor)} disabled />
                 </Field>
               </div>
+
+              <datalist id="contas-bancarias-opcoes">
+                {contasBancarias.map((nome) => (
+                  <option key={nome} value={nome} />
+                ))}
+              </datalist>
 
               <Field label="Observações do pedido">
                 <Textarea

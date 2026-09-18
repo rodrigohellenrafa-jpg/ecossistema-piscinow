@@ -231,6 +231,19 @@ function DetalhePedido() {
     },
   });
 
+  /** Contas bancárias cadastradas (para escolher onde o recurso entra). */
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos-bancarios", "contas-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("conta")
+        .order("conta", { ascending: true });
+      if (error) throw error;
+      return (data as { conta: string }[]).map((c) => c.conta);
+    },
+  });
+
   const invalidarFinanceiro = () => {
     qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
     qc.invalidateQueries({ queryKey: ["venda", id] });
@@ -334,6 +347,7 @@ function DetalhePedido() {
     valor: string;
     acrescimo: string;
     pago: boolean;
+    conta_bancaria: string;
   }>(null);
   const [editPag, setEditPag] = useState<null | {
     id: string;
@@ -486,7 +500,8 @@ function DetalhePedido() {
           valor_cobrado: cobrado,
           valor_parcela: cobrado / parcelas,
           pago: editCond.pago,
-        })
+          conta_bancaria: editCond.conta_bancaria || null,
+        } as never)
         .eq("id", editCond.id);
       if (error) throw error;
     },
@@ -903,6 +918,8 @@ function DetalhePedido() {
                             valor: String(c.valor ?? ""),
                             acrescimo: String(c.acrescimo ?? ""),
                             pago: !!c.pago,
+                            conta_bancaria:
+                              (c as { conta_bancaria?: string | null }).conta_bancaria ?? "",
                           })
                         }
                       >
@@ -1449,6 +1466,21 @@ function DetalhePedido() {
                   onChange={(e) => setEditCond({ ...editCond, bandeira: e.target.value })}
                 />
               </Field>
+              <Field label="Para qual conta vai o recurso">
+                <Input
+                  list="contas-bancarias-opcoes"
+                  placeholder="Selecione ou digite a conta"
+                  value={editCond.conta_bancaria}
+                  onChange={(e) =>
+                    setEditCond({ ...editCond, conta_bancaria: e.target.value })
+                  }
+                />
+              </Field>
+              <datalist id="contas-bancarias-opcoes">
+                {contasBancarias.map((nome) => (
+                  <option key={nome} value={nome} />
+                ))}
+              </datalist>
               <Field label="Data prevista">
                 <Input
                   type="date"
