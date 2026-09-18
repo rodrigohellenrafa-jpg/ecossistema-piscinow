@@ -2406,6 +2406,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aplicar_delta_bancario: {
+        Args: { p_conta: string; p_delta: number }
+        Returns: undefined
+      }
       gerar_despesas_recorrentes: { Args: never; Returns: number }
       has_role: {
         Args: {
