@@ -2457,6 +2457,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      proximo_numero_venda: { Args: never; Returns: string }
       selecionar_obra_board: {
         Args: { p_obra?: string; p_selecionada?: boolean; p_venda?: string }
         Returns: string
