@@ -159,10 +159,17 @@ export const sincronizarAgendaGoogle = createServerFn({ method: "POST" })
 
 /** Envia para o Google Agenda os compromissos, obras e ordens de serviço do sistema. */
 export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
-  .inputValidator((input: { calendarId?: string }) => input)
+  .inputValidator(
+    (input: {
+      calendarId?: string;
+      selecionados?: { eventoIds?: string[]; osIds?: string[]; obraIds?: string[] };
+    }) => input,
+  )
   .middleware([requireSupabaseAuth])
   .handler(async ({ data }) => {
     const calendarId = data?.calendarId || "primary";
+    const sel = data?.selecionados;
+    const filtra = (ids?: string[]) => (sel ? (ids?.length ? ids : null) : null);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
