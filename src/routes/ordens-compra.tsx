@@ -274,6 +274,38 @@ function OrdensCompra() {
     },
   });
 
+  /** Todos os itens das ordens listadas, para agrupar produtos por fornecedor. */
+  const { data: itensTodos = [] } = useQuery({
+    queryKey: ["ordem_compra_itens", "todos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordem_compra_itens")
+        .select("*")
+        .order("created_at");
+      if (error) throw error;
+      return data as Item[];
+    },
+  });
+
+  /** Pedidos de venda vinculados aos itens comprados. */
+  const { data: vendasVinculo = [] } = useQuery({
+    queryKey: ["vendas", "vinculo-compras"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("id, numero, cliente_nome")
+        .order("numero");
+      if (error) throw error;
+      return data as { id: string; numero: string | null; cliente_nome: string | null }[];
+    },
+  });
+
+  const vendaPorId = useMemo(() => {
+    const m = new Map<string, { numero: string | null; cliente_nome: string | null }>();
+    for (const v of vendasVinculo) m.set(v.id, v);
+    return m;
+  }, [vendasVinculo]);
+
   const ordensFiltradas = useMemo(
     () => (filtroStatus === "todas" ? ordens : ordens.filter((o) => o.status === filtroStatus)),
     [ordens, filtroStatus],
