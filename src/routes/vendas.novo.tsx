@@ -1750,12 +1750,21 @@ function NovoPedido() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Entrada paga no fechamento (R$)">
                   <MoedaInput value={entrada} onChange={setEntrada} />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Valor recebido no ato. Abate do pedido e entra no caixa.
                   </p>
+                </Field>
+                <Field label="Conta que recebe a entrada">
+                  <Input
+                    className="text-white"
+                    list="contas-bancarias-opcoes"
+                    placeholder="Selecione ou digite a conta"
+                    value={contaEntrada}
+                    onChange={(e) => setContaEntrada(e.target.value)}
+                  />
                 </Field>
                 <Field label="Já recebido (entrada + condições pagas)">
                   <Input value={brl(valorEntrada)} disabled />
@@ -1764,6 +1773,12 @@ function NovoPedido() {
                   <Input value={brl(saldoDevedor)} disabled />
                 </Field>
               </div>
+
+              <datalist id="contas-bancarias-opcoes">
+                {contasBancarias.map((nome) => (
+                  <option key={nome} value={nome} />
+                ))}
+              </datalist>
 
               <Field label="Observações do pedido">
                 <Textarea
