@@ -706,6 +706,7 @@ function NovoPedido() {
         pago: false,
         bandeira: "",
         observacoes: "",
+        conta_bancaria: "",
       },
     ]);
   };
