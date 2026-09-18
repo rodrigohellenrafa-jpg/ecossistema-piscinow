@@ -341,17 +341,26 @@ function Financeiro() {
 
   const marcarPago = useMutation({
     mutationFn: async (id: string) => {
+      const { data: orig } = await supabase
+        .from("lancamentos_financeiros")
+        .select("*")
+        .eq("id", id)
+        .single();
+
       const { error } = await supabase
         .from("lancamentos_financeiros")
         .update({ status: "Pago", data_pagamento: hojeISO() })
         .eq("id", id);
       if (error) throw error;
 
-      const { data: orig } = await supabase
-        .from("lancamentos_financeiros")
-        .select("*")
-        .eq("id", id)
-        .single();
+      // Entrada soma e saída subtrai do saldo da conta informada.
+      if (orig) {
+        await ajustarSaldoConta(
+          orig.conta_bancaria,
+          sinalFluxo(orig.tipo_fluxo) * Number(orig.valor ?? 0),
+        );
+      }
+
       if (orig && orig.recorrencia && orig.recorrencia !== "nenhuma") {
         const base = orig.vencimento || orig.data_competencia;
         const proxima = proximaData(base, orig.recorrencia);
