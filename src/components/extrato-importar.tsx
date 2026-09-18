@@ -249,10 +249,29 @@ export function ExtratoImportar({
         );
         if (error) throw error;
       }
-      return { importadas: novas.length, ignoradas };
+      let saldoAtualizado = false;
+      if (saldoArquivo && usarSaldo) {
+        const alvo = contas.find((c) => c.conta === conta);
+        if (alvo) {
+          const { error } = await supabase
+            .from("saldos_bancarios")
+            .update({
+              saldo: saldoArquivo.saldo,
+              data_saldo: saldoArquivo.data ?? new Date().toISOString().slice(0, 10),
+            })
+            .eq("id", alvo.id);
+          if (error) throw error;
+          saldoAtualizado = true;
+        }
+      }
+      return { importadas: novas.length, ignoradas, saldoAtualizado };
     },
-    onSuccess: ({ importadas, ignoradas }) => {
+    onSuccess: ({ importadas, ignoradas, saldoAtualizado }) => {
       qc.invalidateQueries({ queryKey: ["extratos-bancarios"] });
+      if (saldoAtualizado) {
+        qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+        toast.success("Saldo da conta atualizado com o saldo do extrato.");
+      }
       if (importadas === 0) {
         toast.info("Nenhum movimento novo: todas as linhas já estavam importadas.");
       } else {
