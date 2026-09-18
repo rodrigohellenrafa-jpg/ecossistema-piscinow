@@ -1206,9 +1206,50 @@ function DetalhePedido() {
           </div>
           <div className="sm:col-span-2">
             <p className="text-xs text-muted-foreground">Valor total do pedido</p>
-            <p className="text-lg font-semibold">{brl(venda.valor_total)}</p>
+            <p className="text-lg font-semibold">{brl(totalVenda)}</p>
           </div>
         </div>
+
+        <div className="mb-6 grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-4 print:hidden">
+          <div className="sm:col-span-4">
+            <p className="font-semibold">Resultado da venda</p>
+            <p className="text-xs text-muted-foreground">
+              O kit de piscina não entra no pedido nem na base de cálculo — os números abaixo são
+              apenas base de custo para apurar lucro ou prejuízo.
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Receita (itens do pedido)</p>
+            <p className="font-medium">{brl(totalVenda)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Custo dos itens</p>
+            <p className="font-medium">{brl(custoItens)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Custo do kit (referência)</p>
+            <p className="font-medium">{brl(custoKit)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Custo total</p>
+            <p className="font-medium">{brl(custoTotalVenda)}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs text-muted-foreground">
+              {lucroVenda >= 0 ? "Lucro da venda" : "Prejuízo da venda"}
+            </p>
+            <p className={`text-lg font-semibold ${lucroVenda >= 0 ? "text-success" : "text-destructive"}`}>
+              {brl(lucroVenda)}
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs text-muted-foreground">Margem</p>
+            <p className={`text-lg font-semibold ${lucroVenda >= 0 ? "text-success" : "text-destructive"}`}>
+              {pct(margemVenda)}
+            </p>
+          </div>
+        </div>
+
 
         <div>
           <p className="mb-2 font-semibold">Condição de pagamento</p>
