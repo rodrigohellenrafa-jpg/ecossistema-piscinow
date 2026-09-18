@@ -1,0 +1,3 @@
+CREATE POLICY mestra_service ON public.configuracao_mestra FOR ALL TO service_role USING(true) WITH CHECK(true);
+CREATE OR REPLACE FUNCTION public.tem_tela(_uid uuid, _tela text) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT (auth.uid()=_uid OR public.has_role(auth.uid(),'admin') OR auth.role()='service_role') AND (public.has_role(_uid,'admin') OR EXISTS(SELECT 1 FROM public.permissoes_telas WHERE user_id=_uid AND _tela=ANY(telas))) $$;
+CREATE OR REPLACE FUNCTION public.tem_telas(_uid uuid, _telas text[]) RETURNS boolean LANGUAGE sql STABLE SECURITY INVOKER SET search_path=public AS $$ SELECT EXISTS(SELECT 1 FROM unnest(_telas) t WHERE public.tem_tela(_uid,t)) $$;
