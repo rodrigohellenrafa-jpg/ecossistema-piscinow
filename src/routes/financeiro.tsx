@@ -389,9 +389,11 @@ function Financeiro() {
       }
     },
     onSuccess: () => {
-      toast.success("Lançamento marcado como pago.");
+      toast.success("Lançamento pago e saldo da conta atualizado.");
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const toggleConciliado = useMutation({
