@@ -45,7 +45,13 @@ export function useRoles() {
   const isAdmin=roles.includes("admin");
   const podeTela=(tela:string)=>isAdmin || telas.includes(tela);
   return { roles, mestre:false, loading:loading || isLoading || carregandoTelas, isAdmin, telas, podeTela,
-    podeRota:(path:string)=>telasDaRota(path).some(podeTela),
+    podeRota:(path:string)=>{
+      if(isAdmin) return true;
+      const exigidas=telasDaRota(path);
+      // rota sem tela cadastrada no catálogo: liberada a qualquer usuário autenticado
+      if(exigidas.length===0) return true;
+      return exigidas.some(podeTela);
+    },
     pode:(area:keyof typeof ACESSO)=>roles.some(r=>ACESSO[area]?.includes(r)),
   };
 }
