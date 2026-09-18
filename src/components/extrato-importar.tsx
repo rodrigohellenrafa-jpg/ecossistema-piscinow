@@ -61,6 +61,47 @@ function paraISO(v: unknown): string | null {
   return null;
 }
 
+/** Lê o valor de uma etiqueta do arquivo OFX (formato SGML dos bancos). */
+function tagOFX(bloco: string, tag: string): string {
+  const m = bloco.match(new RegExp(`<${tag}>([^<\\r\\n]*)`, "i"));
+  return (m?.[1] ?? "").trim();
+}
+
+/** Converte a data do OFX (20260915120000[-3:BRT]) em ISO. */
+function dataOFX(v: string): string | null {
+  const m = v.match(/^(\d{4})(\d{2})(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+type LeituraOFX = { linhas: Linha[]; saldo: number | null; dataSaldo: string | null };
+
+/** Interpreta o extrato em OFX (Money/OFX), formato aceito por C6, Itaú, Nubank etc. */
+function lerOFX(texto: string): LeituraOFX {
+  const linhas: Linha[] = [];
+  const blocos = texto.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi) ?? [];
+  for (const b of blocos) {
+    const data = dataOFX(tagOFX(b, "DTPOSTED"));
+    const valor = Number(tagOFX(b, "TRNAMT").replace(/\s/g, "").replace(",", "."));
+    const descricao =
+      tagOFX(b, "MEMO") || tagOFX(b, "NAME") || tagOFX(b, "TRNTYPE") || "Movimento";
+    if (!data || !Number.isFinite(valor) || valor === 0) continue;
+    linhas.push({
+      data_movimento: data,
+      descricao,
+      documento: tagOFX(b, "CHECKNUM") || tagOFX(b, "FITID") || null,
+      valor: Math.abs(valor),
+      tipo: valor >= 0 ? "entrada" : "saida",
+    });
+  }
+  const bal = texto.match(/<LEDGERBAL>[\s\S]*?(?:<\/LEDGERBAL>|$)/i)?.[0] ?? "";
+  const saldoBruto = Number(tagOFX(bal, "BALAMT").replace(/\s/g, "").replace(",", "."));
+  return {
+    linhas,
+    saldo: Number.isFinite(saldoBruto) && tagOFX(bal, "BALAMT") ? saldoBruto : null,
+    dataSaldo: dataOFX(tagOFX(bal, "DTASOF")),
+  };
+}
+
 function normalizar(registros: Record<string, unknown>[]): Linha[] {
   const linhas: Linha[] = [];
   for (const reg of registros) {
@@ -100,6 +141,10 @@ export function ExtratoImportar({
   const [conta, setConta] = useState(contaInicial ?? "");
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [arquivo, setArquivo] = useState("");
+  const [saldoArquivo, setSaldoArquivo] = useState<{ saldo: number; data: string | null } | null>(
+    null,
+  );
+  const [usarSaldo, setUsarSaldo] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: contas = [] } = useQuery({
@@ -116,9 +161,21 @@ export function ExtratoImportar({
 
   const ler = async (file: File) => {
     setArquivo(file.name);
+    setSaldoArquivo(null);
     try {
+      if (/\.ofx$/i.test(file.name)) {
+        const texto = await file.text();
+        const r = lerOFX(texto);
+        setLinhas(r.linhas);
+        if (r.saldo !== null) setSaldoArquivo({ saldo: r.saldo, data: r.dataSaldo });
+        if (r.linhas.length === 0) {
+          toast.error("Não encontrei movimentos neste arquivo OFX.");
+        }
+        return;
+      }
       let registros: Record<string, unknown>[] = [];
       if (/\.csv$/i.test(file.name)) {
+
         const texto = await file.text();
         const r = Papa.parse<Record<string, unknown>>(texto, {
           header: true,
@@ -137,7 +194,7 @@ export function ExtratoImportar({
         toast.error("Não encontrei colunas de data, descrição e valor na planilha.");
       }
     } catch {
-      toast.error("Não consegui ler esse arquivo. Use CSV ou XLSX.");
+      toast.error("Não consegui ler esse arquivo. Use OFX, CSV ou Excel.");
     }
   };
 
@@ -192,10 +249,29 @@ export function ExtratoImportar({
         );
         if (error) throw error;
       }
-      return { importadas: novas.length, ignoradas };
+      let saldoAtualizado = false;
+      if (saldoArquivo && usarSaldo) {
+        const alvo = contas.find((c) => c.conta === conta);
+        if (alvo) {
+          const { error } = await supabase
+            .from("saldos_bancarios")
+            .update({
+              saldo: saldoArquivo.saldo,
+              data_saldo: saldoArquivo.data ?? new Date().toISOString().slice(0, 10),
+            })
+            .eq("id", alvo.id);
+          if (error) throw error;
+          saldoAtualizado = true;
+        }
+      }
+      return { importadas: novas.length, ignoradas, saldoAtualizado };
     },
-    onSuccess: ({ importadas, ignoradas }) => {
+    onSuccess: ({ importadas, ignoradas, saldoAtualizado }) => {
       qc.invalidateQueries({ queryKey: ["extratos-bancarios"] });
+      if (saldoAtualizado) {
+        qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+        toast.success("Saldo da conta atualizado com o saldo do extrato.");
+      }
       if (importadas === 0) {
         toast.info("Nenhum movimento novo: todas as linhas já estavam importadas.");
       } else {
@@ -207,6 +283,7 @@ export function ExtratoImportar({
       }
       setLinhas([]);
       setArquivo("");
+      setSaldoArquivo(null);
       setOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -225,8 +302,9 @@ export function ExtratoImportar({
         <DialogHeader>
           <DialogTitle>Importar extrato da conta</DialogTitle>
           <DialogDescription>
-            Exporte o extrato do banco em CSV ou Excel e envie aqui. O sistema reconhece as colunas
-            de data, descrição e valor sozinho e ignora linhas repetidas.
+            Baixe o extrato do banco em OFX (no C6 é a opção "OFX", que não pede senha) ou em CSV /
+            Excel e envie aqui. O sistema lê data, descrição e valor sozinho, ignora o que já foi
+            importado e, no OFX, ainda atualiza o saldo da conta.
           </DialogDescription>
         </DialogHeader>
 
@@ -257,7 +335,7 @@ export function ExtratoImportar({
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".ofx,.csv,.xlsx,.xls"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -268,9 +346,27 @@ export function ExtratoImportar({
               <Upload /> Escolher arquivo
             </Button>
             <p className="mt-2 text-xs text-muted-foreground">
-              {arquivo ? `${arquivo} · ${linhas.length} movimentos reconhecidos` : "CSV, XLSX ou XLS"}
+              {arquivo
+                ? `${arquivo} · ${linhas.length} movimentos reconhecidos`
+                : "OFX, CSV, XLSX ou XLS"}
             </p>
           </div>
+
+          {saldoArquivo && (
+            <label className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="size-4"
+                checked={usarSaldo}
+                onChange={(e) => setUsarSaldo(e.target.checked)}
+              />
+              <span>
+                Atualizar o saldo desta conta para <strong>{brl(saldoArquivo.saldo)}</strong>
+                {saldoArquivo.data ? ` (saldo do banco em ${dataBR(saldoArquivo.data)})` : ""}
+              </span>
+            </label>
+          )}
+
 
           {linhas.length > 0 && (
             <div className="max-h-64 overflow-y-auto rounded-lg border">
