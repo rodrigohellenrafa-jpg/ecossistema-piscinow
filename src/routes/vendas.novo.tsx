@@ -695,7 +695,9 @@ function NovoPedido() {
 
 
   const adicionarCondicao = () => {
-    const restante = Math.max(0, Number((valorTotal - totalAplicado).toFixed(2)));
+    // Saldo restante = total do pedido menos a entrada paga e o que já foi
+    // alocado em outras condições.
+    const restante = Math.max(0, Number((valorTotal - entrada - totalAplicado).toFixed(2)));
     setCondicoes((prev) => [
       ...prev,
       {
@@ -1613,7 +1615,7 @@ function NovoPedido() {
                         type="button"
                         className="mt-1 text-xs text-primary underline"
                         onClick={() => {
-                          const metade = Number((valorTotal / 2).toFixed(2));
+                          const metade = Number(((valorTotal - entrada) / 2).toFixed(2));
                           atualizarCondicao(c.key, {
                             valor: metade,
                             valor_parcela: metade / parcelasNum(c.parcelas),
