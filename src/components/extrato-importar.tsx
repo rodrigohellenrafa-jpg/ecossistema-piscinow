@@ -346,9 +346,27 @@ export function ExtratoImportar({
               <Upload /> Escolher arquivo
             </Button>
             <p className="mt-2 text-xs text-muted-foreground">
-              {arquivo ? `${arquivo} · ${linhas.length} movimentos reconhecidos` : "CSV, XLSX ou XLS"}
+              {arquivo
+                ? `${arquivo} · ${linhas.length} movimentos reconhecidos`
+                : "OFX, CSV, XLSX ou XLS"}
             </p>
           </div>
+
+          {saldoArquivo && (
+            <label className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+              <input
+                type="checkbox"
+                className="size-4"
+                checked={usarSaldo}
+                onChange={(e) => setUsarSaldo(e.target.checked)}
+              />
+              <span>
+                Atualizar o saldo desta conta para <strong>{brl(saldoArquivo.saldo)}</strong>
+                {saldoArquivo.data ? ` (saldo do banco em ${dataBR(saldoArquivo.data)})` : ""}
+              </span>
+            </label>
+          )}
+
 
           {linhas.length > 0 && (
             <div className="max-h-64 overflow-y-auto rounded-lg border">
