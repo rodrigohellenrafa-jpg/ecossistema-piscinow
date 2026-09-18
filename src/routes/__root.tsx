@@ -4,10 +4,23 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { LogOut } from "lucide-react";
+import { toast } from "sonner";
+
+import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -142,6 +155,13 @@ function RootShell({ children }: { children: ReactNode }) {
 function UserBadge() {
   const { user, loading } = useAuth();
   const { roles, loading: rolesLoading, isAdmin } = useRoles();
+  const navigate = useNavigate();
+
+  async function sair() {
+    await supabase.auth.signOut();
+    toast.success("Você saiu do sistema.");
+    void navigate({ to: "/auth" });
+  }
 
   if (loading || rolesLoading || !user) {
     return (
@@ -163,12 +183,32 @@ function UserBadge() {
 
   return (
     <div className="ml-auto flex items-center gap-2">
-      <span className="hidden text-xs text-muted-foreground sm:block">
-        {nome} · {perfil}
-      </span>
-      <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-        {iniciais}
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="Menu da conta"
+          className="flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="hidden text-xs text-muted-foreground sm:block">
+            {nome} · {perfil}
+          </span>
+          <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+            {iniciais}
+          </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="flex flex-col">
+            <span className="truncate">{nome}</span>
+            <span className="truncate text-xs font-normal text-muted-foreground">
+              {user.email}
+            </span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={sair}>
+            <LogOut className="size-4" />
+            Sair / trocar de conta
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
