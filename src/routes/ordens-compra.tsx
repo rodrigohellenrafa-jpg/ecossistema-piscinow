@@ -950,8 +950,8 @@ function OrdensCompra() {
         </Card>
       ) : (
         gruposFornecedor.map((g) => (
-          <Card key={g.chave}>
-            <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <ExpandableCard key={g.chave}>
+            <CardHeader className="flex flex-row items-center justify-between gap-3 pr-12">
               <CardTitle className="flex items-center gap-2">
                 {g.nome}
                 <Badge variant="secondary">
