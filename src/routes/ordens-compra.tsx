@@ -10,6 +10,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExpandableCard } from "@/components/expandable-card";
 import {
   Dialog,
   DialogContent,
@@ -146,6 +147,7 @@ type Item = {
   total: number;
   cliente_id: string | null;
   cliente_nome: string | null;
+  venda_id?: string | null;
 };
 
 type Fornecedor = {
@@ -272,14 +274,64 @@ function OrdensCompra() {
     },
   });
 
+  /** Todos os itens das ordens listadas, para agrupar produtos por fornecedor. */
+  const { data: itensTodos = [] } = useQuery({
+    queryKey: ["ordem_compra_itens", "todos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordem_compra_itens")
+        .select("*")
+        .order("created_at");
+      if (error) throw error;
+      return data as Item[];
+    },
+  });
+
+  /** Pedidos de venda vinculados aos itens comprados. */
+  const { data: vendasVinculo = [] } = useQuery({
+    queryKey: ["vendas", "vinculo-compras"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("id, numero, cliente_nome")
+        .order("numero");
+      if (error) throw error;
+      return data as { id: string; numero: string | null; cliente_nome: string | null }[];
+    },
+  });
+
+  const vendaPorId = useMemo(() => {
+    const m = new Map<string, { numero: string | null; cliente_nome: string | null }>();
+    for (const v of vendasVinculo) m.set(v.id, v);
+    return m;
+  }, [vendasVinculo]);
+
   const ordensFiltradas = useMemo(
     () => (filtroStatus === "todas" ? ordens : ordens.filter((o) => o.status === filtroStatus)),
     [ordens, filtroStatus],
   );
 
+  /** Produto comprado, com a ordem e o pedido de venda vinculados. */
+  type LinhaProduto = {
+    id: string;
+    ordemId: string;
+    ordemNumero: string | null;
+    descricao: string;
+    codigo: string | null;
+    unidade: string;
+    quantidade: number;
+    total: number;
+    pedido: string;
+    cliente: string;
+  };
+
   /** Ordens agrupadas por fornecedor (e não por pedido). */
   const gruposFornecedor = useMemo(() => {
-    const mapa = new Map<string, { chave: string; nome: string; ordens: Ordem[]; total: number }>();
+    const mapa = new Map<
+      string,
+      { chave: string; nome: string; ordens: Ordem[]; total: number; produtos: LinhaProduto[] }
+    >();
+    const ordemPorId = new Map(ordensFiltradas.map((o) => [o.id, o]));
     for (const o of ordensFiltradas) {
       const chave = o.fornecedor_id ?? "sem-fornecedor";
       const grupo =
@@ -289,13 +341,38 @@ function OrdensCompra() {
           nome: o.fornecedor_nome ?? "Fornecedor não definido",
           ordens: [] as Ordem[],
           total: 0,
+          produtos: [] as LinhaProduto[],
         };
       grupo.ordens.push(o);
       grupo.total += Number(o.valor_total ?? 0);
       mapa.set(chave, grupo);
     }
+    for (const it of itensTodos) {
+      const ordem = ordemPorId.get(it.ordem_id);
+      if (!ordem) continue;
+      const grupo = mapa.get(ordem.fornecedor_id ?? "sem-fornecedor");
+      if (!grupo) continue;
+      const venda = it.venda_id ? vendaPorId.get(it.venda_id) : undefined;
+      grupo.produtos.push({
+        id: it.id,
+        ordemId: ordem.id,
+        ordemNumero: ordem.numero,
+        descricao: it.descricao,
+        codigo: it.codigo,
+        unidade: it.unidade,
+        quantidade: Number(it.quantidade ?? 0),
+        total: Number(it.total ?? 0),
+        pedido: venda?.numero ?? "Estoque",
+        cliente: it.cliente_nome ?? venda?.cliente_nome ?? "—",
+      });
+    }
+    for (const g of mapa.values()) {
+      g.produtos.sort(
+        (a, b) => a.pedido.localeCompare(b.pedido) || a.descricao.localeCompare(b.descricao),
+      );
+    }
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [ordensFiltradas]);
+  }, [ordensFiltradas, itensTodos, vendaPorId]);
 
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
   const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
@@ -873,8 +950,8 @@ function OrdensCompra() {
         </Card>
       ) : (
         gruposFornecedor.map((g) => (
-          <Card key={g.chave}>
-            <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <ExpandableCard key={g.chave}>
+            <CardHeader className="flex flex-row items-center justify-between gap-3 pr-12">
               <CardTitle className="flex items-center gap-2">
                 {g.nome}
                 <Badge variant="secondary">
@@ -942,8 +1019,59 @@ function OrdensCompra() {
                   </TableBody>
                 </Table>
               </div>
+
+              {g.produtos.length > 0 && (
+                <div className="mt-6 space-y-2">
+                  <p className="text-sm font-semibold">Produtos deste fornecedor por pedido</p>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Pedido</TableHead>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Produto</TableHead>
+                          <TableHead>O.C.</TableHead>
+                          <TableHead className="text-right">Qtd</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {g.produtos.map((p) => (
+                          <TableRow
+                            key={p.id}
+                            className="cursor-pointer"
+                            onClick={() => setDetalheId(p.ordemId)}
+                          >
+                            <TableCell>
+                              <Badge variant={p.pedido === "Estoque" ? "secondary" : "outline"}>
+                                {p.pedido}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{p.cliente}</TableCell>
+                            <TableCell className="font-medium">
+                              {p.descricao}
+                              {p.codigo ? (
+                                <span className="ml-2 font-mono text-xs text-muted-foreground">
+                                  {p.codigo}
+                                </span>
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {p.ordemNumero ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {p.quantidade} {p.unidade}
+                            </TableCell>
+                            <TableCell className="text-right">{brl(p.total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
             </CardContent>
-          </Card>
+          </ExpandableCard>
         ))
       )}
 
