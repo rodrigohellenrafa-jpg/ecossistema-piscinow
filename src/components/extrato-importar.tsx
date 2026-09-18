@@ -302,8 +302,9 @@ export function ExtratoImportar({
         <DialogHeader>
           <DialogTitle>Importar extrato da conta</DialogTitle>
           <DialogDescription>
-            Exporte o extrato do banco em CSV ou Excel e envie aqui. O sistema reconhece as colunas
-            de data, descrição e valor sozinho e ignora linhas repetidas.
+            Baixe o extrato do banco em OFX (no C6 é a opção "OFX", que não pede senha) ou em CSV /
+            Excel e envie aqui. O sistema lê data, descrição e valor sozinho, ignora o que já foi
+            importado e, no OFX, ainda atualiza o saldo da conta.
           </DialogDescription>
         </DialogHeader>
 
