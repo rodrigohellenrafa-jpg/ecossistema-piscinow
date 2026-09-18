@@ -409,13 +409,29 @@ function Financeiro() {
 
   const excluir = useMutation({
     mutationFn: async (id: string) => {
+      const { data: orig } = await supabase
+        .from("lancamentos_financeiros")
+        .select("tipo_fluxo, valor, status, conta_bancaria")
+        .eq("id", id)
+        .maybeSingle();
+
       const { error } = await supabase.from("lancamentos_financeiros").delete().eq("id", id);
       if (error) throw error;
+
+      // Estorna o saldo quando o lançamento excluído já estava pago.
+      if (orig && orig.status === "Pago") {
+        await ajustarSaldoConta(
+          orig.conta_bancaria,
+          -sinalFluxo(orig.tipo_fluxo) * Number(orig.valor ?? 0),
+        );
+      }
     },
     onSuccess: () => {
       toast.success("Lançamento excluído.");
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
