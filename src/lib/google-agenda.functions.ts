@@ -159,14 +159,28 @@ export const sincronizarAgendaGoogle = createServerFn({ method: "POST" })
 
 /** Envia para o Google Agenda os compromissos, obras e ordens de serviço do sistema. */
 export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
-  .inputValidator((input: { calendarId?: string }) => input)
+  .inputValidator(
+    (input: {
+      calendarId?: string;
+      selecionados?: { eventoIds?: string[]; osIds?: string[]; obraIds?: string[] };
+    }) => input,
+  )
   .middleware([requireSupabaseAuth])
   .handler(async ({ data }) => {
     const calendarId = data?.calendarId || "primary";
+    const sel = data?.selecionados;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const desdeDia = desde.slice(0, 10);
+
+    // Quando o usuário marca itens na tela, só os marcados vão para o Google.
+    const evIds = sel?.eventoIds;
+    const osIds = sel?.osIds;
+    const obraIds = sel?.obraIds;
+    const buscaEventos = !sel || (evIds?.length ?? 0) > 0;
+    const buscaOs = !sel || (osIds?.length ?? 0) > 0;
+    const buscaObras = !sel || (obraIds?.length ?? 0) > 0;
 
     const { data: equipe } = await supabaseAdmin
       .from("funcionarios")
@@ -181,22 +195,25 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
       ),
     ).map((email) => ({ email }));
 
+    const qEventos = supabaseAdmin
+      .from("agenda_eventos")
+      .select("id, titulo, descricao, local, inicio, fim, dia_inteiro, cliente_nome, responsavel_nome, google_event_id")
+      .neq("status", "cancelado")
+      .gte("inicio", desde);
+    const qOrdens = supabaseAdmin
+      .from("ordens_servico")
+      .select("id, numero, tipo_servico, descricao, cliente_nome, data_agendada, responsavel, status")
+      .not("data_agendada", "is", null)
+      .gte("data_agendada", desdeDia);
+    const qObras = supabaseAdmin
+      .from("obras")
+      .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral")
+      .not("data_limite", "is", null)
+      .gte("data_limite", desdeDia);
     const [{ data: eventos }, { data: ordens }, { data: obras }] = await Promise.all([
-      supabaseAdmin
-        .from("agenda_eventos")
-        .select("id, titulo, descricao, local, inicio, fim, dia_inteiro, cliente_nome, responsavel_nome, google_event_id")
-        .neq("status", "cancelado")
-        .gte("inicio", desde),
-      supabaseAdmin
-        .from("ordens_servico")
-        .select("id, numero, tipo_servico, descricao, cliente_nome, data_agendada, responsavel, status")
-        .not("data_agendada", "is", null)
-        .gte("data_agendada", desdeDia),
-      supabaseAdmin
-        .from("obras")
-        .select("id, numero, tipo_servico, cliente_nome, endereco_obra, data_limite, responsavel, status_geral")
-        .not("data_limite", "is", null)
-        .gte("data_limite", desdeDia),
+      buscaEventos ? (evIds?.length ? qEventos.in("id", evIds) : qEventos) : Promise.resolve({ data: [] }),
+      buscaOs ? (osIds?.length ? qOrdens.in("id", osIds) : qOrdens) : Promise.resolve({ data: [] }),
+      buscaObras ? (obraIds?.length ? qObras.in("id", obraIds) : qObras) : Promise.resolve({ data: [] }),
     ]);
 
     let enviados = 0;

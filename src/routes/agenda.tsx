@@ -12,6 +12,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -124,6 +125,15 @@ function Agenda() {
   const [form, setForm] = useState(vazio);
   const [periodo, setPeriodo] = useState("30");
   const [somenteMeus, setSomenteMeus] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+
+  const alternar = (id: string, marcado: boolean) =>
+    setSelecionados((prev) => {
+      const novo = new Set(prev);
+      if (marcado) novo.add(id);
+      else novo.delete(id);
+      return novo;
+    });
 
   const pegarToken = useServerFn(meuTokenAgenda);
   const trocarToken = useServerFn(regenerarTokenAgenda);
@@ -148,9 +158,27 @@ function Agenda() {
   });
 
   const enviar = useMutation({
-    mutationFn: () => enviarGoogle({ data: { calendarId: agendaGoogle } }),
+    mutationFn: () => {
+      if (selecionados.size === 0)
+        throw new Error("Marque ao menos um compromisso para enviar.");
+      const eventoIds: string[] = [];
+      const osIds: string[] = [];
+      const obraIds = new Set<string>();
+      for (const id of selecionados) {
+        if (id.startsWith("ev-")) eventoIds.push(id.slice(3));
+        else if (id.startsWith("os-")) osIds.push(id.slice(3));
+        else if (id.startsWith("obra-")) obraIds.add(id.split("-").slice(1, -1).join("-"));
+      }
+      return enviarGoogle({
+        data: {
+          calendarId: agendaGoogle,
+          selecionados: { eventoIds, osIds, obraIds: [...obraIds] },
+        },
+      });
+    },
     onSuccess: (r) => {
-      toast.success(`${r.enviados} compromisso(s) do sistema enviados para o Google.`);
+      toast.success(`${r.enviados} compromisso(s) selecionado(s) enviados para o Google.`);
+      setSelecionados(new Set());
       qc.invalidateQueries({ queryKey: ["agenda-eventos"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -542,8 +570,9 @@ function Agenda() {
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             "Trazer do Google" puxa os compromissos da conta conectada (Campinas Jardim do Trevo).
-            "Enviar para o Google" leva tudo que é criado aqui — compromissos, obras do Flight
-            Board e ordens de serviço. Pode repetir quando quiser: nada é duplicado, só atualizado.
+            "Enviar para o Google" leva apenas os compromissos marcados na lista abaixo (use a
+            caixinha de cada item ou "Selecionar todos"). Pode repetir quando quiser: nada é
+            duplicado, só atualizado.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select value={agendaGoogle} onValueChange={setAgendaGoogle}>
@@ -594,6 +623,19 @@ function Agenda() {
         >
           Só os meus
         </Button>
+        <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+          <Checkbox
+            checked={filtrados.length > 0 && filtrados.every((i) => selecionados.has(i.id))}
+            onCheckedChange={(v) => {
+              if (v) setSelecionados(new Set(filtrados.map((i) => i.id)));
+              else setSelecionados(new Set());
+            }}
+          />
+          Selecionar todos
+        </label>
+        {selecionados.size > 0 && (
+          <Badge variant="secondary">{selecionados.size} selecionado(s)</Badge>
+        )}
       </div>
 
       {porDia.length === 0 && (
@@ -620,18 +662,26 @@ function Agenda() {
                       meu ? "border-primary bg-primary/5" : "border-border"
                     }`}
                   >
-                    <div className="min-w-0">
-                      <p
-                        className={`truncate text-sm ${meu ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-                      >
-                        {i.hora ? `${i.hora} · ` : "Dia inteiro · "}
-                        {i.titulo}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {[i.responsavelNome ?? "sem responsável", i.detalhe, i.local]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <Checkbox
+                        className="mt-0.5 shrink-0"
+                        checked={selecionados.has(i.id)}
+                        onCheckedChange={(v) => alternar(i.id, !!v)}
+                        aria-label={`Selecionar ${i.titulo}`}
+                      />
+                      <div className="min-w-0">
+                        <p
+                          className={`truncate text-sm ${meu ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                        >
+                          {i.hora ? `${i.hora} · ` : "Dia inteiro · "}
+                          {i.titulo}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[i.responsavelNome ?? "sem responsável", i.detalhe, i.local]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {meu && <Badge>Você</Badge>}
