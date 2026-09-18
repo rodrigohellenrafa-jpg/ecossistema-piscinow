@@ -364,6 +364,8 @@ function NovoPedido() {
   const [lucroSugerido, setLucroSugerido] = useState(0);
   /** Entrada paga pelo cliente no fechamento do pedido. */
   const [entrada, setEntrada] = useState(0);
+  /** Conta bancária em que a entrada paga no fechamento entra. */
+  const [contaEntrada, setContaEntrada] = useState("");
 
   /** Prazo de entrega e endereço de instalação impressos no pedido Splash. */
   const [prazoEntrega, setPrazoEntrega] = useState("");
@@ -534,6 +536,7 @@ function NovoPedido() {
     setLucroSugerido(0);
     setCondicoes([]);
     setEntrada(0);
+    setContaEntrada("");
     setPrazoEntrega("");
     setEnderecoInstalacao("");
     setMateriais({
