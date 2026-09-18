@@ -557,8 +557,16 @@ function DetalhePedido() {
   const valorIcmsSt = 0;
 
   const totalPago = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
-  const totalVenda = Number(venda?.valor_total ?? 0);
-  const saldoAberto = Math.max(totalVenda - totalPago, 0);
+  // O valor total da venda é sempre a soma dos itens do pedido.
+  const totalVenda = Number(itens.reduce((s, i) => s + Number(i.total ?? 0), 0).toFixed(2));
+  // Condições multipartidas apenas abatem o saldo (dado informativo), sem mudar o total.
+  const totalCondicoes = Number(
+    condicoes.reduce((s, c) => s + Number(c.valor ?? 0), 0).toFixed(2),
+  );
+  const saldoAberto = Math.max(
+    Number((totalVenda - totalPago - totalCondicoes).toFixed(2)),
+    0,
+  );
   const statusPag = totalPago <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
 
   if (!venda) {
@@ -920,14 +928,22 @@ function DetalhePedido() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-3">
+          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="text-xs text-muted-foreground">Valor total da venda</p>
+              <p className="text-xs text-muted-foreground">
+                Valor total da venda (soma dos itens)
+              </p>
               <p className="font-medium">{brl(totalVenda)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Total pago</p>
               <p className="font-medium">{brl(totalPago)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Abatido em condições (multipartido)
+              </p>
+              <p className="font-medium">{brl(totalCondicoes)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Saldo devedor</p>
