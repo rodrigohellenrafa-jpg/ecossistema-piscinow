@@ -283,6 +283,7 @@ export function ExtratoImportar({
       }
       setLinhas([]);
       setArquivo("");
+      setSaldoArquivo(null);
       setOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
