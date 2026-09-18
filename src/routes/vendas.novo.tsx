@@ -187,6 +187,8 @@ interface CondicaoLinha {
   pago: boolean;
   bandeira: string;
   observacoes: string;
+  /** Conta bancária em que o recurso dessa condição entra. */
+  conta_bancaria: string;
 }
 
 
@@ -309,6 +311,19 @@ function NovoPedido() {
       const { data, error } = await supabase.from("vendas").select("numero");
       if (error) throw error;
       return data.map((v) => v.numero);
+    },
+  });
+
+  /** Contas bancárias cadastradas (para escolher onde o recurso entra). */
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos-bancarios", "contas-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("conta")
+        .order("conta", { ascending: true });
+      if (error) throw error;
+      return (data as { conta: string }[]).map((c) => c.conta);
     },
   });
 
