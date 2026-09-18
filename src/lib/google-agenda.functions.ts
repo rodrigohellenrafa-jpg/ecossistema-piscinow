@@ -169,11 +169,18 @@ export const enviarAgendaParaGoogle = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const calendarId = data?.calendarId || "primary";
     const sel = data?.selecionados;
-    const filtra = (ids?: string[]) => (sel ? (ids?.length ? ids : null) : null);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const desde = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const desdeDia = desde.slice(0, 10);
+
+    // Quando o usuário marca itens na tela, só os marcados vão para o Google.
+    const evIds = sel?.eventoIds;
+    const osIds = sel?.osIds;
+    const obraIds = sel?.obraIds;
+    const buscaEventos = !sel || (evIds?.length ?? 0) > 0;
+    const buscaOs = !sel || (osIds?.length ?? 0) > 0;
+    const buscaObras = !sel || (obraIds?.length ?? 0) > 0;
 
     const { data: equipe } = await supabaseAdmin
       .from("funcionarios")
