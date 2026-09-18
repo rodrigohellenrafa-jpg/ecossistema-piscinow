@@ -622,6 +622,19 @@ function Agenda() {
         >
           Só os meus
         </Button>
+        <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+          <Checkbox
+            checked={filtrados.length > 0 && filtrados.every((i) => selecionados.has(i.id))}
+            onCheckedChange={(v) => {
+              if (v) setSelecionados(new Set(filtrados.map((i) => i.id)));
+              else setSelecionados(new Set());
+            }}
+          />
+          Selecionar todos
+        </label>
+        {selecionados.size > 0 && (
+          <Badge variant="secondary">{selecionados.size} selecionado(s)</Badge>
+        )}
       </div>
 
       {porDia.length === 0 && (
