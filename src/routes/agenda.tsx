@@ -570,8 +570,9 @@ function Agenda() {
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             "Trazer do Google" puxa os compromissos da conta conectada (Campinas Jardim do Trevo).
-            "Enviar para o Google" leva tudo que é criado aqui — compromissos, obras do Flight
-            Board e ordens de serviço. Pode repetir quando quiser: nada é duplicado, só atualizado.
+            "Enviar para o Google" leva apenas os compromissos marcados na lista abaixo (use a
+            caixinha de cada item ou "Selecionar todos"). Pode repetir quando quiser: nada é
+            duplicado, só atualizado.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select value={agendaGoogle} onValueChange={setAgendaGoogle}>
