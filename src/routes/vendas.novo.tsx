@@ -914,7 +914,7 @@ function NovoPedido() {
       }
 
       const ctx = {
-        numero,
+        numero: numeroFinal,
         data,
         clienteId,
         clienteNome: cliente?.nome ?? null,
@@ -1023,7 +1023,7 @@ function NovoPedido() {
         if (semCobertura > 0.01) {
           const { error: erroConta } = await supabase.from("contas").insert({
             tipo: "receber",
-            descricao: `Pedido ${numero} — saldo a receber`,
+            descricao: `Pedido ${numeroFinal} — saldo a receber`,
             parceiro: cliente?.nome ?? null,
             cliente_id: clienteId,
             venda_id: venda.id,
