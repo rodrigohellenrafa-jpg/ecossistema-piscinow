@@ -1922,6 +1922,7 @@ export type Database = {
         Row: {
           acrescimo: number
           bandeira: string | null
+          conta_bancaria: string | null
           created_at: string
           created_by: string | null
           data_prevista: string | null
@@ -1940,6 +1941,7 @@ export type Database = {
         Insert: {
           acrescimo?: number
           bandeira?: string | null
+          conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
           data_prevista?: string | null
@@ -1958,6 +1960,7 @@ export type Database = {
         Update: {
           acrescimo?: number
           bandeira?: string | null
+          conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
           data_prevista?: string | null
