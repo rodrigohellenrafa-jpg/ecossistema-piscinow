@@ -567,8 +567,10 @@ function DetalhePedido() {
   // O valor total da venda é sempre a soma dos itens do pedido.
   const totalVenda = Number(itens.reduce((s, i) => s + Number(i.total ?? 0), 0).toFixed(2));
   // Condições multipartidas apenas abatem o saldo (dado informativo), sem mudar o total.
+  // Condições já pagas viram registro em venda_pagamentos, então já estão em
+  // totalPago — contá-las aqui de novo tirava o valor duas vezes do saldo.
   const totalCondicoes = Number(
-    condicoes.reduce((s, c) => s + Number(c.valor ?? 0), 0).toFixed(2),
+    condicoes.reduce((s, c) => s + (c.pago ? 0 : Number(c.valor ?? 0)), 0).toFixed(2),
   );
   const saldoAberto = Math.max(
     Number((totalVenda - totalPago - totalCondicoes).toFixed(2)),
