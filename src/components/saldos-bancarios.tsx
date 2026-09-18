@@ -82,7 +82,7 @@ export function SaldosBancarios() {
       const { data, error } = await supabase
         .from("lancamentos_financeiros")
         .select("tipo_fluxo, valor, conta_bancaria, status, data_pagamento")
-        .eq("status", "Pago")
+        .ilike("status", "pago")
         .eq("data_pagamento", hoje);
       if (error) throw error;
       return data as { tipo_fluxo: string; valor: number; conta_bancaria: string | null }[];

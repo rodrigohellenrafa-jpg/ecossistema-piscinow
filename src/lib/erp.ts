@@ -20,7 +20,7 @@ export const dataBR = (iso: string | null | undefined) => {
   return `${d}/${m}/${a}`;
 };
 
-export const hojeISO = () => new Date().toISOString().slice(0, 10);
+export const hojeISO = () => new Date().toLocaleDateString("en-CA");
 
 export const addDiasUteis = (inicioISO: string, dias: number) => {
   const d = new Date(`${inicioISO}T12:00:00`);
