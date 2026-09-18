@@ -110,6 +110,7 @@ const GRID_OBRA =
   "grid gap-2 grid-cols-[32px_84px_minmax(180px,1fr)_280px_280px_92px_96px_156px_80px]";
 
 const STATUS_TONE: Record<string, string> = {
+  "Aguardando data": "border-muted-foreground/40 bg-muted/20 text-muted-foreground",
   Agendado: "border-status-scheduled/60 bg-status-scheduled/10 text-status-scheduled",
   "Em Execução": "border-status-running/60 bg-status-running/10 text-status-running",
   Pausado: "border-status-paused/60 bg-status-paused/10 text-status-paused",

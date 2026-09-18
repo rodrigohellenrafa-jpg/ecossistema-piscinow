@@ -102,7 +102,7 @@ export const STATUS_PEDIDO = [
   "cancelado",
 ] as const;
 
-export const STATUS_OBRA = ["Agendado", "Em Execução", "Pausado", "Concluído"] as const;
+export const STATUS_OBRA = ["Aguardando data", "Agendado", "Em Execução", "Pausado", "Concluído"] as const;
 
 export const ETAPAS_OBRA = [
   { key: "etapa_escavacao", label: "Escavação" },
