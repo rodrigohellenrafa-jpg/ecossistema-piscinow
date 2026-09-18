@@ -4,23 +4,21 @@ import { ShieldAlert } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRoles } from "@/hooks/use-role";
-import { areaDaRota, ROTAS_LIVRES } from "@/lib/acesso-rotas";
+
 
 /** Bloqueia a página quando o perfil do usuário não tem acesso à área. */
 export function AreaGuard({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { pode, loading } = useRoles();
+  const { podeRota, loading } = useRoles();
 
-  if (ROTAS_LIVRES.includes(pathname)) return <>{children}</>;
+  if (["/auth", "/reset-password", "/sitemap.xml"].includes(pathname)) return <>{children}</>;
 
-  const area = areaDaRota(pathname);
-  if (!area) return <>{children}</>;
 
   if (loading) {
     return <p className="p-6 text-sm text-muted-foreground">Carregando permissões…</p>;
   }
 
-  if (!pode(area)) {
+  if (!podeRota(pathname)) {
     return (
       <div className="mx-auto max-w-md py-10">
         <Card>

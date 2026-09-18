@@ -1,3 +1,4 @@
+import { PermissoesUsuario, TrocarSenhaMestra } from "@/components/permissoes-usuario";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -210,7 +211,7 @@ function AcessosAdmin() {
     <div className="space-y-6">
       <PageHeader
         title="Controle de Acesso"
-        subtitle="Adicione usuários, gerencie papéis (RBAC) e consulte a matriz de permissões por perfil."
+        subtitle="Usuários e permissões individuais por tela."
       />
 
       <Card>
@@ -377,6 +378,7 @@ function AcessosAdmin() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
+                      <PermissoesUsuario id={u.id} nome={u.nome} admin={u.papeis.some(p=>p.role==="admin")} />
                       <Button
                         size="icon"
                         variant="ghost"
@@ -424,37 +426,7 @@ function AcessosAdmin() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Matriz de permissões</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm">
-          <MatrizItem
-            perfil="Administrador"
-            descricao="Acesso total a todos os módulos: cadastros, vendas, logística, compras, financeiro, RH e controle de acesso."
-          />
-          <MatrizItem
-            perfil="Gerente"
-            descricao="Mesmo acesso do administrador, exceto a exclusão de usuários e configurações críticas de integração."
-          />
-          <MatrizItem
-            perfil="Vendedor"
-            descricao="Clientes, novo pedido, consulta de pedidos, estoque em modo leitura e visualização das próprias comissões."
-          />
-          <MatrizItem
-            perfil="Técnico / Logística"
-            descricao="Flight board, ordens de serviço, entradas de estoque e inventário."
-          />
-          <MatrizItem
-            perfil="Financeiro"
-            descricao="Fluxo de caixa, contas a pagar/receber, central de compras, DRE e folha de pagamento."
-          />
-          <MatrizItem
-            perfil="Usuário"
-            descricao="Acesso somente leitura aos cadastros e consultas liberadas pelo administrador."
-          />
-        </CardContent>
-      </Card>
+      <TrocarSenhaMestra />
 
       <Dialog open={editando !== null} onOpenChange={(open) => !open && setEditando(null)}>
         <DialogContent>
