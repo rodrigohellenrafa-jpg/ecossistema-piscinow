@@ -334,6 +334,7 @@ function Financeiro() {
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
       qc.invalidateQueries({ queryKey: ["lancamento-rateios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
