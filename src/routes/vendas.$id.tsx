@@ -539,38 +539,29 @@ function DetalhePedido() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const linhas = useMemo(() => {
-    const itensGrade = itens.map((i) => ({
-      cod: i.sku ?? "—",
-      descricao: i.descricao,
-      ncm: i.produtos?.ncm ?? "—",
-      cst: i.produtos?.cst ?? "—",
-      cfop: i.produtos?.cfop ?? "—",
-      un: i.produtos?.unidade ?? "UN",
-      qtd: i.quantidade,
-      vlrUnit: i.preco_unitario,
-      vlrTotal: i.total,
-    }));
-    if (kit && kit.preco_venda_kit > 0) {
-      itensGrade.push({
-        cod: "KIT",
-        descricao: "Kit Piscina (casco + filtro + acessórios)",
-        ncm: "—",
-        cst: "—",
-        cfop: "—",
-        un: "UN",
-        qtd: 1,
-        vlrUnit: kit.preco_venda_kit,
-        vlrTotal: kit.preco_venda_kit,
-      });
-    }
-    return itensGrade;
-  }, [itens, kit]);
+  // O kit de piscina nunca entra na grade nem na base de cálculo: é apenas
+  // referência de custo para apurar lucro da venda.
+  const linhas = useMemo(
+    () =>
+      itens.map((i) => ({
+        cod: i.sku ?? "—",
+        descricao: i.descricao,
+        ncm: i.produtos?.ncm ?? "—",
+        cst: i.produtos?.cst ?? "—",
+        cfop: i.produtos?.cfop ?? "—",
+        un: i.produtos?.unidade ?? "UN",
+        qtd: i.quantidade,
+        vlrUnit: i.preco_unitario,
+        vlrTotal: i.total,
+      })),
+    [itens],
+  );
 
   const baseIcms = linhas.reduce((s, l) => s + l.vlrTotal, 0);
   const valorIcms = baseIcms * (aliquotaIcms / 100);
   const baseIcmsSt = 0;
   const valorIcmsSt = 0;
+
 
   const totalPago = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
   // O valor total da venda é sempre a soma dos itens do pedido.
