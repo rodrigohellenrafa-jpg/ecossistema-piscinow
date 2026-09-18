@@ -928,14 +928,22 @@ function DetalhePedido() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-3">
+          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="text-xs text-muted-foreground">Valor total da venda</p>
+              <p className="text-xs text-muted-foreground">
+                Valor total da venda (soma dos itens)
+              </p>
               <p className="font-medium">{brl(totalVenda)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Total pago</p>
               <p className="font-medium">{brl(totalPago)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Abatido em condições (multipartido)
+              </p>
+              <p className="font-medium">{brl(totalCondicoes)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Saldo devedor</p>
