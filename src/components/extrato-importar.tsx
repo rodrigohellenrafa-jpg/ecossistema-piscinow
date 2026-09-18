@@ -61,6 +61,47 @@ function paraISO(v: unknown): string | null {
   return null;
 }
 
+/** Lê o valor de uma etiqueta do arquivo OFX (formato SGML dos bancos). */
+function tagOFX(bloco: string, tag: string): string {
+  const m = bloco.match(new RegExp(`<${tag}>([^<\\r\\n]*)`, "i"));
+  return (m?.[1] ?? "").trim();
+}
+
+/** Converte a data do OFX (20260915120000[-3:BRT]) em ISO. */
+function dataOFX(v: string): string | null {
+  const m = v.match(/^(\d{4})(\d{2})(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+type LeituraOFX = { linhas: Linha[]; saldo: number | null; dataSaldo: string | null };
+
+/** Interpreta o extrato em OFX (Money/OFX), formato aceito por C6, Itaú, Nubank etc. */
+function lerOFX(texto: string): LeituraOFX {
+  const linhas: Linha[] = [];
+  const blocos = texto.match(/<STMTTRN>[\s\S]*?<\/STMTTRN>/gi) ?? [];
+  for (const b of blocos) {
+    const data = dataOFX(tagOFX(b, "DTPOSTED"));
+    const valor = Number(tagOFX(b, "TRNAMT").replace(/\s/g, "").replace(",", "."));
+    const descricao =
+      tagOFX(b, "MEMO") || tagOFX(b, "NAME") || tagOFX(b, "TRNTYPE") || "Movimento";
+    if (!data || !Number.isFinite(valor) || valor === 0) continue;
+    linhas.push({
+      data_movimento: data,
+      descricao,
+      documento: tagOFX(b, "CHECKNUM") || tagOFX(b, "FITID") || null,
+      valor: Math.abs(valor),
+      tipo: valor >= 0 ? "entrada" : "saida",
+    });
+  }
+  const bal = texto.match(/<LEDGERBAL>[\s\S]*?(?:<\/LEDGERBAL>|$)/i)?.[0] ?? "";
+  const saldoBruto = Number(tagOFX(bal, "BALAMT").replace(/\s/g, "").replace(",", "."));
+  return {
+    linhas,
+    saldo: Number.isFinite(saldoBruto) && tagOFX(bal, "BALAMT") ? saldoBruto : null,
+    dataSaldo: dataOFX(tagOFX(bal, "DTASOF")),
+  };
+}
+
 function normalizar(registros: Record<string, unknown>[]): Linha[] {
   const linhas: Linha[] = [];
   for (const reg of registros) {
