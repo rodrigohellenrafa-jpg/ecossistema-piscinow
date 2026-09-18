@@ -834,10 +834,15 @@ function NovoPedido() {
         }
       }
 
+      // O número definitivo é calculado no banco no momento de gravar, para não
+      // "queimar" códigos com rascunhos que foram apagados.
+      const { data: numeroRpc } = await supabase.rpc("proximo_numero_venda");
+      const numeroFinal = (numeroRpc as string | null) ?? numero;
+
       const { data: venda, error: erroVenda } = await supabase
         .from("vendas")
         .insert({
-          numero,
+          numero: numeroFinal,
           data,
           cliente_id: clienteId,
           cliente_nome: cliente?.nome ?? null,
