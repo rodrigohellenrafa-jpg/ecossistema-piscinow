@@ -137,7 +137,7 @@ const groups: {
 
 export function AppSidebar() {
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
-  const { pode } = useRoles();
+  const { podeRota } = useRoles();
 
   return (
     <Sidebar collapsible="icon">
@@ -154,7 +154,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {groups
-          .filter((g) => pode(g.area))
+          .map(g => ({...g, items:g.items.filter(item=>podeRota(item.url))})).filter(g=>g.items.length>0)
           .map((group) => (
             <SidebarGroup key={group.label}>
               <SidebarGroupLabel>{group.label}</SidebarGroupLabel>

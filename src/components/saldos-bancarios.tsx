@@ -1,3 +1,4 @@
+import { TelaPermitida } from "@/components/tela-permitida";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
@@ -195,7 +196,7 @@ export function SaldosBancarios() {
             Saldo registrado por conta bancária.
           </p>
           <div className="mt-2">
-            <ExtratoImportar />
+            <TelaPermitida tela="extrato.importar"><ExtratoImportar /></TelaPermitida>
           </div>
         </div>
         <div className="text-right">

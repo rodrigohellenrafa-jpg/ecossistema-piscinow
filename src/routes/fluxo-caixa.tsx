@@ -1,3 +1,4 @@
+import { TelaPermitida } from "@/components/tela-permitida";
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -256,7 +257,7 @@ function FluxoCaixa() {
         />
       </div>
 
-      <SaldosBancarios />
+      <TelaPermitida tela="saldos"><SaldosBancarios /></TelaPermitida>
 
       <ConciliacaoBancaria />
 

@@ -1,3 +1,4 @@
+import { TelaPermitida } from "@/components/tela-permitida";
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -866,7 +867,7 @@ function DetalhePedido() {
         </CardContent>
       </Card>
 
-      <Card>
+      <TelaPermitida tela="vendas.pagamentos"><Card>
         <CardHeader>
           <CardTitle>Condições de pagamento combinadas</CardTitle>
         </CardHeader>
@@ -1101,6 +1102,7 @@ function DetalhePedido() {
         </CardContent>
       </Card>
 
+      </TelaPermitida>
       <div className="print:block rounded-xl border border-border bg-card p-6 text-sm">
         <div className="mb-6 flex items-start justify-between border-b border-border pb-4">
           <div>
@@ -1328,11 +1330,11 @@ function DetalhePedido() {
         </div>
       </div>
 
-      <HistoricoVenda
+      <TelaPermitida tela="vendas.historico"><HistoricoVenda
         vendaId={id}
         clienteId={venda.cliente_id ?? null}
         clienteNome={venda.cliente_nome ?? null}
-      />
+      /></TelaPermitida>
 
       <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
         <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">

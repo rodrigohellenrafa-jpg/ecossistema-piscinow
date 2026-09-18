@@ -32,8 +32,8 @@ export function SenhaMestra() {
         ativar();
         setSenha("");
         setOpen(false);
-        toast.success("Modo mestre liberado neste aparelho.");
-      } else if (r.motivo === "nao_configurada") {
+        toast.success("Senha mestra confirmada.");
+      } else if (false) {
         toast.error("A senha mestra ainda não foi cadastrada.");
       } else {
         toast.error("Senha mestra incorreta.");
@@ -57,7 +57,7 @@ export function SenhaMestra() {
         }}
       >
         <ShieldCheck className="size-4" />
-        <span className="hidden sm:inline">Modo mestre ativo</span>
+        <span className="hidden sm:inline">Senha confirmada</span>
       </Button>
     );
   }
@@ -73,8 +73,7 @@ export function SenhaMestra() {
         <DialogHeader>
           <DialogTitle>Senha mestra</DialogTitle>
           <DialogDescription>
-            Libera todos os módulos neste aparelho, mesmo com outro usuário logado. Vale até fechar
-            o navegador.
+            Confirma a senha mestra sem alterar as permissões do usuário.
           </DialogDescription>
         </DialogHeader>
         <Input
@@ -89,7 +88,7 @@ export function SenhaMestra() {
         />
         <DialogFooter>
           <Button onClick={() => void desbloquear()} disabled={enviando || !senha}>
-            Desbloquear tudo
+            Confirmar senha
           </Button>
         </DialogFooter>
       </DialogContent>

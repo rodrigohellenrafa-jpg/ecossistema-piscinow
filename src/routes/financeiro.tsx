@@ -1,3 +1,4 @@
+import { TelaPermitida } from "@/components/tela-permitida";
 import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -799,7 +800,7 @@ function Financeiro() {
         />
       </div>
 
-      <SaldosBancarios />
+      <TelaPermitida tela="saldos"><SaldosBancarios /></TelaPermitida>
 
       <Tabs defaultValue="lancamentos">
         <TabsList>

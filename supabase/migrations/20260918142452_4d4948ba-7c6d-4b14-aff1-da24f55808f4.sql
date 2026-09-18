@@ -1,0 +1,1 @@
+ALTER FUNCTION public.tem_tela(uuid,text) SECURITY INVOKER;

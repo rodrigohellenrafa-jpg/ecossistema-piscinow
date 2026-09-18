@@ -28,3 +28,9 @@ Validação: páginas autenticadas abriram sem erros; testes de gravação, foto
 - [x] Validar entrada, edição, troca de conta, exclusão e baixa com desconto em transação revertida; painel verificado.
 - [x] Orientar OFX como referência para reconciliar saldos históricos sem reaplicar movimentos antigos.
 - [x] Corrigir C6 em 18/09/2026: saldo R$ 29.307,27, recebido R$ 2.500,00 e pago R$ 294,31; separar o saldo movimentado do total geral.
+
+## Controle por tela e senha mestra
+- [ ] Catálogo, concessões individuais e proteção de dados por tela/subtela.
+- [ ] Checkboxes por usuário, menus, abas e acesso direto.
+- [ ] Troca segura da senha mestra, sem elevação por armazenamento local.
+- [ ] Validar permissões, persistência e interface.

@@ -339,6 +339,24 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracao_mestra: {
+        Row: {
+          id: boolean
+          senha_hash: string
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          senha_hash: string
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          senha_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conta_rateios: {
         Row: {
           categoria: string
@@ -1658,6 +1676,27 @@ export type Database = {
           },
         ]
       }
+      permissoes_telas: {
+        Row: {
+          created_at: string
+          telas: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          telas?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          telas?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       produtos: {
         Row: {
           aliquota_cofins: number
@@ -2431,6 +2470,8 @@ export type Database = {
         Args: { _areas: string[]; _uid: string }
         Returns: boolean
       }
+      tem_tela: { Args: { _tela: string; _uid: string }; Returns: boolean }
+      tem_telas: { Args: { _telas: string[]; _uid: string }; Returns: boolean }
     }
     Enums: {
       app_role:

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useMestre } from "@/hooks/use-mestre";
+import { telasDaRota } from "@/lib/telas";
 import { supabase } from "@/integrations/supabase/client";
 
 export type Perfil = "admin" | "gerente" | "vendedor" | "financeiro" | "tecnico" | "usuario";
@@ -19,7 +19,7 @@ export const ACESSO: Record<string, Perfil[]> = {
 
 export function useRoles() {
   const { user, loading } = useAuth();
-  const { mestre } = useMestre();
+
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ["user-roles", user?.id],
@@ -28,23 +28,24 @@ export function useRoles() {
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user!.id);
+        .eq("user_id", user?.id ?? "");
       if (error) throw error;
       return data.map((r) => r.role as Perfil);
     },
   });
 
-  // Sem papel atribuído o usuário não enxerga nada até um admin liberar.
-  const base: Perfil[] = roles;
-  // Modo mestre destravado neste aparelho: enxerga e opera tudo.
-  const efetivos: Perfil[] = mestre ? ["admin", ...base.filter((r) => r !== "admin")] : base;
-
-  return {
-    roles: efetivos,
-    mestre,
-    loading: loading || isLoading,
-    isAdmin: mestre || efetivos.includes("admin"),
-    pode: (area: keyof typeof ACESSO) =>
-      mestre || efetivos.some((r) => ACESSO[area]?.includes(r)),
+  const { data: telas = [], isLoading: carregandoTelas } = useQuery({
+    queryKey: ["permissoes-telas", user?.id], enabled: !!user?.id, refetchInterval: 5000,
+    queryFn: async () => {
+      const {data,error}=await supabase.from("permissoes_telas").select("telas").eq("user_id",user?.id ?? "").maybeSingle();
+      if(error) throw error;
+      return data?.telas ?? [];
+    },
+  });
+  const isAdmin=roles.includes("admin");
+  const podeTela=(tela:string)=>isAdmin || telas.includes(tela);
+  return { roles, mestre:false, loading:loading || isLoading || carregandoTelas, isAdmin, telas, podeTela,
+    podeRota:(path:string)=>telasDaRota(path).some(podeTela),
+    pode:(area:keyof typeof ACESSO)=>roles.some(r=>ACESSO[area]?.includes(r)),
   };
 }
