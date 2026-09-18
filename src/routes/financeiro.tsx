@@ -302,6 +302,14 @@ function Financeiro() {
         .single();
       if (error) throw error;
 
+      // Lançamento já pago move o saldo da conta informada na hora.
+      if (form.status === "Pago") {
+        await ajustarSaldoConta(
+          form.conta_bancaria,
+          sinalFluxo(form.tipo_fluxo) * (Number(form.valor) || 0),
+        );
+      }
+
       if (ratear && criado) {
         const { error: err2 } = await supabase.from("lancamento_rateios").insert(
           linhas.map((l) => ({
