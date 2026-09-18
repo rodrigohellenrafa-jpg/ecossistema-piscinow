@@ -152,6 +152,7 @@ function DetalhePedido() {
         descricao: string;
         quantidade: number;
         preco_unitario: number;
+        custo_unitario: number | null;
         total: number;
         produtos: { ncm: string | null; cst: string | null; cfop: string | null; unidade: string | null } | null;
       }>;
