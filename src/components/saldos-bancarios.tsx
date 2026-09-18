@@ -105,7 +105,7 @@ export function SaldosBancarios() {
   const movimentoConta = (conta: string) =>
     contasHoje.filter((c) => (c.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
       .reduce((s, c) => s + (ehEntrada(c.tipo) ? 1 : -1) * valorBaixado(c), 0) + lancHoje
-      .filter((l) => (l.conta_bancaria ?? "").trim() === conta.trim())
+      .filter((l) => (l.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
       .reduce((s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor ?? 0) : -Number(l.valor ?? 0)), 0);
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
@@ -170,7 +170,21 @@ export function SaldosBancarios() {
   });
 
   const total = saldos.reduce((s, c) => s + Number(c.saldo ?? 0), 0);
-  const totalAtual = total;
+  const contasMovimentadasHoje = new Set(
+    [...contasHoje, ...lancHoje]
+      .map((m) => (m.conta_bancaria ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const saldosComMovimentoHoje = saldos.filter((s) =>
+    contasMovimentadasHoje.has(s.conta.trim().toLowerCase()),
+  );
+  const totalAtual = (saldosComMovimentoHoje.length > 0 ? saldosComMovimentoHoje : saldos)
+    .reduce((s, c) => s + Number(c.saldo ?? 0), 0);
+  const contextoSaldo = saldosComMovimentoHoje.length === 1
+    ? saldosComMovimentoHoje[0]?.conta
+    : saldosComMovimentoHoje.length > 1
+      ? `${saldosComMovimentoHoje.length} contas movimentadas hoje`
+      : "todas as contas";
 
   return (
     <ExpandableCard>
@@ -185,10 +199,10 @@ export function SaldosBancarios() {
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual com o dia de hoje</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Saldo atual · {contextoSaldo}</p>
           <p className="text-xl font-semibold tabular-nums">{brl(totalAtual)}</p>
           <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-            Total {brl(total)} · recebido hoje <span className="text-emerald-500">+{brl(entradasHoje)}</span> · pago
+            Todas as contas {brl(total)} · recebido hoje <span className="text-emerald-500">+{brl(entradasHoje)}</span> · pago
             hoje <span className="text-destructive">−{brl(saidasHoje)}</span>
           </p>
         </div>
