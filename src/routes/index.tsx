@@ -150,7 +150,8 @@ function Dashboard() {
   // Saldos das contas bancárias: pega o registro mais recente de cada conta
   // e atualiza em tempo real quando qualquer saldo muda.
   const { data: saldosContas = [] } = useQuery({
-    queryKey: ["dash-saldos-bancarios"],
+    queryKey: ["saldos-bancarios", "dashboard"],
+    refetchInterval: 5000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saldos_bancarios")
@@ -178,7 +179,7 @@ function Dashboard() {
         "postgres_changes",
         { event: "*", schema: "public", table: "saldos_bancarios" },
         () => {
-          qc.invalidateQueries({ queryKey: ["dash-saldos-bancarios"] });
+          qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
         },
       )
       .subscribe();

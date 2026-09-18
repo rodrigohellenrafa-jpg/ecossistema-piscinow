@@ -21,3 +21,8 @@ Validação: páginas autenticadas abriram sem erros; testes de gravação, foto
 - [x] Adicionar formulário de lançamento em lote em Contas e Lançamentos financeiros.
 - [x] Ordenar obras selecionadas antes dos registros não selecionados.
 - [x] Verificar abertura, adição de linhas e validação dos dois formulários; sem gravação de dados de teste.
+
+## Saldos bancários
+- [x] Centralizar movimentos pagos e estornos no saldo da conta.
+- [x] Remover soma duplicada e atualizar painel e resumo diário.
+- [ ] Validar transações e orientar uso do OFX.

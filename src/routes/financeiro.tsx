@@ -1,5 +1,4 @@
 import { LancarEmLote } from "@/components/lancar-em-lote";
-import { ajustarSaldoConta, sinalFluxo } from "@/lib/saldo-conta";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -303,14 +302,6 @@ function Financeiro() {
         .single();
       if (error) throw error;
 
-      // Lançamento já pago move o saldo da conta informada na hora.
-      if (form.status === "Pago") {
-        await ajustarSaldoConta(
-          form.conta_bancaria,
-          sinalFluxo(form.tipo_fluxo) * (Number(form.valor) || 0),
-        );
-      }
-
       if (ratear && criado) {
         const { error: err2 } = await supabase.from("lancamento_rateios").insert(
           linhas.map((l) => ({
@@ -352,14 +343,6 @@ function Financeiro() {
         .update({ status: "Pago", data_pagamento: hojeISO() })
         .eq("id", id);
       if (error) throw error;
-
-      // Entrada soma e saída subtrai do saldo da conta informada.
-      if (orig) {
-        await ajustarSaldoConta(
-          orig.conta_bancaria,
-          sinalFluxo(orig.tipo_fluxo) * Number(orig.valor ?? 0),
-        );
-      }
 
       if (orig && orig.recorrencia && orig.recorrencia !== "nenhuma") {
         const base = orig.vencimento || orig.data_competencia;
@@ -418,13 +401,6 @@ function Financeiro() {
       const { error } = await supabase.from("lancamentos_financeiros").delete().eq("id", id);
       if (error) throw error;
 
-      // Estorna o saldo quando o lançamento excluído já estava pago.
-      if (orig && orig.status === "Pago") {
-        await ajustarSaldoConta(
-          orig.conta_bancaria,
-          -sinalFluxo(orig.tipo_fluxo) * Number(orig.valor ?? 0),
-        );
-      }
     },
     onSuccess: () => {
       toast.success("Lançamento excluído.");
