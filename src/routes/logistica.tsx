@@ -203,13 +203,48 @@ function FlightBoard() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase.from("obras").update({ status_geral: status }).eq("id", id);
       if (error) throw error;
+
+      if (status !== "Agendado") return { agendado: false };
+
+      const obra = obras.find((o) => o.id === id);
+      if (!obra) return { agendado: false };
+      const dia = obra.escavacao_inicio ?? obra.instalacao_inicio ?? obra.data_limite;
+      if (!dia) return { agendado: false };
+
+      const { data: existentes } = await supabase
+        .from("agenda_eventos")
+        .select("id")
+        .eq("obra_id", id)
+        .neq("status", "cancelado")
+        .gte("inicio", `${dia}T00:00:00`)
+        .lte("inicio", `${dia}T23:59:59`);
+      if (existentes && existentes.length > 0) return { agendado: false };
+
+      const { error: erroAgenda } = await supabase.from("agenda_eventos").insert({
+        titulo: `Obra ${obra.numero ?? ""} · ${obra.tipo_servico}${obra.cliente_nome ? ` — ${obra.cliente_nome}` : ""}`.trim(),
+        descricao: obra.responsavel ? `Responsável: ${obra.responsavel}` : null,
+        tipo: "trabalho",
+        inicio: new Date(`${dia}T00:00:00`).toISOString(),
+        fim: new Date(`${dia}T00:00:00`).toISOString(),
+        dia_inteiro: true,
+        local: obra.endereco_obra ?? null,
+        status: "agendado",
+        cliente_nome: obra.cliente_nome ?? null,
+        responsavel_nome: obra.responsavel ?? null,
+        obra_id: obra.id,
+      });
+      if (erroAgenda) throw erroAgenda;
+      return { agendado: true };
     },
-    onSuccess: () => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["obras"] });
-      toast.success("Status atualizado.");
+      qc.invalidateQueries({ queryKey: ["agenda-eventos"] });
+      qc.invalidateQueries({ queryKey: ["agenda-obras"] });
+      toast.success(r?.agendado ? "Status atualizado e compromisso criado na Agenda da Equipe." : "Status atualizado.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const salvarDatas = useMutation({
     mutationFn: async ({
