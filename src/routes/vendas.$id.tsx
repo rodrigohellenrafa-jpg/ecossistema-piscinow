@@ -231,6 +231,19 @@ function DetalhePedido() {
     },
   });
 
+  /** Contas bancárias cadastradas (para escolher onde o recurso entra). */
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos-bancarios", "contas-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saldos_bancarios")
+        .select("conta")
+        .order("conta", { ascending: true });
+      if (error) throw error;
+      return (data as { conta: string }[]).map((c) => c.conta);
+    },
+  });
+
   const invalidarFinanceiro = () => {
     qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
     qc.invalidateQueries({ queryKey: ["venda", id] });
@@ -334,6 +347,7 @@ function DetalhePedido() {
     valor: string;
     acrescimo: string;
     pago: boolean;
+    conta_bancaria: string;
   }>(null);
   const [editPag, setEditPag] = useState<null | {
     id: string;
