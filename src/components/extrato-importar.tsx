@@ -194,7 +194,7 @@ export function ExtratoImportar({
         toast.error("Não encontrei colunas de data, descrição e valor na planilha.");
       }
     } catch {
-      toast.error("Não consegui ler esse arquivo. Use CSV ou XLSX.");
+      toast.error("Não consegui ler esse arquivo. Use OFX, CSV ou Excel.");
     }
   };
 
