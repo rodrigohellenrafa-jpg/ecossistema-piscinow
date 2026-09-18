@@ -2,7 +2,7 @@ import { DataObraPicker } from "@/components/data-obra-picker";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock3, History, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Clock3, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ExpandableCard } from "@/components/expandable-card";
