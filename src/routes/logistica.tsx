@@ -453,7 +453,13 @@ function FlightBoard() {
         title="Flight Board"
         subtitle="Lista linear das obras por status, com prazos e checklist técnico."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <>
+            <Button asChild variant="outline">
+              <Link to="/agenda">
+                <CalendarDays /> Agenda da equipe
+              </Link>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus /> Nova obra
