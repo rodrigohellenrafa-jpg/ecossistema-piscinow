@@ -12,6 +12,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -124,6 +125,15 @@ function Agenda() {
   const [form, setForm] = useState(vazio);
   const [periodo, setPeriodo] = useState("30");
   const [somenteMeus, setSomenteMeus] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+
+  const alternar = (id: string, marcado: boolean) =>
+    setSelecionados((prev) => {
+      const novo = new Set(prev);
+      if (marcado) novo.add(id);
+      else novo.delete(id);
+      return novo;
+    });
 
   const pegarToken = useServerFn(meuTokenAgenda);
   const trocarToken = useServerFn(regenerarTokenAgenda);
@@ -148,9 +158,27 @@ function Agenda() {
   });
 
   const enviar = useMutation({
-    mutationFn: () => enviarGoogle({ data: { calendarId: agendaGoogle } }),
+    mutationFn: () => {
+      if (selecionados.size === 0)
+        throw new Error("Marque ao menos um compromisso para enviar.");
+      const eventoIds: string[] = [];
+      const osIds: string[] = [];
+      const obraIds = new Set<string>();
+      for (const id of selecionados) {
+        if (id.startsWith("ev-")) eventoIds.push(id.slice(3));
+        else if (id.startsWith("os-")) osIds.push(id.slice(3));
+        else if (id.startsWith("obra-")) obraIds.add(id.split("-").slice(1, -1).join("-"));
+      }
+      return enviarGoogle({
+        data: {
+          calendarId: agendaGoogle,
+          selecionados: { eventoIds, osIds, obraIds: [...obraIds] },
+        },
+      });
+    },
     onSuccess: (r) => {
-      toast.success(`${r.enviados} compromisso(s) do sistema enviados para o Google.`);
+      toast.success(`${r.enviados} compromisso(s) selecionado(s) enviados para o Google.`);
+      setSelecionados(new Set());
       qc.invalidateQueries({ queryKey: ["agenda-eventos"] });
     },
     onError: (e: Error) => toast.error(e.message),
