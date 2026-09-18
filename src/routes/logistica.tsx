@@ -2,7 +2,7 @@ import { DataObraPicker } from "@/components/data-obra-picker";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock3, History, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Clock3, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ExpandableCard } from "@/components/expandable-card";
@@ -453,7 +453,13 @@ function FlightBoard() {
         title="Flight Board"
         subtitle="Lista linear das obras por status, com prazos e checklist técnico."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
+          <>
+            <Button asChild variant="outline">
+              <Link to="/agenda">
+                <CalendarDays /> Agenda da equipe
+              </Link>
+            </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus /> Nova obra
@@ -554,6 +560,7 @@ function FlightBoard() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </>
         }
       />
 
