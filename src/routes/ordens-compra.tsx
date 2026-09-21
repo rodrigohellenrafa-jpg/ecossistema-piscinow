@@ -639,6 +639,12 @@ function OrdensCompra() {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
+      if (creditoAplicado > 0) {
+        salvarCreditoDisponivel.mutate(saldoCredito);
+        setCreditoDisponivelInput(null);
+        setCreditoFabricante("");
+        setUsarCreditoFabricante(false);
+      }
       setSelecionadosCompra({});
       setQuantidadesCompra({});
       setValoresCompra({});
@@ -646,6 +652,7 @@ function OrdensCompra() {
       setVinculosCompra({});
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
+
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
