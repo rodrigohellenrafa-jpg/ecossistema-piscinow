@@ -520,11 +520,13 @@ function Contas() {
       valorPago,
       dataPagamento,
       modo,
+      contaBancaria,
     }: {
       id: string;
       valorPago: number;
       dataPagamento: string;
       modo: "quitar" | "saldo";
+      contaBancaria: string;
     }) => {
       const { data: conta } = await supabase.from("contas").select("*").eq("id", id).single();
       if (!conta) throw new Error("Título não encontrado.");
@@ -547,6 +549,7 @@ function Contas() {
             valor_juros: jurosPagos,
             valor_pago: valorPago,
             valor_desconto: 0,
+            conta_bancaria: contaBancaria || null,
           })
           .eq("id", id);
         if (errParcial) throw errParcial;
@@ -566,7 +569,7 @@ function Contas() {
           obra_id: conta.obra_id,
           numero_documento: conta.numero_documento,
           venda_id: conta.venda_id,
-          conta_bancaria: (conta as { conta_bancaria?: string | null }).conta_bancaria ?? null,
+          conta_bancaria: contaBancaria || null,
           recorrencia: "nenhuma",
           tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
           created_by: uidBaixa,
@@ -580,6 +583,7 @@ function Contas() {
             data_pagamento: dataPagamento,
             valor_pago: valorPago,
             valor_desconto: diferenca > 0.009 ? diferenca : 0,
+            conta_bancaria: contaBancaria || null,
           })
           .eq("id", id);
         if (error) throw error;
@@ -633,6 +637,7 @@ function Contas() {
       qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const excluir = useMutation({
@@ -1216,6 +1221,7 @@ function Contas() {
 
       <BaixaDialog
         conta={baixando}
+        contasBancarias={contasBancarias}
         pendente={baixar.isPending}
         onFechar={() => setBaixando(null)}
         onConfirmar={(p) => baixar.mutate(p, { onSuccess: () => setBaixando(null) })}
@@ -1227,11 +1233,13 @@ function Contas() {
 /** Modal de baixa: separa o valor do título do valor realmente pago. */
 function BaixaDialog({
   conta,
+  contasBancarias,
   pendente,
   onFechar,
   onConfirmar,
 }: {
   conta: Conta | null;
+  contasBancarias: { id: string; conta: string; banco: string | null }[];
   pendente: boolean;
   onFechar: () => void;
   onConfirmar: (p: {
@@ -1239,12 +1247,14 @@ function BaixaDialog({
     valorPago: number;
     dataPagamento: string;
     modo: "quitar" | "saldo";
+    contaBancaria: string;
   }) => void;
 }) {
   const total = conta ? Number(conta.valor) + Number(conta.valor_juros ?? 0) : 0;
   const [valorPago, setValorPago] = useState("");
   const [dataPagamento, setDataPagamento] = useState("");
   const [modo, setModo] = useState<"quitar" | "saldo">("quitar");
+  const [contaBancaria, setContaBancaria] = useState("");
 
   const aberto = !!conta;
   const chave = conta?.id ?? "";
@@ -1254,6 +1264,8 @@ function BaixaDialog({
     setValorPago(total.toFixed(2));
     setDataPagamento(new Date().toISOString().slice(0, 10));
     setModo("quitar");
+    const atual = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
+    setContaBancaria(contasBancarias.some((b) => b.conta === atual) ? atual : "");
   }
 
   const pago = Number(String(valorPago).replace(",", ".")) || 0;
@@ -1316,15 +1328,33 @@ function BaixaDialog({
               </Field>
             </div>
           )}
+          <div className="sm:col-span-2">
+            <Field label={recebe ? "Conta que recebeu" : "Conta que pagou"}>
+              <Select value={contaBancaria} onValueChange={setContaBancaria}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta bancária" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contasBancarias.map((b) => (
+                    <SelectItem key={b.id} value={b.conta}>
+                      {b.conta}
+                      {b.banco ? ` · ${b.banco}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
           <Button
-            disabled={pendente || pago <= 0 || !dataPagamento}
+            disabled={pendente || pago <= 0 || !dataPagamento || !contaBancaria}
             onClick={() =>
-              conta && onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo })
+              conta &&
+              onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria })
             }
           >
             Confirmar baixa
