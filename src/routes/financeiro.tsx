@@ -152,6 +152,13 @@ function Financeiro() {
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
+  const [baixa, setBaixa] = useState<{
+    id: string;
+    descricao: string;
+    valor: number;
+    conta: string;
+    data: string;
+  } | null>(null);
 
   const [fTipo, setFTipo] = useState("todos");
   const [fCategoria, setFCategoria] = useState("todas");
