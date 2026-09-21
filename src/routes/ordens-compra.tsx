@@ -177,7 +177,19 @@ type Produto = {
   fornecedor_id: string | null;
   cor_pastilha: string | null;
   modelo_pastilha: string | null;
+  quantidade_compra: number;
+  desconto_compra: number;
+  status_compra: string;
 };
+
+const STATUS_COMPRA = [
+  { valor: "a_comprar", rotulo: "A comprar" },
+  { valor: "comprado", rotulo: "Comprado" },
+  { valor: "recebido", rotulo: "Recebido" },
+] as const;
+
+const statusCompraLabel = (s: string) =>
+  STATUS_COMPRA.find((opcao) => opcao.valor === s)?.rotulo ?? "A comprar";
 
 /** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
 const SEM_CLIENTE = "__estoque__";
@@ -265,7 +277,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
