@@ -175,6 +175,8 @@ type Produto = {
   cst: string | null;
   preco_custo: number;
   fornecedor_id: string | null;
+  cor_pastilha: string | null;
+  modelo_pastilha: string | null;
 };
 
 /** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
@@ -263,7 +265,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
@@ -929,6 +931,20 @@ function OrdensCompra() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const atualizarPastilha = useMutation({
+    mutationFn: async ({ id, campo, valor }: { id: string; campo: "cor_pastilha" | "modelo_pastilha"; valor: string }) => {
+      const { error } = await supabase
+        .from("produtos")
+        .update({ [campo]: valor.trim() || null } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   const excluirOrdem = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ordens_compra").delete().eq("id", id);
@@ -1237,7 +1253,7 @@ function OrdensCompra() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1180px]">
+            <Table className="min-w-[1440px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
@@ -1251,6 +1267,8 @@ function OrdensCompra() {
                   <TableHead>Fornecedor</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Produto</TableHead>
+                  <TableHead>Cor</TableHead>
+                  <TableHead>Modelo</TableHead>
                   <TableHead className="text-right">Qtde</TableHead>
                   <TableHead className="text-right">Vl. unit.</TableHead>
                   <TableHead className="text-right">%</TableHead>
@@ -1281,6 +1299,36 @@ function OrdensCompra() {
                       <TableCell className="font-medium">{fornecedor?.nome ?? "Não encontrado"}</TableCell>
                       <TableCell className="font-mono text-xs">{produto.codigo ?? "—"}</TableCell>
                       <TableCell>{produto.nome}</TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`Cor da pastilha de ${produto.nome}`}
+                          className="w-28"
+                          placeholder="Cor"
+                          defaultValue={produto.cor_pastilha ?? ""}
+                          onBlur={(evento) =>
+                            atualizarPastilha.mutate({
+                              id: produto.id,
+                              campo: "cor_pastilha",
+                              valor: evento.target.value,
+                            })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`Modelo da pastilha de ${produto.nome}`}
+                          className="w-32"
+                          placeholder="Modelo"
+                          defaultValue={produto.modelo_pastilha ?? ""}
+                          onBlur={(evento) =>
+                            atualizarPastilha.mutate({
+                              id: produto.id,
+                              campo: "modelo_pastilha",
+                              valor: evento.target.value,
+                            })
+                          }
+                        />
+                      </TableCell>
                       <TableCell>
                         <Input
                           aria-label={`Quantidade de ${produto.nome}`}
