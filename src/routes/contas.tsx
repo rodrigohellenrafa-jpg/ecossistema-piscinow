@@ -583,6 +583,7 @@ function Contas() {
             data_pagamento: dataPagamento,
             valor_pago: valorPago,
             valor_desconto: diferenca > 0.009 ? diferenca : 0,
+            conta_bancaria: contaBancaria || null,
           })
           .eq("id", id);
         if (error) throw error;
