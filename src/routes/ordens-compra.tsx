@@ -460,7 +460,9 @@ function OrdensCompra() {
 
   const quantidadeCompra = (produto: Produto) => {
     const valor = quantidadesCompra[produto.id];
-    return valor === undefined ? 1 : Math.max(Number(valor) || 0, 0);
+    return valor === undefined
+      ? Number(produto.quantidade_compra ?? 1)
+      : Math.max(Number(valor) || 0, 0);
   };
 
   const valorCompra = (produto: Produto) => {
@@ -469,7 +471,9 @@ function OrdensCompra() {
   };
 
   const percentualCompra = (produto: Produto) =>
-    Math.min(Math.max(Number(percentuaisCompra[produto.id]) || 0, 0), 100);
+    percentuaisCompra[produto.id] === undefined
+      ? Math.min(Math.max(Number(produto.desconto_compra ?? 0) || 0, 0), 100)
+      : Math.min(Math.max(Number(percentuaisCompra[produto.id]) || 0, 0), 100);
 
   const totalCompra = (produto: Produto) =>
     quantidadeCompra(produto) * valorCompra(produto) * (1 - percentualCompra(produto) / 100);
@@ -948,6 +952,21 @@ function OrdensCompra() {
       const { error } = await supabase
         .from("produtos")
         .update({ [campo]: valor.trim() || null } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  /** Salva automaticamente quantidade, valor, desconto e status de compra do produto. */
+  const atualizarCompra = useMutation({
+    mutationFn: async ({ id, campo, valor }: { id: string; campo: string; valor: number | string }) => {
+      const { error } = await supabase
+        .from("produtos")
+        .update({ [campo]: valor } as any)
         .eq("id", id);
       if (error) throw error;
     },
