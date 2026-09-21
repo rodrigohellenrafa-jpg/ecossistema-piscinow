@@ -1291,8 +1291,16 @@ function BaixaDialog({
     setDataPagamento(new Date().toISOString().slice(0, 10));
     setModo("quitar");
     const atual = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
-    setContaBancaria(contasBancarias.some((b) => b.conta === atual) ? atual : "");
+    setContaBancaria(atual);
   }
+
+  const contaAtualTitulo = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
+  const opcoesContas = [
+    ...contasBancarias,
+    ...(contaAtualTitulo && !contasBancarias.some((b) => b.conta === contaAtualTitulo)
+      ? [{ id: `atual-${contaAtualTitulo}`, conta: contaAtualTitulo, banco: null }]
+      : []),
+  ];
 
   const pago = Number(String(valorPago).replace(",", ".")) || 0;
   const diferenca = Number((total - pago).toFixed(2));
@@ -1361,7 +1369,7 @@ function BaixaDialog({
                   <SelectValue placeholder="Selecione a conta bancária" />
                 </SelectTrigger>
                 <SelectContent>
-                  {contasBancarias.map((b) => (
+                  {opcoesContas.map((b) => (
                     <SelectItem key={b.id} value={b.conta}>
                       {b.conta}
                       {b.banco ? ` · ${b.banco}` : ""}
@@ -1370,6 +1378,12 @@ function BaixaDialog({
                 </SelectContent>
               </Select>
             </Field>
+            {opcoesContas.length === 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Nenhuma conta bancária cadastrada. Você pode confirmar a baixa assim mesmo — o saldo
+                por conta só será atualizado depois de cadastrar suas contas no painel.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -1377,7 +1391,12 @@ function BaixaDialog({
             Cancelar
           </Button>
           <Button
-            disabled={pendente || pago <= 0 || !dataPagamento || !contaBancaria}
+            disabled={
+              pendente ||
+              pago <= 0 ||
+              !dataPagamento ||
+              (opcoesContas.length > 0 && !contaBancaria)
+            }
             onClick={() =>
               conta &&
               onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria })
