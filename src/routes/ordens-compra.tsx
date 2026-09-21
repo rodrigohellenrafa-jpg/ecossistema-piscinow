@@ -651,7 +651,13 @@ function OrdensCompra() {
       setVinculosCompra({});
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
-
+      if (idsCriados[0]) {
+        setModoEdicao(false);
+        setDetalheId(idsCriados[0]);
+        if (idsCriados.length > 1) {
+          toast.info("Abrindo a primeira ordem. As demais estão na lista abaixo.");
+        }
+      }
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
