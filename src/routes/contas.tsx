@@ -569,7 +569,7 @@ function Contas() {
           obra_id: conta.obra_id,
           numero_documento: conta.numero_documento,
           venda_id: conta.venda_id,
-          conta_bancaria: (conta as { conta_bancaria?: string | null }).conta_bancaria ?? null,
+          conta_bancaria: contaBancaria || null,
           recorrencia: "nenhuma",
           tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
           created_by: uidBaixa,
