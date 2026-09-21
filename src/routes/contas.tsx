@@ -1221,6 +1221,7 @@ function Contas() {
 
       <BaixaDialog
         conta={baixando}
+        contasBancarias={contasBancarias}
         pendente={baixar.isPending}
         onFechar={() => setBaixando(null)}
         onConfirmar={(p) => baixar.mutate(p, { onSuccess: () => setBaixando(null) })}
