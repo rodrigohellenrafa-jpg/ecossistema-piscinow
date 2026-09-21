@@ -571,6 +571,7 @@ function OrdensCompra() {
       }
 
       let quantidadeOrdens = 0;
+      const idsCriados: string[] = [];
       for (const { fornecedor, itens } of grupos.values()) {
         const numero = proximoCodigo("OC", numeros);
         numeros.push(numero);
@@ -629,10 +630,11 @@ function OrdensCompra() {
         const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
         if (erroItens) throw erroItens;
         quantidadeOrdens += 1;
+        idsCriados.push(ordem.id);
       }
-      return quantidadeOrdens;
+      return { quantidadeOrdens, idsCriados };
     },
-    onSuccess: (quantidade) => {
+    onSuccess: ({ quantidadeOrdens: quantidade, idsCriados }) => {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
@@ -649,7 +651,13 @@ function OrdensCompra() {
       setVinculosCompra({});
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
-
+      if (idsCriados[0]) {
+        setModoEdicao(false);
+        setDetalheId(idsCriados[0]);
+        if (idsCriados.length > 1) {
+          toast.info("Abrindo a primeira ordem. As demais estão na lista abaixo.");
+        }
+      }
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
