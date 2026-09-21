@@ -1719,6 +1719,7 @@ export type Database = {
           cst: string | null
           custo_fabricacao: number
           custo_logistico: number
+          desconto_compra: number
           descricao: string | null
           estoque_atual: number
           estoque_minimo: number
@@ -1731,7 +1732,9 @@ export type Database = {
           origem_mercadoria: string
           preco_custo: number
           preco_venda: number
+          quantidade_compra: number
           sob_encomenda: boolean
+          status_compra: string
           tipo: string
           unidade: string
           unidades_por_compra: number
@@ -1755,6 +1758,7 @@ export type Database = {
           cst?: string | null
           custo_fabricacao?: number
           custo_logistico?: number
+          desconto_compra?: number
           descricao?: string | null
           estoque_atual?: number
           estoque_minimo?: number
@@ -1767,7 +1771,9 @@ export type Database = {
           origem_mercadoria?: string
           preco_custo?: number
           preco_venda?: number
+          quantidade_compra?: number
           sob_encomenda?: boolean
+          status_compra?: string
           tipo?: string
           unidade?: string
           unidades_por_compra?: number
@@ -1791,6 +1797,7 @@ export type Database = {
           cst?: string | null
           custo_fabricacao?: number
           custo_logistico?: number
+          desconto_compra?: number
           descricao?: string | null
           estoque_atual?: number
           estoque_minimo?: number
@@ -1803,7 +1810,9 @@ export type Database = {
           origem_mercadoria?: string
           preco_custo?: number
           preco_venda?: number
+          quantidade_compra?: number
           sob_encomenda?: boolean
+          status_compra?: string
           tipo?: string
           unidade?: string
           unidades_por_compra?: number

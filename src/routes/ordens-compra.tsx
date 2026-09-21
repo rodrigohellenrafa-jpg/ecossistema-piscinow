@@ -177,7 +177,16 @@ type Produto = {
   fornecedor_id: string | null;
   cor_pastilha: string | null;
   modelo_pastilha: string | null;
+  quantidade_compra: number;
+  desconto_compra: number;
+  status_compra: string;
 };
+
+const STATUS_COMPRA = [
+  { valor: "a_comprar", rotulo: "A comprar" },
+  { valor: "comprado", rotulo: "Comprado" },
+  { valor: "recebido", rotulo: "Recebido" },
+] as const;
 
 /** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
 const SEM_CLIENTE = "__estoque__";
@@ -265,7 +274,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
@@ -448,7 +457,9 @@ function OrdensCompra() {
 
   const quantidadeCompra = (produto: Produto) => {
     const valor = quantidadesCompra[produto.id];
-    return valor === undefined ? 1 : Math.max(Number(valor) || 0, 0);
+    return valor === undefined
+      ? Number(produto.quantidade_compra ?? 1)
+      : Math.max(Number(valor) || 0, 0);
   };
 
   const valorCompra = (produto: Produto) => {
@@ -457,7 +468,9 @@ function OrdensCompra() {
   };
 
   const percentualCompra = (produto: Produto) =>
-    Math.min(Math.max(Number(percentuaisCompra[produto.id]) || 0, 0), 100);
+    percentuaisCompra[produto.id] === undefined
+      ? Math.min(Math.max(Number(produto.desconto_compra ?? 0) || 0, 0), 100)
+      : Math.min(Math.max(Number(percentuaisCompra[produto.id]) || 0, 0), 100);
 
   const totalCompra = (produto: Produto) =>
     quantidadeCompra(produto) * valorCompra(produto) * (1 - percentualCompra(produto) / 100);
@@ -945,6 +958,21 @@ function OrdensCompra() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  /** Salva automaticamente quantidade, valor, desconto e status de compra do produto. */
+  const atualizarCompra = useMutation({
+    mutationFn: async ({ id, campo, valor }: { id: string; campo: string; valor: number | string }) => {
+      const { error } = await supabase
+        .from("produtos")
+        .update({ [campo]: valor } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   const excluirOrdem = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ordens_compra").delete().eq("id", id);
@@ -1336,12 +1364,19 @@ function OrdensCompra() {
                           type="number"
                           min="0"
                           step="0.001"
-                          value={quantidadesCompra[produto.id] ?? "1"}
+                          value={quantidadesCompra[produto.id] ?? String(Number(produto.quantidade_compra ?? 1))}
                           onChange={(evento) =>
                             setQuantidadesCompra((atual) => ({
                               ...atual,
                               [produto.id]: evento.target.value,
                             }))
+                          }
+                          onBlur={(evento) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "quantidade_compra",
+                              valor: Math.max(Number(evento.target.value) || 0, 0),
+                            })
                           }
                         />
                       </TableCell>
@@ -1359,6 +1394,13 @@ function OrdensCompra() {
                               [produto.id]: evento.target.value,
                             }))
                           }
+                          onBlur={(evento) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "preco_custo",
+                              valor: Math.max(Number(evento.target.value) || 0, 0),
+                            })
+                          }
                         />
                       </TableCell>
                       <TableCell>
@@ -1369,12 +1411,19 @@ function OrdensCompra() {
                           min="0"
                           max="100"
                           step="0.01"
-                          value={percentuaisCompra[produto.id] ?? "0"}
+                          value={percentuaisCompra[produto.id] ?? String(Number(produto.desconto_compra ?? 0))}
                           onChange={(evento) =>
                             setPercentuaisCompra((atual) => ({
                               ...atual,
                               [produto.id]: evento.target.value,
                             }))
+                          }
+                          onBlur={(evento) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "desconto_compra",
+                              valor: Math.min(Math.max(Number(evento.target.value) || 0, 0), 100),
+                            })
                           }
                         />
                       </TableCell>
@@ -1403,7 +1452,30 @@ function OrdensCompra() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">A comprar</Badge>
+                        <Select
+                          value={produto.status_compra ?? "a_comprar"}
+                          onValueChange={(valor) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "status_compra",
+                              valor,
+                            })
+                          }
+                        >
+                          <SelectTrigger
+                            className="w-32"
+                            aria-label={`Status de compra de ${produto.nome}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_COMPRA.map((opcao) => (
+                              <SelectItem key={opcao.valor} value={opcao.valor}>
+                                {opcao.rotulo}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
