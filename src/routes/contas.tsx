@@ -549,6 +549,7 @@ function Contas() {
             valor_juros: jurosPagos,
             valor_pago: valorPago,
             valor_desconto: 0,
+            conta_bancaria: contaBancaria || null,
           })
           .eq("id", id);
         if (errParcial) throw errParcial;
