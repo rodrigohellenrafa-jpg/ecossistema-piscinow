@@ -903,11 +903,28 @@ function Contas() {
                     </Dialog>
                   </div>
                 ) : (
-                  <Input
-                    value={form.parceiro}
-                    onChange={(e) => set("parceiro")(e.target.value)}
-                    placeholder="Nome do cliente"
-                  />
+                  <Select
+                    value={form.parceiro || "nenhum"}
+                    onValueChange={(v) => set("parceiro")(v === "nenhum" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nenhum">Sem cliente</SelectItem>
+                      {clientesSelect.map((c) => (
+                        <SelectItem key={c.id} value={c.nome}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                      {form.parceiro &&
+                        !clientesSelect.some((c) => c.nome === form.parceiro) && (
+                          <SelectItem value={form.parceiro}>
+                            {form.parceiro} (atual)
+                          </SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
                 )}
               </Field>
               <Field label="Descrição" className="sm:col-span-2">
