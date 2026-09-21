@@ -257,12 +257,17 @@ function Contas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saldos_bancarios")
-        .select("id, conta, banco")
+        .select("id, conta, banco, saldo")
         .order("conta", { ascending: true });
       if (error) throw error;
-      return data as { id: string; conta: string; banco: string | null }[];
+      return data as { id: string; conta: string; banco: string | null; saldo: number | null }[];
     },
   });
+
+  const saldoTotalContas = contasBancarias.reduce(
+    (acc, c) => acc + (Number(c.saldo) || 0),
+    0,
+  );
 
   const [parceiroOpen, setParceiroOpen] = useState(false);
   const [parceiroBusca, setParceiroBusca] = useState("");
