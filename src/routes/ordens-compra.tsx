@@ -231,6 +231,8 @@ function OrdensCompra() {
   });
   const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
   const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
+  const [usarCreditoFabricante, setUsarCreditoFabricante] = useState(false);
+  const [creditoFabricante, setCreditoFabricante] = useState("");
   const [quantidadesCompra, setQuantidadesCompra] = useState<Record<string, string>>({});
   const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
   const [percentuaisCompra, setPercentuaisCompra] = useState<Record<string, string>>({});
