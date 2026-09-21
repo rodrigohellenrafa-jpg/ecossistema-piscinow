@@ -523,12 +523,12 @@ function OrdensCompra() {
   const creditoDisponivelValor =
     creditoDisponivelInput === null
       ? creditoDisponivel
-      : Math.max(Number(creditoDisponivelInput) || 0, 0);
+      : Number(creditoDisponivelInput) || 0;
   const creditoCreditar = usarCreditoFabricante
-    ? Math.min(Math.max(Number(creditoFabricante) || 0, 0), creditoDisponivelValor)
+    ? Math.max(Number(creditoFabricante) || 0, 0)
     : 0;
   const creditoAplicado = Math.min(creditoCreditar, totalSelecionadoCompra);
-  const saldoCredito = Math.max(creditoDisponivelValor - creditoCreditar, 0);
+  const saldoCredito = creditoDisponivelValor - creditoCreditar;
   const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
 
   const todosProdutosSelecionados =
@@ -1435,7 +1435,7 @@ function OrdensCompra() {
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t pt-1">
                   <span className="text-xs font-semibold">(=) SALDO</span>
-                  <span className="w-32 text-right font-semibold">{brl(saldoCredito)}</span>
+                  <span className={`w-32 text-right font-semibold ${saldoCredito < 0 ? "text-destructive" : ""}`}>{brl(saldoCredito)}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Abatido na compra: {brl(creditoAplicado)}
