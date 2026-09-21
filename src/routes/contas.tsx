@@ -1328,15 +1328,33 @@ function BaixaDialog({
               </Field>
             </div>
           )}
+          <div className="sm:col-span-2">
+            <Field label={recebe ? "Conta que recebeu" : "Conta que pagou"}>
+              <Select value={contaBancaria} onValueChange={setContaBancaria}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta bancária" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contasBancarias.map((b) => (
+                    <SelectItem key={b.id} value={b.conta}>
+                      {b.conta}
+                      {b.banco ? ` · ${b.banco}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
           <Button
-            disabled={pendente || pago <= 0 || !dataPagamento}
+            disabled={pendente || pago <= 0 || !dataPagamento || !contaBancaria}
             onClick={() =>
-              conta && onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo })
+              conta &&
+              onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria })
             }
           >
             Confirmar baixa
