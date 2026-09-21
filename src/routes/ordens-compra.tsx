@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
+import { Pencil, Plus, Save, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -1061,6 +1061,36 @@ function OrdensCompra() {
     [],
   );
 
+  const salvarTodosItens = useMutation({
+    mutationFn: async () => {
+      Object.values(salvamentosPendentes.current).forEach(clearTimeout);
+      salvamentosPendentes.current = {};
+      const resultados = await Promise.all(
+        produtos.map((produto) =>
+          supabase
+            .from("produtos")
+            .update({
+              quantidade_compra: quantidadeCompra(produto),
+              preco_custo: valorCompra(produto),
+              desconto_compra: percentualCompra(produto),
+              cor_pastilha: (coresCompra[produto.id] ?? produto.cor_pastilha ?? "").trim(),
+              modelo_pastilha: (modelosCompra[produto.id] ?? produto.modelo_pastilha ?? "").trim(),
+              status_compra: statusCompra[produto.id] ?? produto.status_compra ?? "a_comprar",
+            } as any)
+            .eq("id", produto.id),
+        ),
+      );
+      const erro = resultados.find((r) => r.error)?.error;
+      if (erro) throw erro;
+      return resultados.length;
+    },
+    onSuccess: (total) => {
+      toast.success(total === 1 ? "1 item salvo" : `${total} itens salvos`);
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   const excluirOrdem = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ordens_compra").delete().eq("id", id);
@@ -1644,7 +1674,14 @@ function OrdensCompra() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => salvarTodosItens.mutate()}
+              disabled={produtos.length === 0 || salvarTodosItens.isPending}
+            >
+              <Save /> Salvar itens
+            </Button>
             <Button
               onClick={() => comprarSelecionados.mutate()}
               disabled={produtosSelecionados.length === 0 || comprarSelecionados.isPending}
