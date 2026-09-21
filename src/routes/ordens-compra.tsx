@@ -233,6 +233,8 @@ function OrdensCompra() {
   const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
   const [usarCreditoFabricante, setUsarCreditoFabricante] = useState(false);
   const [creditoFabricante, setCreditoFabricante] = useState("");
+  const [creditoDisponivelInput, setCreditoDisponivelInput] = useState<string | null>(null);
+
   const [quantidadesCompra, setQuantidadesCompra] = useState<Record<string, string>>({});
   const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
   const [percentuaisCompra, setPercentuaisCompra] = useState<Record<string, string>>({});
