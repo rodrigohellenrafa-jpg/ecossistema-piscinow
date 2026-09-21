@@ -3,7 +3,7 @@ import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCircle2, ChevronsUpDown, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, ChevronsUpDown, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
@@ -515,6 +515,23 @@ function Contas() {
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["contas"] });
       qc.invalidateQueries({ queryKey: ["conta-rateios"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const reverterBaixa = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("contas")
+        .update({ status: "aberto", data_pagamento: null, valor_pago: 0, valor_desconto: 0 })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Baixa revertida — o valor voltou para o saldo da conta.");
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1256,6 +1273,9 @@ function Contas() {
             onBaixar={setBaixando}
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
+            onReverter={(c) => {
+              if (window.confirm(`Reverter a baixa de "${c.descricao}"?`)) reverterBaixa.mutate(c.id);
+            }}
           />
         </TabsContent>
         <TabsContent value="receber">
@@ -1267,6 +1287,9 @@ function Contas() {
             onBaixar={setBaixando}
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
+            onReverter={(c) => {
+              if (window.confirm(`Reverter a baixa de "${c.descricao}"?`)) reverterBaixa.mutate(c.id);
+            }}
           />
         </TabsContent>
       </Tabs>
@@ -1466,6 +1489,7 @@ function Lista({
   onBaixar,
   onEditar,
   onExcluir,
+  onReverter,
 }: {
   expansivel?: boolean;
   titulo: string;
@@ -1474,6 +1498,7 @@ function Lista({
   onBaixar: (c: Conta) => void;
   onEditar: (c: Conta) => void;
   onExcluir: (id: string) => void;
+  onReverter: (c: Conta) => void;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
   const [fDescricao, setFDescricao] = useState("");
@@ -1642,7 +1667,7 @@ function Lista({
                     </Badge>
                   </TableCell>
                   <TableCell className={`text-right ${acoesFixas}`}><div className="flex justify-end gap-1">
-                    {c.status !== "pago" && (
+                    {c.status !== "pago" ? (
                       <Button
                         size="icon"
                         variant="ghost"
@@ -1650,6 +1675,16 @@ function Lista({
                         aria-label="Dar baixa"
                       >
                         <CheckCircle2 className="size-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => onReverter(c)}
+                        title="Reverter baixa"
+                        aria-label="Reverter baixa"
+                      >
+                        <RotateCcw className="size-4" />
                       </Button>
                     )}
                     <Button
