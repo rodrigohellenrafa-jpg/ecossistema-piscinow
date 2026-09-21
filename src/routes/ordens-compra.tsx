@@ -465,6 +465,18 @@ function OrdensCompra() {
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [ordensFiltradas, itensTodos, vendaPorId]);
 
+  const linhasExecutadas = useMemo(() => {
+    const ordensPorId = new Map(ordensFiltradas.map((ordem) => [ordem.id, ordem]));
+    const produtosPorId = new Map(produtos.map((produto) => [produto.id, produto]));
+    return itensTodos.flatMap((item) => {
+      const ordem = ordensPorId.get(item.ordem_id);
+      if (!ordem) return [];
+      const produto = item.produto_id ? produtosPorId.get(item.produto_id) : undefined;
+      const venda = item.venda_id ? vendaPorId.get(item.venda_id) : undefined;
+      return [{ item, ordem, produto, venda }];
+    });
+  }, [ordensFiltradas, itensTodos, produtos, vendaPorId]);
+
   const ordemDetalhe = ordens.find((o) => o.id === detalheId) ?? null;
   const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
     ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
@@ -643,7 +655,7 @@ function OrdensCompra() {
       }
       return { quantidadeOrdens, idsCriados };
     },
-    onSuccess: ({ quantidadeOrdens: quantidade, idsCriados }) => {
+    onSuccess: ({ quantidadeOrdens: quantidade }) => {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
@@ -660,13 +672,6 @@ function OrdensCompra() {
       setVinculosCompra({});
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
-      if (idsCriados[0]) {
-        setModoEdicao(false);
-        setDetalheId(idsCriados[0]);
-        if (idsCriados.length > 1) {
-          toast.info("Abrindo a primeira ordem. As demais estão na lista abaixo.");
-        }
-      }
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
@@ -1236,164 +1241,6 @@ function OrdensCompra() {
                 ))}
               </SelectContent>
             </Select>
-            <Dialog open={novaOpen} onOpenChange={setNovaOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus /> Nova ordem
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Criar ordem de compra</DialogTitle>
-                  <DialogDescription>
-                    Escolha o fornecedor, adicione os itens e salve a ordem.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Fornecedor *">
-                    <Select
-                      value={novaOrdem.fornecedor_id}
-                      onValueChange={(v) => setNovaOrdem((f) => ({ ...f, fornecedor_id: v }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fornecedores.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field label="Previsão de entrega">
-                    <Input
-                      type="date"
-                      value={novaOrdem.previsao_entrega}
-                      onChange={(e) =>
-                        setNovaOrdem((f) => ({ ...f, previsao_entrega: e.target.value }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Condições" className="sm:col-span-2">
-                    <Input
-                      value={novaOrdem.condicoes}
-                      onChange={(e) => setNovaOrdem((f) => ({ ...f, condicoes: e.target.value }))}
-                      placeholder="30/60 dias, boleto..."
-                    />
-                  </Field>
-                  <Field label="Observações" className="sm:col-span-2">
-                    <Textarea
-                      value={novaOrdem.observacoes}
-                      onChange={(e) =>
-                        setNovaOrdem((f) => ({ ...f, observacoes: e.target.value }))
-                      }
-                    />
-                  </Field>
-                </div>
-
-                <div className="space-y-2 rounded-lg border border-border p-3">
-                  <p className="text-sm font-medium">Adicionar item</p>
-                  <div className="grid gap-2 sm:grid-cols-4">
-                    <Select
-                      value={novoItem.produto_id}
-                      onValueChange={(v) => setNovoItem((i) => ({ ...i, produto_id: v }))}
-                    >
-                      <SelectTrigger className="sm:col-span-2">
-                        <SelectValue placeholder="Produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {produtos.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.codigo ? `${p.codigo} — ` : ""}
-                            {p.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={novoItem.cliente_id}
-                      onValueChange={(v) => setNovoItem((i) => ({ ...i, cliente_id: v }))}
-                    >
-                      <SelectTrigger className="sm:col-span-2">
-                        <SelectValue placeholder="Cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SEM_CLIENTE}>Estoque (sem cliente)</SelectItem>
-                        {clientes.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="number"
-                      placeholder="Qtd"
-                      value={novoItem.quantidade}
-                      onChange={(e) => setNovoItem((i) => ({ ...i, quantidade: e.target.value }))}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Vlr unitário"
-                      value={novoItem.valor_unitario}
-                      onChange={(e) =>
-                        setNovoItem((i) => ({ ...i, valor_unitario: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={adicionarItemNovaOrdem}>
-                    <Plus className="size-4" /> Adicionar item
-                  </Button>
-
-                  {itensNovaOrdem.length > 0 && (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Produto</TableHead>
-                          <TableHead>Cliente</TableHead>
-                          <TableHead className="text-right">Qtd</TableHead>
-                          <TableHead className="text-right">Vlr Unit</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                          <TableHead />
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {itensNovaOrdem.map((i, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>{i.descricao}</TableCell>
-                            <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
-                            <TableCell className="text-right">{i.quantidade}</TableCell>
-                            <TableCell className="text-right">{brl(i.valor_unitario)}</TableCell>
-                            <TableCell className="text-right">
-                              {brl(i.quantidade * i.valor_unitario - i.desconto)}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() =>
-                                  setItensNovaOrdem((it) => it.filter((_, j) => j !== idx))
-                                }
-                              >
-                                <Trash2 className="text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </div>
-
-                <DialogFooter>
-                  <Button onClick={() => criarOrdem.mutate()} disabled={criarOrdem.isPending}>
-                    Salvar ordem
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
         }
       />
@@ -1401,9 +1248,9 @@ function OrdensCompra() {
       <ExpandableCard>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div>
-            <CardTitle>Produtos para comprar</CardTitle>
+            <CardTitle>Ordem de compra</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Selecione cada produto e ajuste a quantidade antes de comprar.
+              Selecione e ajuste os produtos. Ao executar, a ordem recebe um número e uma nova fica pronta.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-4">
@@ -1469,7 +1316,7 @@ function OrdensCompra() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1440px]">
+            <Table className="min-w-[1560px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
@@ -1491,6 +1338,7 @@ function OrdensCompra() {
                   <TableHead className="text-right">Total a pagar</TableHead>
                   <TableHead>Vínculo</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>NF</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1658,6 +1506,7 @@ function OrdensCompra() {
                           </SelectContent>
                         </Select>
                       </TableCell>
+                      <TableCell className="text-muted-foreground">Após faturar</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button
@@ -1686,6 +1535,64 @@ function OrdensCompra() {
                     </TableRow>
                   );
                 })}
+                {linhasExecutadas.map(({ item, ordem, produto, venda }) => (
+                  <TableRow key={`executada-${item.id}`}>
+                    <TableCell />
+                    <TableCell className="font-mono text-xs font-semibold">{ordem.numero ?? "—"}</TableCell>
+                    <TableCell className="font-medium">{ordem.fornecedor_nome ?? "Não definido"}</TableCell>
+                    <TableCell className="font-mono text-xs">{item.codigo ?? "—"}</TableCell>
+                    <TableCell>{item.descricao}</TableCell>
+                    <TableCell>{produto?.cor_pastilha ?? "—"}</TableCell>
+                    <TableCell>{produto?.modelo_pastilha ?? "—"}</TableCell>
+                    <TableCell className="text-right">{Number(item.quantidade)}</TableCell>
+                    <TableCell className="text-right">{brl(Number(item.valor_unitario))}</TableCell>
+                    <TableCell className="text-right">
+                      {Number(item.quantidade) * Number(item.valor_unitario) > 0
+                        ? `${((Number(item.desconto) / (Number(item.quantidade) * Number(item.valor_unitario))) * 100).toFixed(2)}%`
+                        : "0%"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">{brl(Number(item.total))}</TableCell>
+                    <TableCell>{venda ? `${venda.numero ?? "Pedido"} — ${item.cliente_nome ?? venda.cliente_nome ?? "Cliente"}` : "Estoque"}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={ordem.status}
+                        onValueChange={(status) => atualizarStatus.mutate({ id: ordem.id, status })}
+                      >
+                        <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {STATUS.map((status) => (
+                            <SelectItem key={status} value={status}>{statusLabel[status]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      {etapaAtual(ordem.status) >= 2 ? (
+                        <Input
+                          className="w-28 font-mono"
+                          defaultValue={item.numero_nf ?? ""}
+                          placeholder="Nº da NF"
+                          onBlur={(evento) => {
+                            const numeroNf = evento.target.value.trim();
+                            if (numeroNf !== (item.numero_nf ?? "")) atualizarNumeroNf.mutate({ id: item.id, numeroNf });
+                          }}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">Após faturar</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" title="Abrir ordem" onClick={() => setDetalheId(ordem.id)}>
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Excluir ordem" onClick={() => excluirOrdem.mutate(ordem.id)}>
+                          <Trash2 className="size-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -1701,170 +1608,11 @@ function OrdensCompra() {
               onClick={() => comprarSelecionados.mutate()}
               disabled={produtosSelecionados.length === 0 || comprarSelecionados.isPending}
             >
-              <ShoppingCart /> Comprar ({produtosSelecionados.length})
+              <ShoppingCart /> Executar ordem ({produtosSelecionados.length})
             </Button>
           </div>
         </CardContent>
       </ExpandableCard>
-
-      <div>
-        <h2 className="text-lg font-semibold">Ordens já criadas</h2>
-        <p className="text-sm text-muted-foreground">
-          Consulte, edite, imprima e acompanhe as compras anteriores.
-        </p>
-      </div>
-
-      {ordensFiltradas.length === 0 ? (
-        <Card>
-          <CardContent>
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Nenhuma ordem de compra encontrada.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        gruposFornecedor.map((g) => (
-          <ExpandableCard key={g.chave}>
-            <CardHeader className="flex flex-row items-center justify-between gap-3 pr-12">
-              <CardTitle className="flex items-center gap-2">
-                {g.nome}
-                <Badge variant="secondary">
-                  {g.ordens.length} ordem{g.ordens.length === 1 ? "" : "s"}
-                </Badge>
-              </CardTitle>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground">Total do fornecedor</p>
-                <p className="text-lg font-semibold">{brl(g.total)}</p>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Número</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Previsão</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {g.ordens.map((o) => (
-                      <TableRow
-                        key={o.id}
-                        className="cursor-pointer"
-                        onClick={() => setDetalheId(o.id)}
-                      >
-                        <TableCell className="font-mono text-xs">{o.numero ?? "—"}</TableCell>
-                        <TableCell>{dataBR(o.data_pedido)}</TableCell>
-                        <TableCell>{dataBR(o.previsao_entrega)}</TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Select
-                            value={o.status}
-                            onValueChange={(status) =>
-                              atualizarStatus.mutate({ id: o.id, status })
-                            }
-                          >
-                            <SelectTrigger className="h-8 w-[200px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STATUS.map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  {statusLabel[s]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-
-                        <TableCell className="text-right">{brl(Number(o.valor_total))}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDetalheId(o.id);
-                            }}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              excluirOrdem.mutate(o.id);
-                            }}
-                          >
-                            <Trash2 className="text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {g.produtos.length > 0 && (
-                <div className="mt-6 space-y-2">
-                  <p className="text-sm font-semibold">Produtos deste fornecedor por pedido</p>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Pedido</TableHead>
-                          <TableHead>Cliente</TableHead>
-                          <TableHead>Produto</TableHead>
-                          <TableHead>O.C.</TableHead>
-                          <TableHead className="text-right">Qtd</TableHead>
-                          <TableHead>NF</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {g.produtos.map((p) => (
-                          <TableRow
-                            key={p.id}
-                            className="cursor-pointer"
-                            onClick={() => setDetalheId(p.ordemId)}
-                          >
-                            <TableCell>
-                              <Badge variant={p.pedido === "Estoque" ? "secondary" : "outline"}>
-                                {p.pedido}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{p.cliente}</TableCell>
-                            <TableCell className="font-medium">
-                              {p.descricao}
-                              {p.codigo ? (
-                                <span className="ml-2 font-mono text-xs text-muted-foreground">
-                                  {p.codigo}
-                                </span>
-                              ) : null}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {p.ordemNumero ?? "—"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {p.quantidade} {p.unidade}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{p.numeroNf ?? "—"}</TableCell>
-                            <TableCell className="text-right">{brl(p.total)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </ExpandableCard>
-        ))
-      )}
 
       <Dialog
         open={!!detalheId}
