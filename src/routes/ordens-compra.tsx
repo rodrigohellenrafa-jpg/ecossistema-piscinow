@@ -523,12 +523,12 @@ function OrdensCompra() {
   const creditoDisponivelValor =
     creditoDisponivelInput === null
       ? creditoDisponivel
-      : Math.max(Number(creditoDisponivelInput) || 0, 0);
+      : Number(creditoDisponivelInput) || 0;
   const creditoCreditar = usarCreditoFabricante
-    ? Math.min(Math.max(Number(creditoFabricante) || 0, 0), creditoDisponivelValor)
+    ? Math.max(Number(creditoFabricante) || 0, 0)
     : 0;
   const creditoAplicado = Math.min(creditoCreditar, totalSelecionadoCompra);
-  const saldoCredito = Math.max(creditoDisponivelValor - creditoCreditar, 0);
+  const saldoCredito = creditoDisponivelValor - creditoCreditar;
   const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
 
   const todosProdutosSelecionados =
