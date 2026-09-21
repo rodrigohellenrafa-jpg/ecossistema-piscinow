@@ -1233,11 +1233,13 @@ function Contas() {
 /** Modal de baixa: separa o valor do título do valor realmente pago. */
 function BaixaDialog({
   conta,
+  contasBancarias,
   pendente,
   onFechar,
   onConfirmar,
 }: {
   conta: Conta | null;
+  contasBancarias: { id: string; conta: string; banco: string | null }[];
   pendente: boolean;
   onFechar: () => void;
   onConfirmar: (p: {
@@ -1245,12 +1247,14 @@ function BaixaDialog({
     valorPago: number;
     dataPagamento: string;
     modo: "quitar" | "saldo";
+    contaBancaria: string;
   }) => void;
 }) {
   const total = conta ? Number(conta.valor) + Number(conta.valor_juros ?? 0) : 0;
   const [valorPago, setValorPago] = useState("");
   const [dataPagamento, setDataPagamento] = useState("");
   const [modo, setModo] = useState<"quitar" | "saldo">("quitar");
+  const [contaBancaria, setContaBancaria] = useState("");
 
   const aberto = !!conta;
   const chave = conta?.id ?? "";
@@ -1260,6 +1264,8 @@ function BaixaDialog({
     setValorPago(total.toFixed(2));
     setDataPagamento(new Date().toISOString().slice(0, 10));
     setModo("quitar");
+    const atual = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
+    setContaBancaria(contasBancarias.some((b) => b.conta === atual) ? atual : "");
   }
 
   const pago = Number(String(valorPago).replace(",", ".")) || 0;
