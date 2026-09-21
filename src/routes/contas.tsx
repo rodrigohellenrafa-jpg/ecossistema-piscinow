@@ -1291,8 +1291,16 @@ function BaixaDialog({
     setDataPagamento(new Date().toISOString().slice(0, 10));
     setModo("quitar");
     const atual = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
-    setContaBancaria(contasBancarias.some((b) => b.conta === atual) ? atual : "");
+    setContaBancaria(atual);
   }
+
+  const contaAtualTitulo = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
+  const opcoesContas = [
+    ...contasBancarias,
+    ...(contaAtualTitulo && !contasBancarias.some((b) => b.conta === contaAtualTitulo)
+      ? [{ id: `atual-${contaAtualTitulo}`, conta: contaAtualTitulo, banco: null }]
+      : []),
+  ];
 
   const pago = Number(String(valorPago).replace(",", ".")) || 0;
   const diferenca = Number((total - pago).toFixed(2));
