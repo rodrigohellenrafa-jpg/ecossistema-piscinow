@@ -152,6 +152,13 @@ function Financeiro() {
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
+  const [baixa, setBaixa] = useState<{
+    id: string;
+    descricao: string;
+    valor: number;
+    conta: string;
+    data: string;
+  } | null>(null);
 
   const [fTipo, setFTipo] = useState("todos");
   const [fCategoria, setFCategoria] = useState("todas");
@@ -332,7 +339,7 @@ function Financeiro() {
   });
 
   const marcarPago = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, conta, data }: { id: string; conta: string; data: string }) => {
       const { data: orig } = await supabase
         .from("lancamentos_financeiros")
         .select("*")
@@ -341,7 +348,11 @@ function Financeiro() {
 
       const { error } = await supabase
         .from("lancamentos_financeiros")
-        .update({ status: "Pago", data_pagamento: hojeISO() })
+        .update({
+          status: "Pago",
+          data_pagamento: data || hojeISO(),
+          conta_bancaria: conta || orig?.conta_bancaria || null,
+        })
         .eq("id", id);
       if (error) throw error;
 
@@ -374,8 +385,10 @@ function Financeiro() {
     },
     onSuccess: () => {
       toast.success("Lançamento pago e saldo da conta atualizado.");
+      setBaixa(null);
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -684,19 +697,22 @@ function Financeiro() {
                       : "Onde o recurso entra (conta)"
                   }
                 >
-                  <Input
-                    list="contas-bancarias-financeiro"
+                  <Select
                     value={form.conta_bancaria}
-                    onChange={(e) => set("conta_bancaria")(e.target.value)}
-                    placeholder="Ex.: Caixa, Itaú c/c 1234, Nubank PJ"
-                  />
-                  <datalist id="contas-bancarias-financeiro">
-                    {contasBancarias.map((c) => (
-                      <option key={c.id} value={c.conta}>
-                        {c.banco ?? ""}
-                      </option>
-                    ))}
-                  </datalist>
+                    onValueChange={(v) => set("conta_bancaria")(v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contasBancarias.map((c) => (
+                        <SelectItem key={c.id} value={c.conta}>
+                          {c.conta}
+                          {c.banco ? ` — ${c.banco}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Field label="Forma de pagamento">
                   <Select value={form.forma_pagamento} onValueChange={set("forma_pagamento")}>
@@ -983,7 +999,25 @@ function Financeiro() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             {l.status !== "Pago" && (
-                              <Button variant="ghost" size="icon" onClick={() => marcarPago.mutate(l.id)} title="Marcar como pago">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const combina = contasBancarias.find(
+                                    (c) =>
+                                      c.conta.trim().toLowerCase() ===
+                                      (l.conta_bancaria ?? "").trim().toLowerCase(),
+                                  );
+                                  setBaixa({
+                                    id: l.id,
+                                    descricao: l.descricao,
+                                    valor: l.valor,
+                                    conta: combina?.conta ?? "",
+                                    data: hojeISO(),
+                                  });
+                                }}
+                                title="Dar baixa"
+                              >
                                 <CheckCircle2 className="size-4" />
                               </Button>
                             )}
@@ -1012,6 +1046,68 @@ function Financeiro() {
           <Conciliacao lancamentos={lancamentos} onConciliar={(id) => toggleConciliado.mutate({ id, valor: true })} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!baixa} onOpenChange={(o) => !o && setBaixa(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dar baixa</DialogTitle>
+            <DialogDescription>
+              {baixa ? `${baixa.descricao} — ${brl(baixa.valor)}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <Field label="Conta que recebeu / pagou">
+              <Select
+                value={baixa?.conta ?? ""}
+                onValueChange={(v) => setBaixa((b) => (b ? { ...b, conta: v } : b))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contasBancarias.map((c) => (
+                    <SelectItem key={c.id} value={c.conta}>
+                      {c.conta}
+                      {c.banco ? ` — ${c.banco}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Data do pagamento">
+              <Input
+                type="date"
+                value={baixa?.data ?? ""}
+                onChange={(e) => setBaixa((b) => (b ? { ...b, data: e.target.value } : b))}
+              />
+            </Field>
+            {contasBancarias.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma conta bancária cadastrada. Cadastre em Saldos bancários para que o saldo
+                seja atualizado na baixa.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBaixa(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={
+                !baixa ||
+                marcarPago.isPending ||
+                (contasBancarias.length > 0 && !baixa.conta)
+              }
+              onClick={() =>
+                baixa &&
+                marcarPago.mutate({ id: baixa.id, conta: baixa.conta, data: baixa.data })
+              }
+            >
+              Confirmar baixa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
