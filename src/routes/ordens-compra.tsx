@@ -1367,12 +1367,19 @@ function OrdensCompra() {
                           type="number"
                           min="0"
                           step="0.001"
-                          value={quantidadesCompra[produto.id] ?? "1"}
+                          value={quantidadesCompra[produto.id] ?? String(Number(produto.quantidade_compra ?? 1))}
                           onChange={(evento) =>
                             setQuantidadesCompra((atual) => ({
                               ...atual,
                               [produto.id]: evento.target.value,
                             }))
+                          }
+                          onBlur={(evento) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "quantidade_compra",
+                              valor: Math.max(Number(evento.target.value) || 0, 0),
+                            })
                           }
                         />
                       </TableCell>
@@ -1390,6 +1397,13 @@ function OrdensCompra() {
                               [produto.id]: evento.target.value,
                             }))
                           }
+                          onBlur={(evento) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "preco_custo",
+                              valor: Math.max(Number(evento.target.value) || 0, 0),
+                            })
+                          }
                         />
                       </TableCell>
                       <TableCell>
@@ -1400,12 +1414,19 @@ function OrdensCompra() {
                           min="0"
                           max="100"
                           step="0.01"
-                          value={percentuaisCompra[produto.id] ?? "0"}
+                          value={percentuaisCompra[produto.id] ?? String(Number(produto.desconto_compra ?? 0))}
                           onChange={(evento) =>
                             setPercentuaisCompra((atual) => ({
                               ...atual,
                               [produto.id]: evento.target.value,
                             }))
+                          }
+                          onBlur={(evento) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "desconto_compra",
+                              valor: Math.min(Math.max(Number(evento.target.value) || 0, 0), 100),
+                            })
                           }
                         />
                       </TableCell>
@@ -1434,7 +1455,30 @@ function OrdensCompra() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">A comprar</Badge>
+                        <Select
+                          value={produto.status_compra ?? "a_comprar"}
+                          onValueChange={(valor) =>
+                            atualizarCompra.mutate({
+                              id: produto.id,
+                              campo: "status_compra",
+                              valor,
+                            })
+                          }
+                        >
+                          <SelectTrigger
+                            className="w-32"
+                            aria-label={`Status de compra de ${produto.nome}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_COMPRA.map((opcao) => (
+                              <SelectItem key={opcao.valor} value={opcao.valor}>
+                                {opcao.rotulo}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
