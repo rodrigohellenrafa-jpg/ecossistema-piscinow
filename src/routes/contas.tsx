@@ -257,12 +257,17 @@ function Contas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saldos_bancarios")
-        .select("id, conta, banco")
+        .select("id, conta, banco, saldo")
         .order("conta", { ascending: true });
       if (error) throw error;
-      return data as { id: string; conta: string; banco: string | null }[];
+      return data as { id: string; conta: string; banco: string | null; saldo: number | null }[];
     },
   });
+
+  const saldoTotalContas = contasBancarias.reduce(
+    (acc, c) => acc + (Number(c.saldo) || 0),
+    0,
+  );
 
   const [parceiroOpen, setParceiroOpen] = useState(false);
   const [parceiroBusca, setParceiroBusca] = useState("");
@@ -1215,6 +1220,27 @@ function Contas() {
             Filtrando por data de vencimento: {PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.
           </span>
         )}
+
+        <div
+          className="ml-auto flex items-center gap-3 rounded-lg border bg-card px-3 py-1.5"
+          title={contasBancarias
+            .map((c) => `${c.conta}: ${brl(Number(c.saldo) || 0)}`)
+            .join("  •  ")}
+        >
+          <span className="text-xs text-muted-foreground">Saldo em conta</span>
+          <div className="flex flex-col items-end leading-tight">
+            <span className={`text-sm font-semibold tabular-nums ${saldoTotalContas < 0 ? "text-red-600" : ""}`}>
+              {brl(saldoTotalContas)}
+            </span>
+            {contasBancarias.length > 0 && (
+              <span className="text-[10px] text-muted-foreground">
+                {contasBancarias
+                  .map((c) => `${c.conta}: ${brl(Number(c.saldo) || 0)}`)
+                  .join(" • ")}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="pagar">
