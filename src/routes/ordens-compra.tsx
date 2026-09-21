@@ -107,6 +107,9 @@ const statusVariant = (s: string): "secondary" | "default" | "destructive" | "ou
   return "secondary";
 };
 
+const normalizar = (valor: string) =>
+  valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 type Ordem = {
   id: string;
   numero: string | null;
@@ -412,9 +415,6 @@ function OrdensCompra() {
   const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
     ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
     : null;
-
-  const normalizar = (valor: string) =>
-    valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const fornecedorDaCompra = (produto: Produto) => {
     const categoria = normalizar(produto.categoria ?? "");
