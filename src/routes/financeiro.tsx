@@ -385,8 +385,10 @@ function Financeiro() {
     },
     onSuccess: () => {
       toast.success("Lançamento pago e saldo da conta atualizado.");
+      setBaixa(null);
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
