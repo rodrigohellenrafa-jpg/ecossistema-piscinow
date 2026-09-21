@@ -12,7 +12,10 @@ function Tabs(props: React.ComponentProps<typeof TabsPrimitive.Root>) {
  const map=ABAS[path]; const allowed=map?Object.keys(map).filter(k=>podeTela(map[k])):null;
  const [local,setLocal]=React.useState(props.defaultValue);
  const requested=props.value??local;
- const value=allowed && (!requested || !allowed.includes(requested))?allowed[0]:requested;
+ // Só aplica o controle de permissão quando este grupo de abas é o da rota
+ // (valores presentes no mapa ABAS). Abas internas (ex.: contas bancárias) passam direto.
+ const ehAbasDaRota=!!map && !!requested && Object.prototype.hasOwnProperty.call(map,requested);
+ const value=allowed && ehAbasDaRota && !allowed.includes(requested!)?allowed[0]:requested;
  React.useEffect(()=>{if(props.value!==undefined && value && props.value!==value) props.onValueChange?.(value);},[value,props.value,props.onValueChange]);
  return <TabsPrimitive.Root {...props} value={value} onValueChange={v=>{setLocal(v);props.onValueChange?.(v);}} />;
 }
