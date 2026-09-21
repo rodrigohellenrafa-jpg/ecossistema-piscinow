@@ -1,0 +1,1 @@
+UPDATE public.saldos_bancarios SET saldo = saldo - 5901.33, updated_at = now() WHERE conta = 'RS COMERCIO DE PISCINAS';
