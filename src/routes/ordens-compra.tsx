@@ -408,11 +408,14 @@ function OrdensCompra() {
         : categoria.includes("piscina") || nome.includes("piscina")
           ? "analandia"
           : "progeu";
-    return (
+    const encontrado =
       fornecedores.find((f) => normalizar(f.nome).includes(alvo)) ??
-      fornecedores.find((f) => f.id === produto.fornecedor_id) ??
-      null
-    );
+      fornecedores.find((f) => f.id === produto.fornecedor_id);
+    if (encontrado) return encontrado;
+    if (produto.tipo === "servico") {
+      return { id: SEM_CLIENTE, nome: "Splash Jardim do Trevo" } satisfies Fornecedor;
+    }
+    return null;
   };
 
   const quantidadeCompra = (produto: Produto) => {
@@ -460,18 +463,20 @@ function OrdensCompra() {
         .select("numero");
       if (erroNumeros) throw erroNumeros;
       const numeros = (existentes ?? []).map((ordem) => ordem.numero);
-      const grupos = new Map<string, Produto[]>();
+      const grupos = new Map<string, { fornecedor: Fornecedor; itens: Produto[] }>();
 
       for (const produto of produtosSelecionados) {
         const fornecedor = fornecedorDaCompra(produto);
         if (!fornecedor) continue;
-        grupos.set(fornecedor.id, [...(grupos.get(fornecedor.id) ?? []), produto]);
+        const grupo = grupos.get(fornecedor.id);
+        grupos.set(fornecedor.id, {
+          fornecedor,
+          itens: [...(grupo?.itens ?? []), produto],
+        });
       }
 
       let quantidadeOrdens = 0;
-      for (const [fornecedorId, itens] of grupos) {
-        const fornecedor = fornecedores.find((f) => f.id === fornecedorId);
-        if (!fornecedor) continue;
+      for (const { fornecedor, itens } of grupos.values()) {
         const numero = proximoCodigo("OC", numeros);
         numeros.push(numero);
         const valorProdutos = itens.reduce((total, produto) => total + totalCompra(produto), 0);
@@ -479,7 +484,7 @@ function OrdensCompra() {
           .from("ordens_compra")
           .insert({
             numero,
-            fornecedor_id: fornecedor.id,
+            fornecedor_id: fornecedor.id === SEM_CLIENTE ? null : fornecedor.id,
             fornecedor_nome: fornecedor.nome,
             data_pedido: hojeISO(),
             valor_produtos: valorProdutos,
