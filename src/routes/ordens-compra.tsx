@@ -1795,7 +1795,6 @@ function OrdensCompra() {
                   <Button
                     variant="outline"
                     disabled={
-                      etapaAtual(ordemDetalhe.status) < 2 ||
                       ordemDetalhe.status === "concluida" ||
                       ordemDetalhe.status === "recebida"
                     }
@@ -1803,8 +1802,17 @@ function OrdensCompra() {
                       atualizarStatus.mutate({ id: ordemDetalhe.id, status: "concluida" })
                     }
                   >
-                    Marcar como concluída
+                    Marcar como entregue
                   </Button>
+                  <Button
+                    disabled={ordemDetalhe.status === "recebida"}
+                    onClick={() =>
+                      atualizarStatus.mutate({ id: ordemDetalhe.id, status: "recebida" })
+                    }
+                  >
+                    Dar baixa (finalizar)
+                  </Button>
+
                 </div>
                 {ordemDetalhe.faturada_em && (
                   <p className="text-xs text-muted-foreground">
