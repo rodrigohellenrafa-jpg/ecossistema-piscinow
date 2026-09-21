@@ -188,9 +188,6 @@ const STATUS_COMPRA = [
   { valor: "recebido", rotulo: "Recebido" },
 ] as const;
 
-const statusCompraLabel = (s: string) =>
-  STATUS_COMPRA.find((opcao) => opcao.valor === s)?.rotulo ?? "A comprar";
-
 /** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
 const SEM_CLIENTE = "__estoque__";
 
