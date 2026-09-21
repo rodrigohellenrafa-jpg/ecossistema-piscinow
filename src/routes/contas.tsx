@@ -1391,7 +1391,12 @@ function BaixaDialog({
             Cancelar
           </Button>
           <Button
-            disabled={pendente || pago <= 0 || !dataPagamento || !contaBancaria}
+            disabled={
+              pendente ||
+              pago <= 0 ||
+              !dataPagamento ||
+              (opcoesContas.length > 0 && !contaBancaria)
+            }
             onClick={() =>
               conta &&
               onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria })
