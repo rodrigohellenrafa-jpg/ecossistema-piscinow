@@ -1041,6 +1041,68 @@ function Financeiro() {
           <Conciliacao lancamentos={lancamentos} onConciliar={(id) => toggleConciliado.mutate({ id, valor: true })} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!baixa} onOpenChange={(o) => !o && setBaixa(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dar baixa</DialogTitle>
+            <DialogDescription>
+              {baixa ? `${baixa.descricao} — ${brl(baixa.valor)}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <Field label="Conta que recebeu / pagou">
+              <Select
+                value={baixa?.conta ?? ""}
+                onValueChange={(v) => setBaixa((b) => (b ? { ...b, conta: v } : b))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contasBancarias.map((c) => (
+                    <SelectItem key={c.id} value={c.conta}>
+                      {c.conta}
+                      {c.banco ? ` — ${c.banco}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Data do pagamento">
+              <Input
+                type="date"
+                value={baixa?.data ?? ""}
+                onChange={(e) => setBaixa((b) => (b ? { ...b, data: e.target.value } : b))}
+              />
+            </Field>
+            {contasBancarias.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma conta bancária cadastrada. Cadastre em Saldos bancários para que o saldo
+                seja atualizado na baixa.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBaixa(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={
+                !baixa ||
+                marcarPago.isPending ||
+                (contasBancarias.length > 0 && !baixa.conta)
+              }
+              onClick={() =>
+                baixa &&
+                marcarPago.mutate({ id: baixa.id, conta: baixa.conta, data: baixa.data })
+              }
+            >
+              Confirmar baixa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
