@@ -218,6 +218,15 @@ function OrdensCompra() {
   const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
   const [percentuaisCompra, setPercentuaisCompra] = useState<Record<string, string>>({});
   const [vinculosCompra, setVinculosCompra] = useState<Record<string, string>>({});
+  const [produtoCompraEditando, setProdutoCompraEditando] = useState<Produto | null>(null);
+  const [produtoCompraForm, setProdutoCompraForm] = useState({
+    codigo: "",
+    nome: "",
+    categoria: "",
+    unidade: "UN",
+    preco_custo: "0",
+    fornecedor_id: SEM_CLIENTE,
+  });
 
   const { data: ordens = [] } = useQuery({
     queryKey: ["ordens_compra"],
@@ -541,6 +550,71 @@ function OrdensCompra() {
       setVinculosCompra({});
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const abrirEdicaoProdutoCompra = (produto: Produto) => {
+    setProdutoCompraEditando(produto);
+    setProdutoCompraForm({
+      codigo: produto.codigo ?? "",
+      nome: produto.nome,
+      categoria: produto.categoria ?? "",
+      unidade: produto.unidade,
+      preco_custo: String(Number(produto.preco_custo ?? 0)),
+      fornecedor_id: produto.fornecedor_id ?? SEM_CLIENTE,
+    });
+  };
+
+  const salvarProdutoCompra = useMutation({
+    mutationFn: async () => {
+      if (!produtoCompraEditando) throw new Error("Produto não encontrado");
+      if (!produtoCompraForm.nome.trim()) throw new Error("Informe o nome do produto");
+      const { error } = await supabase
+        .from("produtos")
+        .update({
+          codigo: produtoCompraForm.codigo.trim() || null,
+          nome: produtoCompraForm.nome.trim(),
+          categoria: produtoCompraForm.categoria.trim() || null,
+          unidade: produtoCompraForm.unidade.trim() || "UN",
+          preco_custo: Math.max(Number(produtoCompraForm.preco_custo) || 0, 0),
+          fornecedor_id:
+            produtoCompraForm.fornecedor_id === SEM_CLIENTE
+              ? null
+              : produtoCompraForm.fornecedor_id,
+        })
+        .eq("id", produtoCompraEditando.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Produto atualizado");
+      setProdutoCompraEditando(null);
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const excluirProdutoCompra = useMutation({
+    mutationFn: async (produto: Produto) => {
+      const confirmado = window.confirm(
+        `Excluir “${produto.nome}” do cadastro de produtos? Esta ação não pode ser desfeita.`,
+      );
+      if (!confirmado) return false;
+      const { error } = await supabase.from("produtos").delete().eq("id", produto.id);
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: (excluido, produto) => {
+      if (!excluido) return;
+      toast.success(`${produto.nome} excluído`);
+      setSelecionadosCompra((atual) => {
+        const proximo = { ...atual };
+        delete proximo[produto.id];
+        return proximo;
+      });
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
@@ -1106,7 +1180,7 @@ function OrdensCompra() {
         }
       />
 
-      <Card>
+      <ExpandableCard>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div>
             <CardTitle>Produtos para comprar</CardTitle>
@@ -1141,6 +1215,7 @@ function OrdensCompra() {
                   <TableHead className="text-right">Total a pagar</TableHead>
                   <TableHead>Vínculo</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1240,6 +1315,31 @@ function OrdensCompra() {
                       <TableCell>
                         <Badge variant="secondary">A comprar</Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Editar ${produto.nome}`}
+                            title="Editar produto"
+                            onClick={() => abrirEdicaoProdutoCompra(produto)}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Excluir ${produto.nome}`}
+                            title="Excluir produto"
+                            disabled={excluirProdutoCompra.isPending}
+                            onClick={() => excluirProdutoCompra.mutate(produto)}
+                          >
+                            <Trash2 className="size-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -1255,7 +1355,7 @@ function OrdensCompra() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </ExpandableCard>
 
       <div>
         <h2 className="text-lg font-semibold">Ordens já criadas</h2>
@@ -1653,6 +1753,16 @@ function OrdensCompra() {
                 <Button onClick={iniciarEdicao}>
                   <Pencil className="size-4" /> Editar
                 </Button>
+                <Button
+                  variant="destructive"
+                  disabled={excluirOrdem.isPending}
+                  onClick={() => {
+                    if (!window.confirm(`Excluir a ordem ${ordemDetalhe.numero ?? "selecionada"}?`)) return;
+                    excluirOrdem.mutate(ordemDetalhe.id);
+                  }}
+                >
+                  <Trash2 className="size-4" /> Excluir
+                </Button>
               </div>
             </div>
           )}
@@ -1899,6 +2009,109 @@ function OrdensCompra() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={produtoCompraEditando !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) setProdutoCompraEditando(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar produto a comprar</DialogTitle>
+            <DialogDescription>
+              As alterações serão usadas nesta grade e nos próximos pedidos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Produto *" className="sm:col-span-2">
+              <Input
+                value={produtoCompraForm.nome}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, nome: evento.target.value }))
+                }
+              />
+            </Field>
+            <Field label="SKU">
+              <Input
+                value={produtoCompraForm.codigo}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, codigo: evento.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Categoria">
+              <Input
+                value={produtoCompraForm.categoria}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, categoria: evento.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Unidade">
+              <Input
+                value={produtoCompraForm.unidade}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, unidade: evento.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Valor unitário de custo (R$)">
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={produtoCompraForm.preco_custo}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({
+                    ...atual,
+                    preco_custo: evento.target.value,
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Fornecedor" className="sm:col-span-2">
+              <Select
+                value={produtoCompraForm.fornecedor_id}
+                onValueChange={(valor) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, fornecedor_id: valor }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SEM_CLIENTE}>Fornecedor automático pela categoria</SelectItem>
+                  {fornecedores.map((fornecedor) => (
+                    <SelectItem key={fornecedor.id} value={fornecedor.id}>
+                      {fornecedor.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <DialogFooter className="gap-2">
+            {produtoCompraEditando ? (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={excluirProdutoCompra.isPending}
+                onClick={() => excluirProdutoCompra.mutate(produtoCompraEditando)}
+              >
+                <Trash2 className="size-4" /> Excluir
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              onClick={() => salvarProdutoCompra.mutate()}
+              disabled={salvarProdutoCompra.isPending}
+            >
+              <Pencil className="size-4" /> Salvar alterações
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
