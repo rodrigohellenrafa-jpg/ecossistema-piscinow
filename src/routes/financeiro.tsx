@@ -1037,8 +1037,21 @@ function Financeiro() {
                               >
                                 <CheckCircle2 className="size-4" />
                               </Button>
-                            )}
-                            <Button variant="ghost" size="icon" onClick={() => excluir.mutate(l.id)} title="Excluir">
+                             )}
+                             {l.status === "Pago" && (
+                               <Button
+                                 variant="ghost"
+                                 size="icon"
+                                 onClick={() => {
+                                   if (window.confirm(`Reverter a baixa de "${l.descricao}"?`))
+                                     reverterBaixa.mutate(l.id);
+                                 }}
+                                 title="Reverter baixa"
+                               >
+                                 <RotateCcw className="size-4" />
+                               </Button>
+                             )}
+                             <Button variant="ghost" size="icon" onClick={() => excluir.mutate(l.id)} title="Excluir">
                               <Trash2 className="size-4" />
                             </Button>
                           </div>
