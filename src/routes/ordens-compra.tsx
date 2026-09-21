@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -107,6 +107,9 @@ const statusVariant = (s: string): "secondary" | "default" | "destructive" | "ou
   return "secondary";
 };
 
+const normalizar = (valor: string) =>
+  valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 type Ordem = {
   id: string;
   numero: string | null;
@@ -149,6 +152,7 @@ type Item = {
   cliente_id: string | null;
   cliente_nome: string | null;
   venda_id?: string | null;
+  numero_nf: string | null;
 };
 
 type Fornecedor = {
@@ -201,6 +205,7 @@ const novoItemVazio = {
 function OrdensCompra() {
   const qc = useQueryClient();
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
+  const [buscaFornecedor, setBuscaFornecedor] = useState("");
   const [detalheId, setDetalheId] = useState<string | null>(null);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [novaOpen, setNovaOpen] = useState(false);
@@ -332,10 +337,14 @@ function OrdensCompra() {
     return m;
   }, [vendasVinculo]);
 
-  const ordensFiltradas = useMemo(
-    () => (filtroStatus === "todas" ? ordens : ordens.filter((o) => o.status === filtroStatus)),
-    [ordens, filtroStatus],
-  );
+  const ordensFiltradas = useMemo(() => {
+    const busca = normalizar(buscaFornecedor.trim());
+    return ordens.filter(
+      (ordem) =>
+        (filtroStatus === "todas" || ordem.status === filtroStatus) &&
+        (!busca || normalizar(ordem.fornecedor_nome ?? "").includes(busca)),
+    );
+  }, [ordens, filtroStatus, buscaFornecedor]);
 
   /** Produto comprado, com a ordem e o pedido de venda vinculados. */
   type LinhaProduto = {
@@ -349,6 +358,7 @@ function OrdensCompra() {
     total: number;
     pedido: string;
     cliente: string;
+    numeroNf: string | null;
   };
 
   /** Ordens agrupadas por fornecedor (e não por pedido). */
@@ -390,6 +400,7 @@ function OrdensCompra() {
         total: Number(it.total ?? 0),
         pedido: venda?.numero ?? "Estoque",
         cliente: it.cliente_nome ?? venda?.cliente_nome ?? "—",
+        numeroNf: it.numero_nf ?? null,
       });
     }
     for (const g of mapa.values()) {
@@ -404,9 +415,6 @@ function OrdensCompra() {
   const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
     ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
     : null;
-
-  const normalizar = (valor: string) =>
-    valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const fornecedorDaCompra = (produto: Produto) => {
     const categoria = normalizar(produto.categoria ?? "");
@@ -427,6 +435,14 @@ function OrdensCompra() {
     return null;
   };
 
+  const produtosFiltrados = useMemo(() => {
+    const busca = normalizar(buscaFornecedor.trim());
+    if (!busca) return produtos;
+    return produtos.filter((produto) =>
+      normalizar(fornecedorDaCompra(produto)?.nome ?? "").includes(busca),
+    );
+  }, [produtos, fornecedores, buscaFornecedor]);
+
   const quantidadeCompra = (produto: Produto) => {
     const valor = quantidadesCompra[produto.id];
     return valor === undefined ? 1 : Math.max(Number(valor) || 0, 0);
@@ -443,14 +459,14 @@ function OrdensCompra() {
   const totalCompra = (produto: Produto) =>
     quantidadeCompra(produto) * valorCompra(produto) * (1 - percentualCompra(produto) / 100);
 
-  const produtosSelecionados = produtos.filter((p) => selecionadosCompra[p.id]);
+  const produtosSelecionados = produtosFiltrados.filter((p) => selecionadosCompra[p.id]);
   const totalSelecionadoCompra = produtosSelecionados.reduce((total, p) => total + totalCompra(p), 0);
   const todosProdutosSelecionados =
-    produtos.length > 0 && produtos.every((p) => selecionadosCompra[p.id]);
+    produtosFiltrados.length > 0 && produtosFiltrados.every((p) => selecionadosCompra[p.id]);
 
   const marcarTodosProdutos = (marcado: boolean) => {
     setSelecionadosCompra(
-      marcado ? Object.fromEntries(produtos.map((produto) => [produto.id, true])) : {},
+      marcado ? Object.fromEntries(produtosFiltrados.map((produto) => [produto.id, true])) : {},
     );
   };
 
@@ -897,6 +913,21 @@ function OrdensCompra() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const atualizarNumeroNf = useMutation({
+    mutationFn: async ({ id, numeroNf }: { id: string; numeroNf: string }) => {
+      const { error } = await supabase
+        .from("ordem_compra_itens")
+        .update({ numero_nf: numeroNf.trim() || null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Número da NF salvo");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   const excluirOrdem = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ordens_compra").delete().eq("id", id);
@@ -1005,6 +1036,16 @@ function OrdensCompra() {
         subtitle="Controle de pedidos por fornecedor, ICMS, status e impressão."
         actions={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <div className="relative min-w-56 flex-1 sm:flex-none">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                aria-label="Buscar por fornecedor"
+                className="pl-9 sm:w-64"
+                placeholder="Buscar por fornecedor"
+                value={buscaFornecedor}
+                onChange={(evento) => setBuscaFornecedor(evento.target.value)}
+              />
+            </div>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger className="w-44">
                 <SelectValue />
@@ -1219,7 +1260,7 @@ function OrdensCompra() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {produtos.map((produto) => {
+                {produtosFiltrados.map((produto) => {
                   const fornecedor = fornecedorDaCompra(produto);
                   return (
                     <TableRow key={produto.id}>
@@ -1456,6 +1497,7 @@ function OrdensCompra() {
                           <TableHead>Produto</TableHead>
                           <TableHead>O.C.</TableHead>
                           <TableHead className="text-right">Qtd</TableHead>
+                          <TableHead>NF</TableHead>
                           <TableHead className="text-right">Total</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1486,6 +1528,7 @@ function OrdensCompra() {
                             <TableCell className="text-right">
                               {p.quantidade} {p.unidade}
                             </TableCell>
+                            <TableCell className="font-mono text-xs">{p.numeroNf ?? "—"}</TableCell>
                             <TableCell className="text-right">{brl(p.total)}</TableCell>
                           </TableRow>
                         ))}
@@ -1574,6 +1617,7 @@ function OrdensCompra() {
                     <TableHead className="text-right">Qtd</TableHead>
                     <TableHead className="text-right">Vlr Unit</TableHead>
                     <TableHead className="text-right">Desconto</TableHead>
+                    <TableHead>NF</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1589,6 +1633,24 @@ function OrdensCompra() {
                       <TableCell className="text-right">{i.quantidade}</TableCell>
                       <TableCell className="text-right">{brl(Number(i.valor_unitario))}</TableCell>
                       <TableCell className="text-right">{brl(Number(i.desconto))}</TableCell>
+                      <TableCell>
+                        {etapaAtual(ordemDetalhe.status) >= 2 ? (
+                          <Input
+                            aria-label={`Número da NF de ${i.descricao}`}
+                            className="min-w-28 font-mono"
+                            defaultValue={i.numero_nf ?? ""}
+                            placeholder="Nº da NF"
+                            onBlur={(evento) => {
+                              const numeroNf = evento.target.value.trim();
+                              if (numeroNf !== (i.numero_nf ?? "")) {
+                                atualizarNumeroNf.mutate({ id: i.id, numeroNf });
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">Após faturar</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{brl(Number(i.total))}</TableCell>
                     </TableRow>
                   ))}

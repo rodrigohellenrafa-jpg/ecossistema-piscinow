@@ -1413,6 +1413,7 @@ export type Database = {
           descricao: string
           id: string
           ncm: string | null
+          numero_nf: string | null
           ordem_id: string
           produto_id: string | null
           quantidade: number
@@ -1431,6 +1432,7 @@ export type Database = {
           descricao: string
           id?: string
           ncm?: string | null
+          numero_nf?: string | null
           ordem_id: string
           produto_id?: string | null
           quantidade?: number
@@ -1449,6 +1451,7 @@ export type Database = {
           descricao?: string
           id?: string
           ncm?: string | null
+          numero_nf?: string | null
           ordem_id?: string
           produto_id?: string | null
           quantidade?: number
