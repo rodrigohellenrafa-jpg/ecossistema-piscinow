@@ -82,13 +82,14 @@ const STATUS = [
 
 const statusLabel: Record<string, string> = {
   sob_encomenda: "Sob encomenda",
-  pendente: "Pendente (fila de compras)",
+  pendente: "A comprar",
   enviada: "Enviada ao fornecedor",
   faturada: "Faturada pelo fornecedor",
-  concluida: "Concluída (material entregue)",
-  recebida: "Recebida",
+  concluida: "Entregue",
+  recebida: "Finalizada (baixada)",
   cancelada: "Cancelada",
 };
+
 
 /** Ordem das etapas do fluxo da O.C. */
 const FLUXO = ["pendente", "enviada", "faturada", "concluida"] as const;
@@ -1451,11 +1452,26 @@ function OrdensCompra() {
                         <TableCell className="font-mono text-xs">{o.numero ?? "—"}</TableCell>
                         <TableCell>{dataBR(o.data_pedido)}</TableCell>
                         <TableCell>{dataBR(o.previsao_entrega)}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusVariant(o.status)}>
-                            {statusLabel[o.status] ?? o.status}
-                          </Badge>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={o.status}
+                            onValueChange={(status) =>
+                              atualizarStatus.mutate({ id: o.id, status })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[200px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {statusLabel[s]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
+
                         <TableCell className="text-right">{brl(Number(o.valor_total))}</TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -1779,7 +1795,6 @@ function OrdensCompra() {
                   <Button
                     variant="outline"
                     disabled={
-                      etapaAtual(ordemDetalhe.status) < 2 ||
                       ordemDetalhe.status === "concluida" ||
                       ordemDetalhe.status === "recebida"
                     }
@@ -1787,8 +1802,17 @@ function OrdensCompra() {
                       atualizarStatus.mutate({ id: ordemDetalhe.id, status: "concluida" })
                     }
                   >
-                    Marcar como concluída
+                    Marcar como entregue
                   </Button>
+                  <Button
+                    disabled={ordemDetalhe.status === "recebida"}
+                    onClick={() =>
+                      atualizarStatus.mutate({ id: ordemDetalhe.id, status: "recebida" })
+                    }
+                  >
+                    Dar baixa (finalizar)
+                  </Button>
+
                 </div>
                 {ordemDetalhe.faturada_em && (
                   <p className="text-xs text-muted-foreground">
