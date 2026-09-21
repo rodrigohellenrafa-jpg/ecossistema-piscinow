@@ -1452,11 +1452,26 @@ function OrdensCompra() {
                         <TableCell className="font-mono text-xs">{o.numero ?? "—"}</TableCell>
                         <TableCell>{dataBR(o.data_pedido)}</TableCell>
                         <TableCell>{dataBR(o.previsao_entrega)}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusVariant(o.status)}>
-                            {statusLabel[o.status] ?? o.status}
-                          </Badge>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={o.status}
+                            onValueChange={(status) =>
+                              atualizarStatus.mutate({ id: o.id, status })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[200px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {statusLabel[s]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
+
                         <TableCell className="text-right">{brl(Number(o.valor_total))}</TableCell>
                         <TableCell className="text-right">
                           <Button
