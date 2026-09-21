@@ -1713,6 +1713,7 @@ export type Database = {
           cfop: string | null
           codigo: string | null
           codigo_servico_municipal: string | null
+          cor_pastilha: string | null
           created_at: string
           created_by: string | null
           cst: string | null
@@ -1724,6 +1725,7 @@ export type Database = {
           fornecedor_id: string | null
           id: string
           localizacao: string | null
+          modelo_pastilha: string | null
           ncm: string | null
           nome: string
           origem_mercadoria: string
@@ -1747,6 +1749,7 @@ export type Database = {
           cfop?: string | null
           codigo?: string | null
           codigo_servico_municipal?: string | null
+          cor_pastilha?: string | null
           created_at?: string
           created_by?: string | null
           cst?: string | null
@@ -1758,6 +1761,7 @@ export type Database = {
           fornecedor_id?: string | null
           id?: string
           localizacao?: string | null
+          modelo_pastilha?: string | null
           ncm?: string | null
           nome: string
           origem_mercadoria?: string
@@ -1781,6 +1785,7 @@ export type Database = {
           cfop?: string | null
           codigo?: string | null
           codigo_servico_municipal?: string | null
+          cor_pastilha?: string | null
           created_at?: string
           created_by?: string | null
           cst?: string | null
@@ -1792,6 +1797,7 @@ export type Database = {
           fornecedor_id?: string | null
           id?: string
           localizacao?: string | null
+          modelo_pastilha?: string | null
           ncm?: string | null
           nome?: string
           origem_mercadoria?: string
