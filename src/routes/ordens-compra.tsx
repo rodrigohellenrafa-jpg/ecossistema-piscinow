@@ -1280,9 +1280,37 @@ function OrdensCompra() {
               Selecione cada produto e ajuste a quantidade antes de comprar.
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Total selecionado</p>
-            <p className="text-lg font-semibold">{brl(totalSelecionadoCompra)}</p>
+          <div className="flex flex-wrap items-center justify-end gap-4">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Total selecionado</p>
+              <p className="text-lg font-semibold">{brl(totalSelecionadoCompra)}</p>
+            </div>
+            <div className="rounded-lg border p-3 text-left">
+              <label className="flex items-center gap-2 text-xs font-medium">
+                <Checkbox
+                  checked={usarCreditoFabricante}
+                  onCheckedChange={(valor) => setUsarCreditoFabricante(valor === true)}
+                />
+                Crédito fabricante
+              </label>
+              <Input
+                className="mt-2 h-8 w-36"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="0,00"
+                disabled={!usarCreditoFabricante}
+                value={creditoFabricante}
+                onChange={(evento) => setCreditoFabricante(evento.target.value)}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Abatido: {brl(creditoAplicado)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Total a pagar</p>
+              <p className="text-lg font-semibold text-primary">{brl(totalAPagarCompra)}</p>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
