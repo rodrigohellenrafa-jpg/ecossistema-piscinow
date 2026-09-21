@@ -1253,7 +1253,7 @@ function OrdensCompra() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1180px]">
+            <Table className="min-w-[1440px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
