@@ -539,7 +539,7 @@ function OrdensCompra() {
             fornecedor_nome: fornecedor.nome,
             data_pedido: hojeISO(),
             valor_produtos: valorProdutos,
-            desconto: 0,
+            desconto: creditoOrdem,
             icms_base: valorProdutos,
             icms_valor: valorProdutos * 0.18,
             icms_st_base: 0,
