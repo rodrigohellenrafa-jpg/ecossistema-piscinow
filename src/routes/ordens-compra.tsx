@@ -629,10 +629,11 @@ function OrdensCompra() {
         const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
         if (erroItens) throw erroItens;
         quantidadeOrdens += 1;
+        idsCriados.push(ordem.id);
       }
-      return quantidadeOrdens;
+      return { quantidadeOrdens, idsCriados };
     },
-    onSuccess: (quantidade) => {
+    onSuccess: ({ quantidadeOrdens: quantidade, idsCriados }) => {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
