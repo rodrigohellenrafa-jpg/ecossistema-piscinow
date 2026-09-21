@@ -537,6 +537,30 @@ export type Database = {
           },
         ]
       }
+      credito_fabricante: {
+        Row: {
+          created_at: string
+          fornecedor_nome: string
+          id: string
+          saldo: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fornecedor_nome?: string
+          id?: string
+          saldo?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fornecedor_nome?: string
+          id?: string
+          saldo?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       despesas_recorrentes: {
         Row: {
           ativo: boolean
