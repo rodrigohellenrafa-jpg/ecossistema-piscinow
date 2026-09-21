@@ -527,6 +527,10 @@ function OrdensCompra() {
         const numero = proximoCodigo("OC", numeros);
         numeros.push(numero);
         const valorProdutos = itens.reduce((total, produto) => total + totalCompra(produto), 0);
+        const creditoOrdem =
+          creditoAplicado > 0 && totalSelecionadoCompra > 0
+            ? Math.min((valorProdutos / totalSelecionadoCompra) * creditoAplicado, valorProdutos)
+            : 0;
         const { data: ordem, error: erroOrdem } = await supabase
           .from("ordens_compra")
           .insert({
