@@ -1287,6 +1287,9 @@ function Contas() {
             onBaixar={setBaixando}
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
+            onReverter={(c) => {
+              if (window.confirm(`Reverter a baixa de "${c.descricao}"?`)) reverterBaixa.mutate(c.id);
+            }}
           />
         </TabsContent>
       </Tabs>
