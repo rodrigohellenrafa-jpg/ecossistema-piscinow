@@ -22,6 +22,11 @@ Validação: páginas autenticadas abriram sem erros; testes de gravação, foto
 - [x] Ordenar obras selecionadas antes dos registros não selecionados.
 - [x] Verificar abertura, adição de linhas e validação dos dois formulários; sem gravação de dados de teste.
 
+## Ordem de compra por produto
+- [x] Exibir grade com uma linha por produto, fornecedor, valores, vínculo e status.
+- [x] Comprar apenas itens selecionados, separados automaticamente por fornecedor.
+- [x] Validar a grade e a abertura das ordens existentes no computador; tabela com rolagem no celular.
+
 ## Saldos bancários
 - [x] Centralizar movimentos pagos e estornos no saldo da conta.
 - [x] Remover soma duplicada e atualizar painel e resumo diário.
