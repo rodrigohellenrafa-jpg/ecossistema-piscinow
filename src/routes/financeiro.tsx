@@ -332,7 +332,7 @@ function Financeiro() {
   });
 
   const marcarPago = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, conta, data }: { id: string; conta: string; data: string }) => {
       const { data: orig } = await supabase
         .from("lancamentos_financeiros")
         .select("*")
@@ -341,7 +341,11 @@ function Financeiro() {
 
       const { error } = await supabase
         .from("lancamentos_financeiros")
-        .update({ status: "Pago", data_pagamento: hojeISO() })
+        .update({
+          status: "Pago",
+          data_pagamento: data || hojeISO(),
+          conta_bancaria: conta || orig?.conta_bancaria || null,
+        })
         .eq("id", id);
       if (error) throw error;
 
