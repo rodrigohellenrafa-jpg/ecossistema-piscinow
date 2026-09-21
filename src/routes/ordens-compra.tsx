@@ -519,10 +519,21 @@ function OrdensCompra() {
 
   const produtosSelecionados = produtosFiltrados.filter((p) => selecionadosCompra[p.id]);
   const totalSelecionadoCompra = produtosSelecionados.reduce((total, p) => total + totalCompra(p), 0);
+  const creditoDisponivel = Number(creditoRegistro?.saldo ?? 0);
+  const creditoDisponivelValor =
+    creditoDisponivelInput === null
+      ? creditoDisponivel
+      : Math.max(Number(creditoDisponivelInput) || 0, 0);
   const creditoAplicado = usarCreditoFabricante
-    ? Math.min(Math.max(Number(creditoFabricante) || 0, 0), totalSelecionadoCompra)
+    ? Math.min(
+        Math.max(Number(creditoFabricante) || 0, 0),
+        totalSelecionadoCompra,
+        creditoDisponivelValor,
+      )
     : 0;
+  const saldoCredito = Math.max(creditoDisponivelValor - creditoAplicado, 0);
   const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
+
   const todosProdutosSelecionados =
     produtosFiltrados.length > 0 && produtosFiltrados.every((p) => selecionadosCompra[p.id]);
 
