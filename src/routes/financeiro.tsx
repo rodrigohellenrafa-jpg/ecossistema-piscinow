@@ -695,19 +695,22 @@ function Financeiro() {
                       : "Onde o recurso entra (conta)"
                   }
                 >
-                  <Input
-                    list="contas-bancarias-financeiro"
+                  <Select
                     value={form.conta_bancaria}
-                    onChange={(e) => set("conta_bancaria")(e.target.value)}
-                    placeholder="Ex.: Caixa, Itaú c/c 1234, Nubank PJ"
-                  />
-                  <datalist id="contas-bancarias-financeiro">
-                    {contasBancarias.map((c) => (
-                      <option key={c.id} value={c.conta}>
-                        {c.banco ?? ""}
-                      </option>
-                    ))}
-                  </datalist>
+                    onValueChange={(v) => set("conta_bancaria")(v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a conta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contasBancarias.map((c) => (
+                        <SelectItem key={c.id} value={c.conta}>
+                          {c.conta}
+                          {c.banco ? ` — ${c.banco}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Field label="Forma de pagamento">
                   <Select value={form.forma_pagamento} onValueChange={set("forma_pagamento")}>
