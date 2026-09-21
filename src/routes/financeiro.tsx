@@ -3,7 +3,7 @@ import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Link2, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Link2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
@@ -334,6 +334,23 @@ function Financeiro() {
       qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
       qc.invalidateQueries({ queryKey: ["lancamento-rateios"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const reverterBaixa = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("lancamentos_financeiros")
+        .update({ status: "Pendente", data_pagamento: null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Baixa revertida — o valor voltou para o saldo da conta.");
+      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
