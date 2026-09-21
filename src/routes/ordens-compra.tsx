@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -10,6 +10,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ExpandableCard } from "@/components/expandable-card";
 import {
   Dialog,
@@ -162,10 +163,13 @@ type Produto = {
   id: string;
   codigo: string | null;
   nome: string;
+  categoria: string | null;
+  tipo: string;
   unidade: string;
   ncm: string | null;
   cst: string | null;
   preco_custo: number;
+  fornecedor_id: string | null;
 };
 
 /** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
@@ -209,6 +213,11 @@ function OrdensCompra() {
     observacoes: "",
   });
   const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
+  const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
+  const [quantidadesCompra, setQuantidadesCompra] = useState<Record<string, string>>({});
+  const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
+  const [percentuaisCompra, setPercentuaisCompra] = useState<Record<string, string>>({});
+  const [vinculosCompra, setVinculosCompra] = useState<Record<string, string>>({});
 
   const { data: ordens = [] } = useQuery({
     queryKey: ["ordens_compra"],
@@ -239,7 +248,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, unidade, ncm, cst, preco_custo")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
@@ -293,15 +302,23 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendas")
-        .select("id, numero, cliente_nome")
+        .select("id, numero, cliente_id, cliente_nome")
         .order("numero");
       if (error) throw error;
-      return data as { id: string; numero: string | null; cliente_nome: string | null }[];
+      return data as {
+        id: string;
+        numero: string | null;
+        cliente_id: string | null;
+        cliente_nome: string | null;
+      }[];
     },
   });
 
   const vendaPorId = useMemo(() => {
-    const m = new Map<string, { numero: string | null; cliente_nome: string | null }>();
+    const m = new Map<
+      string,
+      { numero: string | null; cliente_id: string | null; cliente_nome: string | null }
+    >();
     for (const v of vendasVinculo) m.set(v.id, v);
     return m;
   }, [vendasVinculo]);
@@ -378,6 +395,150 @@ function OrdensCompra() {
   const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
     ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
     : null;
+
+  const normalizar = (valor: string) =>
+    valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  const fornecedorDaCompra = (produto: Produto) => {
+    const categoria = normalizar(produto.categoria ?? "");
+    const nome = normalizar(produto.nome);
+    const alvo =
+      produto.tipo === "servico"
+        ? "splash jardim do trevo"
+        : categoria.includes("piscina") || nome.includes("piscina")
+          ? "analandia"
+          : "progeu";
+    return (
+      fornecedores.find((f) => normalizar(f.nome).includes(alvo)) ??
+      fornecedores.find((f) => f.id === produto.fornecedor_id) ??
+      null
+    );
+  };
+
+  const quantidadeCompra = (produto: Produto) => {
+    const valor = quantidadesCompra[produto.id];
+    return valor === undefined ? 1 : Math.max(Number(valor) || 0, 0);
+  };
+
+  const valorCompra = (produto: Produto) => {
+    const valor = valoresCompra[produto.id];
+    return valor === undefined ? Number(produto.preco_custo) : Math.max(Number(valor) || 0, 0);
+  };
+
+  const percentualCompra = (produto: Produto) =>
+    Math.min(Math.max(Number(percentuaisCompra[produto.id]) || 0, 0), 100);
+
+  const totalCompra = (produto: Produto) =>
+    quantidadeCompra(produto) * valorCompra(produto) * (1 - percentualCompra(produto) / 100);
+
+  const produtosSelecionados = produtos.filter((p) => selecionadosCompra[p.id]);
+  const totalSelecionadoCompra = produtosSelecionados.reduce((total, p) => total + totalCompra(p), 0);
+  const todosProdutosSelecionados =
+    produtos.length > 0 && produtos.every((p) => selecionadosCompra[p.id]);
+
+  const marcarTodosProdutos = (marcado: boolean) => {
+    setSelecionadosCompra(
+      marcado ? Object.fromEntries(produtos.map((produto) => [produto.id, true])) : {},
+    );
+  };
+
+  const comprarSelecionados = useMutation({
+    mutationFn: async () => {
+      if (produtosSelecionados.length === 0) throw new Error("Selecione ao menos um produto");
+
+      const semFornecedor = produtosSelecionados.filter((produto) => !fornecedorDaCompra(produto));
+      if (semFornecedor.length > 0) {
+        throw new Error(`Fornecedor não encontrado para: ${semFornecedor.map((p) => p.nome).join(", ")}`);
+      }
+      if (produtosSelecionados.some((produto) => quantidadeCompra(produto) <= 0)) {
+        throw new Error("A quantidade dos produtos selecionados deve ser maior que zero");
+      }
+
+      const { data: auth } = await supabase.auth.getUser();
+      const { data: existentes, error: erroNumeros } = await supabase
+        .from("ordens_compra")
+        .select("numero");
+      if (erroNumeros) throw erroNumeros;
+      const numeros = (existentes ?? []).map((ordem) => ordem.numero);
+      const grupos = new Map<string, Produto[]>();
+
+      for (const produto of produtosSelecionados) {
+        const fornecedor = fornecedorDaCompra(produto);
+        if (!fornecedor) continue;
+        grupos.set(fornecedor.id, [...(grupos.get(fornecedor.id) ?? []), produto]);
+      }
+
+      let quantidadeOrdens = 0;
+      for (const [fornecedorId, itens] of grupos) {
+        const fornecedor = fornecedores.find((f) => f.id === fornecedorId);
+        if (!fornecedor) continue;
+        const numero = proximoCodigo("OC", numeros);
+        numeros.push(numero);
+        const valorProdutos = itens.reduce((total, produto) => total + totalCompra(produto), 0);
+        const { data: ordem, error: erroOrdem } = await supabase
+          .from("ordens_compra")
+          .insert({
+            numero,
+            fornecedor_id: fornecedor.id,
+            fornecedor_nome: fornecedor.nome,
+            data_pedido: hojeISO(),
+            valor_produtos: valorProdutos,
+            desconto: 0,
+            icms_base: valorProdutos,
+            icms_valor: valorProdutos * 0.18,
+            icms_st_base: 0,
+            icms_st_valor: 0,
+            valor_total: valorProdutos,
+            status: "pendente",
+            observacoes: "Compra selecionada na grade de produtos",
+            created_by: auth.user?.id ?? null,
+          })
+          .select("id")
+          .single();
+        if (erroOrdem) throw erroOrdem;
+
+        const payload = itens.map((produto) => {
+          const vendaId = vinculosCompra[produto.id];
+          const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
+          const bruto = quantidadeCompra(produto) * valorCompra(produto);
+          const desconto = bruto * (percentualCompra(produto) / 100);
+          return {
+            ordem_id: ordem.id,
+            produto_id: produto.id,
+            codigo: produto.codigo,
+            descricao: produto.nome,
+            ncm: produto.ncm,
+            cst: produto.cst,
+            unidade: produto.unidade,
+            quantidade: quantidadeCompra(produto),
+            valor_unitario: valorCompra(produto),
+            desconto,
+            total: bruto - desconto,
+            cliente_id: venda?.cliente_id ?? null,
+            cliente_nome: venda?.cliente_nome ?? null,
+            venda_id: vendaId || null,
+          };
+        });
+        const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
+        if (erroItens) throw erroItens;
+        quantidadeOrdens += 1;
+      }
+      return quantidadeOrdens;
+    },
+    onSuccess: (quantidade) => {
+      toast.success(
+        quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
+      );
+      setSelecionadosCompra({});
+      setQuantidadesCompra({});
+      setValoresCompra({});
+      setPercentuaisCompra({});
+      setVinculosCompra({});
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
 
   const [formEdicao, setFormEdicao] = useState<{
     fornecedor_id: string;
@@ -939,6 +1100,164 @@ function OrdensCompra() {
           </div>
         }
       />
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <div>
+            <CardTitle>Produtos para comprar</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Selecione cada produto e ajuste a quantidade antes de comprar.
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Total selecionado</p>
+            <p className="text-lg font-semibold">{brl(totalSelecionadoCompra)}</p>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="overflow-x-auto">
+            <Table className="min-w-[1180px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label="Selecionar todos os produtos"
+                      checked={todosProdutosSelecionados}
+                      onCheckedChange={(valor) => marcarTodosProdutos(valor === true)}
+                    />
+                  </TableHead>
+                  <TableHead>O.C.</TableHead>
+                  <TableHead>Fornecedor</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Qtde</TableHead>
+                  <TableHead className="text-right">Vl. unit.</TableHead>
+                  <TableHead className="text-right">%</TableHead>
+                  <TableHead className="text-right">Total a pagar</TableHead>
+                  <TableHead>Vínculo</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {produtos.map((produto) => {
+                  const fornecedor = fornecedorDaCompra(produto);
+                  return (
+                    <TableRow key={produto.id}>
+                      <TableCell>
+                        <Checkbox
+                          aria-label={`Selecionar ${produto.nome}`}
+                          checked={selecionadosCompra[produto.id] === true}
+                          onCheckedChange={(valor) =>
+                            setSelecionadosCompra((atual) => ({
+                              ...atual,
+                              [produto.id]: valor === true,
+                            }))
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">Nova</TableCell>
+                      <TableCell className="font-medium">{fornecedor?.nome ?? "Não encontrado"}</TableCell>
+                      <TableCell className="font-mono text-xs">{produto.codigo ?? "—"}</TableCell>
+                      <TableCell>{produto.nome}</TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`Quantidade de ${produto.nome}`}
+                          className="ml-auto w-20 text-right"
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          value={quantidadesCompra[produto.id] ?? "1"}
+                          onChange={(evento) =>
+                            setQuantidadesCompra((atual) => ({
+                              ...atual,
+                              [produto.id]: evento.target.value,
+                            }))
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`Valor unitário de ${produto.nome}`}
+                          className="ml-auto w-28 text-right"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={valoresCompra[produto.id] ?? String(Number(produto.preco_custo))}
+                          onChange={(evento) =>
+                            setValoresCompra((atual) => ({
+                              ...atual,
+                              [produto.id]: evento.target.value,
+                            }))
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`Desconto percentual de ${produto.nome}`}
+                          className="ml-auto w-20 text-right"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={percentuaisCompra[produto.id] ?? "0"}
+                          onChange={(evento) =>
+                            setPercentuaisCompra((atual) => ({
+                              ...atual,
+                              [produto.id]: evento.target.value,
+                            }))
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">{brl(totalCompra(produto))}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={vinculosCompra[produto.id] ?? SEM_CLIENTE}
+                          onValueChange={(valor) =>
+                            setVinculosCompra((atual) => ({
+                              ...atual,
+                              [produto.id]: valor === SEM_CLIENTE ? "" : valor,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={SEM_CLIENTE}>Estoque</SelectItem>
+                            {vendasVinculo.map((venda) => (
+                              <SelectItem key={venda.id} value={venda.id}>
+                                {venda.numero ?? "Pedido"} — {venda.cliente_nome ?? "Cliente"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">A comprar</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={() => comprarSelecionados.mutate()}
+              disabled={produtosSelecionados.length === 0 || comprarSelecionados.isPending}
+            >
+              <ShoppingCart /> Comprar ({produtosSelecionados.length})
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h2 className="text-lg font-semibold">Ordens já criadas</h2>
+        <p className="text-sm text-muted-foreground">
+          Consulte, edite, imprima e acompanhe as compras anteriores.
+        </p>
+      </div>
 
       {ordensFiltradas.length === 0 ? (
         <Card>
