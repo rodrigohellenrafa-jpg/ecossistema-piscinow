@@ -1301,6 +1301,36 @@ function OrdensCompra() {
                       <TableCell>{produto.nome}</TableCell>
                       <TableCell>
                         <Input
+                          aria-label={`Cor da pastilha de ${produto.nome}`}
+                          className="w-28"
+                          placeholder="Cor"
+                          defaultValue={produto.cor_pastilha ?? ""}
+                          onBlur={(evento) =>
+                            atualizarPastilha.mutate({
+                              id: produto.id,
+                              campo: "cor_pastilha",
+                              valor: evento.target.value,
+                            })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          aria-label={`Modelo da pastilha de ${produto.nome}`}
+                          className="w-32"
+                          placeholder="Modelo"
+                          defaultValue={produto.modelo_pastilha ?? ""}
+                          onBlur={(evento) =>
+                            atualizarPastilha.mutate({
+                              id: produto.id,
+                              campo: "modelo_pastilha",
+                              valor: evento.target.value,
+                            })
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
                           aria-label={`Quantidade de ${produto.nome}`}
                           className="ml-auto w-20 text-right"
                           type="number"
