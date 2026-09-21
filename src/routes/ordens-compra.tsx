@@ -231,6 +231,8 @@ function OrdensCompra() {
   });
   const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
   const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
+  const [usarCreditoFabricante, setUsarCreditoFabricante] = useState(false);
+  const [creditoFabricante, setCreditoFabricante] = useState("");
   const [quantidadesCompra, setQuantidadesCompra] = useState<Record<string, string>>({});
   const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
   const [percentuaisCompra, setPercentuaisCompra] = useState<Record<string, string>>({});
@@ -477,6 +479,10 @@ function OrdensCompra() {
 
   const produtosSelecionados = produtosFiltrados.filter((p) => selecionadosCompra[p.id]);
   const totalSelecionadoCompra = produtosSelecionados.reduce((total, p) => total + totalCompra(p), 0);
+  const creditoAplicado = usarCreditoFabricante
+    ? Math.min(Math.max(Number(creditoFabricante) || 0, 0), totalSelecionadoCompra)
+    : 0;
+  const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
   const todosProdutosSelecionados =
     produtosFiltrados.length > 0 && produtosFiltrados.every((p) => selecionadosCompra[p.id]);
 
@@ -521,6 +527,10 @@ function OrdensCompra() {
         const numero = proximoCodigo("OC", numeros);
         numeros.push(numero);
         const valorProdutos = itens.reduce((total, produto) => total + totalCompra(produto), 0);
+        const creditoOrdem =
+          creditoAplicado > 0 && totalSelecionadoCompra > 0
+            ? Math.min((valorProdutos / totalSelecionadoCompra) * creditoAplicado, valorProdutos)
+            : 0;
         const { data: ordem, error: erroOrdem } = await supabase
           .from("ordens_compra")
           .insert({
@@ -529,14 +539,17 @@ function OrdensCompra() {
             fornecedor_nome: fornecedor.nome,
             data_pedido: hojeISO(),
             valor_produtos: valorProdutos,
-            desconto: 0,
+            desconto: creditoOrdem,
             icms_base: valorProdutos,
             icms_valor: valorProdutos * 0.18,
             icms_st_base: 0,
             icms_st_valor: 0,
-            valor_total: valorProdutos,
+            valor_total: Math.max(valorProdutos - creditoOrdem, 0),
             status: "pendente",
-            observacoes: "Compra selecionada na grade de produtos",
+            observacoes:
+              creditoOrdem > 0
+                ? `Compra selecionada na grade de produtos | Crédito fabricante abatido: ${brl(creditoOrdem)}`
+                : "Compra selecionada na grade de produtos",
             created_by: auth.user?.id ?? null,
           })
           .select("id")
@@ -1274,9 +1287,37 @@ function OrdensCompra() {
               Selecione cada produto e ajuste a quantidade antes de comprar.
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Total selecionado</p>
-            <p className="text-lg font-semibold">{brl(totalSelecionadoCompra)}</p>
+          <div className="flex flex-wrap items-center justify-end gap-4">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Total selecionado</p>
+              <p className="text-lg font-semibold">{brl(totalSelecionadoCompra)}</p>
+            </div>
+            <div className="rounded-lg border p-3 text-left">
+              <label className="flex items-center gap-2 text-xs font-medium">
+                <Checkbox
+                  checked={usarCreditoFabricante}
+                  onCheckedChange={(valor) => setUsarCreditoFabricante(valor === true)}
+                />
+                Crédito fabricante
+              </label>
+              <Input
+                className="mt-2 h-8 w-36"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="0,00"
+                disabled={!usarCreditoFabricante}
+                value={creditoFabricante}
+                onChange={(evento) => setCreditoFabricante(evento.target.value)}
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Abatido: {brl(creditoAplicado)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Total a pagar</p>
+              <p className="text-lg font-semibold text-primary">{brl(totalAPagarCompra)}</p>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
