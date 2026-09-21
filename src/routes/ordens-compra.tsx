@@ -935,7 +935,7 @@ function OrdensCompra() {
     mutationFn: async ({ id, campo, valor }: { id: string; campo: "cor_pastilha" | "modelo_pastilha"; valor: string }) => {
       const { error } = await supabase
         .from("produtos")
-        .update({ [campo]: valor.trim() || null })
+        .update({ [campo]: valor.trim() || null } as any)
         .eq("id", id);
       if (error) throw error;
     },
