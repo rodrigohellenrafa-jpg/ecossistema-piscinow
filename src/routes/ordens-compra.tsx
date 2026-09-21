@@ -524,10 +524,17 @@ function OrdensCompra() {
     creditoDisponivelInput === null
       ? creditoDisponivel
       : Number(creditoDisponivelInput) || 0;
-  const creditoCreditar = usarCreditoFabricante
-    ? Math.max(Number(creditoFabricante) || 0, 0)
-    : 0;
-  const creditoAplicado = Math.min(creditoCreditar, totalSelecionadoCompra);
+  const creditoCreditar = usarCreditoFabricante ? Number(creditoFabricante) || 0 : 0;
+  const creditoAplicado = (() => {
+    if (creditoCreditar === 0 || totalSelecionadoCompra <= 0) return 0;
+    // Valor negativo digitado: entra como cobrança (soma no total a pagar).
+    if (creditoCreditar < 0) return creditoCreditar;
+    // Saldo do fabricante negativo: creditar passa a cobrar, limitado ao débito existente.
+    if (creditoDisponivelValor < 0) {
+      return -Math.min(creditoCreditar, Math.abs(creditoDisponivelValor));
+    }
+    return Math.min(creditoCreditar, totalSelecionadoCompra);
+  })();
   const saldoCredito = creditoDisponivelValor - creditoCreditar;
   const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
 
@@ -577,8 +584,8 @@ function OrdensCompra() {
         numeros.push(numero);
         const valorProdutos = itens.reduce((total, produto) => total + totalCompra(produto), 0);
         const creditoOrdem =
-          creditoAplicado > 0 && totalSelecionadoCompra > 0
-            ? Math.min((valorProdutos / totalSelecionadoCompra) * creditoAplicado, valorProdutos)
+          creditoAplicado !== 0 && totalSelecionadoCompra > 0
+            ? (valorProdutos / totalSelecionadoCompra) * creditoAplicado
             : 0;
         const { data: ordem, error: erroOrdem } = await supabase
           .from("ordens_compra")
@@ -593,12 +600,14 @@ function OrdensCompra() {
             icms_valor: valorProdutos * 0.18,
             icms_st_base: 0,
             icms_st_valor: 0,
-            valor_total: Math.max(valorProdutos - creditoOrdem, 0),
+            valor_total: valorProdutos - creditoOrdem,
             status: "pendente",
             observacoes:
               creditoOrdem > 0
                 ? `Compra selecionada na grade de produtos | Crédito fabricante abatido: ${brl(creditoOrdem)}`
-                : "Compra selecionada na grade de produtos",
+                : creditoOrdem < 0
+                  ? `Compra selecionada na grade de produtos | Crédito fabricante negativo cobrado: ${brl(Math.abs(creditoOrdem))}`
+                  : "Compra selecionada na grade de produtos",
             created_by: auth.user?.id ?? null,
           })
           .select("id")
@@ -638,7 +647,7 @@ function OrdensCompra() {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
-      if (creditoAplicado > 0) {
+      if (creditoAplicado !== 0 || creditoCreditar !== 0) {
         salvarCreditoDisponivel.mutate(saldoCredito);
         setCreditoDisponivelInput(null);
         setCreditoFabricante("");
@@ -1446,7 +1455,9 @@ function OrdensCompra() {
                   <span className={`w-32 text-right font-semibold ${saldoCredito < 0 ? "text-destructive" : ""}`}>{brl(saldoCredito)}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Abatido na compra: {brl(creditoAplicado)}
+                  {creditoAplicado < 0
+                    ? `Cobrado na compra: ${brl(Math.abs(creditoAplicado))}`
+                    : `Abatido na compra: ${brl(creditoAplicado)}`}
                 </p>
               </div>
             </div>
