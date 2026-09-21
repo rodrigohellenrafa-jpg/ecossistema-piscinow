@@ -544,9 +544,12 @@ function OrdensCompra() {
             icms_valor: valorProdutos * 0.18,
             icms_st_base: 0,
             icms_st_valor: 0,
-            valor_total: valorProdutos,
+            valor_total: Math.max(valorProdutos - creditoOrdem, 0),
             status: "pendente",
-            observacoes: "Compra selecionada na grade de produtos",
+            observacoes:
+              creditoOrdem > 0
+                ? `Compra selecionada na grade de produtos | Crédito fabricante abatido: ${brl(creditoOrdem)}`
+                : "Compra selecionada na grade de produtos",
             created_by: auth.user?.id ?? null,
           })
           .select("id")
