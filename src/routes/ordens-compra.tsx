@@ -290,6 +290,40 @@ function OrdensCompra() {
     },
   });
 
+  const { data: creditoRegistro } = useQuery({
+    queryKey: ["credito_fabricante"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("credito_fabricante" as never)
+        .select("id, saldo")
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as { id: string; saldo: number } | null) ?? null;
+    },
+  });
+
+  const salvarCreditoDisponivel = useMutation({
+    mutationFn: async (saldo: number) => {
+      if (creditoRegistro?.id) {
+        const { error } = await supabase
+          .from("credito_fabricante" as never)
+          .update({ saldo, updated_at: new Date().toISOString() } as never)
+          .eq("id", creditoRegistro.id);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await supabase
+        .from("credito_fabricante" as never)
+        .insert({ fornecedor_nome: "Geral", saldo } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["credito_fabricante"] }),
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+
+
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes", "lista-simples"],
     queryFn: async () => {
