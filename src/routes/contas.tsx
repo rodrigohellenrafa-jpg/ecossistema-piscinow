@@ -519,6 +519,23 @@ function Contas() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const reverterBaixa = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("contas")
+        .update({ status: "aberto", data_pagamento: null, valor_pago: 0, valor_desconto: 0 })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Baixa revertida — o valor voltou para o saldo da conta.");
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const baixar = useMutation({
     mutationFn: async ({
       id,
