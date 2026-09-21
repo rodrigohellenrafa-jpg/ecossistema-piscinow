@@ -987,7 +987,25 @@ function Financeiro() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             {l.status !== "Pago" && (
-                              <Button variant="ghost" size="icon" onClick={() => marcarPago.mutate(l.id)} title="Marcar como pago">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const combina = contasBancarias.find(
+                                    (c) =>
+                                      c.conta.trim().toLowerCase() ===
+                                      (l.conta_bancaria ?? "").trim().toLowerCase(),
+                                  );
+                                  setBaixa({
+                                    id: l.id,
+                                    descricao: l.descricao,
+                                    valor: l.valor,
+                                    conta: combina?.conta ?? "",
+                                    data: hojeISO(),
+                                  });
+                                }}
+                                title="Dar baixa"
+                              >
                                 <CheckCircle2 className="size-4" />
                               </Button>
                             )}
