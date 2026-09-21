@@ -1674,7 +1674,14 @@ function OrdensCompra() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => salvarTodosItens.mutate()}
+              disabled={produtos.length === 0 || salvarTodosItens.isPending}
+            >
+              <Save /> Salvar itens
+            </Button>
             <Button
               onClick={() => comprarSelecionados.mutate()}
               disabled={produtosSelecionados.length === 0 || comprarSelecionados.isPending}
