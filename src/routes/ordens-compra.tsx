@@ -931,6 +931,20 @@ function OrdensCompra() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  const atualizarPastilha = useMutation({
+    mutationFn: async ({ id, campo, valor }: { id: string; campo: "cor_pastilha" | "modelo_pastilha"; valor: string }) => {
+      const { error } = await supabase
+        .from("produtos")
+        .update({ [campo]: valor.trim() || null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
   const excluirOrdem = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ordens_compra").delete().eq("id", id);
@@ -1253,6 +1267,8 @@ function OrdensCompra() {
                   <TableHead>Fornecedor</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Produto</TableHead>
+                  <TableHead>Cor</TableHead>
+                  <TableHead>Modelo</TableHead>
                   <TableHead className="text-right">Qtde</TableHead>
                   <TableHead className="text-right">Vl. unit.</TableHead>
                   <TableHead className="text-right">%</TableHead>
