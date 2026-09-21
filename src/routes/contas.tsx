@@ -637,6 +637,7 @@ function Contas() {
       qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const excluir = useMutation({
