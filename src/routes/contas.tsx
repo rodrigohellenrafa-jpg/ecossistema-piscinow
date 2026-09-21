@@ -1378,6 +1378,12 @@ function BaixaDialog({
                 </SelectContent>
               </Select>
             </Field>
+            {opcoesContas.length === 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Nenhuma conta bancária cadastrada. Você pode confirmar a baixa assim mesmo — o saldo
+                por conta só será atualizado depois de cadastrar suas contas no painel.
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
