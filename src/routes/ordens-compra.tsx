@@ -1435,7 +1435,7 @@ function OrdensCompra() {
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t pt-1">
                   <span className="text-xs font-semibold">(=) SALDO</span>
-                  <span className="w-32 text-right font-semibold">{brl(saldoCredito)}</span>
+                  <span className={`w-32 text-right font-semibold ${saldoCredito < 0 ? "text-destructive" : ""}`}>{brl(saldoCredito)}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Abatido na compra: {brl(creditoAplicado)}
