@@ -571,6 +571,7 @@ function OrdensCompra() {
       }
 
       let quantidadeOrdens = 0;
+      const idsCriados: string[] = [];
       for (const { fornecedor, itens } of grupos.values()) {
         const numero = proximoCodigo("OC", numeros);
         numeros.push(numero);
