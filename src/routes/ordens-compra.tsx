@@ -1442,7 +1442,6 @@ function OrdensCompra() {
                   <Input
                     className="h-8 w-32 text-right"
                     type="number"
-                    min={0}
                     step="0.01"
                     placeholder="0,00"
                     disabled={!usarCreditoFabricante}
