@@ -1137,19 +1137,28 @@ function Contas() {
                 label={form.tipo === "pagar" ? "De onde o recurso sai (conta)" : "Onde o recurso entra (conta)"}
                 className="sm:col-span-2"
               >
-                <Input
-                  list="contas-bancarias-lista"
-                  value={form.conta_bancaria}
-                  onChange={(e) => set("conta_bancaria")(e.target.value)}
-                  placeholder="Ex.: Caixa, Itaú c/c 1234, Nubank PJ"
-                />
-                <datalist id="contas-bancarias-lista">
-                  {contasBancarias.map((c) => (
-                    <option key={c.id} value={c.conta}>
-                      {c.banco ?? ""}
-                    </option>
-                  ))}
-                </datalist>
+                <Select
+                  value={form.conta_bancaria || "nenhuma"}
+                  onValueChange={(v) => set("conta_bancaria")(v === "nenhuma" ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a conta bancária" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nenhuma">Sem conta vinculada</SelectItem>
+                    {contasBancarias.map((c) => (
+                      <SelectItem key={c.id} value={c.conta}>
+                        {c.conta}{c.banco ? ` — ${c.banco}` : ""}
+                      </SelectItem>
+                    ))}
+                    {form.conta_bancaria &&
+                      !contasBancarias.some((c) => c.conta === form.conta_bancaria) && (
+                        <SelectItem value={form.conta_bancaria}>
+                          {form.conta_bancaria} (atual)
+                        </SelectItem>
+                      )}
+                  </SelectContent>
+                </Select>
               </Field>
 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
               <Field label="Observações" className="sm:col-span-2">

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layers, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,46 @@ export function LancarEmLote({ destino }: { destino: "contas" | "financeiro" }) 
   const [tipo, setTipo] = useState("pagar");
   const qc = useQueryClient();
   const alterar = (id: string, campo: keyof Linha, valor: string) => setLinhas((l) => l.map((r) => r.id === id ? { ...r, [campo]: valor } : r));
+  const { data: categorias = [] } = useQuery({
+    queryKey: ["categorias-financeiras"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("categorias_financeiras").select("id, nome, tipo").order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos-bancarios"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("saldos_bancarios").select("id, banco, conta").order("conta");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: fornecedores = [] } = useQuery({
+    queryKey: ["fornecedores-lote"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("fornecedores").select("id, nome").order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: colaboradores = [] } = useQuery({
+    queryKey: ["funcionarios-lote"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("funcionarios").select("id, nome, cargo").eq("ativo", true).order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: clientes = [] } = useQuery({
+    queryKey: ["clientes-lote"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("clientes").select("id, nome").eq("ativo", true).order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
   const salvar = useMutation({
     mutationFn: async () => {
       if (!linhas.length) throw new Error("Adicione pelo menos um lançamento.");
@@ -34,6 +74,7 @@ export function LancarEmLote({ destino }: { destino: "contas" | "financeiro" }) 
     onSuccess: () => { toast.success(`${linhas.length} lançamentos salvos.`); setOpen(false); setLinhas([]); qc.invalidateQueries({ queryKey: [destino === "contas" ? "contas" : "lancamentos_financeiros"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const categoriasFiltradas = categorias.filter((c) => c.tipo === "ambas" || c.tipo === tipo);
   return <Dialog open={open} onOpenChange={(v) => { if (salvar.isPending) return; setOpen(v); if (v && !linhas.length) setLinhas([nova(), nova()]); }}>
     <DialogTrigger asChild><Button variant="outline"><Layers /> Lançar em lote</Button></DialogTrigger>
     <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
@@ -43,9 +84,38 @@ export function LancarEmLote({ destino }: { destino: "contas" | "financeiro" }) 
         <Field label={`Descrição · ${i + 1}`}><Input aria-label={`Descrição ${i + 1}`} value={l.descricao} onChange={(e) => alterar(l.id,"descricao",e.target.value)} /></Field>
         <Field label="Valor (R$)"><Input aria-label={`Valor ${i + 1}`} type="number" min="0.01" step="0.01" value={l.valor} onChange={(e) => alterar(l.id,"valor",e.target.value)} /></Field>
         <Field label={destino === "contas" ? "Vencimento" : "Competência / vencimento"}><Input type="date" value={l.data} onChange={(e) => alterar(l.id,"data",e.target.value)} /></Field>
-        <Field label="Categoria"><Input value={l.categoria} onChange={(e) => alterar(l.id,"categoria",e.target.value)} /></Field>
-        {destino === "contas" && <Field label="Beneficiário / cliente"><Input value={l.parceiro} onChange={(e) => alterar(l.id,"parceiro",e.target.value)} /></Field>}
-        <Field label={tipo === "pagar" ? "Conta de saída" : "Conta de entrada"}><Input value={l.conta} onChange={(e) => alterar(l.id,"conta",e.target.value)} /></Field>
+        <Field label="Categoria">
+          <Select value={l.categoria || "nenhuma"} onValueChange={(v) => alterar(l.id, "categoria", v === "nenhuma" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="nenhuma">Sem categoria</SelectItem>
+              {categoriasFiltradas.map((c) => <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+        {destino === "contas" && <Field label="Beneficiário / cliente">
+          <Select value={l.parceiro || "nenhum"} onValueChange={(v) => alterar(l.id, "parceiro", v === "nenhum" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="nenhum">Sem vínculo</SelectItem>
+              {fornecedores.length > 0 && <div className="px-2 pt-2 text-xs font-semibold text-muted-foreground">Fornecedores</div>}
+              {fornecedores.map((f) => <SelectItem key={`forn:${f.id}`} value={f.nome}>{f.nome}</SelectItem>)}
+              {colaboradores.length > 0 && <div className="px-2 pt-2 text-xs font-semibold text-muted-foreground">Colaboradores</div>}
+              {colaboradores.map((c) => <SelectItem key={`func:${c.id}`} value={c.nome}>{c.nome}{c.cargo ? ` — ${c.cargo}` : ""}</SelectItem>)}
+              {clientes.length > 0 && <div className="px-2 pt-2 text-xs font-semibold text-muted-foreground">Clientes</div>}
+              {clientes.map((c) => <SelectItem key={`cli:${c.id}`} value={c.nome}>{c.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>}
+        <Field label={tipo === "pagar" ? "Conta de saída" : "Conta de entrada"}>
+          <Select value={l.conta || "nenhuma"} onValueChange={(v) => alterar(l.id, "conta", v === "nenhuma" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="nenhuma">Sem conta</SelectItem>
+              {contasBancarias.map((c) => <SelectItem key={c.id} value={c.conta}>{c.conta}{c.banco ? ` — ${c.banco}` : ""}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
         <Button variant="ghost" size="icon" aria-label={`Remover linha ${i + 1}`} onClick={() => setLinhas((r) => r.filter((x) => x.id !== l.id))}><Trash2 /></Button>
       </div>)}<Button variant="outline" onClick={() => setLinhas((r) => [...r, nova()])}><Plus /> Adicionar lançamento</Button></fieldset>
       <DialogFooter className="items-center"><span className="mr-auto text-sm font-semibold">Total: {brl(linhas.reduce((s,l) => s + (Number(l.valor) || 0),0))}</span><Button disabled={salvar.isPending} onClick={() => salvar.mutate()}>{salvar.isPending ? "Salvando…" : "Salvar lote"}</Button></DialogFooter>
