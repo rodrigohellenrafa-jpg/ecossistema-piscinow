@@ -1375,20 +1375,47 @@ function OrdensCompra() {
                 />
                 Crédito fabricante
               </label>
-              <Input
-                className="mt-2 h-8 w-36"
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="0,00"
-                disabled={!usarCreditoFabricante}
-                value={creditoFabricante}
-                onChange={(evento) => setCreditoFabricante(evento.target.value)}
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Abatido: {brl(creditoAplicado)}
-              </p>
+              <div className="mt-2 space-y-1 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-muted-foreground">CRÉDITO</span>
+                  <Input
+                    className="h-8 w-32 text-right"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="0,00"
+                    value={creditoDisponivelInput ?? String(creditoDisponivel)}
+                    onChange={(evento) => setCreditoDisponivelInput(evento.target.value)}
+                    onBlur={() => {
+                      if (creditoDisponivelInput === null) return;
+                      const valor = Math.max(Number(creditoDisponivelInput) || 0, 0);
+                      if (valor !== creditoDisponivel) salvarCreditoDisponivel.mutate(valor);
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-muted-foreground">(−) CREDITAR</span>
+                  <Input
+                    className="h-8 w-32 text-right"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="0,00"
+                    disabled={!usarCreditoFabricante}
+                    value={creditoFabricante}
+                    onChange={(evento) => setCreditoFabricante(evento.target.value)}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t pt-1">
+                  <span className="text-xs font-semibold">(=) SALDO</span>
+                  <span className="w-32 text-right font-semibold">{brl(saldoCredito)}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Abatido na compra: {brl(creditoAplicado)}
+                </p>
+              </div>
             </div>
+
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Total a pagar</p>
               <p className="text-lg font-semibold text-primary">{brl(totalAPagarCompra)}</p>
