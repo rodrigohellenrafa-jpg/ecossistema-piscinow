@@ -233,6 +233,8 @@ function OrdensCompra() {
   const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
   const [usarCreditoFabricante, setUsarCreditoFabricante] = useState(false);
   const [creditoFabricante, setCreditoFabricante] = useState("");
+  const [creditoDisponivelInput, setCreditoDisponivelInput] = useState<string | null>(null);
+
   const [quantidadesCompra, setQuantidadesCompra] = useState<Record<string, string>>({});
   const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
   const [percentuaisCompra, setPercentuaisCompra] = useState<Record<string, string>>({});
@@ -287,6 +289,40 @@ function OrdensCompra() {
       return data as Produto[];
     },
   });
+
+  const { data: creditoRegistro } = useQuery({
+    queryKey: ["credito_fabricante"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("credito_fabricante" as never)
+        .select("id, saldo")
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as { id: string; saldo: number } | null) ?? null;
+    },
+  });
+
+  const salvarCreditoDisponivel = useMutation({
+    mutationFn: async (saldo: number) => {
+      if (creditoRegistro?.id) {
+        const { error } = await supabase
+          .from("credito_fabricante" as never)
+          .update({ saldo, updated_at: new Date().toISOString() } as never)
+          .eq("id", creditoRegistro.id);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await supabase
+        .from("credito_fabricante" as never)
+        .insert({ fornecedor_nome: "Geral", saldo } as never);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["credito_fabricante"] }),
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+
 
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes", "lista-simples"],
@@ -483,10 +519,21 @@ function OrdensCompra() {
 
   const produtosSelecionados = produtosFiltrados.filter((p) => selecionadosCompra[p.id]);
   const totalSelecionadoCompra = produtosSelecionados.reduce((total, p) => total + totalCompra(p), 0);
+  const creditoDisponivel = Number(creditoRegistro?.saldo ?? 0);
+  const creditoDisponivelValor =
+    creditoDisponivelInput === null
+      ? creditoDisponivel
+      : Math.max(Number(creditoDisponivelInput) || 0, 0);
   const creditoAplicado = usarCreditoFabricante
-    ? Math.min(Math.max(Number(creditoFabricante) || 0, 0), totalSelecionadoCompra)
+    ? Math.min(
+        Math.max(Number(creditoFabricante) || 0, 0),
+        totalSelecionadoCompra,
+        creditoDisponivelValor,
+      )
     : 0;
+  const saldoCredito = Math.max(creditoDisponivelValor - creditoAplicado, 0);
   const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
+
   const todosProdutosSelecionados =
     produtosFiltrados.length > 0 && produtosFiltrados.every((p) => selecionadosCompra[p.id]);
 
@@ -592,6 +639,12 @@ function OrdensCompra() {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
+      if (creditoAplicado > 0) {
+        salvarCreditoDisponivel.mutate(saldoCredito);
+        setCreditoDisponivelInput(null);
+        setCreditoFabricante("");
+        setUsarCreditoFabricante(false);
+      }
       setSelecionadosCompra({});
       setQuantidadesCompra({});
       setValoresCompra({});
@@ -599,6 +652,7 @@ function OrdensCompra() {
       setVinculosCompra({});
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
+
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
@@ -1321,20 +1375,47 @@ function OrdensCompra() {
                 />
                 Crédito fabricante
               </label>
-              <Input
-                className="mt-2 h-8 w-36"
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="0,00"
-                disabled={!usarCreditoFabricante}
-                value={creditoFabricante}
-                onChange={(evento) => setCreditoFabricante(evento.target.value)}
-              />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Abatido: {brl(creditoAplicado)}
-              </p>
+              <div className="mt-2 space-y-1 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-muted-foreground">CRÉDITO</span>
+                  <Input
+                    className="h-8 w-32 text-right"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="0,00"
+                    value={creditoDisponivelInput ?? String(creditoDisponivel)}
+                    onChange={(evento) => setCreditoDisponivelInput(evento.target.value)}
+                    onBlur={() => {
+                      if (creditoDisponivelInput === null) return;
+                      const valor = Math.max(Number(creditoDisponivelInput) || 0, 0);
+                      if (valor !== creditoDisponivel) salvarCreditoDisponivel.mutate(valor);
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-muted-foreground">(−) CREDITAR</span>
+                  <Input
+                    className="h-8 w-32 text-right"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="0,00"
+                    disabled={!usarCreditoFabricante}
+                    value={creditoFabricante}
+                    onChange={(evento) => setCreditoFabricante(evento.target.value)}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t pt-1">
+                  <span className="text-xs font-semibold">(=) SALDO</span>
+                  <span className="w-32 text-right font-semibold">{brl(saldoCredito)}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Abatido na compra: {brl(creditoAplicado)}
+                </p>
+              </div>
             </div>
+
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Total a pagar</p>
               <p className="text-lg font-semibold text-primary">{brl(totalAPagarCompra)}</p>
