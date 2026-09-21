@@ -175,6 +175,8 @@ type Produto = {
   cst: string | null;
   preco_custo: number;
   fornecedor_id: string | null;
+  cor_pastilha: string | null;
+  modelo_pastilha: string | null;
 };
 
 /** Valor usado no Select quando o item é para reposição de estoque (sem cliente). */
@@ -263,7 +265,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
