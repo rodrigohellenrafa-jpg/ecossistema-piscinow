@@ -1369,7 +1369,7 @@ function BaixaDialog({
                   <SelectValue placeholder="Selecione a conta bancária" />
                 </SelectTrigger>
                 <SelectContent>
-                  {contasBancarias.map((b) => (
+                  {opcoesContas.map((b) => (
                     <SelectItem key={b.id} value={b.conta}>
                       {b.conta}
                       {b.banco ? ` · ${b.banco}` : ""}
