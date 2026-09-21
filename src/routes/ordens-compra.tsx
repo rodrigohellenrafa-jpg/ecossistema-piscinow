@@ -82,13 +82,14 @@ const STATUS = [
 
 const statusLabel: Record<string, string> = {
   sob_encomenda: "Sob encomenda",
-  pendente: "Pendente (fila de compras)",
+  pendente: "A comprar",
   enviada: "Enviada ao fornecedor",
   faturada: "Faturada pelo fornecedor",
-  concluida: "Concluída (material entregue)",
-  recebida: "Recebida",
+  concluida: "Entregue",
+  recebida: "Finalizada (baixada)",
   cancelada: "Cancelada",
 };
+
 
 /** Ordem das etapas do fluxo da O.C. */
 const FLUXO = ["pendente", "enviada", "faturada", "concluida"] as const;
