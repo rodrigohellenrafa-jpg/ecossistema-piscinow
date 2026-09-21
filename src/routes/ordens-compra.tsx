@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
@@ -236,7 +236,11 @@ function OrdensCompra() {
   const [quantidadesCompra, setQuantidadesCompra] = useState<Record<string, string>>({});
   const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
   const [percentuaisCompra, setPercentuaisCompra] = useState<Record<string, string>>({});
+  const [coresCompra, setCoresCompra] = useState<Record<string, string>>({});
+  const [modelosCompra, setModelosCompra] = useState<Record<string, string>>({});
+  const [statusCompra, setStatusCompra] = useState<Record<string, string>>({});
   const [vinculosCompra, setVinculosCompra] = useState<Record<string, string>>({});
+  const salvamentosPendentes = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [produtoCompraEditando, setProdutoCompraEditando] = useState<Produto | null>(null);
   const [produtoCompraForm, setProdutoCompraForm] = useState({
     codigo: "",
@@ -957,20 +961,6 @@ function OrdensCompra() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
-  const atualizarPastilha = useMutation({
-    mutationFn: async ({ id, campo, valor }: { id: string; campo: "cor_pastilha" | "modelo_pastilha"; valor: string }) => {
-      const { error } = await supabase
-        .from("produtos")
-        .update({ [campo]: valor.trim() || null } as any)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
-    },
-    onError: (erro: Error) => toast.error(erro.message),
-  });
-
   /** Salva automaticamente quantidade, valor, desconto e status de compra do produto. */
   const atualizarCompra = useMutation({
     mutationFn: async ({ id, campo, valor }: { id: string; campo: string; valor: number | string }) => {
@@ -980,11 +970,42 @@ function OrdensCompra() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+    onMutate: ({ id, campo, valor }) => {
+      qc.setQueryData<Produto[]>(["produtos", "lista-simples"], (atuais) =>
+        atuais?.map((produto) =>
+          produto.id === id ? ({ ...produto, [campo]: valor } as Produto) : produto,
+        ),
+      );
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
+
+  const salvarAutomaticamente = (
+    id: string,
+    campo: string,
+    valor: number | string,
+    imediato = false,
+  ) => {
+    const chave = `${id}:${campo}`;
+    const pendente = salvamentosPendentes.current[chave];
+    if (pendente) clearTimeout(pendente);
+    if (imediato) {
+      delete salvamentosPendentes.current[chave];
+      atualizarCompra.mutate({ id, campo, valor });
+      return;
+    }
+    salvamentosPendentes.current[chave] = setTimeout(() => {
+      delete salvamentosPendentes.current[chave];
+      atualizarCompra.mutate({ id, campo, valor });
+    }, 450);
+  };
+
+  useEffect(
+    () => () => {
+      Object.values(salvamentosPendentes.current).forEach(clearTimeout);
+    },
+    [],
+  );
 
   const excluirOrdem = useMutation({
     mutationFn: async (id: string) => {
@@ -1373,13 +1394,14 @@ function OrdensCompra() {
                           aria-label={`Cor da pastilha de ${produto.nome}`}
                           className="w-28"
                           placeholder="Cor"
-                          defaultValue={produto.cor_pastilha ?? ""}
+                          value={coresCompra[produto.id] ?? produto.cor_pastilha ?? ""}
+                          onChange={(evento) => {
+                            const valor = evento.target.value;
+                            setCoresCompra((atual) => ({ ...atual, [produto.id]: valor }));
+                            salvarAutomaticamente(produto.id, "cor_pastilha", valor.trim());
+                          }}
                           onBlur={(evento) =>
-                            atualizarPastilha.mutate({
-                              id: produto.id,
-                              campo: "cor_pastilha",
-                              valor: evento.target.value,
-                            })
+                            salvarAutomaticamente(produto.id, "cor_pastilha", evento.target.value.trim(), true)
                           }
                         />
                       </TableCell>
@@ -1388,13 +1410,14 @@ function OrdensCompra() {
                           aria-label={`Modelo da pastilha de ${produto.nome}`}
                           className="w-32"
                           placeholder="Modelo"
-                          defaultValue={produto.modelo_pastilha ?? ""}
+                          value={modelosCompra[produto.id] ?? produto.modelo_pastilha ?? ""}
+                          onChange={(evento) => {
+                            const valor = evento.target.value;
+                            setModelosCompra((atual) => ({ ...atual, [produto.id]: valor }));
+                            salvarAutomaticamente(produto.id, "modelo_pastilha", valor.trim());
+                          }}
                           onBlur={(evento) =>
-                            atualizarPastilha.mutate({
-                              id: produto.id,
-                              campo: "modelo_pastilha",
-                              valor: evento.target.value,
-                            })
+                            salvarAutomaticamente(produto.id, "modelo_pastilha", evento.target.value.trim(), true)
                           }
                         />
                       </TableCell>
@@ -1406,18 +1429,16 @@ function OrdensCompra() {
                           min="0"
                           step="0.001"
                           value={quantidadesCompra[produto.id] ?? String(Number(produto.quantidade_compra ?? 1))}
-                          onChange={(evento) =>
+                          onChange={(evento) => {
+                            const valor = evento.target.value;
                             setQuantidadesCompra((atual) => ({
                               ...atual,
-                              [produto.id]: evento.target.value,
-                            }))
-                          }
+                              [produto.id]: valor,
+                            }));
+                            salvarAutomaticamente(produto.id, "quantidade_compra", Math.max(Number(valor) || 0, 0));
+                          }}
                           onBlur={(evento) =>
-                            atualizarCompra.mutate({
-                              id: produto.id,
-                              campo: "quantidade_compra",
-                              valor: Math.max(Number(evento.target.value) || 0, 0),
-                            })
+                            salvarAutomaticamente(produto.id, "quantidade_compra", Math.max(Number(evento.target.value) || 0, 0), true)
                           }
                         />
                       </TableCell>
@@ -1429,18 +1450,16 @@ function OrdensCompra() {
                           min="0"
                           step="0.01"
                           value={valoresCompra[produto.id] ?? String(Number(produto.preco_custo))}
-                          onChange={(evento) =>
+                          onChange={(evento) => {
+                            const valor = evento.target.value;
                             setValoresCompra((atual) => ({
                               ...atual,
-                              [produto.id]: evento.target.value,
-                            }))
-                          }
+                              [produto.id]: valor,
+                            }));
+                            salvarAutomaticamente(produto.id, "preco_custo", Math.max(Number(valor) || 0, 0));
+                          }}
                           onBlur={(evento) =>
-                            atualizarCompra.mutate({
-                              id: produto.id,
-                              campo: "preco_custo",
-                              valor: Math.max(Number(evento.target.value) || 0, 0),
-                            })
+                            salvarAutomaticamente(produto.id, "preco_custo", Math.max(Number(evento.target.value) || 0, 0), true)
                           }
                         />
                       </TableCell>
@@ -1453,18 +1472,16 @@ function OrdensCompra() {
                           max="100"
                           step="0.01"
                           value={percentuaisCompra[produto.id] ?? String(Number(produto.desconto_compra ?? 0))}
-                          onChange={(evento) =>
+                          onChange={(evento) => {
+                            const valor = evento.target.value;
                             setPercentuaisCompra((atual) => ({
                               ...atual,
-                              [produto.id]: evento.target.value,
-                            }))
-                          }
+                              [produto.id]: valor,
+                            }));
+                            salvarAutomaticamente(produto.id, "desconto_compra", Math.min(Math.max(Number(valor) || 0, 0), 100));
+                          }}
                           onBlur={(evento) =>
-                            atualizarCompra.mutate({
-                              id: produto.id,
-                              campo: "desconto_compra",
-                              valor: Math.min(Math.max(Number(evento.target.value) || 0, 0), 100),
-                            })
+                            salvarAutomaticamente(produto.id, "desconto_compra", Math.min(Math.max(Number(evento.target.value) || 0, 0), 100), true)
                           }
                         />
                       </TableCell>
@@ -1494,14 +1511,11 @@ function OrdensCompra() {
                       </TableCell>
                       <TableCell>
                         <Select
-                          value={produto.status_compra ?? "a_comprar"}
-                          onValueChange={(valor) =>
-                            atualizarCompra.mutate({
-                              id: produto.id,
-                              campo: "status_compra",
-                              valor,
-                            })
-                          }
+                          value={statusCompra[produto.id] ?? produto.status_compra ?? "a_comprar"}
+                          onValueChange={(valor) => {
+                            setStatusCompra((atual) => ({ ...atual, [produto.id]: valor }));
+                            salvarAutomaticamente(produto.id, "status_compra", valor, true);
+                          }}
                         >
                           <SelectTrigger
                             className="w-32"
