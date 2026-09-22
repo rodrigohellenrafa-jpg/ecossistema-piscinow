@@ -367,6 +367,17 @@ function OrdensCompra() {
     },
   });
 
+  const { data: pagamentosTodasOrdens = [] } = useQuery({
+    queryKey: ["ordem_compra_pagamentos", "todas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordem_compra_pagamentos")
+        .select("id, ordem_id, valor");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: contasBancarias = [] } = useQuery({
     queryKey: ["saldos_bancarios", "contas-ordens"],
     queryFn: async () => {
@@ -386,6 +397,17 @@ function OrdensCompra() {
   const [editPagamentoId, setEditPagamentoId] = useState<string | null>(null);
 
   const totalPagoOrdem = pagamentosOrdem.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+
+  const totaisPagosPorOrdem = useMemo(() => {
+    const totais = new Map<string, number>();
+    for (const pagamento of pagamentosTodasOrdens) {
+      totais.set(
+        pagamento.ordem_id,
+        (totais.get(pagamento.ordem_id) ?? 0) + Number(pagamento.valor ?? 0),
+      );
+    }
+    return totais;
+  }, [pagamentosTodasOrdens]);
 
   const sincronizarValorPago = async (ordemId: string) => {
     const { data } = await supabase
@@ -735,7 +757,7 @@ function OrdensCompra() {
       }
 
       let quantidadeOrdens = 0;
-      const idsCriados: string[] = [];
+      const ordensCriadas: Ordem[] = [];
       for (const { fornecedor, itens } of grupos.values()) {
         const numero = proximoCodigo("OC", numeros);
         numeros.push(numero);
@@ -767,7 +789,7 @@ function OrdensCompra() {
                   : "Compra selecionada na grade de produtos",
             created_by: auth.user?.id ?? null,
           })
-          .select("id")
+          .select("*")
           .single();
         if (erroOrdem) throw erroOrdem;
 
@@ -796,18 +818,14 @@ function OrdensCompra() {
         const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
         if (erroItens) throw erroItens;
         quantidadeOrdens += 1;
-        idsCriados.push(ordem.id);
+        ordensCriadas.push(ordem as Ordem);
       }
-      return { quantidadeOrdens, idsCriados };
+      return { quantidadeOrdens, ordensCriadas };
     },
-    onSuccess: ({ quantidadeOrdens: quantidade, idsCriados }) => {
+    onSuccess: async ({ quantidadeOrdens: quantidade, ordensCriadas }) => {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
-      if (idsCriados.length > 0) {
-        setModoEdicao(false);
-        setDetalheId(idsCriados[0]);
-      }
       if (creditoAplicado !== 0 || creditoCreditar !== 0) {
         salvarCreditoDisponivel.mutate(saldoCredito);
         setCreditoDisponivelInput(null);
@@ -819,8 +837,19 @@ function OrdensCompra() {
       setValoresCompra({});
       setPercentuaisCompra({});
       setVinculosCompra({});
-      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
-      qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] });
+      qc.setQueryData<Ordem[]>(["ordens_compra"], (atuais = []) => [
+        ...ordensCriadas,
+        ...atuais.filter((atual) => !ordensCriadas.some((criada) => criada.id === atual.id)),
+      ]);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["ordens_compra"] }),
+        qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] }),
+      ]);
+      const primeiraOrdem = ordensCriadas[0];
+      if (primeiraOrdem) {
+        setModoEdicao(false);
+        setDetalheId(primeiraOrdem.id);
+      }
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
@@ -1408,6 +1437,65 @@ function OrdensCompra() {
           </div>
         }
       />
+
+      {ordensFiltradas.length > 0 && (
+        <section className="space-y-3" aria-label="Ordens executadas e pagamentos">
+          <div>
+            <h2 className="text-base font-semibold">Ordens executadas e pagamentos</h2>
+            <p className="text-sm text-muted-foreground">
+              Cada ordem permanece aqui com o número, o valor pago e o saldo.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {ordensFiltradas.map((ordem) => {
+              const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
+              const saldo = Number(ordem.valor_total ?? 0) - pago;
+              return (
+                <Card key={ordem.id} className="overflow-hidden">
+                  <CardHeader className="space-y-2 pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="font-mono text-base">{ordem.numero ?? "O.C. sem número"}</CardTitle>
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                          {ordem.fornecedor_nome ?? "Fornecedor não definido"}
+                        </p>
+                      </div>
+                      <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2 text-right">
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Total</p>
+                        <p className="text-sm font-semibold">{brl(Number(ordem.valor_total ?? 0))}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Pago</p>
+                        <p className="text-sm font-semibold">{brl(pago)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Saldo</p>
+                        <p className="text-sm font-semibold">{brl(saldo)}</p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => {
+                        setModoEdicao(false);
+                        setDetalheId(ordem.id);
+                      }}
+                    >
+                      Abrir O.C. e pagamentos
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <ExpandableCard>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
