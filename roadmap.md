@@ -6,3 +6,6 @@
 - [x] Validar tipos e revisar pendências
 - [x] Unificar produtos disponíveis e ordens executadas em uma única grade
 - [x] Iniciar nova ordem somente após executar e numerar a compra anterior
+- [x] Corrigir recebimentos exibidos como débito no histórico da venda
+- [x] Separar taxa/retenção financeira do valor recebido e do total da venda
+- [x] Renomear o resumo de custos do extrato para Recebido

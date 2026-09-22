@@ -58,6 +58,8 @@ export const Route = createFileRoute("/vendas/$id")({
         property: "og:description",
         content: "Espelho de impressão estilo DANFE com totais, ICMS e parcelas do pedido.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: () => (
