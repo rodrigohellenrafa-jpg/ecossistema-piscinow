@@ -800,10 +800,14 @@ function OrdensCompra() {
       }
       return { quantidadeOrdens, idsCriados };
     },
-    onSuccess: ({ quantidadeOrdens: quantidade }) => {
+    onSuccess: ({ quantidadeOrdens: quantidade, idsCriados }) => {
       toast.success(
         quantidade === 1 ? "1 ordem de compra criada" : `${quantidade} ordens de compra criadas`,
       );
+      if (idsCriados.length > 0) {
+        setModoEdicao(false);
+        setDetalheId(idsCriados[0]);
+      }
       if (creditoAplicado !== 0 || creditoCreditar !== 0) {
         salvarCreditoDisponivel.mutate(saldoCredito);
         setCreditoDisponivelInput(null);
