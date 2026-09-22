@@ -398,13 +398,13 @@ export function ConciliacaoBancaria() {
                                 <span>
                                   {l.descricao}{" "}
                                   <span className="text-xs text-muted-foreground">
-                                    {dataBR(l.data_pagamento ?? l.data_competencia)} ·{" "}
-                                    {l.categoria || "—"}
+                                    {dataBR(l.data)} · {l.categoria || "—"} ·{" "}
+                                    {l.origem === "titulo" ? "Conta" : "Lançamento"}
                                   </span>
                                 </span>
                                 <Button
                                   size="sm"
-                                  onClick={() => conciliar.mutate({ mov: m, lanc: l })}
+                                  onClick={() => conciliar.mutate({ mov: m, alvo: l })}
                                   disabled={conciliar.isPending}
                                 >
                                   <Link2 /> Conciliar
@@ -430,7 +430,7 @@ export function ConciliacaoBancaria() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => conciliar.mutate({ mov: m, lanc: null })}
+                            onClick={() => conciliar.mutate({ mov: m, alvo: null })}
                             disabled={conciliar.isPending}
                           >
                             <SkipForward /> Marcar como conferido
