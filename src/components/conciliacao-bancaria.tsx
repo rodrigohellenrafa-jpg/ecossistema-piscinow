@@ -125,30 +125,51 @@ export function ConciliacaoBancaria() {
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ["extratos-bancarios"] });
     qc.invalidateQueries({ queryKey: ["conciliacao-lancamentos"] });
+    qc.invalidateQueries({ queryKey: ["conciliacao-titulos"] });
     qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+    qc.invalidateQueries({ queryKey: ["contas"] });
+  };
+
+  /** Registro do sistema que pode casar com um movimento do extrato. */
+  type Candidato = {
+    origem: "lancamento" | "titulo";
+    id: string;
+    descricao: string;
+    categoria: string | null;
+    data: string;
+  };
+
+  const casar = async (mov: Extrato, alvo: Candidato | null) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("extratos_bancarios")
+      .update({
+        conciliado: true,
+        lancamento_id: alvo?.origem === "lancamento" ? alvo.id : null,
+        conta_id: alvo?.origem === "titulo" ? alvo.id : null,
+        conciliado_em: new Date().toISOString(),
+        conciliado_por: auth.user?.id ?? null,
+      } as never)
+      .eq("id", mov.id);
+    if (error) throw error;
+    if (alvo?.origem === "lancamento") {
+      const { error: e2 } = await supabase
+        .from("lancamentos_financeiros")
+        .update({ conciliado: true, conta_bancaria: mov.conta })
+        .eq("id", alvo.id);
+      if (e2) throw e2;
+    }
+    if (alvo?.origem === "titulo") {
+      const { error: e3 } = await supabase
+        .from("contas")
+        .update({ conta_bancaria: mov.conta })
+        .eq("id", alvo.id);
+      if (e3) throw e3;
+    }
   };
 
   const conciliar = useMutation({
-    mutationFn: async ({ mov, lanc }: { mov: Extrato; lanc: Lanc | null }) => {
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({
-          conciliado: true,
-          lancamento_id: lanc?.id ?? null,
-          conciliado_em: new Date().toISOString(),
-          conciliado_por: auth.user?.id ?? null,
-        } as never)
-        .eq("id", mov.id);
-      if (error) throw error;
-      if (lanc) {
-        const { error: e2 } = await supabase
-          .from("lancamentos_financeiros")
-          .update({ conciliado: true, conta_bancaria: mov.conta })
-          .eq("id", lanc.id);
-        if (e2) throw e2;
-      }
-    },
+    mutationFn: ({ mov, alvo }: { mov: Extrato; alvo: Candidato | null }) => casar(mov, alvo),
     onSuccess: () => {
       invalidar();
       toast.success("Movimento conciliado.");
