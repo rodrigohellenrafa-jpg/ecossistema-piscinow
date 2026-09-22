@@ -40,6 +40,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
+/** Data em que o controle passou a valer; pedidos anteriores são só histórico. */
+const INICIO_CONTROLE = "2026-09-04";
+
 const TIPOS_ATENDIMENTO = [
   { value: "in", label: "IN · Balcão" },
   { value: "out", label: "OUT · Serviço externo" },
