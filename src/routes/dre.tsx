@@ -105,7 +105,7 @@ function Dre() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("venda_pagamentos")
-        .select("retencao_financeira, data_pagamento");
+        .select("retencao_financeira, data_pagamento, observacoes");
       if (error) throw error;
       return data;
     },
@@ -174,9 +174,17 @@ function Dre() {
     }
 
     const despesasContas = [...porCategoria.values()].reduce((s, v) => s + v, 0);
-    const taxasFinanceiras = retencoes
-      .filter((p) => p.data_pagamento && noPeriodo(p.data_pagamento))
+    const retencoesPeriodo = retencoes.filter(
+      (p) => p.data_pagamento && noPeriodo(p.data_pagamento),
+    );
+    const ehInadimplencia = (obs: string | null) => /inadimpl/i.test(obs ?? "");
+    const inadimplencia = retencoesPeriodo
+      .filter((p) => ehInadimplencia(p.observacoes))
       .reduce((s, p) => s + Number(p.retencao_financeira ?? 0), 0);
+    const taxasMaquina = retencoesPeriodo
+      .filter((p) => !ehInadimplencia(p.observacoes))
+      .reduce((s, p) => s + Number(p.retencao_financeira ?? 0), 0);
+    const taxasFinanceiras = taxasMaquina + inadimplencia;
     const despesasFixas = despesasLancamentos + despesasContas;
     const categorias = [...porCategoria.entries()]
       .map(([categoria, valor]) => ({ categoria, valor }))
