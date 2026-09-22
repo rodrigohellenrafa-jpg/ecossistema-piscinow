@@ -5,9 +5,9 @@
  * ou um evento financeiro (entrada/saída). O extrato mostra saldo acumulado e
  * totais por obra, e permite programar chamados recorrentes ligados ao cliente.
  */
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -213,12 +213,21 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
   });
 
   const salvarCustoItem = useMutation({
-    mutationFn: async ({ itemId, valor }: { itemId: string; valor: string }) => {
-      const custo = num(valor);
-      if (custo < 0) throw new Error("O valor cadastrado não pode ser negativo.");
+    mutationFn: async ({
+      itemId,
+      valorTotal,
+      qtd,
+    }: {
+      itemId: string;
+      valorTotal: string;
+      qtd: number;
+    }) => {
+      const total = num(valorTotal);
+      if (total < 0) throw new Error("O valor cadastrado não pode ser negativo.");
+      const unitario = qtd > 0 ? total / qtd : 0;
       const { error } = await supabase
         .from("venda_itens")
-        .update({ custo_unitario: custo })
+        .update({ custo_unitario: unitario })
         .eq("id", itemId)
         .eq("venda_id", vendaId);
       if (error) throw error;
@@ -293,14 +302,56 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
   );
   /** Recebido = soma do que realmente entrou como pagamento do pedido. */
   const totalRecebido = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
-  const totalVendaItens = itens.reduce(
-    (s, i) => s + Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 0),
-    0,
-  );
-  const totalCustoItens = itens.reduce(
-    (s, i) => s + num(custosEditados[i.id] ?? String(i.custo_unitario ?? 0)) * Number(i.quantidade ?? 0),
-    0,
-  );
+  /** Custo de cada linha do multipartido: produto (unitário × qtde) e extras da venda. */
+  const custoLinhaItem = (item: Props["itens"][number]) =>
+    num(custosEditados[item.id] ?? String(item.custo_unitario ?? 0)) *
+    Number(item.quantidade ?? 0);
+  const custoFrete = num(extrasEditados.frete ?? String(venda?.valor_frete ?? 0));
+  const custoMaoObra = num(extrasEditados.mao_obra ?? String(venda?.valor_mao_obra ?? 0));
+  const custoImposto = num(extrasEditados.imposto ?? String(venda?.valor_impostos ?? 0));
+  const extrasLinhas = [
+    { campo: "frete" as const, label: "Frete", padrao: String(venda?.valor_frete ?? 0) },
+    { campo: "mao_obra" as const, label: "M.O.", padrao: String(venda?.valor_mao_obra ?? 0) },
+    { campo: "imposto" as const, label: "Imposto", padrao: String(venda?.valor_impostos ?? 0) },
+  ];
+
+  /** Linhas com saldo acumulado: Recebido → cada produto → Frete/M.O./Imposto. */
+  const linhas = useMemo(() => {
+    const arr: Array<{ key: string; custo: number; saldo: number }> = [];
+    let saldo = totalRecebido;
+    arr.push({ key: "recebido", custo: 0, saldo });
+    for (const item of itens) {
+      const custo = custoLinhaItem(item);
+      saldo -= custo;
+      arr.push({ key: item.id, custo, saldo });
+    }
+    for (const ex of extrasLinhas) {
+      const custo = num(extrasEditados[ex.campo] ?? ex.padrao);
+      saldo -= custo;
+      arr.push({ key: ex.campo, custo, saldo });
+    }
+    return arr;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itens, totalRecebido, custoFrete, custoMaoObra, custoImposto, custosEditados, extrasEditados, venda]);
+
+  const saldoDe = Object.fromEntries(linhas.map((l) => [l.key, l.saldo]));
+  const custoTotalGeral = linhas.reduce((s, l) => s + l.custo, 0);
+  const lucroMultipartido = totalRecebido - custoTotalGeral;
+  const margemMultipartido = totalRecebido > 0 ? (lucroMultipartido / totalRecebido) * 100 : 0;
+
+  /** Salva o custo da linha: produto grava o unitário; extras gravam na venda. */
+  const salvarLinha = (key: string, valor: string) => {
+    const item = itens.find((i) => i.id === key);
+    if (item) {
+      salvarCustoItem.mutate({
+        itemId: item.id,
+        valorTotal: valor,
+        qtd: Number(item.quantidade ?? 0),
+      });
+    } else {
+      salvarExtra.mutate({ campo: key as "frete" | "mao_obra" | "imposto", valor });
+    }
+  };
 
   const proximos = lancamentos
     .filter((l) => l.recorrencia !== "nenhuma" && l.proxima_data)
