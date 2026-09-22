@@ -621,6 +621,24 @@ function NovoPedido() {
       ? Array.from(new Set(condicoes.map((c) => c.forma_pagamento))).join(" + ")
       : FORMAS_PAGAMENTO[0];
 
+  // Cliente do pedido pode ser um cliente cadastrado, um fornecedor ou um
+  // funcionário (valores "for:<id>" / "fun:<id>" no seletor). Só clientes
+  // cadastrados preenchem o vínculo cliente_id; os demais gravam só o nome.
+  const selecaoCliente = useMemo(() => {
+    if (clienteId.startsWith("for:")) {
+      const id = clienteId.slice(4);
+      const f = fornecedores.find((x) => x.id === id);
+      return { id: null as string | null, nome: f?.nome ?? null };
+    }
+    if (clienteId.startsWith("fun:")) {
+      const id = clienteId.slice(4);
+      const f = vendedores.find((x) => x.id === id);
+      return { id: null as string | null, nome: f?.nome ?? null };
+    }
+    const c = clientes.find((x) => x.id === clienteId);
+    return { id: clienteId || null, nome: c?.nome ?? null };
+  }, [clienteId, clientes, fornecedores, vendedores]);
+
   // ----- Rascunho salvo no banco como orçamento não concluído -----
   useEffect(() => {
     if (!rascunhoPronto) return;
