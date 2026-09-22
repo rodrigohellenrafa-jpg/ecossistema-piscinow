@@ -163,7 +163,7 @@ export function FluxoColunas() {
           <CardTitle className="text-base">Contas a pagar ({contas.length})</CardTitle>
           <p className="text-xs text-muted-foreground">Títulos com vencimento, pagos e em aberto.</p>
           <Button asChild size="sm" variant="outline" className="mt-2 w-fit">
-            <Link to="/contas" search={{}}>
+            <Link to="/contas" search={{ periodo: undefined, tipo: undefined }}>
               <ArrowUpRight /> Abrir e editar
             </Link>
           </Button>

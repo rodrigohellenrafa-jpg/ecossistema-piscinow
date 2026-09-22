@@ -225,7 +225,7 @@ function FluxoCaixa() {
               </SelectContent>
             </Select>
             <Button asChild variant="outline">
-              <Link to="/contas" search={{}}>
+              <Link to="/contas" search={{ periodo: undefined, tipo: undefined }}>
                 <Plus /> Conta a pagar/receber
               </Link>
             </Button>
