@@ -251,6 +251,16 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     (s, p) => s + Number(p.valor_origem ?? p.valor ?? 0),
     0,
   );
+  /** Recebido = soma do que realmente entrou como pagamento do pedido. */
+  const totalRecebido = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+  const totalVendaItens = itens.reduce(
+    (s, i) => s + Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 0),
+    0,
+  );
+  const totalCustoItens = itens.reduce(
+    (s, i) => s + num(custosEditados[i.id] ?? String(i.custo_unitario ?? 0)) * Number(i.quantidade ?? 0),
+    0,
+  );
 
   const proximos = lancamentos
     .filter((l) => l.recorrencia !== "nenhuma" && l.proxima_data)
