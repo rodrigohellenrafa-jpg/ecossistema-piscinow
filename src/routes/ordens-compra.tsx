@@ -383,6 +383,18 @@ function OrdensCompra() {
     },
   });
 
+  /** Itens de pedidos que consomem cada produto (demanda por pedido). */
+  const { data: consumoItens = [] } = useQuery({
+    queryKey: ["venda_itens", "consumo-compras"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_itens")
+        .select("produto_id, quantidade, venda_id");
+      if (error) throw error;
+      return data as { produto_id: string | null; quantidade: number; venda_id: string }[];
+    },
+  });
+
   const vendaPorId = useMemo(() => {
     const m = new Map<
       string,
