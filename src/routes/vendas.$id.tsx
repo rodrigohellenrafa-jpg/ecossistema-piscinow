@@ -58,6 +58,8 @@ export const Route = createFileRoute("/vendas/$id")({
         property: "og:description",
         content: "Espelho de impressão estilo DANFE com totais, ICMS e parcelas do pedido.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: () => (
@@ -99,6 +101,7 @@ function DetalhePedido() {
     forma_pagamento: "Pix",
     conta_bancaria: "",
     valor: "",
+    valor_origem: "",
     observacoes: "",
   });
 
@@ -258,12 +261,16 @@ function DetalhePedido() {
     mutationFn: async () => {
       const valor = Number(String(novoPag.valor).replace(",", "."));
       if (!valor || valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const valorOrigem = Number(String(novoPag.valor_origem).replace(",", ".")) || valor;
+      const retencaoFinanceira = Math.max(Number((valorOrigem - valor).toFixed(2)), 0);
       const { error } = await supabase.from("venda_pagamentos").insert({
         venda_id: id,
         data_pagamento: novoPag.data_pagamento,
         forma_pagamento: novoPag.forma_pagamento,
         conta_bancaria: novoPag.conta_bancaria || null,
         valor,
+        valor_origem: valorOrigem,
+        retencao_financeira: retencaoFinanceira,
         observacoes: novoPag.observacoes || null,
         created_by: user?.id ?? null,
       } as never);
@@ -276,6 +283,7 @@ function DetalhePedido() {
         forma_pagamento: "Pix",
         conta_bancaria: "",
         valor: "",
+        valor_origem: "",
         observacoes: "",
       });
       invalidarFinanceiro();
@@ -357,6 +365,7 @@ function DetalhePedido() {
     forma_pagamento: string;
     conta_bancaria: string;
     valor: string;
+    valor_origem: string;
     observacoes: string;
   }>(null);
 
@@ -520,6 +529,7 @@ function DetalhePedido() {
       if (!editPag) return;
       const valor = num(editPag.valor);
       if (valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const valorOrigem = num(editPag.valor_origem) || valor;
       const { error } = await supabase
         .from("venda_pagamentos")
         .update({
@@ -527,6 +537,8 @@ function DetalhePedido() {
           forma_pagamento: editPag.forma_pagamento,
           conta_bancaria: editPag.conta_bancaria || null,
           valor,
+          valor_origem: valorOrigem,
+          retencao_financeira: Math.max(Number((valorOrigem - valor).toFixed(2)), 0),
           observacoes: editPag.observacoes || null,
         })
         .eq("id", editPag.id);
@@ -973,7 +985,7 @@ function DetalhePedido() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <Field label="Data do pagamento">
               <Input
                 type="date"
@@ -1014,6 +1026,15 @@ function DetalhePedido() {
                 placeholder="0,00"
               />
             </Field>
+            <Field label="Valor de origem (R$)">
+              <Input
+                type="number"
+                step="0.01"
+                value={novoPag.valor_origem}
+                onChange={(e) => setNovoPag({ ...novoPag, valor_origem: e.target.value })}
+                placeholder="Antes da retenção"
+              />
+            </Field>
             <Field label="Observações">
               <Input
                 value={novoPag.observacoes}
@@ -1046,7 +1067,9 @@ function DetalhePedido() {
                 <TableHead>Forma</TableHead>
                 <TableHead>Cartão / conta</TableHead>
                 <TableHead>Observações</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-right">Origem</TableHead>
+                <TableHead className="text-right">Retenção</TableHead>
+                <TableHead className="text-right">Recebido</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -1057,7 +1080,11 @@ function DetalhePedido() {
                   <TableCell>{p.forma_pagamento}</TableCell>
                   <TableCell>{p.conta_bancaria ?? "—"}</TableCell>
                   <TableCell>{p.observacoes ?? "—"}</TableCell>
-                  <TableCell className="text-right">{brl(Number(p.valor))}</TableCell>
+                  <TableCell className="text-right">{brl(Number(p.valor_origem ?? p.valor))}</TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {Number(p.retencao_financeira ?? 0) > 0 ? brl(Number(p.retencao_financeira)) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right text-success">{brl(Number(p.valor))}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button
@@ -1071,6 +1098,7 @@ function DetalhePedido() {
                             forma_pagamento: p.forma_pagamento,
                             conta_bancaria: p.conta_bancaria ?? "",
                             valor: String(p.valor ?? ""),
+                            valor_origem: String(p.valor_origem ?? p.valor ?? ""),
                             observacoes: p.observacoes ?? "",
                           })
                         }
@@ -1092,7 +1120,7 @@ function DetalhePedido() {
               ))}
               {pagamentos.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
                     Nenhum pagamento registrado. O pedido está em aberto.
                   </TableCell>
                 </TableRow>
@@ -1626,6 +1654,15 @@ function DetalhePedido() {
                   onChange={(e) => setEditPag({ ...editPag, valor: e.target.value })}
                 />
               </Field>
+              <Field label="Valor de origem (R$)">
+                <Input
+                  value={editPag.valor_origem}
+                  onChange={(e) => setEditPag({ ...editPag, valor_origem: e.target.value })}
+                />
+              </Field>
+              <p className="self-end text-sm text-muted-foreground">
+                Taxa / retenção: {brl(Math.max(num(editPag.valor_origem) - num(editPag.valor), 0))}
+              </p>
               <Field label="Observações" className="sm:col-span-2">
                 <Input
                   value={editPag.observacoes}
