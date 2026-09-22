@@ -24,6 +24,7 @@ type Lancamento = {
 
 type Conta = {
   id: string;
+  tipo: string;
   descricao: string;
   parceiro: string | null;
   categoria: string | null;
@@ -67,10 +68,11 @@ export function FluxoColunas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("id, descricao, parceiro, categoria, valor, valor_juros, vencimento, status, data_pagamento")
-        .eq("tipo", "pagar")
+        .select(
+          "id, tipo, descricao, parceiro, categoria, valor, valor_juros, vencimento, status, data_pagamento",
+        )
         .order("vencimento", { ascending: false })
-        .limit(60);
+        .limit(80);
       if (error) throw error;
       return data as Conta[];
     },
@@ -160,8 +162,10 @@ export function FluxoColunas() {
 
       <ExpandableCard>
         <CardHeader className="pr-12">
-          <CardTitle className="text-base">Contas a pagar ({contas.length})</CardTitle>
-          <p className="text-xs text-muted-foreground">Títulos com vencimento, pagos e em aberto.</p>
+          <CardTitle className="text-base">Contas a pagar e receber ({contas.length})</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Títulos com vencimento, pagos e em aberto, incluindo recebimentos de vendas.
+          </p>
           <Button asChild size="sm" variant="outline" className="mt-2 w-fit">
             <Link to="/contas" search={{ periodo: undefined, tipo: undefined }}>
               <ArrowUpRight /> Abrir e editar
@@ -179,11 +183,18 @@ export function FluxoColunas() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="tabular-nums text-destructive">
+                  <p
+                    className={`tabular-nums ${c.tipo === "receber" ? "text-success" : "text-destructive"}`}
+                  >
+                    {c.tipo === "receber" ? "+" : "−"}
                     {brl(Number(c.valor ?? 0) + Number(c.valor_juros ?? 0))}
                   </p>
                   <Badge variant={c.status === "pago" ? "outline" : "secondary"} className="mt-1">
-                    {c.status === "pago" ? "Pago" : "Em aberto"}
+                    {c.status === "pago"
+                      ? c.tipo === "receber"
+                        ? "Recebido"
+                        : "Pago"
+                      : "Em aberto"}
                   </Badge>
                 </div>
               </div>

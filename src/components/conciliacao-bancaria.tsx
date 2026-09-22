@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Link2, Link2Off, PlusCircle, SkipForward } from "lucide-react";
+import { Check, Link2, Link2Off, PlusCircle, SkipForward, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ExtratoImportar } from "@/components/extrato-importar";
@@ -23,6 +23,20 @@ type Extrato = {
   tipo: string;
   conciliado: boolean;
   lancamento_id: string | null;
+  conta_id: string | null;
+};
+
+type TituloConta = {
+  id: string;
+  tipo: string;
+  descricao: string;
+  categoria: string | null;
+  valor: number;
+  valor_pago: number | null;
+  status: string;
+  data_pagamento: string | null;
+  vencimento: string;
+  conta_bancaria: string | null;
 };
 
 type Lanc = {
@@ -63,7 +77,9 @@ export function ConciliacaoBancaria() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("extratos_bancarios")
-        .select("id, conta, banco, data_movimento, descricao, valor, tipo, conciliado, lancamento_id")
+        .select(
+          "id, conta, banco, data_movimento, descricao, valor, tipo, conciliado, lancamento_id, conta_id",
+        )
         .order("data_movimento", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -86,36 +102,74 @@ export function ConciliacaoBancaria() {
     },
   });
 
+  /** Títulos de contas a pagar/receber já baixados também entram na conciliação. */
+  const { data: titulos = [] } = useQuery({
+    queryKey: ["conciliacao-titulos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select(
+          "id, tipo, descricao, categoria, valor, valor_pago, status, data_pagamento, vencimento, conta_bancaria",
+        )
+        .eq("status", "pago")
+        .order("data_pagamento", { ascending: false })
+        .limit(600);
+      if (error) throw error;
+      return data as TituloConta[];
+    },
+  });
+
   const usadas = contas.slice(0, MAX_CONTAS);
   const ativa = conta || usadas[0]?.conta || "";
 
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ["extratos-bancarios"] });
     qc.invalidateQueries({ queryKey: ["conciliacao-lancamentos"] });
+    qc.invalidateQueries({ queryKey: ["conciliacao-titulos"] });
     qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+    qc.invalidateQueries({ queryKey: ["contas"] });
+  };
+
+  /** Registro do sistema que pode casar com um movimento do extrato. */
+  type Candidato = {
+    origem: "lancamento" | "titulo";
+    id: string;
+    descricao: string;
+    categoria: string | null;
+    data: string;
+  };
+
+  const casar = async (mov: Extrato, alvo: Candidato | null) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("extratos_bancarios")
+      .update({
+        conciliado: true,
+        lancamento_id: alvo?.origem === "lancamento" ? alvo.id : null,
+        conta_id: alvo?.origem === "titulo" ? alvo.id : null,
+        conciliado_em: new Date().toISOString(),
+        conciliado_por: auth.user?.id ?? null,
+      } as never)
+      .eq("id", mov.id);
+    if (error) throw error;
+    if (alvo?.origem === "lancamento") {
+      const { error: e2 } = await supabase
+        .from("lancamentos_financeiros")
+        .update({ conciliado: true, conta_bancaria: mov.conta })
+        .eq("id", alvo.id);
+      if (e2) throw e2;
+    }
+    if (alvo?.origem === "titulo") {
+      const { error: e3 } = await supabase
+        .from("contas")
+        .update({ conta_bancaria: mov.conta })
+        .eq("id", alvo.id);
+      if (e3) throw e3;
+    }
   };
 
   const conciliar = useMutation({
-    mutationFn: async ({ mov, lanc }: { mov: Extrato; lanc: Lanc | null }) => {
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from("extratos_bancarios")
-        .update({
-          conciliado: true,
-          lancamento_id: lanc?.id ?? null,
-          conciliado_em: new Date().toISOString(),
-          conciliado_por: auth.user?.id ?? null,
-        } as never)
-        .eq("id", mov.id);
-      if (error) throw error;
-      if (lanc) {
-        const { error: e2 } = await supabase
-          .from("lancamentos_financeiros")
-          .update({ conciliado: true, conta_bancaria: mov.conta })
-          .eq("id", lanc.id);
-        if (e2) throw e2;
-      }
-    },
+    mutationFn: ({ mov, alvo }: { mov: Extrato; alvo: Candidato | null }) => casar(mov, alvo),
     onSuccess: () => {
       invalidar();
       toast.success("Movimento conciliado.");
@@ -186,21 +240,78 @@ export function ConciliacaoBancaria() {
   const pendentes = daConta.filter((m) => !m.conciliado);
   const conciliados = daConta.filter((m) => m.conciliado).slice(0, 30);
 
-  /** Lançamentos ainda livres que podem casar com um movimento do extrato. */
-  const sugestoes = (m: Extrato) => {
+  /** Ids já amarrados a algum movimento do extrato, para não conciliar duas vezes. */
+  const jaUsados = useMemo(() => {
+    const usados = new Set<string>();
+    for (const m of extrato) {
+      if (m.lancamento_id) usados.add(m.lancamento_id);
+      if (m.conta_id) usados.add(m.conta_id);
+    }
+    return usados;
+  }, [extrato]);
+
+  /** Lançamentos e títulos ainda livres que podem casar com um movimento do extrato. */
+  const sugestoes = (m: Extrato, ignorar: Set<string> = new Set()): Candidato[] => {
     const alvo = Number(m.valor ?? 0);
-    const esperado = m.tipo === "entrada" ? "receita" : "despesa";
-    return lancamentos
+    const entrada = m.tipo === "entrada";
+    const esperado = entrada ? "receita" : "despesa";
+    const deLancamentos: Candidato[] = lancamentos
       .filter((l) => !l.conciliado && l.status !== "Cancelado" && l.tipo_fluxo === esperado)
+      .filter((l) => !jaUsados.has(l.id) && !ignorar.has(l.id))
       .filter((l) => Math.abs(Number(l.valor ?? 0) - alvo) <= 0.02)
       .filter((l) => dias(l.data_pagamento ?? l.data_competencia, m.data_movimento) <= 7)
-      .sort(
-        (a, b) =>
-          dias(a.data_pagamento ?? a.data_competencia, m.data_movimento) -
-          dias(b.data_pagamento ?? b.data_competencia, m.data_movimento),
+      .map((l) => ({
+        origem: "lancamento" as const,
+        id: l.id,
+        descricao: l.descricao,
+        categoria: l.categoria,
+        data: l.data_pagamento ?? l.data_competencia,
+      }));
+    const deTitulos: Candidato[] = titulos
+      .filter((t) => (entrada ? t.tipo === "receber" : t.tipo !== "receber"))
+      .filter((t) => !jaUsados.has(t.id) && !ignorar.has(t.id))
+      .filter(
+        (t) => Math.abs(Number(t.valor_pago ?? t.valor ?? 0) - alvo) <= 0.02,
       )
+      .filter((t) => dias(t.data_pagamento ?? t.vencimento, m.data_movimento) <= 7)
+      .map((t) => ({
+        origem: "titulo" as const,
+        id: t.id,
+        descricao: t.descricao,
+        categoria: t.categoria,
+        data: t.data_pagamento ?? t.vencimento,
+      }));
+    return [...deLancamentos, ...deTitulos]
+      .sort((a, b) => dias(a.data, m.data_movimento) - dias(b.data, m.data_movimento))
       .slice(0, 3);
   };
+
+  /** Concilia sozinho todos os movimentos com uma única correspondência clara. */
+  const conciliarAutomatico = useMutation({
+    mutationFn: async () => {
+      const usados = new Set<string>();
+      let feitos = 0;
+      for (const mov of pendentes) {
+        const candidatos = sugestoes(mov, usados);
+        if (candidatos.length !== 1) continue;
+        const alvo = candidatos[0]!;
+        await casar(mov, alvo);
+        usados.add(alvo.id);
+        feitos += 1;
+      }
+      return { feitos, restantes: pendentes.length - feitos };
+    },
+    onSuccess: ({ feitos, restantes }) => {
+      invalidar();
+      if (feitos === 0)
+        toast.info("Nenhuma correspondência única encontrada para conciliar sozinho.");
+      else
+        toast.success(
+          `${feitos} movimento(s) conciliado(s) automaticamente. ${restantes} aguardando conferência.`,
+        );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const somaPendentes = pendentes.reduce(
     (s, m) => s + (m.tipo === "entrada" ? Number(m.valor ?? 0) : -Number(m.valor ?? 0)),
@@ -255,6 +366,14 @@ export function ConciliacaoBancaria() {
                       {brl(somaPendentes)}
                     </strong>
                   </span>
+                  <Button
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => conciliarAutomatico.mutate()}
+                    disabled={conciliarAutomatico.isPending || pendentes.length === 0}
+                  >
+                    <Wand2 /> Conciliar automaticamente
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
@@ -287,13 +406,13 @@ export function ConciliacaoBancaria() {
                                 <span>
                                   {l.descricao}{" "}
                                   <span className="text-xs text-muted-foreground">
-                                    {dataBR(l.data_pagamento ?? l.data_competencia)} ·{" "}
-                                    {l.categoria || "—"}
+                                    {dataBR(l.data)} · {l.categoria || "—"} ·{" "}
+                                    {l.origem === "titulo" ? "Conta" : "Lançamento"}
                                   </span>
                                 </span>
                                 <Button
                                   size="sm"
-                                  onClick={() => conciliar.mutate({ mov: m, lanc: l })}
+                                  onClick={() => conciliar.mutate({ mov: m, alvo: l })}
                                   disabled={conciliar.isPending}
                                 >
                                   <Link2 /> Conciliar
@@ -319,7 +438,7 @@ export function ConciliacaoBancaria() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => conciliar.mutate({ mov: m, lanc: null })}
+                            onClick={() => conciliar.mutate({ mov: m, alvo: null })}
                             disabled={conciliar.isPending}
                           >
                             <SkipForward /> Marcar como conferido
