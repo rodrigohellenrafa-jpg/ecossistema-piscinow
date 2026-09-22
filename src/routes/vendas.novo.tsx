@@ -876,8 +876,8 @@ function NovoPedido() {
         .insert({
           numero: numeroFinal,
           data,
-          cliente_id: clienteId,
-          cliente_nome: cliente?.nome ?? null,
+          cliente_id: selecaoCliente.id,
+          cliente_nome: selecaoCliente.nome,
           vendedor: vendedor?.nome ?? null,
           // O vendedor vem dos usuários do sistema (auth), não do cadastro de funcionários.
           vendedor_id: null,
@@ -1056,8 +1056,8 @@ function NovoPedido() {
           const { error: erroConta } = await supabase.from("contas").insert({
             tipo: "receber",
             descricao: `Pedido ${numeroFinal} — saldo a receber`,
-            parceiro: cliente?.nome ?? null,
-            cliente_id: clienteId,
+            parceiro: selecaoCliente.nome,
+            cliente_id: selecaoCliente.id,
             venda_id: venda.id,
             categoria: "Vendas",
             valor: semCobertura,
