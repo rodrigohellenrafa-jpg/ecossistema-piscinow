@@ -361,6 +361,26 @@ function Vendas() {
             <Kpi label="Pedidos em aberto" value={String(emAberto)} to="/logistica" />
           </div>
 
+          <p className="text-xs text-muted-foreground">
+            Os indicadores acima consideram pedidos a partir de {dataBR(INICIO_CONTROLE)}.
+          </p>
+
+          {pedidosHistoricos.length > 0 && (
+            <Card>
+              <CardHeader className="gap-1">
+                <CardTitle className="text-base">
+                  Histórico anterior a {dataBR(INICIO_CONTROLE)} (só informação)
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {pedidosHistoricos.length} pedido(s) somando {brl(faturamentoHistorico)}. Fazem
+                  parte do faturamento do mês de origem e não entram nos números acima nem no caixa
+                  atual.
+                </p>
+              </CardHeader>
+            </Card>
+          )}
+
+
           <Card>
             <CardHeader className="gap-3">
               <CardTitle>Histórico de Pedidos</CardTitle>
