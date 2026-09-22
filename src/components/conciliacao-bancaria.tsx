@@ -102,6 +102,23 @@ export function ConciliacaoBancaria() {
     },
   });
 
+  /** Títulos de contas a pagar/receber já baixados também entram na conciliação. */
+  const { data: titulos = [] } = useQuery({
+    queryKey: ["conciliacao-titulos"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select(
+          "id, tipo, descricao, categoria, valor, valor_pago, status, data_pagamento, vencimento, conta_bancaria",
+        )
+        .eq("status", "pago")
+        .order("data_pagamento", { ascending: false })
+        .limit(600);
+      if (error) throw error;
+      return data as TituloConta[];
+    },
+  });
+
   const usadas = contas.slice(0, MAX_CONTAS);
   const ativa = conta || usadas[0]?.conta || "";
 
