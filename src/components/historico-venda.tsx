@@ -241,10 +241,13 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       if (v < 0) throw new Error("O valor não pode ser negativo.");
       const coluna =
         campo === "frete" ? "valor_frete" : campo === "mao_obra" ? "valor_mao_obra" : "valor_impostos";
-      const { error } = await supabase
-        .from("vendas")
-        .update({ [coluna]: v } as Record<string, number>)
-        .eq("id", vendaId);
+      const atualizacao =
+        campo === "frete"
+          ? { valor_frete: v }
+          : campo === "mao_obra"
+            ? { valor_mao_obra: v }
+            : { valor_impostos: v };
+      const { error } = await supabase.from("vendas").update(atualizacao).eq("id", vendaId);
       if (error) throw error;
     },
     onSuccess: (_, variaveis) => {
