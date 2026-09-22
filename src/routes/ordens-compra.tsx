@@ -1570,7 +1570,18 @@ function OrdensCompra() {
                 })}
                 {linhasExecutadas.map(({ item, ordem, produto, venda }) => (
                   <TableRow key={`executada-${item.id}`}>
-                    <TableCell />
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`Selecionar item ${item.descricao}`}
+                        checked={selecionadosExecutados[item.id] === true}
+                        onCheckedChange={(valor) =>
+                          setSelecionadosExecutados((atual) => ({
+                            ...atual,
+                            [item.id]: valor === true,
+                          }))
+                        }
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-xs font-semibold">{ordem.numero ?? "—"}</TableCell>
                     <TableCell className="font-medium">{ordem.fornecedor_nome ?? "Não definido"}</TableCell>
                     <TableCell className="font-mono text-xs">{item.codigo ?? "—"}</TableCell>
