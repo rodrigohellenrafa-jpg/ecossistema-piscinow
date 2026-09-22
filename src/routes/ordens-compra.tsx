@@ -231,6 +231,7 @@ function OrdensCompra() {
   });
   const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
   const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
+  const [selecionadosExecutados, setSelecionadosExecutados] = useState<Record<string, boolean>>({});
   const [usarCreditoFabricante, setUsarCreditoFabricante] = useState(false);
   const [creditoFabricante, setCreditoFabricante] = useState("");
   const [creditoDisponivelInput, setCreditoDisponivelInput] = useState<string | null>(null);
@@ -550,12 +551,18 @@ function OrdensCompra() {
   const saldoCredito = creditoDisponivelValor - creditoCreditar;
   const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
 
+  const itensExecutadosSelecionados = linhasExecutadas.filter(({ item }) => selecionadosExecutados[item.id]);
   const todosProdutosSelecionados =
-    produtosFiltrados.length > 0 && produtosFiltrados.every((p) => selecionadosCompra[p.id]);
+    (produtosFiltrados.length > 0 || linhasExecutadas.length > 0) &&
+    produtosFiltrados.every((p) => selecionadosCompra[p.id]) &&
+    linhasExecutadas.every(({ item }) => selecionadosExecutados[item.id]);
 
   const marcarTodosProdutos = (marcado: boolean) => {
     setSelecionadosCompra(
       marcado ? Object.fromEntries(produtosFiltrados.map((produto) => [produto.id, true])) : {},
+    );
+    setSelecionadosExecutados(
+      marcado ? Object.fromEntries(linhasExecutadas.map(({ item }) => [item.id, true])) : {},
     );
   };
 
@@ -1123,6 +1130,21 @@ function OrdensCompra() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Remove em lote os itens de ordens já executadas que foram marcados na grade. */
+  const excluirItensSelecionados = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("ordem_compra_itens").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Itens removidos");
+      setSelecionadosExecutados({});
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const recalcularTotal = (o: Ordem) =>
     Number(o.valor_produtos) - Number(o.desconto) + Number(o.icms_st_valor);
 
@@ -1548,7 +1570,18 @@ function OrdensCompra() {
                 })}
                 {linhasExecutadas.map(({ item, ordem, produto, venda }) => (
                   <TableRow key={`executada-${item.id}`}>
-                    <TableCell />
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`Selecionar item ${item.descricao}`}
+                        checked={selecionadosExecutados[item.id] === true}
+                        onCheckedChange={(valor) =>
+                          setSelecionadosExecutados((atual) => ({
+                            ...atual,
+                            [item.id]: valor === true,
+                          }))
+                        }
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-xs font-semibold">{ordem.numero ?? "—"}</TableCell>
                     <TableCell className="font-medium">{ordem.fornecedor_nome ?? "Não definido"}</TableCell>
                     <TableCell className="font-mono text-xs">{item.codigo ?? "—"}</TableCell>
@@ -1608,6 +1641,18 @@ function OrdensCompra() {
             </Table>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            {itensExecutadosSelecionados.length > 0 && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (!window.confirm(`Excluir ${itensExecutadosSelecionados.length} item(ns) das ordens executadas?`)) return;
+                  excluirItensSelecionados.mutate(itensExecutadosSelecionados.map(({ item }) => item.id));
+                }}
+                disabled={excluirItensSelecionados.isPending}
+              >
+                <Trash2 /> Excluir itens selecionados ({itensExecutadosSelecionados.length})
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => salvarTodosItens.mutate()}
