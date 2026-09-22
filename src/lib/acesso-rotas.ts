@@ -20,6 +20,7 @@ const MAPA: { prefixo: string; area: Area }[] = [
   { prefixo: "/estoque", area: "compras" },
   { prefixo: "/notas-compra", area: "compras" },
   { prefixo: "/fluxo-caixa", area: "financeiro" },
+  { prefixo: "/movimentacoes", area: "financeiro" },
   { prefixo: "/financeiro", area: "financeiro" },
   { prefixo: "/contas", area: "financeiro" },
   { prefixo: "/relatorio-contas", area: "financeiro" },
