@@ -1641,6 +1641,18 @@ function OrdensCompra() {
             </Table>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            {itensExecutadosSelecionados.length > 0 && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (!window.confirm(`Excluir ${itensExecutadosSelecionados.length} item(ns) das ordens executadas?`)) return;
+                  excluirItensSelecionados.mutate(itensExecutadosSelecionados.map(({ item }) => item.id));
+                }}
+                disabled={excluirItensSelecionados.isPending}
+              >
+                <Trash2 /> Excluir itens selecionados ({itensExecutadosSelecionados.length})
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => salvarTodosItens.mutate()}
