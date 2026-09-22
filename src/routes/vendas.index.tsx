@@ -273,13 +273,28 @@ function Vendas() {
     [vendas, q],
   );
 
-  const faturamento = pedidos.reduce((s, v) => s + Number(v.valor_total), 0);
-  const ticketMedio = pedidos.length ? faturamento / pedidos.length : 0;
-  const custoTotal = pedidos.reduce((s, v) => s + Number(v.custo_total), 0);
+  /** Pedidos anteriores ao início do controle ficam só como histórico. */
+  const pedidosAtuais = useMemo(
+    () => pedidos.filter((v) => String(v.data).slice(0, 10) >= INICIO_CONTROLE),
+    [pedidos],
+  );
+  const pedidosHistoricos = useMemo(
+    () => pedidos.filter((v) => String(v.data).slice(0, 10) < INICIO_CONTROLE),
+    [pedidos],
+  );
+
+  const faturamento = pedidosAtuais.reduce((s, v) => s + Number(v.valor_total), 0);
+  const ticketMedio = pedidosAtuais.length ? faturamento / pedidosAtuais.length : 0;
+  const custoTotal = pedidosAtuais.reduce((s, v) => s + Number(v.custo_total), 0);
   const margemMedia = margem(faturamento, custoTotal);
-  const emAberto = pedidos.filter((v) =>
+  const emAberto = pedidosAtuais.filter((v) =>
     ["aprovado", "em_producao"].includes(v.status_pedido),
   ).length;
+
+  const faturamentoHistorico = pedidosHistoricos.reduce(
+    (s, v) => s + Number(v.valor_total),
+    0,
+  );
 
   const totalOrcado = orcamentos.reduce((s, v) => s + Number(v.valor_total), 0);
   const ticketOrcamento = orcamentos.length ? totalOrcado / orcamentos.length : 0;
