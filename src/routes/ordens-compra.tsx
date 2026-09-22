@@ -806,7 +806,12 @@ function OrdensCompra() {
         if (erroOrdem) throw erroOrdem;
 
         const payload = itens.map((produto) => {
-          const vendaId = vinculosCompra[produto.id];
+          const vendaId =
+            vinculosCompra[produto.id] ||
+            produto.venda_vinculo_id ||
+            (demandaPorProduto.get(produto.id)?.pedidos.length === 1
+              ? demandaPorProduto.get(produto.id)!.pedidos[0]!.id
+              : "");
           const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
           const bruto = quantidadeCompra(produto) * valorCompra(produto);
           const desconto = bruto * (percentualCompra(produto) / 100);
