@@ -110,6 +110,7 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
   const [form, setForm] = useState<FormState>(formVazio);
   const [filtroObra, setFiltroObra] = useState("todas");
   const [custosEditados, setCustosEditados] = useState<Record<string, string>>({});
+  const [extrasEditados, setExtrasEditados] = useState<Record<string, string>>({});
 
   const { data: obras = [] } = useQuery({
     queryKey: ["historico-obras", vendaId, clienteId],
@@ -240,7 +241,10 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       if (v < 0) throw new Error("O valor não pode ser negativo.");
       const coluna =
         campo === "frete" ? "valor_frete" : campo === "mao_obra" ? "valor_mao_obra" : "valor_impostos";
-      const { error } = await supabase.from("vendas").update({ [coluna]: v }).eq("id", vendaId);
+      const { error } = await supabase
+        .from("vendas")
+        .update({ [coluna]: v } as Record<string, number>)
+        .eq("id", vendaId);
       if (error) throw error;
     },
     onSuccess: (_, variaveis) => {
