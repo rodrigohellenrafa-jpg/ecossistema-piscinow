@@ -1254,6 +1254,14 @@ function OrdensCompra() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => marcarTodosProdutos(!todosProdutosSelecionados)}
+            >
+              {todosProdutosSelecionados ? "Limpar seleção" : "Selecionar todos"}
+            </Button>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Total selecionado</p>
               <p className="text-lg font-semibold">{brl(totalSelecionadoCompra)}</p>
@@ -1320,11 +1328,14 @@ function OrdensCompra() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
-                    <Checkbox
-                      aria-label="Selecionar todos os produtos"
-                      checked={todosProdutosSelecionados}
-                      onCheckedChange={(valor) => marcarTodosProdutos(valor === true)}
-                    />
+                    <div className="flex items-center gap-1">
+                      <Checkbox
+                        aria-label="Selecionar todos os produtos"
+                        checked={todosProdutosSelecionados}
+                        onCheckedChange={(valor) => marcarTodosProdutos(valor === true)}
+                      />
+                      <span className="text-[10px] font-normal text-muted-foreground">Todos</span>
+                    </div>
                   </TableHead>
                   <TableHead>O.C.</TableHead>
                   <TableHead>Fornecedor</TableHead>
