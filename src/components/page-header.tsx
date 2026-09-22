@@ -27,12 +27,14 @@ export function Kpi({
   hint,
   tone = "default",
   to,
+  search,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "default" | "positive" | "negative" | "warning";
   to?: string;
+  search?: Record<string, string>;
 }) {
   const cor =
     tone === "positive"
