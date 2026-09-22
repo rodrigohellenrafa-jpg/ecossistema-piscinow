@@ -23,6 +23,20 @@ type Extrato = {
   tipo: string;
   conciliado: boolean;
   lancamento_id: string | null;
+  conta_id: string | null;
+};
+
+type TituloConta = {
+  id: string;
+  tipo: string;
+  descricao: string;
+  categoria: string | null;
+  valor: number;
+  valor_pago: number | null;
+  status: string;
+  data_pagamento: string | null;
+  vencimento: string;
+  conta_bancaria: string | null;
 };
 
 type Lanc = {
@@ -63,7 +77,9 @@ export function ConciliacaoBancaria() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("extratos_bancarios")
-        .select("id, conta, banco, data_movimento, descricao, valor, tipo, conciliado, lancamento_id")
+        .select(
+          "id, conta, banco, data_movimento, descricao, valor, tipo, conciliado, lancamento_id, conta_id",
+        )
         .order("data_movimento", { ascending: false })
         .limit(500);
       if (error) throw error;
