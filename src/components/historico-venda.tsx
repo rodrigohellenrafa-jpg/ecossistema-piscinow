@@ -378,111 +378,125 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       <CardContent className="space-y-6">
         <div className="space-y-3">
           <div>
-            <p className="font-medium">Custo multipartido dos produtos</p>
+            <p className="font-medium">Multipartido da venda</p>
             <p className="text-sm text-muted-foreground">
-              Cada produto aparece em duas linhas: o nome e, abaixo, o valor cadastrado de custo —
-              corrija para confrontar com o valor real da venda.
+              Produto · venda recebida · (−) custo · (=) total acumulado. Digite o custo de cada
+              linha e clique fora (ou Enter) para salvar — o lucro é recalculado na hora.
             </p>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Produto / custo cadastrado</TableHead>
-                  <TableHead className="text-right">Qtde</TableHead>
-                  <TableHead className="text-right">Venda</TableHead>
-                  <TableHead className="text-right">Total custo</TableHead>
-                  <TableHead className="w-12" />
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Venda rec.</TableHead>
+                  <TableHead className="text-right">(−) Custo</TableHead>
+                  <TableHead className="text-right">(=) Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">Recebido</TableCell>
+                  <TableCell className="text-right font-medium">{brl(totalRecebido)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
+                  <TableCell className="text-right font-medium">{brl(totalRecebido)}</TableCell>
+                </TableRow>
                 {itens.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                       Nenhum produto registrado nesta venda.
                     </TableCell>
                   </TableRow>
                 )}
                 {itens.map((item) => {
-                  const valor = custosEditados[item.id] ?? String(item.custo_unitario ?? 0);
                   const qtd = Number(item.quantidade ?? 0);
-                  const venda = Number(item.preco_unitario ?? 0) * qtd;
-                  const custo = num(valor) * qtd;
+                  const valorPadrao = String(num(String(item.custo_unitario ?? 0)) * qtd);
+                  const valor = custosEditados[item.id] ?? valorPadrao;
                   return (
-                    <Fragment key={item.id}>
-                      <TableRow>
-                        <TableCell className="font-medium">{item.descricao}</TableCell>
-                        <TableCell className="text-right">{qtd}</TableCell>
-                        <TableCell className="text-right">{brl(venda)}</TableCell>
-                        <TableCell className="text-right">{brl(custo)}</TableCell>
-                        <TableCell />
-                      </TableRow>
-                      <TableRow className="border-b">
-                        <TableCell colSpan={3}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
-                              Valor cadastrado (unitário)
-                            </span>
-                            <Input
-                              className="h-8 w-36"
-                              inputMode="decimal"
-                              value={valor}
-                              onChange={(e) =>
-                                setCustosEditados((atual) => ({
-                                  ...atual,
-                                  [item.id]: e.target.value,
-                                }))
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter")
-                                  salvarCustoItem.mutate({ itemId: item.id, valor });
-                              }}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          Lucro {brl(venda - custo)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            aria-label={`Salvar valor cadastrado de ${item.descricao}`}
-                            title="Salvar valor cadastrado"
-                            disabled={
-                              salvarCustoItem.isPending || custosEditados[item.id] === undefined
-                            }
-                            onClick={() => salvarCustoItem.mutate({ itemId: item.id, valor })}
-                          >
-                            <Save className="size-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    </Fragment>
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.descricao}</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right">
+                        <Input
+                          className="ml-auto h-8 w-28 text-right"
+                          inputMode="decimal"
+                          aria-label={`Custo de ${item.descricao}`}
+                          value={valor}
+                          onChange={(e) =>
+                            setCustosEditados((atual) => ({
+                              ...atual,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          onBlur={() => {
+                            if (custosEditados[item.id] !== undefined)
+                              salvarLinha(item.id, custosEditados[item.id]);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") salvarLinha(item.id, valor);
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {brl(saldoDe[item.id] ?? 0)}
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
+                {extrasLinhas.map((ex) => {
+                  const valor = extrasEditados[ex.campo] ?? ex.padrao;
+                  return (
+                    <TableRow key={ex.campo}>
+                      <TableCell className="font-medium">{ex.label}</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right">
+                        <Input
+                          className="ml-auto h-8 w-28 text-right"
+                          inputMode="decimal"
+                          aria-label={`Custo de ${ex.label}`}
+                          value={valor}
+                          onChange={(e) =>
+                            setExtrasEditados((atual) => ({
+                              ...atual,
+                              [ex.campo]: e.target.value,
+                            }))
+                          }
+                          onBlur={() => {
+                            if (extrasEditados[ex.campo] !== undefined)
+                              salvarLinha(ex.campo, extrasEditados[ex.campo]);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") salvarLinha(ex.campo, valor);
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {brl(saldoDe[ex.campo] ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                <TableRow className="border-t-2 font-semibold">
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right">{brl(totalRecebido)}</TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {brl(custoTotalGeral)}
+                  </TableCell>
+                  <TableCell className="text-right">{brl(lucroMultipartido)}</TableCell>
+                </TableRow>
+                <TableRow className="font-semibold">
+                  <TableCell>(%)</TableCell>
+                  <TableCell />
+                  <TableCell />
+                  <TableCell className="text-right">
+                    {margemMultipartido.toFixed(1)}%
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
-          {itens.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Valor real da venda</p>
-                <p className="text-lg font-semibold">{brl(totalVendaItens)}</p>
-              </div>
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Custo cadastrado</p>
-                <p className="text-lg font-semibold text-destructive">{brl(totalCustoItens)}</p>
-              </div>
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Lucro</p>
-                <p className="text-lg font-semibold text-success">
-                  {brl(totalVendaItens - totalCustoItens)}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
+
 
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
