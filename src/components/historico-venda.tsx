@@ -150,6 +150,19 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     },
   });
 
+  const { data: venda } = useQuery({
+    queryKey: ["historico-venda-dados", vendaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("id, valor_frete, valor_mao_obra, valor_impostos")
+        .eq("id", vendaId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
 
   const salvar = useMutation({
     mutationFn: async () => {
