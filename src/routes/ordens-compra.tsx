@@ -1549,7 +1549,31 @@ function OrdensCompra() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {(() => {
+                          const demanda = demandaPorProduto.get(produto.id);
+                          if (!demanda || demanda.pedidos.length === 0) return null;
+                          const vinculado = vinculosCompra[produto.id];
+                          if (vinculado) return null;
+                          return (
+                            <div className="mt-1 w-48 text-xs text-muted-foreground">
+                              <p className="font-medium">
+                                Demanda: {demanda.total} un. em {demanda.pedidos.length} pedido(s)
+                              </p>
+                              <ul className="space-y-0.5">
+                                {demanda.pedidos.slice(0, 4).map((p) => (
+                                  <li key={p.id} className="truncate">
+                                    {p.rotulo} · {p.quantidade} un.
+                                  </li>
+                                ))}
+                                {demanda.pedidos.length > 4 && (
+                                  <li>+{demanda.pedidos.length - 4} outro(s)</li>
+                                )}
+                              </ul>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
+
                       <TableCell>
                         <Select
                           value={statusCompra[produto.id] ?? produto.status_compra ?? "a_comprar"}
