@@ -1874,7 +1874,21 @@ function OrdensCompra() {
                         : "0%"}
                     </TableCell>
                     <TableCell className="text-right font-semibold">{brl(Number(item.total))}</TableCell>
-                    <TableCell>{venda ? `${venda.numero ?? "Pedido"} — ${item.cliente_nome ?? venda.cliente_nome ?? "Cliente"}` : "Estoque"}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        if (venda)
+                          return `${venda.numero ?? "Pedido"} — ${item.cliente_nome ?? venda.cliente_nome ?? "Cliente"}`;
+                        const vinculoProduto = produto?.venda_vinculo_id
+                          ? vendaPorId.get(produto.venda_vinculo_id)
+                          : undefined;
+                        if (vinculoProduto)
+                          return `${vinculoProduto.numero ?? "Pedido"} — ${vinculoProduto.cliente_nome ?? "Cliente"}`;
+                        const pedidos = produto ? demandaPorProduto.get(produto.id)?.pedidos : undefined;
+                        if (pedidos && pedidos.length > 0)
+                          return pedidos.map((p) => p.rotulo).join(" · ");
+                        return "Estoque";
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <Select
                         value={ordem.status}
