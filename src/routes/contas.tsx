@@ -55,6 +55,10 @@ import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/contas")({
   staticData: { sitemap: false },
+  validateSearch: (s: Record<string, unknown>) => ({
+    periodo: typeof s.periodo === "string" ? s.periodo : undefined,
+    tipo: s.tipo === "pagar" || s.tipo === "receber" ? (s.tipo as "pagar" | "receber") : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Contas a Pagar e Receber | Piscinow ERP" },
