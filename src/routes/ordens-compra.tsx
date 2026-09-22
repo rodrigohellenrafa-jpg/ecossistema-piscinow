@@ -180,6 +180,7 @@ type Produto = {
   quantidade_compra: number;
   desconto_compra: number;
   status_compra: string;
+  venda_vinculo_id: string | null;
 };
 
 const STATUS_COMPRA = [
@@ -283,7 +284,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra, venda_vinculo_id")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
