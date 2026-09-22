@@ -476,9 +476,12 @@ function OrdensCompra() {
       toast.success("Pagamento excluído");
       qc.invalidateQueries({ queryKey: ["ordem_compra_pagamentos"] });
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
 
 
