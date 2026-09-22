@@ -240,21 +240,78 @@ export function ConciliacaoBancaria() {
   const pendentes = daConta.filter((m) => !m.conciliado);
   const conciliados = daConta.filter((m) => m.conciliado).slice(0, 30);
 
-  /** Lançamentos ainda livres que podem casar com um movimento do extrato. */
-  const sugestoes = (m: Extrato) => {
+  /** Ids já amarrados a algum movimento do extrato, para não conciliar duas vezes. */
+  const jaUsados = useMemo(() => {
+    const usados = new Set<string>();
+    for (const m of extrato) {
+      if (m.lancamento_id) usados.add(m.lancamento_id);
+      if (m.conta_id) usados.add(m.conta_id);
+    }
+    return usados;
+  }, [extrato]);
+
+  /** Lançamentos e títulos ainda livres que podem casar com um movimento do extrato. */
+  const sugestoes = (m: Extrato, ignorar: Set<string> = new Set()): Candidato[] => {
     const alvo = Number(m.valor ?? 0);
-    const esperado = m.tipo === "entrada" ? "receita" : "despesa";
-    return lancamentos
+    const entrada = m.tipo === "entrada";
+    const esperado = entrada ? "receita" : "despesa";
+    const deLancamentos: Candidato[] = lancamentos
       .filter((l) => !l.conciliado && l.status !== "Cancelado" && l.tipo_fluxo === esperado)
+      .filter((l) => !jaUsados.has(l.id) && !ignorar.has(l.id))
       .filter((l) => Math.abs(Number(l.valor ?? 0) - alvo) <= 0.02)
       .filter((l) => dias(l.data_pagamento ?? l.data_competencia, m.data_movimento) <= 7)
-      .sort(
-        (a, b) =>
-          dias(a.data_pagamento ?? a.data_competencia, m.data_movimento) -
-          dias(b.data_pagamento ?? b.data_competencia, m.data_movimento),
+      .map((l) => ({
+        origem: "lancamento" as const,
+        id: l.id,
+        descricao: l.descricao,
+        categoria: l.categoria,
+        data: l.data_pagamento ?? l.data_competencia,
+      }));
+    const deTitulos: Candidato[] = titulos
+      .filter((t) => (entrada ? t.tipo === "receber" : t.tipo !== "receber"))
+      .filter((t) => !jaUsados.has(t.id) && !ignorar.has(t.id))
+      .filter(
+        (t) => Math.abs(Number(t.valor_pago ?? t.valor ?? 0) - alvo) <= 0.02,
       )
+      .filter((t) => dias(t.data_pagamento ?? t.vencimento, m.data_movimento) <= 7)
+      .map((t) => ({
+        origem: "titulo" as const,
+        id: t.id,
+        descricao: t.descricao,
+        categoria: t.categoria,
+        data: t.data_pagamento ?? t.vencimento,
+      }));
+    return [...deLancamentos, ...deTitulos]
+      .sort((a, b) => dias(a.data, m.data_movimento) - dias(b.data, m.data_movimento))
       .slice(0, 3);
   };
+
+  /** Concilia sozinho todos os movimentos com uma única correspondência clara. */
+  const conciliarAutomatico = useMutation({
+    mutationFn: async () => {
+      const usados = new Set<string>();
+      let feitos = 0;
+      for (const mov of pendentes) {
+        const candidatos = sugestoes(mov, usados);
+        if (candidatos.length !== 1) continue;
+        const alvo = candidatos[0]!;
+        await casar(mov, alvo);
+        usados.add(alvo.id);
+        feitos += 1;
+      }
+      return { feitos, restantes: pendentes.length - feitos };
+    },
+    onSuccess: ({ feitos, restantes }) => {
+      invalidar();
+      if (feitos === 0)
+        toast.info("Nenhuma correspondência única encontrada para conciliar sozinho.");
+      else
+        toast.success(
+          `${feitos} movimento(s) conciliado(s) automaticamente. ${restantes} aguardando conferência.`,
+        );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const somaPendentes = pendentes.reduce(
     (s, m) => s + (m.tipo === "entrada" ? Number(m.valor ?? 0) : -Number(m.valor ?? 0)),
