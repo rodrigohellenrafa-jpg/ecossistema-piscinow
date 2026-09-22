@@ -248,7 +248,8 @@ function Dre() {
     { label: "(-) CMV e Custos de Obra", valor: -linha.cmv, sinal: "-" },
     { label: "(=) Lucro Bruto", valor: linha.lucroBruto, sinal: "=", destaque: true },
     { label: "(-) Despesas Fixas e Administrativas", valor: -linha.despesasFixas, sinal: "-" },
-    { label: "   Taxas / retenções financeiras", valor: -linha.taxasFinanceiras, sinal: "-" },
+    { label: "   Taxas de máquina / financeira", valor: -linha.taxasMaquina, sinal: "-" },
+    { label: "   Retenção por inadimplência (contratos antigos)", valor: -linha.inadimplencia, sinal: "-" },
     { label: "(-) Folha de Pagamento", valor: -linha.folha, sinal: "-" },
     { label: "(=) Resultado Líquido Operacional", valor: linha.resultado, sinal: "=", destaque: true },
   ];
