@@ -40,6 +40,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { validarSenhaMestra } from "@/lib/mestre.functions";
 import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 
+/** Data em que o controle passou a valer; pedidos anteriores são só histórico. */
+const INICIO_CONTROLE = "2026-09-04";
+
 const TIPOS_ATENDIMENTO = [
   { value: "in", label: "IN · Balcão" },
   { value: "out", label: "OUT · Serviço externo" },
@@ -273,13 +276,28 @@ function Vendas() {
     [vendas, q],
   );
 
-  const faturamento = pedidos.reduce((s, v) => s + Number(v.valor_total), 0);
-  const ticketMedio = pedidos.length ? faturamento / pedidos.length : 0;
-  const custoTotal = pedidos.reduce((s, v) => s + Number(v.custo_total), 0);
+  /** Pedidos anteriores ao início do controle ficam só como histórico. */
+  const pedidosAtuais = useMemo(
+    () => pedidos.filter((v) => String(v.data).slice(0, 10) >= INICIO_CONTROLE),
+    [pedidos],
+  );
+  const pedidosHistoricos = useMemo(
+    () => pedidos.filter((v) => String(v.data).slice(0, 10) < INICIO_CONTROLE),
+    [pedidos],
+  );
+
+  const faturamento = pedidosAtuais.reduce((s, v) => s + Number(v.valor_total), 0);
+  const ticketMedio = pedidosAtuais.length ? faturamento / pedidosAtuais.length : 0;
+  const custoTotal = pedidosAtuais.reduce((s, v) => s + Number(v.custo_total), 0);
   const margemMedia = margem(faturamento, custoTotal);
-  const emAberto = pedidos.filter((v) =>
+  const emAberto = pedidosAtuais.filter((v) =>
     ["aprovado", "em_producao"].includes(v.status_pedido),
   ).length;
+
+  const faturamentoHistorico = pedidosHistoricos.reduce(
+    (s, v) => s + Number(v.valor_total),
+    0,
+  );
 
   const totalOrcado = orcamentos.reduce((s, v) => s + Number(v.valor_total), 0);
   const ticketOrcamento = orcamentos.length ? totalOrcado / orcamentos.length : 0;
@@ -342,6 +360,26 @@ function Vendas() {
             />
             <Kpi label="Pedidos em aberto" value={String(emAberto)} to="/logistica" />
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            Os indicadores acima consideram pedidos a partir de {dataBR(INICIO_CONTROLE)}.
+          </p>
+
+          {pedidosHistoricos.length > 0 && (
+            <Card>
+              <CardHeader className="gap-1">
+                <CardTitle className="text-base">
+                  Histórico anterior a {dataBR(INICIO_CONTROLE)} (só informação)
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {pedidosHistoricos.length} pedido(s) somando {brl(faturamentoHistorico)}. Fazem
+                  parte do faturamento do mês de origem e não entram nos números acima nem no caixa
+                  atual.
+                </p>
+              </CardHeader>
+            </Card>
+          )}
+
 
           <Card>
             <CardHeader className="gap-3">
