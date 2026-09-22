@@ -239,8 +239,6 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     mutationFn: async ({ campo, valor }: { campo: "frete" | "mao_obra" | "imposto"; valor: string }) => {
       const v = num(valor);
       if (v < 0) throw new Error("O valor não pode ser negativo.");
-      const coluna =
-        campo === "frete" ? "valor_frete" : campo === "mao_obra" ? "valor_mao_obra" : "valor_impostos";
       const atualizacao =
         campo === "frete"
           ? { valor_frete: v }
