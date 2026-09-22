@@ -208,6 +208,8 @@ function Dre() {
       lucroBruto,
       despesasFixas,
       taxasFinanceiras,
+      taxasMaquina,
+      inadimplencia,
       categorias,
       folha,
       resultado,
