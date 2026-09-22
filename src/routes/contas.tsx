@@ -1266,7 +1266,7 @@ function Contas() {
         </div>
       </div>
 
-      <Tabs defaultValue="pagar">
+      <Tabs value={aba} onValueChange={(v) => setAba(v as "pagar" | "receber")}>
         <TabsList>
           <TabsTrigger value="pagar">A pagar ({pagar.length})</TabsTrigger>
           <TabsTrigger value="receber">A receber ({receber.length})</TabsTrigger>
