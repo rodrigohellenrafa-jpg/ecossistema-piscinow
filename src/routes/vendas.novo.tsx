@@ -1194,11 +1194,30 @@ function NovoPedido() {
                       <SelectValue placeholder="Selecione o cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {clientes.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nome}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        <SelectLabel>Clientes</SelectLabel>
+                        {clientes.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Fornecedores</SelectLabel>
+                        {fornecedores.map((f) => (
+                          <SelectItem key={f.id} value={`for:${f.id}`}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Funcionários</SelectLabel>
+                        {vendedores.map((f) => (
+                          <SelectItem key={f.id} value={`fun:${f.id}`}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <ClienteRapidoDialog
