@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.sincronizar_saldo_pagamento_compra() FROM PUBLIC, anon, authenticated;
