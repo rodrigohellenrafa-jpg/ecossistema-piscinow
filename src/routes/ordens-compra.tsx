@@ -352,6 +352,30 @@ function OrdensCompra() {
     },
   });
 
+  /** Pagamentos registrados para a ordem aberta. */
+  const { data: pagamentosOrdem = [] } = useQuery({
+    queryKey: ["ordem_compra_pagamentos", detalheId],
+    enabled: !!detalheId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordem_compra_pagamentos")
+        .select("*")
+        .eq("ordem_id", detalheId!)
+        .order("data_pagamento");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: contasBancarias = [] } = useQuery({
+    queryKey: ["saldos_bancarios", "contas-ordens"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("saldos_bancarios").select("conta").order("conta");
+      if (error) throw error;
+      return Array.from(new Set((data ?? []).map((c) => c.conta))).filter(Boolean);
+    },
+  });
+
   /** Todos os itens das ordens listadas, para agrupar produtos por fornecedor. */
   const { data: itensTodos = [] } = useQuery({
     queryKey: ["ordem_compra_itens", "todos"],
