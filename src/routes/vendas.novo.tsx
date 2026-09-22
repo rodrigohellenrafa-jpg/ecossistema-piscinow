@@ -34,7 +34,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -223,6 +225,19 @@ function NovoPedido() {
       const { data, error } = await supabase
         .from("clientes")
         .select("id, nome, documento, logradouro, numero, bairro, cidade, estado, cep, endereco_obra")
+        .order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: fornecedores = [] } = useQuery({
+    queryKey: ["fornecedores-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data;
@@ -606,18 +621,35 @@ function NovoPedido() {
       ? Array.from(new Set(condicoes.map((c) => c.forma_pagamento))).join(" + ")
       : FORMAS_PAGAMENTO[0];
 
+  // Cliente do pedido pode ser um cliente cadastrado, um fornecedor ou um
+  // funcionário (valores "for:<id>" / "fun:<id>" no seletor). Só clientes
+  // cadastrados preenchem o vínculo cliente_id; os demais gravam só o nome.
+  const selecaoCliente = useMemo(() => {
+    if (clienteId.startsWith("for:")) {
+      const id = clienteId.slice(4);
+      const f = fornecedores.find((x) => x.id === id);
+      return { id: null as string | null, nome: f?.nome ?? null };
+    }
+    if (clienteId.startsWith("fun:")) {
+      const id = clienteId.slice(4);
+      const f = vendedores.find((x) => x.id === id);
+      return { id: null as string | null, nome: f?.nome ?? null };
+    }
+    const c = clientes.find((x) => x.id === clienteId);
+    return { id: clienteId || null, nome: c?.nome ?? null };
+  }, [clienteId, clientes, fornecedores, vendedores]);
+
   // ----- Rascunho salvo no banco como orçamento não concluído -----
   useEffect(() => {
     if (!rascunhoPronto) return;
     if (!clienteId && itens.length === 0) return;
     const timer = setTimeout(async () => {
       try {
-        const cliente = clientes.find((c) => c.id === clienteId);
         const cabecalho = {
           numero,
           data,
-          cliente_id: clienteId || null,
-          cliente_nome: cliente?.nome ?? null,
+          cliente_id: selecaoCliente.id,
+          cliente_nome: selecaoCliente.nome,
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
           status_pedido: "orcamento",
@@ -809,7 +841,7 @@ function NovoPedido() {
       if (!clienteId) throw new Error("Selecione o cliente.");
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
-      const cliente = clientes.find((c) => c.id === clienteId);
+      const cliente = { id: selecaoCliente.id, nome: selecaoCliente.nome };
       const vendedor =
         vendedores.find((v) => v.id === vendedorId) ??
         vendedores.find((v) => v.id === user?.id) ??
@@ -844,8 +876,8 @@ function NovoPedido() {
         .insert({
           numero: numeroFinal,
           data,
-          cliente_id: clienteId,
-          cliente_nome: cliente?.nome ?? null,
+          cliente_id: selecaoCliente.id,
+          cliente_nome: selecaoCliente.nome,
           vendedor: vendedor?.nome ?? null,
           // O vendedor vem dos usuários do sistema (auth), não do cadastro de funcionários.
           vendedor_id: null,
@@ -1024,8 +1056,8 @@ function NovoPedido() {
           const { error: erroConta } = await supabase.from("contas").insert({
             tipo: "receber",
             descricao: `Pedido ${numeroFinal} — saldo a receber`,
-            parceiro: cliente?.nome ?? null,
-            cliente_id: clienteId,
+            parceiro: selecaoCliente.nome,
+            cliente_id: selecaoCliente.id,
             venda_id: venda.id,
             categoria: "Vendas",
             valor: semCobertura,
@@ -1162,11 +1194,30 @@ function NovoPedido() {
                       <SelectValue placeholder="Selecione o cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      {clientes.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nome}
-                        </SelectItem>
-                      ))}
+                      <SelectGroup>
+                        <SelectLabel>Clientes</SelectLabel>
+                        {clientes.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Fornecedores</SelectLabel>
+                        {fornecedores.map((f) => (
+                          <SelectItem key={f.id} value={`for:${f.id}`}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Funcionários</SelectLabel>
+                        {vendedores.map((f) => (
+                          <SelectItem key={f.id} value={`fun:${f.id}`}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <ClienteRapidoDialog
