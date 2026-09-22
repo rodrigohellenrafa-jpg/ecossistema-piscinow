@@ -231,6 +231,7 @@ function OrdensCompra() {
   });
   const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
   const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
+  const [selecionadosExecutados, setSelecionadosExecutados] = useState<Record<string, boolean>>({});
   const [usarCreditoFabricante, setUsarCreditoFabricante] = useState(false);
   const [creditoFabricante, setCreditoFabricante] = useState("");
   const [creditoDisponivelInput, setCreditoDisponivelInput] = useState<string | null>(null);
@@ -550,12 +551,18 @@ function OrdensCompra() {
   const saldoCredito = creditoDisponivelValor - creditoCreditar;
   const totalAPagarCompra = Math.max(totalSelecionadoCompra - creditoAplicado, 0);
 
+  const itensExecutadosSelecionados = linhasExecutadas.filter(({ item }) => selecionadosExecutados[item.id]);
   const todosProdutosSelecionados =
-    produtosFiltrados.length > 0 && produtosFiltrados.every((p) => selecionadosCompra[p.id]);
+    (produtosFiltrados.length > 0 || linhasExecutadas.length > 0) &&
+    produtosFiltrados.every((p) => selecionadosCompra[p.id]) &&
+    linhasExecutadas.every(({ item }) => selecionadosExecutados[item.id]);
 
   const marcarTodosProdutos = (marcado: boolean) => {
     setSelecionadosCompra(
       marcado ? Object.fromEntries(produtosFiltrados.map((produto) => [produto.id, true])) : {},
+    );
+    setSelecionadosExecutados(
+      marcado ? Object.fromEntries(linhasExecutadas.map(({ item }) => [item.id, true])) : {},
     );
   };
 
