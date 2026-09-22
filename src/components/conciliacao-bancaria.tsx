@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Link2, Link2Off, PlusCircle, SkipForward } from "lucide-react";
+import { Check, Link2, Link2Off, PlusCircle, SkipForward, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ExtratoImportar } from "@/components/extrato-importar";
@@ -366,6 +366,14 @@ export function ConciliacaoBancaria() {
                       {brl(somaPendentes)}
                     </strong>
                   </span>
+                  <Button
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => conciliarAutomatico.mutate()}
+                    disabled={conciliarAutomatico.isPending || pendentes.length === 0}
+                  >
+                    <Wand2 /> Conciliar automaticamente
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
