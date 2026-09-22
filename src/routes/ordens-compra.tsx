@@ -423,6 +423,8 @@ function OrdensCompra() {
       if (!detalheId) throw new Error("Ordem não encontrada");
       const valor = Number(novoPagamento.valor);
       if (!Number.isFinite(valor) || valor === 0) throw new Error("Informe o valor do pagamento");
+      if (!novoPagamento.conta_bancaria)
+        throw new Error("Escolha a conta de onde o dinheiro saiu");
       const payload = {
         ordem_id: detalheId,
         data_pagamento: novoPagamento.data_pagamento || hojeISO(),
