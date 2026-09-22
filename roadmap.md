@@ -10,3 +10,5 @@
 - [x] Separar taxa/retenção financeira do valor recebido e do total da venda
 - [x] Renomear o resumo de custos do extrato para Recebido
 - [x] Mostrar produtos em duas linhas no histórico e permitir corrigir o valor cadastrado para recalcular o lucro
+- [x] Integrar pagamentos realizados com movimentações e saldo da conta selecionada
+- [x] Impedir novas entradas e saídas realizadas sem conta bancária escolhida

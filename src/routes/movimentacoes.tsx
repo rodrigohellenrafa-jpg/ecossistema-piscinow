@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownCircle, ArrowUpCircle, Search } from "lucide-react";
 
 import { Kpi, PageHeader } from "@/components/page-header";
@@ -68,6 +68,7 @@ type Linha = {
 };
 
 export function Movimentacoes() {
+  const qc = useQueryClient();
   const [busca, setBusca] = useState("");
   const [sentido, setSentido] = useState("todos");
   const [situacao, setSituacao] = useState("todos");
@@ -75,6 +76,21 @@ export function Movimentacoes() {
   const [conta, setConta] = useState("todas");
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
+
+  useEffect(() => {
+    const atualizar = () => {
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+    };
+    const canal = supabase
+      .channel("movimentacoes-financeiras")
+      .on("postgres_changes", { event: "*", schema: "public", table: "contas" }, atualizar)
+      .on("postgres_changes", { event: "*", schema: "public", table: "lancamentos_financeiros" }, atualizar)
+      .on("postgres_changes", { event: "*", schema: "public", table: "saldos_bancarios" }, atualizar)
+      .subscribe();
+    return () => { void supabase.removeChannel(canal); };
+  }, [qc]);
 
   const { data: contas = [] } = useQuery({
     queryKey: ["contas"],
