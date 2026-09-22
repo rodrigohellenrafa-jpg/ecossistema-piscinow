@@ -9,3 +9,4 @@
 - [x] Corrigir recebimentos exibidos como débito no histórico da venda
 - [x] Separar taxa/retenção financeira do valor recebido e do total da venda
 - [x] Renomear o resumo de custos do extrato para Recebido
+- [x] Mostrar produtos em duas linhas no histórico e permitir corrigir o valor cadastrado para recalcular o lucro
