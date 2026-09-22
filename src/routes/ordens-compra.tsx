@@ -1737,13 +1737,20 @@ function OrdensCompra() {
                       <TableCell className="text-right font-semibold">{brl(totalCompra(produto))}</TableCell>
                       <TableCell>
                         <Select
-                          value={vinculosCompra[produto.id] ?? SEM_CLIENTE}
-                          onValueChange={(valor) =>
+                          value={vinculosCompra[produto.id] || produto.venda_vinculo_id || SEM_CLIENTE}
+                          onValueChange={(valor) => {
+                            const vinculo = valor === SEM_CLIENTE ? "" : valor;
                             setVinculosCompra((atual) => ({
                               ...atual,
-                              [produto.id]: valor === SEM_CLIENTE ? "" : valor,
-                            }))
-                          }
+                              [produto.id]: vinculo,
+                            }));
+                            salvarAutomaticamente(
+                              produto.id,
+                              "venda_vinculo_id",
+                              vinculo || (null as unknown as string),
+                              true,
+                            );
+                          }}
                         >
                           <SelectTrigger className="w-48">
                             <SelectValue />
@@ -1760,7 +1767,7 @@ function OrdensCompra() {
                         {(() => {
                           const demanda = demandaPorProduto.get(produto.id);
                           if (!demanda || demanda.pedidos.length === 0) return null;
-                          const vinculado = vinculosCompra[produto.id];
+                          const vinculado = vinculosCompra[produto.id] || produto.venda_vinculo_id;
                           if (vinculado) return null;
                           return (
                             <div className="mt-1 w-48 text-xs text-muted-foreground">
