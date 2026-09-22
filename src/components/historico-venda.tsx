@@ -234,6 +234,28 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const salvarExtra = useMutation({
+    mutationFn: async ({ campo, valor }: { campo: "frete" | "mao_obra" | "imposto"; valor: string }) => {
+      const v = num(valor);
+      if (v < 0) throw new Error("O valor não pode ser negativo.");
+      const coluna =
+        campo === "frete" ? "valor_frete" : campo === "mao_obra" ? "valor_mao_obra" : "valor_impostos";
+      const { error } = await supabase.from("vendas").update({ [coluna]: v }).eq("id", vendaId);
+      if (error) throw error;
+    },
+    onSuccess: (_, variaveis) => {
+      toast.success("Valor atualizado. O lucro foi recalculado.");
+      setExtrasEditados((atual) => {
+        const proximo = { ...atual };
+        delete proximo[variaveis.campo];
+        return proximo;
+      });
+      qc.invalidateQueries({ queryKey: ["historico-venda-dados", vendaId] });
+      qc.invalidateQueries({ queryKey: ["venda", vendaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filtrados = useMemo(
     () =>
       filtroObra === "todas"
