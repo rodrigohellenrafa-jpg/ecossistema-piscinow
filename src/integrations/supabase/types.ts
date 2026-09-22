@@ -2309,8 +2309,10 @@ export type Database = {
           forma_pagamento: string
           id: string
           observacoes: string | null
+          retencao_financeira: number
           updated_at: string
           valor: number
+          valor_origem: number | null
           venda_id: string
         }
         Insert: {
@@ -2321,8 +2323,10 @@ export type Database = {
           forma_pagamento: string
           id?: string
           observacoes?: string | null
+          retencao_financeira?: number
           updated_at?: string
           valor: number
+          valor_origem?: number | null
           venda_id: string
         }
         Update: {
@@ -2333,8 +2337,10 @@ export type Database = {
           forma_pagamento?: string
           id?: string
           observacoes?: string | null
+          retencao_financeira?: number
           updated_at?: string
           valor?: number
+          valor_origem?: number | null
           venda_id?: string
         }
         Relationships: [
