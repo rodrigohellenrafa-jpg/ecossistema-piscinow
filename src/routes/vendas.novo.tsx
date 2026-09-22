@@ -645,12 +645,11 @@ function NovoPedido() {
     if (!clienteId && itens.length === 0) return;
     const timer = setTimeout(async () => {
       try {
-        const cliente = clientes.find((c) => c.id === clienteId);
         const cabecalho = {
           numero,
           data,
-          cliente_id: clienteId || null,
-          cliente_nome: cliente?.nome ?? null,
+          cliente_id: selecaoCliente.id,
+          cliente_nome: selecaoCliente.nome,
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
           status_pedido: "orcamento",
@@ -842,7 +841,7 @@ function NovoPedido() {
       if (!clienteId) throw new Error("Selecione o cliente.");
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
 
-      const cliente = clientes.find((c) => c.id === clienteId);
+      const cliente = { id: selecaoCliente.id, nome: selecaoCliente.nome };
       const vendedor =
         vendedores.find((v) => v.id === vendedorId) ??
         vendedores.find((v) => v.id === user?.id) ??
