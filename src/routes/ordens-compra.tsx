@@ -404,6 +404,28 @@ function OrdensCompra() {
     return m;
   }, [vendasVinculo]);
 
+  /** Demanda consolidada: quais pedidos consomem cada produto e em que quantidade. */
+  const demandaPorProduto = useMemo(() => {
+    const mapa = new Map<
+      string,
+      { total: number; pedidos: { id: string; rotulo: string; quantidade: number }[] }
+    >();
+    for (const item of consumoItens) {
+      if (!item.produto_id) continue;
+      const atual = mapa.get(item.produto_id) ?? { total: 0, pedidos: [] };
+      const quantidade = Number(item.quantidade ?? 0);
+      const venda = vendaPorId.get(item.venda_id);
+      const rotulo = `${venda?.numero ?? "Pedido"} — ${venda?.cliente_nome ?? "Cliente"}`;
+      const existente = atual.pedidos.find((p) => p.id === item.venda_id);
+      if (existente) existente.quantidade += quantidade;
+      else atual.pedidos.push({ id: item.venda_id, rotulo, quantidade });
+      atual.total += quantidade;
+      mapa.set(item.produto_id, atual);
+    }
+    return mapa;
+  }, [consumoItens, vendaPorId]);
+
+
   const ordensFiltradas = useMemo(() => {
     const busca = normalizar(buscaFornecedor.trim());
     return ordens.filter(
