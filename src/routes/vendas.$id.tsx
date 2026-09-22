@@ -254,13 +254,17 @@ function DetalhePedido() {
     qc.invalidateQueries({ queryKey: ["venda", id] });
     qc.invalidateQueries({ queryKey: ["vendas"] });
     qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
-    qc.invalidateQueries({ queryKey: ["lancamentos"] });
+    qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
+    qc.invalidateQueries({ queryKey: ["contas"] });
+    qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
   };
 
   const adicionarPagamento = useMutation({
     mutationFn: async () => {
       const valor = Number(String(novoPag.valor).replace(",", "."));
       if (!valor || valor <= 0) throw new Error("Informe um valor maior que zero.");
+      if (contasBancarias.length > 0 && !novoPag.conta_bancaria)
+        throw new Error("Escolha a conta onde o dinheiro entrou.");
       const valorOrigem = Number(String(novoPag.valor_origem).replace(",", ".")) || valor;
       const retencaoFinanceira = Math.max(Number((valorOrigem - valor).toFixed(2)), 0);
       const { error } = await supabase.from("venda_pagamentos").insert({
@@ -529,6 +533,8 @@ function DetalhePedido() {
       if (!editPag) return;
       const valor = num(editPag.valor);
       if (valor <= 0) throw new Error("Informe um valor maior que zero.");
+      if (contasBancarias.length > 0 && !editPag.conta_bancaria)
+        throw new Error("Escolha a conta onde o dinheiro entrou.");
       const valorOrigem = num(editPag.valor_origem) || valor;
       const { error } = await supabase
         .from("venda_pagamentos")
@@ -1010,12 +1016,20 @@ function DetalhePedido() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Cartão / conta (ex.: Cartão A)">
-              <Input
+            <Field label="Conta onde entrou">
+              <Select
                 value={novoPag.conta_bancaria}
-                onChange={(e) => setNovoPag({ ...novoPag, conta_bancaria: e.target.value })}
-                placeholder="Cartão A"
-              />
+                onValueChange={(v) => setNovoPag({ ...novoPag, conta_bancaria: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contasBancarias.map((conta) => (
+                    <SelectItem key={conta} value={conta}>{conta}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Valor (R$)">
               <Input
@@ -1065,7 +1079,7 @@ function DetalhePedido() {
               <TableRow>
                 <TableHead>Data</TableHead>
                 <TableHead>Forma</TableHead>
-                <TableHead>Cartão / conta</TableHead>
+                <TableHead>Conta de entrada</TableHead>
                 <TableHead>Observações</TableHead>
                 <TableHead className="text-right">Origem</TableHead>
                 <TableHead className="text-right">Retenção</TableHead>
@@ -1643,11 +1657,20 @@ function DetalhePedido() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Cartão / conta">
-                <Input
+              <Field label="Conta onde entrou">
+                <Select
                   value={editPag.conta_bancaria}
-                  onChange={(e) => setEditPag({ ...editPag, conta_bancaria: e.target.value })}
-                />
+                  onValueChange={(v) => setEditPag({ ...editPag, conta_bancaria: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contasBancarias.map((conta) => (
+                      <SelectItem key={conta} value={conta}>{conta}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
               <Field label="Valor (R$)">
                 <Input

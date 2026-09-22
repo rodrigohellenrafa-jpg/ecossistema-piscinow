@@ -460,6 +460,8 @@ function OrdensCompra() {
       });
       qc.invalidateQueries({ queryKey: ["ordem_compra_pagamentos"] });
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
     },
@@ -476,6 +478,8 @@ function OrdensCompra() {
       toast.success("Pagamento excluído");
       qc.invalidateQueries({ queryKey: ["ordem_compra_pagamentos"] });
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
     },

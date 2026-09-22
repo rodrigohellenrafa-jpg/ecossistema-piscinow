@@ -269,6 +269,8 @@ function Financeiro() {
     mutationFn: async () => {
       if (!form.descricao.trim()) throw new Error("Informe a descrição.");
       if (!ratear && !form.categoria.trim()) throw new Error("Informe a categoria.");
+      if (form.status === "Pago" && contasBancarias.length > 0 && !form.conta_bancaria)
+        throw new Error("Escolha a conta onde o dinheiro entrou ou saiu.");
 
       const linhas = rateio
         .map((r) => ({ categoria: r.categoria.trim(), valor: Number(r.valor) || 0 }))
