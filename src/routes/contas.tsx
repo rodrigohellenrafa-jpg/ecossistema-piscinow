@@ -202,7 +202,9 @@ function Contas() {
   const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
-  const [periodo, setPeriodo] = useState("todas");
+  const busca = Route.useSearch();
+  const [periodo, setPeriodo] = useState(busca.periodo ?? "todas");
+  const [aba, setAba] = useState<"pagar" | "receber">(busca.tipo ?? "pagar");
   const [baixando, setBaixando] = useState<Conta | null>(null);
 
   const { data = [] } = useQuery({
