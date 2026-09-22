@@ -3,11 +3,10 @@
  *
  * Gatilho: venda confirmada em /vendas/novo.
  * 1) Financeiro: entrada vira título recebido e o saldo vira parcelas a receber.
- * 2) Estoque: item com saldo -> baixa; item sem saldo -> ordem de compra
- *    automática no fornecedor padrão, marcada como "sob encomenda".
+ * 2) Estoque: item com saldo -> baixa; item sem saldo -> fica como demanda
+ *    na tela de Ordem de compra (nenhuma O.C. é criada automaticamente).
  */
 import { supabase } from "@/integrations/supabase/client";
-import { proximoCodigo } from "@/lib/erp";
 
 export interface ItemVenda {
   produto_id: string | null;
