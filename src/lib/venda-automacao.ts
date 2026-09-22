@@ -3,11 +3,10 @@
  *
  * Gatilho: venda confirmada em /vendas/novo.
  * 1) Financeiro: entrada vira título recebido e o saldo vira parcelas a receber.
- * 2) Estoque: item com saldo -> baixa; item sem saldo -> ordem de compra
- *    automática no fornecedor padrão, marcada como "sob encomenda".
+ * 2) Estoque: item com saldo -> baixa; item sem saldo -> fica como demanda
+ *    na tela de Ordem de compra (nenhuma O.C. é criada automaticamente).
  */
 import { supabase } from "@/integrations/supabase/client";
-import { proximoCodigo } from "@/lib/erp";
 
 export interface ItemVenda {
   produto_id: string | null;
@@ -133,71 +132,8 @@ export async function rotearEstoque(
     if (error) throw error;
   }
 
-  if (faltas.length === 0) return resultado;
-
-  // Agrupa as faltas pelo fornecedor padrão de cada produto.
-  const porFornecedor = new Map<string, { item: ItemVenda; falta: number }[]>();
-  for (const f of faltas) {
-    const p = produtos?.find((x) => x.id === f.item.produto_id);
-    const chave = p?.fornecedor_id ?? "sem-fornecedor";
-    porFornecedor.set(chave, [...(porFornecedor.get(chave) ?? []), f]);
-  }
-
-  const [{ data: numerosOC }, { data: fornecedores }] = await Promise.all([
-    supabase.from("ordens_compra").select("numero"),
-    supabase.from("fornecedores").select("id, nome"),
-  ]);
-  const existentes = (numerosOC ?? []).map((o) => o.numero);
-
-  for (const [fornecedorId, lista] of porFornecedor) {
-    const numeroFinal = proximoCodigo("OC", existentes);
-    existentes.push(numeroFinal);
-    const fornecedor = (fornecedores ?? []).find((f) => f.id === fornecedorId);
-
-    const linhas = lista.map((f) => {
-      const p = produtos?.find((x) => x.id === f.item.produto_id);
-      const unit = Number(p?.preco_custo ?? f.item.custo_unitario ?? 0);
-      return {
-        produto_id: f.item.produto_id,
-        codigo: p?.codigo ?? f.item.sku ?? null,
-        descricao: f.item.descricao,
-        ncm: p?.ncm ?? null,
-        cst: p?.cst ?? null,
-        unidade: p?.unidade ?? "UN",
-        quantidade: f.falta,
-        valor_unitario: unit,
-        desconto: 0,
-        total: unit * f.falta,
-        cliente_id: ctx.clienteId || null,
-        cliente_nome: ctx.clienteNome,
-      };
-    });
-    const total = linhas.reduce((s, l) => s + l.total, 0);
-
-    const { data: ordem, error: erroOC } = await supabase
-      .from("ordens_compra")
-      .insert({
-        numero: numeroFinal,
-        fornecedor_id: fornecedorId === "sem-fornecedor" ? null : fornecedorId,
-        fornecedor_nome: fornecedor?.nome ?? "Fornecedor a definir",
-        data_pedido: ctx.data,
-        valor_produtos: total,
-        valor_total: total,
-        status: "pendente",
-        observacoes: `Gerada automaticamente pelo pedido ${ctx.numero} (itens sem saldo em estoque).`,
-        created_by: ctx.userId,
-      } as never)
-      .select("id, numero")
-      .single();
-    if (erroOC) throw erroOC;
-
-    const { error: erroItens } = await supabase
-      .from("ordem_compra_itens")
-      .insert(linhas.map((l) => ({ ...l, ordem_id: ordem.id })) as never);
-    if (erroItens) throw erroItens;
-
-    resultado.ordensCriadas.push(ordem.numero ?? numeroFinal);
-  }
-
+  // Itens sem saldo NÃO geram ordem de compra automática.
+  // A falta aparece como demanda em "Ordem de compra", e a O.C. só é criada
+  // quando o usuário seleciona os itens e clica em "Executar ordem".
   return resultado;
 }
