@@ -1813,6 +1813,7 @@ export type Database = {
           unidade: string
           unidades_por_compra: number
           updated_at: string
+          venda_vinculo_id: string | null
         }
         Insert: {
           aliquota_cofins?: number
@@ -1852,6 +1853,7 @@ export type Database = {
           unidade?: string
           unidades_por_compra?: number
           updated_at?: string
+          venda_vinculo_id?: string | null
         }
         Update: {
           aliquota_cofins?: number
@@ -1891,6 +1893,7 @@ export type Database = {
           unidade?: string
           unidades_por_compra?: number
           updated_at?: string
+          venda_vinculo_id?: string | null
         }
         Relationships: [
           {
@@ -1898,6 +1901,13 @@ export type Database = {
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_venda_vinculo_id_fkey"
+            columns: ["venda_vinculo_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
         ]

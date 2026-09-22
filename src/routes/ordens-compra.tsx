@@ -180,6 +180,7 @@ type Produto = {
   quantidade_compra: number;
   desconto_compra: number;
   status_compra: string;
+  venda_vinculo_id: string | null;
 };
 
 const STATUS_COMPRA = [
@@ -283,7 +284,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra, venda_vinculo_id")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
@@ -805,7 +806,12 @@ function OrdensCompra() {
         if (erroOrdem) throw erroOrdem;
 
         const payload = itens.map((produto) => {
-          const vendaId = vinculosCompra[produto.id];
+          const vendaId =
+            vinculosCompra[produto.id] ||
+            produto.venda_vinculo_id ||
+            (demandaPorProduto.get(produto.id)?.pedidos.length === 1
+              ? demandaPorProduto.get(produto.id)!.pedidos[0]!.id
+              : "");
           const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
           const bruto = quantidadeCompra(produto) * valorCompra(produto);
           const desconto = bruto * (percentualCompra(produto) / 100);
@@ -1736,13 +1742,20 @@ function OrdensCompra() {
                       <TableCell className="text-right font-semibold">{brl(totalCompra(produto))}</TableCell>
                       <TableCell>
                         <Select
-                          value={vinculosCompra[produto.id] ?? SEM_CLIENTE}
-                          onValueChange={(valor) =>
+                          value={vinculosCompra[produto.id] || produto.venda_vinculo_id || SEM_CLIENTE}
+                          onValueChange={(valor) => {
+                            const vinculo = valor === SEM_CLIENTE ? "" : valor;
                             setVinculosCompra((atual) => ({
                               ...atual,
-                              [produto.id]: valor === SEM_CLIENTE ? "" : valor,
-                            }))
-                          }
+                              [produto.id]: vinculo,
+                            }));
+                            salvarAutomaticamente(
+                              produto.id,
+                              "venda_vinculo_id",
+                              vinculo || (null as unknown as string),
+                              true,
+                            );
+                          }}
                         >
                           <SelectTrigger className="w-48">
                             <SelectValue />
@@ -1759,7 +1772,7 @@ function OrdensCompra() {
                         {(() => {
                           const demanda = demandaPorProduto.get(produto.id);
                           if (!demanda || demanda.pedidos.length === 0) return null;
-                          const vinculado = vinculosCompra[produto.id];
+                          const vinculado = vinculosCompra[produto.id] || produto.venda_vinculo_id;
                           if (vinculado) return null;
                           return (
                             <div className="mt-1 w-48 text-xs text-muted-foreground">
@@ -1861,7 +1874,21 @@ function OrdensCompra() {
                         : "0%"}
                     </TableCell>
                     <TableCell className="text-right font-semibold">{brl(Number(item.total))}</TableCell>
-                    <TableCell>{venda ? `${venda.numero ?? "Pedido"} — ${item.cliente_nome ?? venda.cliente_nome ?? "Cliente"}` : "Estoque"}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        if (venda)
+                          return `${venda.numero ?? "Pedido"} — ${item.cliente_nome ?? venda.cliente_nome ?? "Cliente"}`;
+                        const vinculoProduto = produto?.venda_vinculo_id
+                          ? vendaPorId.get(produto.venda_vinculo_id)
+                          : undefined;
+                        if (vinculoProduto)
+                          return `${vinculoProduto.numero ?? "Pedido"} — ${vinculoProduto.cliente_nome ?? "Cliente"}`;
+                        const pedidos = produto ? demandaPorProduto.get(produto.id)?.pedidos : undefined;
+                        if (pedidos && pedidos.length > 0)
+                          return pedidos.map((p) => p.rotulo).join(" · ");
+                        return "Estoque";
+                      })()}
+                    </TableCell>
                     <TableCell>
                       <Select
                         value={ordem.status}

@@ -1,0 +1,1 @@
+ALTER TABLE public.produtos ADD COLUMN IF NOT EXISTS venda_vinculo_id uuid REFERENCES public.vendas(id) ON DELETE SET NULL;
