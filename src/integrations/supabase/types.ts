@@ -1515,6 +1515,53 @@ export type Database = {
           },
         ]
       }
+      ordem_compra_pagamentos: {
+        Row: {
+          conta_bancaria: string | null
+          created_at: string
+          created_by: string | null
+          data_pagamento: string
+          forma_pagamento: string
+          id: string
+          observacoes: string | null
+          ordem_id: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          conta_bancaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string
+          forma_pagamento?: string
+          id?: string
+          observacoes?: string | null
+          ordem_id: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          conta_bancaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_pagamento?: string
+          forma_pagamento?: string
+          id?: string
+          observacoes?: string | null
+          ordem_id?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordem_compra_pagamentos_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ordens_compra: {
         Row: {
           condicoes: string | null
