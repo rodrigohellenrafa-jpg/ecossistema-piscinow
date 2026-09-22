@@ -5,9 +5,9 @@
  * ou um evento financeiro (entrada/saída). O extrato mostra saldo acumulado e
  * totais por obra, e permite programar chamados recorrentes ligados ao cliente.
  */
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -110,6 +110,7 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
   const [form, setForm] = useState<FormState>(formVazio);
   const [filtroObra, setFiltroObra] = useState("todas");
   const [custosEditados, setCustosEditados] = useState<Record<string, string>>({});
+  const [extrasEditados, setExtrasEditados] = useState<Record<string, string>>({});
 
   const { data: obras = [] } = useQuery({
     queryKey: ["historico-obras", vendaId, clienteId],
@@ -145,6 +146,19 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
         .from("venda_pagamentos")
         .select("valor, valor_origem, retencao_financeira")
         .eq("venda_id", vendaId);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: venda } = useQuery({
+    queryKey: ["historico-venda-dados", vendaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("id, valor_frete, valor_mao_obra, valor_impostos")
+        .eq("id", vendaId)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -199,12 +213,21 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
   });
 
   const salvarCustoItem = useMutation({
-    mutationFn: async ({ itemId, valor }: { itemId: string; valor: string }) => {
-      const custo = num(valor);
-      if (custo < 0) throw new Error("O valor cadastrado não pode ser negativo.");
+    mutationFn: async ({
+      itemId,
+      valorTotal,
+      qtd,
+    }: {
+      itemId: string;
+      valorTotal: string;
+      qtd: number;
+    }) => {
+      const total = num(valorTotal);
+      if (total < 0) throw new Error("O valor cadastrado não pode ser negativo.");
+      const unitario = qtd > 0 ? total / qtd : 0;
       const { error } = await supabase
         .from("venda_itens")
-        .update({ custo_unitario: custo })
+        .update({ custo_unitario: unitario })
         .eq("id", itemId)
         .eq("venda_id", vendaId);
       if (error) throw error;
@@ -217,6 +240,32 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
         return proximo;
       });
       qc.invalidateQueries({ queryKey: ["venda-itens", vendaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const salvarExtra = useMutation({
+    mutationFn: async ({ campo, valor }: { campo: "frete" | "mao_obra" | "imposto"; valor: string }) => {
+      const v = num(valor);
+      if (v < 0) throw new Error("O valor não pode ser negativo.");
+      const atualizacao =
+        campo === "frete"
+          ? { valor_frete: v }
+          : campo === "mao_obra"
+            ? { valor_mao_obra: v }
+            : { valor_impostos: v };
+      const { error } = await supabase.from("vendas").update(atualizacao).eq("id", vendaId);
+      if (error) throw error;
+    },
+    onSuccess: (_, variaveis) => {
+      toast.success("Valor atualizado. O lucro foi recalculado.");
+      setExtrasEditados((atual) => {
+        const proximo = { ...atual };
+        delete proximo[variaveis.campo];
+        return proximo;
+      });
+      qc.invalidateQueries({ queryKey: ["historico-venda-dados", vendaId] });
+      qc.invalidateQueries({ queryKey: ["venda", vendaId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -253,14 +302,56 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
   );
   /** Recebido = soma do que realmente entrou como pagamento do pedido. */
   const totalRecebido = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
-  const totalVendaItens = itens.reduce(
-    (s, i) => s + Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 0),
-    0,
-  );
-  const totalCustoItens = itens.reduce(
-    (s, i) => s + num(custosEditados[i.id] ?? String(i.custo_unitario ?? 0)) * Number(i.quantidade ?? 0),
-    0,
-  );
+  /** Custo de cada linha do multipartido: produto (unitário × qtde) e extras da venda. */
+  const custoLinhaItem = (item: Props["itens"][number]) =>
+    num(custosEditados[item.id] ?? String(item.custo_unitario ?? 0)) *
+    Number(item.quantidade ?? 0);
+  const custoFrete = num(extrasEditados.frete ?? String(venda?.valor_frete ?? 0));
+  const custoMaoObra = num(extrasEditados.mao_obra ?? String(venda?.valor_mao_obra ?? 0));
+  const custoImposto = num(extrasEditados.imposto ?? String(venda?.valor_impostos ?? 0));
+  const extrasLinhas = [
+    { campo: "frete" as const, label: "Frete", padrao: String(venda?.valor_frete ?? 0) },
+    { campo: "mao_obra" as const, label: "M.O.", padrao: String(venda?.valor_mao_obra ?? 0) },
+    { campo: "imposto" as const, label: "Imposto", padrao: String(venda?.valor_impostos ?? 0) },
+  ];
+
+  /** Linhas com saldo acumulado: Recebido → cada produto → Frete/M.O./Imposto. */
+  const linhas = useMemo(() => {
+    const arr: Array<{ key: string; custo: number; saldo: number }> = [];
+    let saldo = totalRecebido;
+    arr.push({ key: "recebido", custo: 0, saldo });
+    for (const item of itens) {
+      const custo = custoLinhaItem(item);
+      saldo -= custo;
+      arr.push({ key: item.id, custo, saldo });
+    }
+    for (const ex of extrasLinhas) {
+      const custo = num(extrasEditados[ex.campo] ?? ex.padrao);
+      saldo -= custo;
+      arr.push({ key: ex.campo, custo, saldo });
+    }
+    return arr;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itens, totalRecebido, custoFrete, custoMaoObra, custoImposto, custosEditados, extrasEditados, venda]);
+
+  const saldoDe = Object.fromEntries(linhas.map((l) => [l.key, l.saldo]));
+  const custoTotalGeral = linhas.reduce((s, l) => s + l.custo, 0);
+  const lucroMultipartido = totalRecebido - custoTotalGeral;
+  const margemMultipartido = totalRecebido > 0 ? (lucroMultipartido / totalRecebido) * 100 : 0;
+
+  /** Salva o custo da linha: produto grava o unitário; extras gravam na venda. */
+  const salvarLinha = (key: string, valor: string) => {
+    const item = itens.find((i) => i.id === key);
+    if (item) {
+      salvarCustoItem.mutate({
+        itemId: item.id,
+        valorTotal: valor,
+        qtd: Number(item.quantidade ?? 0),
+      });
+    } else {
+      salvarExtra.mutate({ campo: key as "frete" | "mao_obra" | "imposto", valor });
+    }
+  };
 
   const proximos = lancamentos
     .filter((l) => l.recorrencia !== "nenhuma" && l.proxima_data)
@@ -287,111 +378,125 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       <CardContent className="space-y-6">
         <div className="space-y-3">
           <div>
-            <p className="font-medium">Custo multipartido dos produtos</p>
+            <p className="font-medium">Multipartido da venda</p>
             <p className="text-sm text-muted-foreground">
-              Cada produto aparece em duas linhas: o nome e, abaixo, o valor cadastrado de custo —
-              corrija para confrontar com o valor real da venda.
+              Produto · venda recebida · (−) custo · (=) total acumulado. Digite o custo de cada
+              linha e clique fora (ou Enter) para salvar — o lucro é recalculado na hora.
             </p>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Produto / custo cadastrado</TableHead>
-                  <TableHead className="text-right">Qtde</TableHead>
-                  <TableHead className="text-right">Venda</TableHead>
-                  <TableHead className="text-right">Total custo</TableHead>
-                  <TableHead className="w-12" />
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Venda rec.</TableHead>
+                  <TableHead className="text-right">(−) Custo</TableHead>
+                  <TableHead className="text-right">(=) Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">Recebido</TableCell>
+                  <TableCell className="text-right font-medium">{brl(totalRecebido)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
+                  <TableCell className="text-right font-medium">{brl(totalRecebido)}</TableCell>
+                </TableRow>
                 {itens.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                       Nenhum produto registrado nesta venda.
                     </TableCell>
                   </TableRow>
                 )}
                 {itens.map((item) => {
-                  const valor = custosEditados[item.id] ?? String(item.custo_unitario ?? 0);
                   const qtd = Number(item.quantidade ?? 0);
-                  const venda = Number(item.preco_unitario ?? 0) * qtd;
-                  const custo = num(valor) * qtd;
+                  const valorPadrao = String(num(String(item.custo_unitario ?? 0)) * qtd);
+                  const valor = custosEditados[item.id] ?? valorPadrao;
                   return (
-                    <Fragment key={item.id}>
-                      <TableRow>
-                        <TableCell className="font-medium">{item.descricao}</TableCell>
-                        <TableCell className="text-right">{qtd}</TableCell>
-                        <TableCell className="text-right">{brl(venda)}</TableCell>
-                        <TableCell className="text-right">{brl(custo)}</TableCell>
-                        <TableCell />
-                      </TableRow>
-                      <TableRow className="border-b">
-                        <TableCell colSpan={3}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">
-                              Valor cadastrado (unitário)
-                            </span>
-                            <Input
-                              className="h-8 w-36"
-                              inputMode="decimal"
-                              value={valor}
-                              onChange={(e) =>
-                                setCustosEditados((atual) => ({
-                                  ...atual,
-                                  [item.id]: e.target.value,
-                                }))
-                              }
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter")
-                                  salvarCustoItem.mutate({ itemId: item.id, valor });
-                              }}
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          Lucro {brl(venda - custo)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            aria-label={`Salvar valor cadastrado de ${item.descricao}`}
-                            title="Salvar valor cadastrado"
-                            disabled={
-                              salvarCustoItem.isPending || custosEditados[item.id] === undefined
-                            }
-                            onClick={() => salvarCustoItem.mutate({ itemId: item.id, valor })}
-                          >
-                            <Save className="size-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    </Fragment>
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.descricao}</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right">
+                        <Input
+                          className="ml-auto h-8 w-28 text-right"
+                          inputMode="decimal"
+                          aria-label={`Custo de ${item.descricao}`}
+                          value={valor}
+                          onChange={(e) =>
+                            setCustosEditados((atual) => ({
+                              ...atual,
+                              [item.id]: e.target.value,
+                            }))
+                          }
+                          onBlur={() => {
+                            if (custosEditados[item.id] !== undefined)
+                              salvarLinha(item.id, custosEditados[item.id]);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") salvarLinha(item.id, valor);
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {brl(saldoDe[item.id] ?? 0)}
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
+                {extrasLinhas.map((ex) => {
+                  const valor = extrasEditados[ex.campo] ?? ex.padrao;
+                  return (
+                    <TableRow key={ex.campo}>
+                      <TableCell className="font-medium">{ex.label}</TableCell>
+                      <TableCell />
+                      <TableCell className="text-right">
+                        <Input
+                          className="ml-auto h-8 w-28 text-right"
+                          inputMode="decimal"
+                          aria-label={`Custo de ${ex.label}`}
+                          value={valor}
+                          onChange={(e) =>
+                            setExtrasEditados((atual) => ({
+                              ...atual,
+                              [ex.campo]: e.target.value,
+                            }))
+                          }
+                          onBlur={() => {
+                            if (extrasEditados[ex.campo] !== undefined)
+                              salvarLinha(ex.campo, extrasEditados[ex.campo]);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") salvarLinha(ex.campo, valor);
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {brl(saldoDe[ex.campo] ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                <TableRow className="border-t-2 font-semibold">
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right">{brl(totalRecebido)}</TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {brl(custoTotalGeral)}
+                  </TableCell>
+                  <TableCell className="text-right">{brl(lucroMultipartido)}</TableCell>
+                </TableRow>
+                <TableRow className="font-semibold">
+                  <TableCell>(%)</TableCell>
+                  <TableCell />
+                  <TableCell />
+                  <TableCell className="text-right">
+                    {margemMultipartido.toFixed(1)}%
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
-          {itens.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Valor real da venda</p>
-                <p className="text-lg font-semibold">{brl(totalVendaItens)}</p>
-              </div>
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Custo cadastrado</p>
-                <p className="text-lg font-semibold text-destructive">{brl(totalCustoItens)}</p>
-              </div>
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">Lucro</p>
-                <p className="text-lg font-semibold text-success">
-                  {brl(totalVendaItens - totalCustoItens)}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
+
 
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
