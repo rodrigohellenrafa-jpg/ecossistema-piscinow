@@ -5,7 +5,7 @@
  * ou um evento financeiro (entrada/saída). O extrato mostra saldo acumulado e
  * totais por obra, e permite programar chamados recorrentes ligados ao cliente.
  */
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -76,6 +76,7 @@ interface Props {
     descricao: string;
     quantidade: number;
     custo_unitario: number | null;
+    preco_unitario?: number | null;
   }>;
 }
 
@@ -250,6 +251,16 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     (s, p) => s + Number(p.valor_origem ?? p.valor ?? 0),
     0,
   );
+  /** Recebido = soma do que realmente entrou como pagamento do pedido. */
+  const totalRecebido = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+  const totalVendaItens = itens.reduce(
+    (s, i) => s + Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 0),
+    0,
+  );
+  const totalCustoItens = itens.reduce(
+    (s, i) => s + num(custosEditados[i.id] ?? String(i.custo_unitario ?? 0)) * Number(i.quantidade ?? 0),
+    0,
+  );
 
   const proximos = lancamentos
     .filter((l) => l.recorrencia !== "nenhuma" && l.proxima_data)
@@ -276,54 +287,112 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       <CardContent className="space-y-6">
         <div className="space-y-3">
           <div>
-            <p className="font-medium">Produtos da venda</p>
+            <p className="font-medium">Custo multipartido dos produtos</p>
             <p className="text-sm text-muted-foreground">
-              Corrija o valor cadastrado de cada produto para refletir o lucro real da venda.
+              Cada produto aparece em duas linhas: o nome e, abaixo, o valor cadastrado de custo —
+              corrija para confrontar com o valor real da venda.
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {itens.map((item) => {
-              const valor = custosEditados[item.id] ?? String(item.custo_unitario ?? 0);
-              return (
-                <div key={item.id} className="rounded-lg border border-border p-3">
-                  <p className="font-medium">{item.descricao}</p>
-                  <div className="mt-2 flex items-end gap-2">
-                    <Field label="Valor cadastrado (unitário)" className="min-w-0 flex-1">
-                      <Input
-                        inputMode="decimal"
-                        value={valor}
-                        onChange={(e) =>
-                          setCustosEditados((atual) => ({ ...atual, [item.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            salvarCustoItem.mutate({ itemId: item.id, valor });
-                          }
-                        }}
-                      />
-                    </Field>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      aria-label={`Salvar valor cadastrado de ${item.descricao}`}
-                      title="Salvar valor cadastrado"
-                      disabled={salvarCustoItem.isPending || custosEditados[item.id] === undefined}
-                      onClick={() => salvarCustoItem.mutate({ itemId: item.id, valor })}
-                    >
-                      <Save className="size-4" />
-                    </Button>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {item.quantidade} un. × {brl(num(valor))} = {brl(item.quantidade * num(valor))}
-                  </p>
-                </div>
-              );
-            })}
-            {itens.length === 0 && (
-              <p className="text-sm text-muted-foreground">Nenhum produto registrado nesta venda.</p>
-            )}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produto / custo cadastrado</TableHead>
+                  <TableHead className="text-right">Qtde</TableHead>
+                  <TableHead className="text-right">Venda</TableHead>
+                  <TableHead className="text-right">Total custo</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {itens.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      Nenhum produto registrado nesta venda.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {itens.map((item) => {
+                  const valor = custosEditados[item.id] ?? String(item.custo_unitario ?? 0);
+                  const qtd = Number(item.quantidade ?? 0);
+                  const venda = Number(item.preco_unitario ?? 0) * qtd;
+                  const custo = num(valor) * qtd;
+                  return (
+                    <Fragment key={item.id}>
+                      <TableRow>
+                        <TableCell className="font-medium">{item.descricao}</TableCell>
+                        <TableCell className="text-right">{qtd}</TableCell>
+                        <TableCell className="text-right">{brl(venda)}</TableCell>
+                        <TableCell className="text-right">{brl(custo)}</TableCell>
+                        <TableCell />
+                      </TableRow>
+                      <TableRow className="border-b">
+                        <TableCell colSpan={3}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                              Valor cadastrado (unitário)
+                            </span>
+                            <Input
+                              className="h-8 w-36"
+                              inputMode="decimal"
+                              value={valor}
+                              onChange={(e) =>
+                                setCustosEditados((atual) => ({
+                                  ...atual,
+                                  [item.id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter")
+                                  salvarCustoItem.mutate({ itemId: item.id, valor });
+                              }}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          Lucro {brl(venda - custo)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            aria-label={`Salvar valor cadastrado de ${item.descricao}`}
+                            title="Salvar valor cadastrado"
+                            disabled={
+                              salvarCustoItem.isPending || custosEditados[item.id] === undefined
+                            }
+                            onClick={() => salvarCustoItem.mutate({ itemId: item.id, valor })}
+                          >
+                            <Save className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
+          {itens.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">Valor real da venda</p>
+                <p className="text-lg font-semibold">{brl(totalVendaItens)}</p>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">Custo cadastrado</p>
+                <p className="text-lg font-semibold text-destructive">{brl(totalCustoItens)}</p>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">Lucro</p>
+                <p className="text-lg font-semibold text-success">
+                  {brl(totalVendaItens - totalCustoItens)}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
+
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Data">
@@ -447,7 +516,9 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">Recebido</p>
-            <p className="text-lg font-semibold text-success">{brl(totalEntradas)}</p>
+            <p className="text-lg font-semibold text-success">
+              {brl(totalRecebido || totalEntradas)}
+            </p>
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">Taxas / retenções</p>
