@@ -24,6 +24,7 @@ type Lancamento = {
 
 type Conta = {
   id: string;
+  tipo: string;
   descricao: string;
   parceiro: string | null;
   categoria: string | null;
@@ -67,10 +68,11 @@ export function FluxoColunas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("id, descricao, parceiro, categoria, valor, valor_juros, vencimento, status, data_pagamento")
-        .eq("tipo", "pagar")
+        .select(
+          "id, tipo, descricao, parceiro, categoria, valor, valor_juros, vencimento, status, data_pagamento",
+        )
         .order("vencimento", { ascending: false })
-        .limit(60);
+        .limit(80);
       if (error) throw error;
       return data as Conta[];
     },
