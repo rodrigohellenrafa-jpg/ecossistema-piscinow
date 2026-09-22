@@ -1130,6 +1130,21 @@ function OrdensCompra() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Remove em lote os itens de ordens já executadas que foram marcados na grade. */
+  const excluirItensSelecionados = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase.from("ordem_compra_itens").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Itens removidos");
+      setSelecionadosExecutados({});
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const recalcularTotal = (o: Ordem) =>
     Number(o.valor_produtos) - Number(o.desconto) + Number(o.icms_st_valor);
 
