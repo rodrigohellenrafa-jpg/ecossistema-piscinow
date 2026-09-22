@@ -516,7 +516,9 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">Recebido</p>
-            <p className="text-lg font-semibold text-success">{brl(totalEntradas)}</p>
+            <p className="text-lg font-semibold text-success">
+              {brl(totalRecebido || totalEntradas)}
+            </p>
           </div>
           <div className="rounded-lg border border-border p-3">
             <p className="text-xs text-muted-foreground">Taxas / retenções</p>
