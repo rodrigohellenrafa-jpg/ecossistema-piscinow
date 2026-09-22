@@ -383,6 +383,18 @@ function OrdensCompra() {
     },
   });
 
+  /** Itens de pedidos que consomem cada produto (demanda por pedido). */
+  const { data: consumoItens = [] } = useQuery({
+    queryKey: ["venda_itens", "consumo-compras"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_itens")
+        .select("produto_id, quantidade, venda_id");
+      if (error) throw error;
+      return data as { produto_id: string | null; quantidade: number; venda_id: string }[];
+    },
+  });
+
   const vendaPorId = useMemo(() => {
     const m = new Map<
       string,
@@ -391,6 +403,28 @@ function OrdensCompra() {
     for (const v of vendasVinculo) m.set(v.id, v);
     return m;
   }, [vendasVinculo]);
+
+  /** Demanda consolidada: quais pedidos consomem cada produto e em que quantidade. */
+  const demandaPorProduto = useMemo(() => {
+    const mapa = new Map<
+      string,
+      { total: number; pedidos: { id: string; rotulo: string; quantidade: number }[] }
+    >();
+    for (const item of consumoItens) {
+      if (!item.produto_id) continue;
+      const atual = mapa.get(item.produto_id) ?? { total: 0, pedidos: [] };
+      const quantidade = Number(item.quantidade ?? 0);
+      const venda = vendaPorId.get(item.venda_id);
+      const rotulo = `${venda?.numero ?? "Pedido"} — ${venda?.cliente_nome ?? "Cliente"}`;
+      const existente = atual.pedidos.find((p) => p.id === item.venda_id);
+      if (existente) existente.quantidade += quantidade;
+      else atual.pedidos.push({ id: item.venda_id, rotulo, quantidade });
+      atual.total += quantidade;
+      mapa.set(item.produto_id, atual);
+    }
+    return mapa;
+  }, [consumoItens, vendaPorId]);
+
 
   const ordensFiltradas = useMemo(() => {
     const busca = normalizar(buscaFornecedor.trim());
@@ -1515,7 +1549,31 @@ function OrdensCompra() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {(() => {
+                          const demanda = demandaPorProduto.get(produto.id);
+                          if (!demanda || demanda.pedidos.length === 0) return null;
+                          const vinculado = vinculosCompra[produto.id];
+                          if (vinculado) return null;
+                          return (
+                            <div className="mt-1 w-48 text-xs text-muted-foreground">
+                              <p className="font-medium">
+                                Demanda: {demanda.total} un. em {demanda.pedidos.length} pedido(s)
+                              </p>
+                              <ul className="space-y-0.5">
+                                {demanda.pedidos.slice(0, 4).map((p) => (
+                                  <li key={p.id} className="truncate">
+                                    {p.rotulo} · {p.quantidade} un.
+                                  </li>
+                                ))}
+                                {demanda.pedidos.length > 4 && (
+                                  <li>+{demanda.pedidos.length - 4} outro(s)</li>
+                                )}
+                              </ul>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
+
                       <TableCell>
                         <Select
                           value={statusCompra[produto.id] ?? produto.status_compra ?? "a_comprar"}
