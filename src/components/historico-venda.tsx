@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -71,6 +71,12 @@ interface Props {
   vendaId: string;
   clienteId: string | null;
   clienteNome: string | null;
+  itens: Array<{
+    id: string;
+    descricao: string;
+    quantidade: number;
+    custo_unitario: number | null;
+  }>;
 }
 
 interface FormState {
@@ -97,11 +103,12 @@ const formVazio = (): FormState => ({
   observacoes: "",
 });
 
-export function HistoricoVenda({ vendaId, clienteId, clienteNome }: Props) {
+export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [form, setForm] = useState<FormState>(formVazio);
   const [filtroObra, setFiltroObra] = useState("todas");
+  const [custosEditados, setCustosEditados] = useState<Record<string, string>>({});
 
   const { data: obras = [] } = useQuery({
     queryKey: ["historico-obras", vendaId, clienteId],
@@ -190,6 +197,29 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome }: Props) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const salvarCustoItem = useMutation({
+    mutationFn: async ({ itemId, valor }: { itemId: string; valor: string }) => {
+      const custo = num(valor);
+      if (custo < 0) throw new Error("O valor cadastrado não pode ser negativo.");
+      const { error } = await supabase
+        .from("venda_itens")
+        .update({ custo_unitario: custo })
+        .eq("id", itemId)
+        .eq("venda_id", vendaId);
+      if (error) throw error;
+    },
+    onSuccess: (_, variaveis) => {
+      toast.success("Valor cadastrado atualizado. O lucro foi recalculado.");
+      setCustosEditados((atual) => {
+        const proximo = { ...atual };
+        delete proximo[variaveis.itemId];
+        return proximo;
+      });
+      qc.invalidateQueries({ queryKey: ["venda-itens", vendaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filtrados = useMemo(
     () =>
       filtroObra === "todas"
@@ -244,6 +274,57 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome }: Props) {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="space-y-3">
+          <div>
+            <p className="font-medium">Produtos da venda</p>
+            <p className="text-sm text-muted-foreground">
+              Corrija o valor cadastrado de cada produto para refletir o lucro real da venda.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {itens.map((item) => {
+              const valor = custosEditados[item.id] ?? String(item.custo_unitario ?? 0);
+              return (
+                <div key={item.id} className="rounded-lg border border-border p-3">
+                  <p className="font-medium">{item.descricao}</p>
+                  <div className="mt-2 flex items-end gap-2">
+                    <Field label="Valor cadastrado (unitário)" className="min-w-0 flex-1">
+                      <Input
+                        inputMode="decimal"
+                        value={valor}
+                        onChange={(e) =>
+                          setCustosEditados((atual) => ({ ...atual, [item.id]: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            salvarCustoItem.mutate({ itemId: item.id, valor });
+                          }
+                        }}
+                      />
+                    </Field>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      aria-label={`Salvar valor cadastrado de ${item.descricao}`}
+                      title="Salvar valor cadastrado"
+                      disabled={salvarCustoItem.isPending || custosEditados[item.id] === undefined}
+                      onClick={() => salvarCustoItem.mutate({ itemId: item.id, valor })}
+                    >
+                      <Save className="size-4" />
+                    </Button>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.quantidade} un. × {brl(num(valor))} = {brl(item.quantidade * num(valor))}
+                  </p>
+                </div>
+              );
+            })}
+            {itens.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum produto registrado nesta venda.</p>
+            )}
+          </div>
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Data">
             <Input

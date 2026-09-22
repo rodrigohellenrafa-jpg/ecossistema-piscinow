@@ -1362,6 +1362,7 @@ function DetalhePedido() {
         vendaId={id}
         clienteId={venda.cliente_id ?? null}
         clienteNome={venda.cliente_nome ?? null}
+        itens={itens}
       /></TelaPermitida>
 
       <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>
