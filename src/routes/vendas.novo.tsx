@@ -34,7 +34,9 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -223,6 +225,19 @@ function NovoPedido() {
       const { data, error } = await supabase
         .from("clientes")
         .select("id, nome, documento, logradouro, numero, bairro, cidade, estado, cep, endereco_obra")
+        .order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: fornecedores = [] } = useQuery({
+    queryKey: ["fornecedores-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome")
+        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data;
