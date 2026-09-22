@@ -130,6 +130,18 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome }: Props) {
     },
   });
 
+  const { data: pagamentos = [] } = useQuery({
+    queryKey: ["historico-venda-pagamentos", vendaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_pagamentos")
+        .select("valor, valor_origem, retencao_financeira")
+        .eq("venda_id", vendaId);
+      if (error) throw error;
+      return data;
+    },
+  });
+
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -200,8 +212,14 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome }: Props) {
   }, [filtrados]);
 
   const totalEntradas = extrato.reduce((s, l) => s + (l.mov > 0 ? l.mov : 0), 0);
-  const totalSaidas = extrato.reduce((s, l) => s + (l.mov < 0 ? -l.mov : 0), 0);
-  const resultado = totalEntradas - totalSaidas;
+  const totalRetencoes = pagamentos.reduce(
+    (s, p) => s + Number(p.retencao_financeira ?? 0),
+    0,
+  );
+  const totalOrigem = pagamentos.reduce(
+    (s, p) => s + Number(p.valor_origem ?? p.valor ?? 0),
+    0,
+  );
 
   const proximos = lancamentos
     .filter((l) => l.recorrencia !== "nenhuma" && l.proxima_data)
@@ -343,20 +361,16 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome }: Props) {
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border border-border p-3">
-            <p className="text-xs text-muted-foreground">Entradas</p>
+            <p className="text-xs text-muted-foreground">Valor de origem</p>
+            <p className="text-lg font-semibold">{brl(totalOrigem || totalEntradas)}</p>
+          </div>
+          <div className="rounded-lg border border-border p-3">
+            <p className="text-xs text-muted-foreground">Recebido</p>
             <p className="text-lg font-semibold text-success">{brl(totalEntradas)}</p>
           </div>
           <div className="rounded-lg border border-border p-3">
-            <p className="text-xs text-muted-foreground">Custos</p>
-            <p className="text-lg font-semibold text-destructive">{brl(totalSaidas)}</p>
-          </div>
-          <div className="rounded-lg border border-border p-3">
-            <p className="text-xs text-muted-foreground">Resultado no período</p>
-            <p
-              className={`text-lg font-semibold ${resultado >= 0 ? "text-success" : "text-destructive"}`}
-            >
-              {brl(resultado)}
-            </p>
+            <p className="text-xs text-muted-foreground">Taxas / retenções</p>
+            <p className="text-lg font-semibold text-destructive">{brl(totalRetencoes)}</p>
           </div>
         </div>
 

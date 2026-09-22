@@ -100,6 +100,17 @@ function Dre() {
     },
   });
 
+  const { data: retencoes = [] } = useQuery({
+    queryKey: ["retencoes-financeiras-dre"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_pagamentos")
+        .select("retencao_financeira, data_pagamento");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: rateios = [] } = useQuery({
     queryKey: ["conta-rateios-dre"],
     queryFn: async () => {
@@ -163,7 +174,10 @@ function Dre() {
     }
 
     const despesasContas = [...porCategoria.values()].reduce((s, v) => s + v, 0);
-    const despesasFixas = despesasLancamentos + despesasContas;
+    const taxasFinanceiras = retencoes
+      .filter((p) => p.data_pagamento && noPeriodo(p.data_pagamento))
+      .reduce((s, p) => s + Number(p.retencao_financeira ?? 0), 0);
+    const despesasFixas = despesasLancamentos + despesasContas + taxasFinanceiras;
     const categorias = [...porCategoria.entries()]
       .map(([categoria, valor]) => ({ categoria, valor }))
       .sort((a, b) => b.valor - a.valor);
@@ -185,13 +199,14 @@ function Dre() {
       cmv,
       lucroBruto,
       despesasFixas,
+      taxasFinanceiras,
       categorias,
       folha,
       resultado,
       base,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendas, lancamentos, contasPagas, rateios, funcionarios, visao, ano, mes, trimestre, inicio, fim]);
+  }, [vendas, lancamentos, contasPagas, rateios, retencoes, funcionarios, visao, ano, mes, trimestre, inicio, fim]);
 
   const evolucao = useMemo(() => {
     const porMes: Record<string, { faturamento: number; custo: number; despesa: number }> = {};
@@ -223,6 +238,7 @@ function Dre() {
     { label: "(-) CMV e Custos de Obra", valor: -linha.cmv, sinal: "-" },
     { label: "(=) Lucro Bruto", valor: linha.lucroBruto, sinal: "=", destaque: true },
     { label: "(-) Despesas Fixas e Administrativas", valor: -linha.despesasFixas, sinal: "-" },
+    { label: "   Taxas / retenções financeiras", valor: -linha.taxasFinanceiras, sinal: "-" },
     { label: "(-) Folha de Pagamento", valor: -linha.folha, sinal: "-" },
     { label: "(=) Resultado Líquido Operacional", valor: linha.resultado, sinal: "=", destaque: true },
   ];
