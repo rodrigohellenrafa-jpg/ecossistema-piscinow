@@ -824,8 +824,8 @@ function Financeiro() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Receitas do mês" value={brl(receitaMes)} tone="positive" to="/contas" />
-        <Kpi label="Despesas do mês" value={brl(despesaMes)} tone="negative" to="/contas" />
+        <Kpi label="Receitas do mês" value={brl(receitaMes)} tone="positive" to="/contas" search={{ periodo: "mes", tipo: "receber" }} />
+        <Kpi label="Despesas do mês" value={brl(despesaMes)} tone="negative" to="/contas" search={{ periodo: "mes", tipo: "pagar" }} />
         <Kpi label="Saldo do mês" value={brl(saldoMes)} tone={saldoMes >= 0 ? "positive" : "negative"} to="/fluxo-caixa" />
         <Kpi
           label="Previsto x Realizado"

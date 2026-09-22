@@ -55,6 +55,10 @@ import { useAbrirModal } from "@/hooks/use-abrir-modal";
 
 export const Route = createFileRoute("/contas")({
   staticData: { sitemap: false },
+  validateSearch: (s: Record<string, unknown>) => ({
+    periodo: typeof s.periodo === "string" ? s.periodo : undefined,
+    tipo: s.tipo === "pagar" || s.tipo === "receber" ? (s.tipo as "pagar" | "receber") : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Contas a Pagar e Receber | Piscinow ERP" },
@@ -198,7 +202,9 @@ function Contas() {
   const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
-  const [periodo, setPeriodo] = useState("todas");
+  const busca = Route.useSearch();
+  const [periodo, setPeriodo] = useState(busca.periodo ?? "todas");
+  const [aba, setAba] = useState<"pagar" | "receber">(busca.tipo ?? "pagar");
   const [baixando, setBaixando] = useState<Conta | null>(null);
 
   const { data = [] } = useQuery({
@@ -1260,7 +1266,7 @@ function Contas() {
         </div>
       </div>
 
-      <Tabs defaultValue="pagar">
+      <Tabs value={aba} onValueChange={(v) => setAba(v as "pagar" | "receber")}>
         <TabsList>
           <TabsTrigger value="pagar">A pagar ({pagar.length})</TabsTrigger>
           <TabsTrigger value="receber">A receber ({receber.length})</TabsTrigger>

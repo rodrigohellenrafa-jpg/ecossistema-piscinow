@@ -27,12 +27,14 @@ export function Kpi({
   hint,
   tone = "default",
   to,
+  search,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "default" | "positive" | "negative" | "warning";
   to?: string;
+  search?: Record<string, string>;
 }) {
   const cor =
     tone === "positive"
@@ -53,7 +55,7 @@ export function Kpi({
     "block rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-primary/5";
   if (to) {
     return (
-      <Link to={to} className={className}>
+      <Link to={to} search={search as never} className={className}>
         {body}
       </Link>
     );
