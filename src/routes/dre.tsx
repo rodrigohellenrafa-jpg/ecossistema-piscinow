@@ -177,7 +177,7 @@ function Dre() {
     const taxasFinanceiras = retencoes
       .filter((p) => p.data_pagamento && noPeriodo(p.data_pagamento))
       .reduce((s, p) => s + Number(p.retencao_financeira ?? 0), 0);
-    const despesasFixas = despesasLancamentos + despesasContas + taxasFinanceiras;
+    const despesasFixas = despesasLancamentos + despesasContas;
     const categorias = [...porCategoria.entries()]
       .map(([categoria, valor]) => ({ categoria, valor }))
       .sort((a, b) => b.valor - a.valor);
@@ -189,7 +189,7 @@ function Dre() {
     const mesesFolha = visao === "anual" ? 12 : visao === "trimestral" ? 3 : visao === "personalizado" ? Math.max(0, (Number(fim.slice(0, 4)) - Number(inicio.slice(0, 4))) * 12 + Number(fim.slice(5, 7)) - Number(inicio.slice(5, 7)) + 1) : 1;
     const folha = salarios * mesesFolha + comissoesEstimadas;
 
-    const resultado = lucroBruto - despesasFixas - folha;
+    const resultado = lucroBruto - despesasFixas - taxasFinanceiras - folha;
 
     const base = faturamentoBruto || 1;
     return {
