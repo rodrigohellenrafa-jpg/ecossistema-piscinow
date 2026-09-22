@@ -376,6 +376,86 @@ function OrdensCompra() {
     },
   });
 
+  const [novoPagamento, setNovoPagamento] = useState({
+    data_pagamento: hojeISO(),
+    forma_pagamento: "Pix",
+    conta_bancaria: "",
+    valor: "",
+    observacoes: "",
+  });
+  const [editPagamentoId, setEditPagamentoId] = useState<string | null>(null);
+
+  const totalPagoOrdem = pagamentosOrdem.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+
+  const sincronizarValorPago = async (ordemId: string) => {
+    const { data } = await supabase
+      .from("ordem_compra_pagamentos")
+      .select("valor")
+      .eq("ordem_id", ordemId);
+    const soma = (data ?? []).reduce((s, p) => s + Number(p.valor ?? 0), 0);
+    await supabase.from("ordens_compra").update({ valor_pago: soma }).eq("id", ordemId);
+  };
+
+  const salvarPagamento = useMutation({
+    mutationFn: async () => {
+      if (!detalheId) throw new Error("Ordem não encontrada");
+      const valor = Number(novoPagamento.valor);
+      if (!Number.isFinite(valor) || valor === 0) throw new Error("Informe o valor do pagamento");
+      const payload = {
+        ordem_id: detalheId,
+        data_pagamento: novoPagamento.data_pagamento || hojeISO(),
+        forma_pagamento: novoPagamento.forma_pagamento,
+        conta_bancaria: novoPagamento.conta_bancaria || null,
+        valor,
+        observacoes: novoPagamento.observacoes || null,
+      };
+      if (editPagamentoId) {
+        const { error } = await supabase
+          .from("ordem_compra_pagamentos")
+          .update(payload)
+          .eq("id", editPagamentoId);
+        if (error) throw error;
+      } else {
+        const { data: auth } = await supabase.auth.getUser();
+        const { error } = await supabase
+          .from("ordem_compra_pagamentos")
+          .insert({ ...payload, created_by: auth.user?.id ?? null });
+        if (error) throw error;
+      }
+      await sincronizarValorPago(detalheId);
+    },
+    onSuccess: () => {
+      toast.success(editPagamentoId ? "Pagamento atualizado" : "Pagamento registrado");
+      setEditPagamentoId(null);
+      setNovoPagamento({
+        data_pagamento: hojeISO(),
+        forma_pagamento: "Pix",
+        conta_bancaria: "",
+        valor: "",
+        observacoes: "",
+      });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const excluirPagamento = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ordem_compra_pagamentos").delete().eq("id", id);
+      if (error) throw error;
+      if (detalheId) await sincronizarValorPago(detalheId);
+    },
+    onSuccess: () => {
+      toast.success("Pagamento excluído");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
+
   /** Todos os itens das ordens listadas, para agrupar produtos por fornecedor. */
   const { data: itensTodos = [] } = useQuery({
     queryKey: ["ordem_compra_itens", "todos"],
