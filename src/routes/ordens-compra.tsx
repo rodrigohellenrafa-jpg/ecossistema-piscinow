@@ -2032,6 +2032,180 @@ function OrdensCompra() {
                 </Field>
               </div>
 
+              <div className="space-y-4 rounded-lg border border-border p-4 print:hidden">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Pagamentos da compra</p>
+                    <p className="text-xs text-muted-foreground">
+                      Registre quantos pagamentos forem necessários para esta ordem.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Pago / Saldo</p>
+                    <p className="font-semibold">
+                      {brl(totalPagoOrdem)} /{" "}
+                      {brl(Number(ordemDetalhe.valor_total ?? 0) - totalPagoOrdem)}
+                    </p>
+                  </div>
+                </div>
+
+                {pagamentosOrdem.length > 0 && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Forma</TableHead>
+                        <TableHead>Conta</TableHead>
+                        <TableHead>Observações</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pagamentosOrdem.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell>{dataBR(p.data_pagamento)}</TableCell>
+                          <TableCell>{p.forma_pagamento}</TableCell>
+                          <TableCell>{p.conta_bancaria ?? "—"}</TableCell>
+                          <TableCell>{p.observacoes ?? "—"}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {brl(Number(p.valor))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label="Editar pagamento"
+                                onClick={() => {
+                                  setEditPagamentoId(p.id);
+                                  setNovoPagamento({
+                                    data_pagamento: p.data_pagamento,
+                                    forma_pagamento: p.forma_pagamento,
+                                    conta_bancaria: p.conta_bancaria ?? "",
+                                    valor: String(p.valor),
+                                    observacoes: p.observacoes ?? "",
+                                  });
+                                }}
+                              >
+                                <Pencil className="size-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label="Excluir pagamento"
+                                onClick={() => {
+                                  if (window.confirm("Excluir este pagamento?")) {
+                                    excluirPagamento.mutate(p.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="size-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-5">
+                  <Field label="Data">
+                    <Input
+                      type="date"
+                      value={novoPagamento.data_pagamento}
+                      onChange={(e) =>
+                        setNovoPagamento((s) => ({ ...s, data_pagamento: e.target.value }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Forma">
+                    <Select
+                      value={novoPagamento.forma_pagamento}
+                      onValueChange={(v) =>
+                        setNovoPagamento((s) => ({ ...s, forma_pagamento: v }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Pix", "Boleto", "Transferência", "Cartão", "Dinheiro", "Crédito fabricante"].map(
+                          (f) => (
+                            <SelectItem key={f} value={f}>
+                              {f}
+                            </SelectItem>
+                          ),
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Conta">
+                    <Select
+                      value={novoPagamento.conta_bancaria}
+                      onValueChange={(v) =>
+                        setNovoPagamento((s) => ({ ...s, conta_bancaria: v }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contasBancarias.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Valor (R$)">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={novoPagamento.valor}
+                      onChange={(e) => setNovoPagamento((s) => ({ ...s, valor: e.target.value }))}
+                    />
+                  </Field>
+                  <Field label="Observações">
+                    <Input
+                      value={novoPagamento.observacoes}
+                      onChange={(e) =>
+                        setNovoPagamento((s) => ({ ...s, observacoes: e.target.value }))
+                      }
+                    />
+                  </Field>
+                  <div className="flex gap-2 sm:col-span-5">
+                    <Button
+                      onClick={() => salvarPagamento.mutate()}
+                      disabled={salvarPagamento.isPending}
+                    >
+                      <Plus /> {editPagamentoId ? "Salvar pagamento" : "Adicionar pagamento"}
+                    </Button>
+                    {editPagamentoId && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setEditPagamentoId(null);
+                          setNovoPagamento({
+                            data_pagamento: hojeISO(),
+                            forma_pagamento: "Pix",
+                            conta_bancaria: "",
+                            valor: "",
+                            observacoes: "",
+                          });
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+
+
               <div className="space-y-3 rounded-lg border border-border p-4 print:hidden">
                 <div>
                   <p className="text-sm font-medium">Fluxo da ordem de compra</p>
