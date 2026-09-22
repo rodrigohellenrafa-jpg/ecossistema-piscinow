@@ -76,6 +76,7 @@ interface Props {
     descricao: string;
     quantidade: number;
     custo_unitario: number | null;
+    preco_unitario?: number | null;
   }>;
 }
 
