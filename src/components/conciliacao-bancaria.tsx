@@ -160,10 +160,12 @@ export function ConciliacaoBancaria() {
       if (e2) throw e2;
     }
     if (alvo?.origem === "titulo") {
+      // Só preenche a conta quando o título ainda não tem; nunca move saldo entre contas.
       const { error: e3 } = await supabase
         .from("contas")
         .update({ conta_bancaria: mov.conta })
-        .eq("id", alvo.id);
+        .eq("id", alvo.id)
+        .is("conta_bancaria", null);
       if (e3) throw e3;
     }
   };
@@ -267,8 +269,10 @@ export function ConciliacaoBancaria() {
         categoria: l.categoria,
         data: l.data_pagamento ?? l.data_competencia,
       }));
+    const mesmaConta = (c: string | null) => !c || c.trim().toLowerCase() === m.conta.trim().toLowerCase();
     const deTitulos: Candidato[] = titulos
       .filter((t) => (entrada ? t.tipo === "receber" : t.tipo !== "receber"))
+      .filter((t) => mesmaConta(t.conta_bancaria))
       .filter((t) => !jaUsados.has(t.id) && !ignorar.has(t.id))
       .filter(
         (t) => Math.abs(Number(t.valor_pago ?? t.valor ?? 0) - alvo) <= 0.02,

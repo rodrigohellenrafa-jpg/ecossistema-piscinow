@@ -840,6 +840,16 @@ function NovoPedido() {
     mutationFn: async (modo: "pedido" | "venda" = "pedido") => {
       if (!clienteId) throw new Error("Selecione o cliente.");
       if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
+      if (contasBancarias.length > 0) {
+        const norm = (s: string) => s.trim().toLowerCase();
+        const validas = new Set(contasBancarias.map(norm));
+        const checar = (conta: string, rotulo: string) => {
+          if (!conta.trim()) throw new Error(`Escolha a conta onde o dinheiro entrou (${rotulo}).`);
+          if (!validas.has(norm(conta))) throw new Error(`Conta bancária não cadastrada (${rotulo}): ${conta}. Escolha uma conta da lista.`);
+        };
+        if (entrada > 0) checar(contaEntrada, "entrada");
+        condicoes.filter((c) => c.pago && c.valor > 0).forEach((c, i) => checar(c.conta_bancaria ?? "", `condição paga ${i + 1}`));
+      }
 
       const cliente = { id: selecaoCliente.id, nome: selecaoCliente.nome };
       const vendedor =
