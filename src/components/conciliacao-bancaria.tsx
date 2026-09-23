@@ -155,15 +155,18 @@ export function ConciliacaoBancaria() {
     if (alvo?.origem === "lancamento") {
       const { error: e2 } = await supabase
         .from("lancamentos_financeiros")
-        .update({ conciliado: true, conta_bancaria: mov.conta })
+        .update({ conciliado: true })
         .eq("id", alvo.id);
       if (e2) throw e2;
+      await supabase.from("lancamentos_financeiros").update({ conta_bancaria: mov.conta }).eq("id", alvo.id).is("conta_bancaria", null);
     }
     if (alvo?.origem === "titulo") {
+      // Só preenche a conta quando o título ainda não tem; nunca move saldo entre contas.
       const { error: e3 } = await supabase
         .from("contas")
         .update({ conta_bancaria: mov.conta })
-        .eq("id", alvo.id);
+        .eq("id", alvo.id)
+        .is("conta_bancaria", null);
       if (e3) throw e3;
     }
   };
@@ -257,6 +260,7 @@ export function ConciliacaoBancaria() {
     const esperado = entrada ? "receita" : "despesa";
     const deLancamentos: Candidato[] = lancamentos
       .filter((l) => !l.conciliado && l.status !== "Cancelado" && l.tipo_fluxo === esperado)
+      .filter((l) => !l.conta_bancaria || l.conta_bancaria.trim().toLowerCase() === m.conta.trim().toLowerCase())
       .filter((l) => !jaUsados.has(l.id) && !ignorar.has(l.id))
       .filter((l) => Math.abs(Number(l.valor ?? 0) - alvo) <= 0.02)
       .filter((l) => dias(l.data_pagamento ?? l.data_competencia, m.data_movimento) <= 7)
@@ -267,8 +271,10 @@ export function ConciliacaoBancaria() {
         categoria: l.categoria,
         data: l.data_pagamento ?? l.data_competencia,
       }));
+    const mesmaConta = (c: string | null) => !c || c.trim().toLowerCase() === m.conta.trim().toLowerCase();
     const deTitulos: Candidato[] = titulos
       .filter((t) => (entrada ? t.tipo === "receber" : t.tipo !== "receber"))
+      .filter((t) => mesmaConta(t.conta_bancaria))
       .filter((t) => !jaUsados.has(t.id) && !ignorar.has(t.id))
       .filter(
         (t) => Math.abs(Number(t.valor_pago ?? t.valor ?? 0) - alvo) <= 0.02,
