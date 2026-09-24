@@ -349,6 +349,27 @@ function Dashboard() {
     return { entradas, saidas, resultado: entradas - saidas };
   }, [contas, lancamentos, ontem]);
 
+  /** Movimentos realizados hoje, um a um, para mostrar os valores separados. */
+  const fluxoHoje = useMemo(() => {
+    const entradas: { descricao: string; valor: number }[] = [];
+    const saidas: { descricao: string; valor: number }[] = [];
+    for (const conta of contas) {
+      if (conta.status !== "pago" || texto(conta.data_pagamento).slice(0, 10) !== hoje) continue;
+      const valor = numero(conta.valor_pago) || numero(conta.valor);
+      (conta.tipo === "receber" ? entradas : saidas).push({ descricao: texto(conta.descricao), valor });
+    }
+    for (const lancamento of lancamentos) {
+      if (lancamento.status !== "Pago" || texto(lancamento.data_pagamento).slice(0, 10) !== hoje) continue;
+      (lancamento.tipo_fluxo === "receita" ? entradas : saidas).push({
+        descricao: texto(lancamento.descricao),
+        valor: numero(lancamento.valor),
+      });
+    }
+    const totalEntradas = entradas.reduce((s, m) => s + m.valor, 0);
+    const totalSaidas = saidas.reduce((s, m) => s + m.valor, 0);
+    return { entradas, saidas, totalEntradas, totalSaidas, saldo: totalEntradas - totalSaidas };
+  }, [contas, lancamentos, hoje]);
+
   const saldoTotal = saldosContas.reduce((soma, conta) => soma + conta.saldo, 0);
   const faturamento = vendas.reduce((soma, venda) => soma + numero(venda.valor_total), 0);
   const custosVariaveis = vendas.reduce(
@@ -645,7 +666,7 @@ function Dashboard() {
 
           {detalhe === "saldo" && (() => {
             const principal =
-              saldosContas.find((c) => c.conta.toUpperCase().includes("RS COMERCIO")) ?? saldosContas[0];
+              saldosContas.find((c) => c.conta.toUpperCase().includes("RS C6")) ?? saldosContas[0];
             const outras = saldosContas.filter((c) => c.conta !== principal?.conta);
             return (
               <div className="space-y-3">
