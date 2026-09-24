@@ -561,6 +561,7 @@ function Contas() {
     }) => {
       const { data: conta } = await supabase.from("contas").select("*").eq("id", id).single();
       if (!conta) throw new Error("Título não encontrado.");
+      if (conta.status === "pago") throw new Error("Este título já foi baixado. Nada foi alterado.");
 
       const total = Number(conta.valor) + Number(conta.valor_juros ?? 0);
       const diferenca = Number((total - valorPago).toFixed(2));
