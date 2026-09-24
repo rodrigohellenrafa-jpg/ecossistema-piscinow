@@ -360,7 +360,7 @@ function Dashboard() {
     const saidas: { descricao: string; valor: number }[] = [];
     for (const conta of contas) {
       if (conta.status !== "pago" || texto(conta.data_pagamento).slice(0, 10) !== hoje) continue;
-      const valor = numero(conta.valor_pago) || numero(conta.valor);
+      const valor = valorMovimentado(conta);
       (conta.tipo === "receber" ? entradas : saidas).push({ descricao: texto(conta.descricao), valor });
     }
     for (const lancamento of lancamentos) {
