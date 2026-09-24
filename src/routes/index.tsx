@@ -486,6 +486,25 @@ function Dashboard() {
                 <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
               </div>
             </div>
+            {(fluxoHoje.entradas.length > 0 || fluxoHoje.saidas.length > 0) && (
+              <div className="space-y-0.5">
+                <p className="text-[11px] font-medium uppercase text-muted-foreground">Hoje</p>
+                {fluxoHoje.entradas.length > 0 && (
+                  <p className="truncate text-[11px] tabular-nums text-success" title={fluxoHoje.entradas.map((m) => `${m.descricao} ${brl(m.valor)}`).join(" · ")}>
+                    + {fluxoHoje.entradas.map((m) => brl(m.valor)).join(" · ")}
+                  </p>
+                )}
+                {fluxoHoje.saidas.length > 0 && (
+                  <p className="truncate text-[11px] tabular-nums text-destructive" title={fluxoHoje.saidas.map((m) => `${m.descricao} ${brl(m.valor)}`).join(" · ")}>
+                    − {fluxoHoje.saidas.map((m) => brl(m.valor)).join(" · ")}
+                  </p>
+                )}
+                <p className="text-[11px] tabular-nums text-muted-foreground">
+                  Saldo do dia:{" "}
+                  <strong className={fluxoHoje.saldo >= 0 ? "text-success" : "text-destructive"}>{brl(fluxoHoje.saldo)}</strong>
+                </p>
+              </div>
+            )}
             <div className="space-y-1">
               {saldosContas.length === 0 ? (
                 <p className="py-4 text-center text-xs text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
@@ -684,6 +703,33 @@ function Dashboard() {
                   <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
                   <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
                   <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
+                </div>
+                <div className="space-y-1 rounded-md border border-border p-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Movimentos de hoje</p>
+                  {fluxoHoje.entradas.length === 0 && fluxoHoje.saidas.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum movimento realizado hoje.</p>
+                  ) : (
+                    <>
+                      {fluxoHoje.entradas.map((m, i) => (
+                        <div key={`e-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="min-w-0 truncate">{m.descricao}</span>
+                          <span className="shrink-0 font-medium tabular-nums text-success">+{brl(m.valor)}</span>
+                        </div>
+                      ))}
+                      {fluxoHoje.saidas.map((m, i) => (
+                        <div key={`s-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="min-w-0 truncate">{m.descricao}</span>
+                          <span className="shrink-0 font-medium tabular-nums text-destructive">−{brl(m.valor)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between border-t border-border pt-1 text-xs font-semibold">
+                        <span>Saldo do dia</span>
+                        <span className={`tabular-nums ${fluxoHoje.saldo >= 0 ? "text-success" : "text-destructive"}`}>
+                          {brl(fluxoHoje.saldo)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 {outras.map((conta) => (
                   <div key={conta.conta} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
