@@ -1469,7 +1469,7 @@ function BaixaDialog({
             }
             onClick={() =>
               conta &&
-              onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria })
+              onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria, comprovantePath })
             }
           >
             Confirmar baixa
