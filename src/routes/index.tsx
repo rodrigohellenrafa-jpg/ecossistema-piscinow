@@ -95,6 +95,20 @@ function AcessoCard({ to, children }: { to: "/agenda" | "/fluxo-caixa" | "/conta
 
 type Detalhe = "mensagem" | "agenda" | "saldo" | "contas" | "equilibrio";
 
+// Cor de cada situação: agenda (azul), caixa (verde), vencimentos (laranja), equilíbrio (roxo)
+const acento = {
+  agenda: "var(--chart-4)",
+  saldo: "var(--success)",
+  contas: "var(--warning)",
+  equilibrio: "var(--chart-5)",
+} as const;
+
+const estiloCard = (cor: string): React.CSSProperties => ({
+  backgroundColor: `color-mix(in oklab, ${cor} 10%, var(--card))`,
+  borderColor: `color-mix(in oklab, ${cor} 40%, transparent)`,
+  borderTop: `3px solid ${cor}`,
+});
+
 function Dashboard() {
   const qc = useQueryClient();
   const sincronizarFn = useServerFn(sincronizarNotas);
