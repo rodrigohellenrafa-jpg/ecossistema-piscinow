@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -103,7 +103,7 @@ const acento = {
   equilibrio: "var(--chart-5)",
 } as const;
 
-const estiloCard = (cor: string): React.CSSProperties => ({
+const estiloCard = (cor: string): CSSProperties => ({
   backgroundColor: `color-mix(in oklab, ${cor} 10%, var(--card))`,
   borderColor: `color-mix(in oklab, ${cor} 40%, transparent)`,
   borderTop: `3px solid ${cor}`,
@@ -391,7 +391,7 @@ function Dashboard() {
       )}
 
       <div
-        className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-4 [&>div]:cursor-pointer [&>div]:transition-colors [&>div:hover]:border-primary/50"
+        className="grid grid-cols-2 items-start gap-3 [&>div]:cursor-pointer [&>div]:transition-all [&>div:hover]:brightness-[0.97]"
         onClick={(e) => {
           if ((e.target as HTMLElement).closest("a,button")) return;
           const card = (e.target as HTMLElement).closest("[data-detalhe]") as HTMLElement | null;
