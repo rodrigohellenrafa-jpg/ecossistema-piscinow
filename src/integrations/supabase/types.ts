@@ -403,6 +403,7 @@ export type Database = {
           categoria: string | null
           cliente_id: string | null
           competencia_recorrencia: string | null
+          comprovante_path: string | null
           condicao_id: string | null
           conta_bancaria: string | null
           created_at: string
@@ -436,6 +437,7 @@ export type Database = {
           categoria?: string | null
           cliente_id?: string | null
           competencia_recorrencia?: string | null
+          comprovante_path?: string | null
           condicao_id?: string | null
           conta_bancaria?: string | null
           created_at?: string
@@ -469,6 +471,7 @@ export type Database = {
           categoria?: string | null
           cliente_id?: string | null
           competencia_recorrencia?: string | null
+          comprovante_path?: string | null
           condicao_id?: string | null
           conta_bancaria?: string | null
           created_at?: string
@@ -961,6 +964,7 @@ export type Database = {
         Row: {
           categoria: string
           cliente_id: string | null
+          comprovante_path: string | null
           conciliado: boolean
           conta_bancaria: string | null
           created_at: string
@@ -987,6 +991,7 @@ export type Database = {
         Insert: {
           categoria?: string
           cliente_id?: string | null
+          comprovante_path?: string | null
           conciliado?: boolean
           conta_bancaria?: string | null
           created_at?: string
@@ -1013,6 +1018,7 @@ export type Database = {
         Update: {
           categoria?: string
           cliente_id?: string | null
+          comprovante_path?: string | null
           conciliado?: boolean
           conta_bancaria?: string | null
           created_at?: string
@@ -1523,6 +1529,7 @@ export type Database = {
       }
       ordem_compra_pagamentos: {
         Row: {
+          comprovante_path: string | null
           conta_bancaria: string | null
           created_at: string
           created_by: string | null
@@ -1535,6 +1542,7 @@ export type Database = {
           valor: number
         }
         Insert: {
+          comprovante_path?: string | null
           conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
@@ -1547,6 +1555,7 @@ export type Database = {
           valor?: number
         }
         Update: {
+          comprovante_path?: string | null
           conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
@@ -2365,6 +2374,7 @@ export type Database = {
       }
       venda_pagamentos: {
         Row: {
+          comprovante_path: string | null
           conta_bancaria: string | null
           created_at: string
           created_by: string | null
@@ -2379,6 +2389,7 @@ export type Database = {
           venda_id: string
         }
         Insert: {
+          comprovante_path?: string | null
           conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
@@ -2393,6 +2404,7 @@ export type Database = {
           venda_id: string
         }
         Update: {
+          comprovante_path?: string | null
           conta_bancaria?: string | null
           created_at?: string
           created_by?: string | null
