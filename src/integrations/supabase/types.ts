@@ -420,6 +420,7 @@ export type Database = {
           recorrencia: string
           recorrencia_fim: string | null
           recorrencia_id: string | null
+          saldo_gerenciado_externamente: boolean
           status: string
           tipo: string
           tipo_despesa: string | null
@@ -452,6 +453,7 @@ export type Database = {
           recorrencia?: string
           recorrencia_fim?: string | null
           recorrencia_id?: string | null
+          saldo_gerenciado_externamente?: boolean
           status?: string
           tipo?: string
           tipo_despesa?: string | null
@@ -484,6 +486,7 @@ export type Database = {
           recorrencia?: string
           recorrencia_fim?: string | null
           recorrencia_id?: string | null
+          saldo_gerenciado_externamente?: boolean
           status?: string
           tipo?: string
           tipo_despesa?: string | null

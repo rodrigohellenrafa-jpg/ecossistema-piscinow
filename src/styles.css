@@ -341,24 +341,24 @@
 #documentos-venda .doc-itens th {
   background: #eaf3fb;
 }
-/* Ordem de compra: linhas intercaladas verde claro / branco */
+/* Ordem de compra: vermelho identifica saída financeira */
 #documentos-venda .doc-itens-compra th,
 #documentos-venda .doc-itens-compra td {
-  border-color: #14532d;
-  color: #0f2e18;
+  border-color: #991b1b;
+  color: #450a0a;
 }
 #documentos-venda .doc-itens-compra th {
-  background: #bbf7d0;
+  background: #fecaca;
 }
 #documentos-venda .doc-itens-compra tbody tr:nth-child(odd) td {
-  background: #e9f9ee;
+  background: #fef2f2;
 }
 #documentos-venda .doc-itens-compra tbody tr:nth-child(even) td {
   background: #ffffff;
 }
 #documentos-venda .doc-compra .doc-box,
 #documentos-venda .doc-compra .doc-header {
-  border-color: #14532d;
+  border-color: #991b1b;
 }
 #documentos-venda .doc-center {
   text-align: center;
