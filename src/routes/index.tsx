@@ -384,7 +384,7 @@ function Dashboard() {
           if (card) setDetalhe(card.dataset.detalhe as Detalhe);
         }}
       >
-        <Card className="min-w-0 overflow-hidden">
+        <Card data-detalhe="agenda" className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
               <CalendarDays className="size-3.5 shrink-0 text-primary" /> Agenda
@@ -430,7 +430,7 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden">
+        <Card data-detalhe="saldo" className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
               <Landmark className="size-3.5 shrink-0 text-primary" /> Saldo · ontem
@@ -471,7 +471,7 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden">
+        <Card data-detalhe="contas" className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
               <Waves className="size-3.5 shrink-0 text-primary" /> Venc. hoje
@@ -515,7 +515,7 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden">
+        <Card data-detalhe="equilibrio" className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
               <Scale className="size-3.5 shrink-0 text-primary" /> Equilíbrio
