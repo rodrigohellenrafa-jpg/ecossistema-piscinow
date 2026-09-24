@@ -206,7 +206,7 @@ function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("id, tipo, descricao, parceiro, valor, valor_pago, status, vencimento, data_pagamento");
+        .select("id, tipo, descricao, parceiro, valor, valor_pago, valor_juros, valor_desconto, status, vencimento, data_pagamento");
       if (error) throw error;
       return data;
     },
@@ -332,12 +332,17 @@ function Dashboard() {
   const totalPagarHoje = pagarHoje.reduce((soma, conta) => soma + numero(conta.valor), 0);
   const totalReceberHoje = receberHoje.reduce((soma, conta) => soma + numero(conta.valor), 0);
 
+  /** Valor que realmente movimentou a conta: valor pago ou valor + acréscimo − desconto. */
+  const valorMovimentado = (conta: (typeof contas)[number]) =>
+    numero(conta.valor_pago) ||
+    Math.max(0, numero(conta.valor) + numero(conta.valor_juros) - numero(conta.valor_desconto));
+
   const fluxoOntem = useMemo(() => {
     let entradas = 0;
     let saidas = 0;
     for (const conta of contas) {
       if (conta.status !== "pago" || texto(conta.data_pagamento).slice(0, 10) !== ontem) continue;
-      const valor = numero(conta.valor_pago) || numero(conta.valor);
+      const valor = valorMovimentado(conta);
       if (conta.tipo === "receber") entradas += valor;
       else saidas += valor;
     }
