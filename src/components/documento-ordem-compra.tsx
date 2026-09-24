@@ -55,35 +55,6 @@ const EMPRESA_PADRAO = {
   contato: "",
 };
 
-/** Monta o corpo do e-mail em texto simples com os itens da ordem. */
-const corpoEmail = (ordem: Ordem, itens: Item[], empresaNome: string) => {
-  const linhas = itens.map(
-    (i) =>
-      `- ${i.quantidade} ${i.unidade} | ${i.descricao}${i.codigo ? ` (cód. ${i.codigo})` : ""} | unit. ${brl(
-        Number(i.valor_unitario),
-      )} | total ${brl(Number(i.total))}`,
-  );
-  return [
-    "Olá,",
-    "",
-    `Segue nossa ordem de compra ${ordem.numero ?? ""} emitida em ${dataBR(ordem.data_pedido)}.`,
-    "",
-    "ITENS:",
-    ...linhas,
-    "",
-    `Valor total: ${brl(Number(ordem.valor_total))}`,
-    ordem.previsao_entrega ? `Previsão de entrega: ${dataBR(ordem.previsao_entrega)}` : "",
-    ordem.condicoes ? `Condições de pagamento: ${ordem.condicoes}` : "",
-    ordem.observacoes ? `Observações: ${ordem.observacoes}` : "",
-    "",
-    "Favor confirmar o recebimento e o prazo de entrega.",
-    "",
-    "Atenciosamente,",
-    empresaNome,
-  ]
-    .filter((l) => l !== "")
-    .join("\n");
-};
 
 export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Props) {
   const emp = { ...EMPRESA_PADRAO, ...(empresa ?? {}) };
