@@ -340,51 +340,51 @@ function Dashboard() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
         title="Visão do dia"
         subtitle={`${new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })} · agenda, caixa e compromissos financeiros.`}
       />
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <Card className="min-w-0 overflow-hidden xl:min-h-[31rem]">
-          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <CalendarDays className="size-4 text-primary" /> Agenda da semana
+      <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="min-w-0 overflow-hidden">
+          <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
+            <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
+              <CalendarDays className="size-3.5 shrink-0 text-primary" /> Agenda da semana
             </CardTitle>
-            <AcessoCard to="/agenda">Abrir agenda</AcessoCard>
+            <AcessoCard to="/agenda">Abrir</AcessoCard>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="font-medium">Obras de hoje</p>
+          <CardContent className="space-y-2 p-3 pt-2">
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-2">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium">Obras de hoje</p>
                 <Badge>{obrasHoje.length}</Badge>
               </div>
               {obrasHoje.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma etapa de obra programada para hoje.</p>
+                <p className="text-xs text-muted-foreground">Nenhuma etapa de obra hoje.</p>
               ) : (
-                <div className="space-y-2">
-                  {obrasHoje.map((item) => (
-                    <div key={item.id} className="border-l-2 border-primary pl-3 text-sm">
-                      <p className="font-medium">{item.titulo}</p>
-                      <p className="text-xs text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
+                <div className="space-y-1">
+                  {obrasHoje.slice(0, 3).map((item) => (
+                    <div key={item.id} className="border-l-2 border-primary pl-2">
+                      <p className="truncate text-xs font-medium">{item.titulo}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-0.5">
               {agendaSemana.length === 0 ? (
-                <p className="py-12 text-center text-sm text-muted-foreground">Nenhum compromisso nesta semana.</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">Nenhum compromisso nesta semana.</p>
               ) : (
-                agendaSemana.slice(0, 8).map((item) => (
-                  <div key={item.id} className="flex gap-3 border-b border-border py-2 last:border-0">
-                    <div className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                agendaSemana.slice(0, 6).map((item) => (
+                  <div key={item.id} className="flex gap-2 border-b border-border py-1.5 last:border-0">
+                    <div className="w-12 shrink-0 text-[11px] font-medium text-muted-foreground">
                       {new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" })}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{item.titulo}</p>
-                      <p className="truncate text-xs text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
+                      <p className="truncate text-xs font-medium">{item.titulo}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
                     </div>
                   </div>
                 ))
@@ -393,36 +393,36 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden xl:min-h-[31rem]">
-          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Landmark className="size-4 text-primary" /> Saldo e fluxo de ontem
+        <Card className="min-w-0 overflow-hidden">
+          <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
+            <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
+              <Landmark className="size-3.5 shrink-0 text-primary" /> Saldo e fluxo de ontem
             </CardTitle>
-            <AcessoCard to="/fluxo-caixa">Ver fluxo</AcessoCard>
+            <AcessoCard to="/fluxo-caixa">Fluxo</AcessoCard>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-2 p-3 pt-2">
             <div>
-              <p className="text-xs font-medium uppercase text-muted-foreground">Saldo atual nas contas</p>
-              <p className={`mt-1 text-3xl font-semibold tabular-nums ${saldoTotal < 0 ? "text-destructive" : "text-success"}`}>
+              <p className="text-[11px] font-medium uppercase text-muted-foreground">Saldo nas contas</p>
+              <p className={`text-xl font-semibold tabular-nums ${saldoTotal < 0 ? "text-destructive" : "text-success"}`}>
                 {brl(saldoTotal)}
               </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
-              <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
-              <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
+            <div className="grid grid-cols-3 gap-1.5">
+              <ResumoValor label="Entradas" valor={fluxoOntem.entradas} positivo />
+              <ResumoValor label="Saídas" valor={fluxoOntem.saidas} />
+              <ResumoValor label="Resultado" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {saldosContas.length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
+                <p className="py-4 text-center text-xs text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
               ) : (
-                saldosContas.map((conta) => (
-                  <div key={conta.conta} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-3">
+                saldosContas.slice(0, 4).map((conta) => (
+                  <div key={conta.conta} className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{conta.conta}</p>
-                      <p className="truncate text-xs text-muted-foreground">{conta.banco || "Conta bancária"}</p>
+                      <p className="truncate text-xs font-medium">{conta.conta}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{conta.banco || "Conta bancária"}</p>
                     </div>
-                    <span className={`shrink-0 font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}>
+                    <span className={`shrink-0 text-xs font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}>
                       {brl(conta.saldo)}
                     </span>
                   </div>
@@ -432,41 +432,41 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden xl:min-h-[29rem]">
-          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Waves className="size-4 text-primary" /> Contas com vencimento hoje
+        <Card className="min-w-0 overflow-hidden">
+          <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
+            <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
+              <Waves className="size-3.5 shrink-0 text-primary" /> Vencem hoje
             </CardTitle>
-            <AcessoCard to="/contas">Abrir contas</AcessoCard>
+            <AcessoCard to="/contas">Contas</AcessoCard>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-md border border-border p-3">
-                <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <ArrowDownCircle className="size-4 text-destructive" /> A pagar
+          <CardContent className="space-y-2 p-3 pt-2">
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="rounded-md border border-border p-2">
+                <p className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                  <ArrowDownCircle className="size-3 text-destructive" /> A pagar
                 </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-destructive">{brl(totalPagarHoje)}</p>
-                <p className="text-xs text-muted-foreground">{pagarHoje.length} título(s)</p>
+                <p className="text-sm font-semibold tabular-nums text-destructive">{brl(totalPagarHoje)}</p>
+                <p className="text-[11px] text-muted-foreground">{pagarHoje.length} título(s)</p>
               </div>
-              <div className="rounded-md border border-border p-3">
-                <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <ArrowUpCircle className="size-4 text-success" /> A receber
+              <div className="rounded-md border border-border p-2">
+                <p className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                  <ArrowUpCircle className="size-3 text-success" /> A receber
                 </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-success">{brl(totalReceberHoje)}</p>
-                <p className="text-xs text-muted-foreground">{receberHoje.length} título(s)</p>
+                <p className="text-sm font-semibold tabular-nums text-success">{brl(totalReceberHoje)}</p>
+                <p className="text-[11px] text-muted-foreground">{receberHoje.length} título(s)</p>
               </div>
             </div>
             {contasHoje.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">Nenhuma conta vence hoje.</p>
+              <p className="py-6 text-center text-xs text-muted-foreground">Nenhuma conta vence hoje.</p>
             ) : (
-              <div className="space-y-2">
-                {contasHoje.slice(0, 7).map((conta) => (
-                  <div key={conta.id} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
+              <div className="space-y-0.5">
+                {contasHoje.slice(0, 6).map((conta) => (
+                  <div key={conta.id} className="flex items-center justify-between gap-2 border-b border-border py-1.5 last:border-0">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{conta.descricao}</p>
-                      <p className="truncate text-xs text-muted-foreground">{conta.parceiro || "Sem beneficiário"} · {conta.status}</p>
+                      <p className="truncate text-xs font-medium">{conta.descricao}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{conta.parceiro || "Sem beneficiário"} · {conta.status}</p>
                     </div>
-                    <span className={`shrink-0 font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}>
+                    <span className={`shrink-0 text-xs font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}>
                       {conta.tipo === "receber" ? "+" : "−"} {brl(numero(conta.valor))}
                     </span>
                   </div>
@@ -476,43 +476,42 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-w-0 overflow-hidden xl:min-h-[29rem]">
-          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Scale className="size-4 text-primary" /> Ponto de equilíbrio do mês
+        <Card className="min-w-0 overflow-hidden">
+          <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
+            <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
+              <Scale className="size-3.5 shrink-0 text-primary" /> Ponto de equilíbrio
             </CardTitle>
-            <AcessoCard to="/dre">Abrir DRE</AcessoCard>
+            <AcessoCard to="/dre">DRE</AcessoCard>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+          <CardContent className="space-y-2 p-3 pt-2">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <p className="text-xs text-muted-foreground">Faturamento</p>
-                <p className="font-semibold tabular-nums text-success">{brl(faturamento)}</p>
+                <p className="text-[11px] text-muted-foreground">Faturamento</p>
+                <p className="text-sm font-semibold tabular-nums text-success">{brl(faturamento)}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Necessário para empatar</p>
-                <p className="font-semibold tabular-nums">{brl(pontoEquilibrio)}</p>
+                <p className="text-[11px] text-muted-foreground">Para empatar</p>
+                <p className="text-sm font-semibold tabular-nums">{brl(pontoEquilibrio)}</p>
               </div>
             </div>
-            <div className="h-64">
+            <div className="h-28">
               {faturamento === 0 && pontoEquilibrio === 0 ? (
-                <p className="py-20 text-center text-sm text-muted-foreground">Ainda não há dados suficientes neste mês.</p>
+                <p className="py-8 text-center text-xs text-muted-foreground">Ainda não há dados suficientes neste mês.</p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dadosEquilibrio} margin={{ top: 16, right: 8, left: 8, bottom: 0 }}>
+                  <BarChart data={dadosEquilibrio} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                    <XAxis dataKey="nome" stroke="var(--muted-foreground)" fontSize={12} />
-                    <YAxis stroke="var(--muted-foreground)" fontSize={12} width={78} tickFormatter={(v) => `${Math.round(Number(v) / 1000)} mil`} />
-                    <Tooltip formatter={(v: number) => brl(Number(v))} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }} />
-                    <Legend />
+                    <XAxis dataKey="nome" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} />
+                    <YAxis stroke="var(--muted-foreground)" fontSize={10} width={52} tickFormatter={(v) => `${Math.round(Number(v) / 1000)} mil`} tickLine={false} />
+                    <Tooltip formatter={(v: number) => brl(Number(v))} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
                     <ReferenceLine y={pontoEquilibrio} stroke="var(--destructive)" strokeDasharray="4 4" />
-                    <Bar dataKey="faturamento" name="Faturamento" fill="var(--success)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="equilibrio" name="Ponto de equilíbrio" fill="var(--chart-4)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="faturamento" name="Faturamento" fill="var(--success)" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="equilibrio" name="Ponto de equilíbrio" fill="var(--chart-4)" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
-            <div className="flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center justify-between gap-2 text-xs">
               <span className="text-muted-foreground">Progresso até o equilíbrio</span>
               <strong className={faturamento >= pontoEquilibrio && pontoEquilibrio > 0 ? "text-success" : "text-warning"}>
                 {percentualEquilibrio.toFixed(1)}%
@@ -527,9 +526,9 @@ function Dashboard() {
 
 function ResumoValor({ label, valor, positivo = false }: { label: string; valor: number; positivo?: boolean }) {
   return (
-    <div className="rounded-md border border-border p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-sm font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
+    <div className="min-w-0 rounded-md border border-border p-1.5">
+      <p className="truncate text-[10px] text-muted-foreground">{label}</p>
+      <p className={`text-xs font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
         {brl(valor)}
       </p>
     </div>
