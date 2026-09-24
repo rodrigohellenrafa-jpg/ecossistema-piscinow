@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -25,6 +26,7 @@ import {
   MessageCircle,
   Link2,
   Gauge,
+  ChevronRight,
 } from "lucide-react";
 
 import {
@@ -32,13 +34,20 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarFooter,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useRoles, type ACESSO } from "@/hooks/use-role";
 import { InstallAppButton } from "@/components/install-app-button";
 
@@ -136,6 +145,60 @@ const groups: {
 
 ];
 
+type MenuGroup = (typeof groups)[number];
+
+function MenuSuspenso({ group, currentPath }: { group: MenuGroup; currentPath: string }) {
+  const contemRotaAtual = group.items.some(
+    (item) => currentPath === item.url || (item.url !== "/" && currentPath.startsWith(`${item.url}/`)),
+  );
+  const [aberto, setAberto] = useState(contemRotaAtual);
+  const GroupIcon = group.items[0]?.icon;
+
+  useEffect(() => {
+    if (contemRotaAtual) setAberto(true);
+  }, [contemRotaAtual]);
+
+  if (!GroupIcon) return null;
+
+  return (
+    <Collapsible open={aberto} onOpenChange={setAberto}>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton
+              tooltip={group.label}
+              isActive={contemRotaAtual}
+              aria-label={`${aberto ? "Fechar" : "Abrir"} ${group.label}`}
+              aria-expanded={aberto}
+              className="font-medium"
+            >
+              <GroupIcon />
+              <span>{group.label}</span>
+              <ChevronRight
+                className={`ml-auto transition-transform duration-200 ${aberto ? "rotate-90" : ""}`}
+              />
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarMenuSub>
+              {group.items.map((item) => (
+                <SidebarMenuSubItem key={item.url}>
+                  <SidebarMenuSubButton asChild isActive={currentPath === item.url}>
+                    <Link to={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </Collapsible>
+  );
+}
+
 export function AppSidebar() {
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const { podeRota } = useRoles();
@@ -155,27 +218,12 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {groups
-          .map(g => ({...g, items:g.items.filter(item=>podeRota(item.url))})).filter(g=>g.items.length>0)
+          .map((g) => ({ ...g, items: g.items.filter((item) => podeRota(item.url)) }))
+          .filter((g) => g.items.length > 0)
           .map((group) => (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroup key={group.label} className="py-0.5">
               <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.items.map((item) => (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton
-                        asChild
-                        tooltip={item.title}
-                        isActive={currentPath === item.url}
-                      >
-                        <Link to={item.url}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
+                <MenuSuspenso group={group} currentPath={currentPath} />
               </SidebarGroupContent>
             </SidebarGroup>
           ))}
