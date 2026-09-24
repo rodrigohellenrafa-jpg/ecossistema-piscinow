@@ -78,9 +78,9 @@ type AgendaItem = {
 
 function AcessoCard({ to, children }: { to: "/agenda" | "/fluxo-caixa" | "/contas" | "/dre"; children: string }) {
   return (
-    <Button asChild size="sm" variant="ghost">
+    <Button asChild size="sm" variant="ghost" className="h-7 shrink-0 gap-1 rounded-md px-2 text-xs">
       <Link to={to} search={to === "/contas" ? { periodo: "hoje", tipo: undefined } : undefined}>
-        {children} <ArrowRight />
+        {children} <ArrowRight className="size-3.5" />
       </Link>
     </Button>
   );
