@@ -67,10 +67,10 @@ export function SaldosBancarios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("tipo, valor, valor_pago, valor_desconto, valor_juros, conta_bancaria, status, data_pagamento")
+        .select("tipo, descricao, valor, valor_pago, valor_desconto, valor_juros, conta_bancaria, status, data_pagamento")
         .eq("data_pagamento", hoje);
       if (error) throw error;
-      return (data as { tipo: string; valor: number; valor_juros: number | null; valor_pago: number; valor_desconto: number; conta_bancaria: string | null; status: string }[])
+      return (data as { tipo: string; descricao: string; valor: number; valor_juros: number | null; valor_pago: number; valor_desconto: number; conta_bancaria: string | null; status: string }[])
         .filter((c) => ["pago", "pago_parcial"].includes(c.status.toLowerCase()));
     },
     refetchInterval: 5000,
@@ -82,10 +82,10 @@ export function SaldosBancarios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lancamentos_financeiros")
-        .select("tipo_fluxo, valor, conta_bancaria, status, data_pagamento")
+        .select("tipo_fluxo, descricao, valor, conta_bancaria, status, data_pagamento")
         .eq("data_pagamento", hoje);
       if (error) throw error;
-      return (data as { tipo_fluxo: string; valor: number; conta_bancaria: string | null; status: string }[])
+      return (data as { tipo_fluxo: string; descricao: string; valor: number; conta_bancaria: string | null; status: string }[])
         .filter((l) => ["pago", "pago_parcial"].includes(l.status.toLowerCase()));
     },
     refetchInterval: 5000,
@@ -94,13 +94,24 @@ export function SaldosBancarios() {
   const valorBaixado = (c: typeof contasHoje[number]) => Number(c.valor_pago) || Math.max(0, Number(c.valor) + Number(c.valor_juros) - Number(c.valor_desconto));
   const ehEntrada = (t: string) => ["receber", "entrada", "receita"].includes(t.toLowerCase());
 
-  const entradasHoje =
-    contasHoje.filter((c) => ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
-    lancHoje.filter((l) => ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
-
-  const saidasHoje =
-    contasHoje.filter((c) => !ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
-    lancHoje.filter((l) => !ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
+  /** Movimentos de hoje, um a um, para exibir os valores separados. */
+  const movimentosHoje = [
+    ...contasHoje.map((c) => ({
+      descricao: c.descricao,
+      valor: valorBaixado(c),
+      entrada: ehEntrada(c.tipo),
+    })),
+    ...lancHoje.map((l) => ({
+      descricao: l.descricao,
+      valor: Number(l.valor ?? 0),
+      entrada: ehEntrada(l.tipo_fluxo),
+    })),
+  ];
+  const entradasLista = movimentosHoje.filter((m) => m.entrada);
+  const saidasLista = movimentosHoje.filter((m) => !m.entrada);
+  const entradasHoje = entradasLista.reduce((s, m) => s + m.valor, 0);
+  const saidasHoje = saidasLista.reduce((s, m) => s + m.valor, 0);
+  const saldoDia = entradasHoje - saidasHoje;
 
   /** Movimento do dia já identificado com a conta bancária informada. */
   const movimentoConta = (conta: string) =>
@@ -209,6 +220,55 @@ export function SaldosBancarios() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {movimentosHoje.length > 0 && (
+          <div className="space-y-3 rounded-lg border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Movimentos de hoje
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-emerald-500">
+                  Entradas · {entradasLista.length} · {brl(entradasHoje)}
+                </p>
+                {entradasLista.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhuma entrada hoje.</p>
+                ) : (
+                  entradasLista.map((m, i) => (
+                    <div key={`e-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate">{m.descricao}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-emerald-500">
+                        +{brl(m.valor)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-destructive">
+                  Saídas · {saidasLista.length} · {brl(saidasHoje)}
+                </p>
+                {saidasLista.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhuma saída hoje.</p>
+                ) : (
+                  saidasLista.map((m, i) => (
+                    <div key={`s-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate">{m.descricao}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-destructive">
+                        −{brl(m.valor)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t pt-2 text-xs font-semibold">
+              <span>Saldo do dia (entradas − saídas)</span>
+              <span className={`tabular-nums ${saldoDia >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                {saldoDia >= 0 ? "+" : "−"}{brl(Math.abs(saldoDia))}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {saldos.map((s) => {
             const e = edits[s.id];
