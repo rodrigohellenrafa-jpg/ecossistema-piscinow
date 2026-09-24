@@ -2308,6 +2308,7 @@ function OrdensCompra() {
                                     conta_bancaria: p.conta_bancaria ?? "",
                                     valor: String(p.valor),
                                     observacoes: p.observacoes ?? "",
+                                    comprovante_path: p.comprovante_path ?? null,
                                   });
                                 }}
                               >
