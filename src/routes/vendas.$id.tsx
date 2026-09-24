@@ -1,3 +1,4 @@
+import { num as numBR } from "@/lib/erp";
 import { TelaPermitida } from "@/components/tela-permitida";
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
@@ -261,11 +262,11 @@ function DetalhePedido() {
 
   const adicionarPagamento = useMutation({
     mutationFn: async () => {
-      const valor = Number(String(novoPag.valor).replace(",", "."));
+      const valor = numBR(novoPag.valor);
       if (!valor || valor <= 0) throw new Error("Informe um valor maior que zero.");
       if (contasBancarias.length > 0 && !novoPag.conta_bancaria)
         throw new Error("Escolha a conta onde o dinheiro entrou.");
-      const valorOrigem = Number(String(novoPag.valor_origem).replace(",", ".")) || valor;
+      const valorOrigem = numBR(novoPag.valor_origem) || valor;
       const retencaoFinanceira = Math.max(Number((valorOrigem - valor).toFixed(2)), 0);
       const { error } = await supabase.from("venda_pagamentos").insert({
         venda_id: id,
@@ -332,7 +333,7 @@ function DetalhePedido() {
   });
 
   // ---- Edição por bloco (cada card tem seu próprio modal) ----
-  const num = (v: unknown) => Number(String(v ?? "").replace(",", ".")) || 0;
+  const num = numBR;
 
   const [editPedido, setEditPedido] = useState<null | {
     data: string;
