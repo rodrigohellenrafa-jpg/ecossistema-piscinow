@@ -220,6 +220,55 @@ export function SaldosBancarios() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {movimentosHoje.length > 0 && (
+          <div className="space-y-3 rounded-lg border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Movimentos de hoje
+            </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-emerald-500">
+                  Entradas · {entradasLista.length} · {brl(entradasHoje)}
+                </p>
+                {entradasLista.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhuma entrada hoje.</p>
+                ) : (
+                  entradasLista.map((m, i) => (
+                    <div key={`e-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate">{m.descricao}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-emerald-500">
+                        +{brl(m.valor)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-destructive">
+                  Saídas · {saidasLista.length} · {brl(saidasHoje)}
+                </p>
+                {saidasLista.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhuma saída hoje.</p>
+                ) : (
+                  saidasLista.map((m, i) => (
+                    <div key={`s-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate">{m.descricao}</span>
+                      <span className="shrink-0 font-medium tabular-nums text-destructive">
+                        −{brl(m.valor)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between border-t pt-2 text-xs font-semibold">
+              <span>Saldo do dia (entradas − saídas)</span>
+              <span className={`tabular-nums ${saldoDia >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                {saldoDia >= 0 ? "+" : "−"}{brl(Math.abs(saldoDia))}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {saldos.map((s) => {
             const e = edits[s.id];
