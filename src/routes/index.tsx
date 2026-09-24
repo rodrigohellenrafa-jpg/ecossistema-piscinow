@@ -349,7 +349,7 @@ function Dashboard() {
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <CalendarDays className="size-3.5 shrink-0 text-primary" /> Agenda da semana
+              <CalendarDays className="size-3.5 shrink-0 text-primary" /> Agenda
             </CardTitle>
             <AcessoCard to="/agenda">Abrir</AcessoCard>
           </CardHeader>
@@ -395,7 +395,7 @@ function Dashboard() {
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Landmark className="size-3.5 shrink-0 text-primary" /> Saldo e fluxo de ontem
+              <Landmark className="size-3.5 shrink-0 text-primary" /> Saldo · ontem
             </CardTitle>
             <AcessoCard to="/fluxo-caixa">Fluxo</AcessoCard>
           </CardHeader>
@@ -478,19 +478,19 @@ function Dashboard() {
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Scale className="size-3.5 shrink-0 text-primary" /> Ponto de equilíbrio
+              <Scale className="size-3.5 shrink-0 text-primary" /> Equilíbrio
             </CardTitle>
             <AcessoCard to="/dre">DRE</AcessoCard>
           </CardHeader>
           <CardContent className="space-y-2 p-3 pt-2">
             <div className="grid grid-cols-2 gap-2">
-              <div>
+              <div className="min-w-0">
                 <p className="text-[11px] text-muted-foreground">Faturamento</p>
-                <p className="text-sm font-semibold tabular-nums text-success">{brl(faturamento)}</p>
+                <p className="truncate text-xs font-semibold tabular-nums text-success">{brl(faturamento)}</p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[11px] text-muted-foreground">Para empatar</p>
-                <p className="text-sm font-semibold tabular-nums">{brl(pontoEquilibrio)}</p>
+                <p className="truncate text-xs font-semibold tabular-nums">{brl(pontoEquilibrio)}</p>
               </div>
             </div>
             <div className="h-28">
@@ -527,7 +527,7 @@ function ResumoValor({ label, valor, positivo = false }: { label: string; valor:
   return (
     <div className="min-w-0 rounded-md border border-border p-1.5">
       <p className="truncate text-[10px] text-muted-foreground">{label}</p>
-      <p className={`text-xs font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
+      <p className={`truncate text-[11px] font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
         {brl(valor)}
       </p>
     </div>
