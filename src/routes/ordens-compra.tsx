@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ComprovanteAnexo } from "@/components/comprovante-anexo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ExpandableCard } from "@/components/expandable-card";
@@ -396,6 +397,7 @@ function OrdensCompra() {
     conta_bancaria: "",
     valor: "",
     observacoes: "",
+    comprovante_path: null as string | null,
   });
   const [editPagamentoId, setEditPagamentoId] = useState<string | null>(null);
   const [ordemParaBaixar, setOrdemParaBaixar] = useState<Ordem | null>(null);
@@ -403,6 +405,7 @@ function OrdensCompra() {
     data_pagamento: hojeISO(),
     conta_bancaria: "",
     valor: "",
+    comprovante_path: null as string | null,
   });
 
   const totalPagoOrdem = pagamentosOrdem.reduce((s, p) => s + Number(p.valor ?? 0), 0);
@@ -441,6 +444,7 @@ function OrdensCompra() {
         conta_bancaria: novoPagamento.conta_bancaria || null,
         valor,
         observacoes: novoPagamento.observacoes || null,
+        comprovante_path: novoPagamento.comprovante_path,
       };
       if (editPagamentoId) {
         const { error } = await supabase
@@ -466,6 +470,7 @@ function OrdensCompra() {
         conta_bancaria: "",
         valor: "",
         observacoes: "",
+        comprovante_path: null,
       });
       qc.invalidateQueries({ queryKey: ["ordem_compra_pagamentos"] });
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
@@ -507,6 +512,7 @@ function OrdensCompra() {
       data_pagamento: hojeISO(),
       conta_bancaria: "",
       valor: String(saldo),
+      comprovante_path: null,
     });
   };
 
@@ -524,6 +530,7 @@ function OrdensCompra() {
         conta_bancaria: baixaCompra.conta_bancaria,
         valor,
         observacoes: "Baixa automática pelo status Comprado",
+        comprovante_path: baixaCompra.comprovante_path,
         created_by: auth.user?.id ?? null,
       });
       if (error) throw error;
@@ -2301,6 +2308,7 @@ function OrdensCompra() {
                                     conta_bancaria: p.conta_bancaria ?? "",
                                     valor: String(p.valor),
                                     observacoes: p.observacoes ?? "",
+                                    comprovante_path: p.comprovante_path ?? null,
                                   });
                                 }}
                               >
@@ -2392,6 +2400,17 @@ function OrdensCompra() {
                       }
                     />
                   </Field>
+                  <div className="sm:col-span-5">
+                    <Field label="Comprovante">
+                      <ComprovanteAnexo
+                        tabela="ordem_compra_pagamentos"
+                        valor={novoPagamento.comprovante_path}
+                        onChange={(comprovante_path) =>
+                          setNovoPagamento((s) => ({ ...s, comprovante_path }))
+                        }
+                      />
+                    </Field>
+                  </div>
                   <div className="flex gap-2 sm:col-span-5">
                     <Button
                       onClick={() => salvarPagamento.mutate()}
@@ -2410,6 +2429,7 @@ function OrdensCompra() {
                             conta_bancaria: "",
                             valor: "",
                             observacoes: "",
+                            comprovante_path: null,
                           });
                         }}
                       >
@@ -2800,6 +2820,17 @@ function OrdensCompra() {
                 </SelectContent>
               </Select>
             </Field>
+            <div className="sm:col-span-2">
+              <Field label="Comprovante (opcional)">
+                <ComprovanteAnexo
+                  tabela="ordem_compra_pagamentos"
+                  valor={baixaCompra.comprovante_path}
+                  onChange={(comprovante_path) =>
+                    setBaixaCompra((atual) => ({ ...atual, comprovante_path }))
+                  }
+                />
+              </Field>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOrdemParaBaixar(null)}>Cancelar</Button>

@@ -25,6 +25,7 @@ import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ComprovanteAnexo } from "@/components/comprovante-anexo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -145,6 +146,7 @@ const vazio = {
   recorrencia: "nenhuma",
   status: "Pendente",
   observacoes: "",
+  comprovante_path: null as string | null,
 };
 
 function Financeiro() {
@@ -158,6 +160,7 @@ function Financeiro() {
     valor: number;
     conta: string;
     data: string;
+    comprovante_path: string | null;
   } | null>(null);
 
   const [fTipo, setFTipo] = useState("todos");
@@ -304,6 +307,7 @@ function Financeiro() {
         recorrencia: form.recorrencia,
         status: form.status,
         observacoes: form.observacoes || null,
+        comprovante_path: form.comprovante_path,
         obra_id: vinc.obra_id ?? (form.obra_id || null),
         numero_documento: form.numero_documento || null,
         created_by: uid,
@@ -358,7 +362,17 @@ function Financeiro() {
   });
 
   const marcarPago = useMutation({
-    mutationFn: async ({ id, conta, data }: { id: string; conta: string; data: string }) => {
+    mutationFn: async ({
+      id,
+      conta,
+      data,
+      comprovantePath,
+    }: {
+      id: string;
+      conta: string;
+      data: string;
+      comprovantePath: string | null;
+    }) => {
       const { data: orig } = await supabase
         .from("lancamentos_financeiros")
         .select("*")
@@ -371,6 +385,7 @@ function Financeiro() {
           status: "Pago",
           data_pagamento: data || hojeISO(),
           conta_bancaria: conta || orig?.conta_bancaria || null,
+          comprovante_path: comprovantePath,
         })
         .eq("id", id);
       if (error) throw error;
@@ -709,6 +724,13 @@ function Financeiro() {
                     onChange={(e) => set("data_pagamento")(e.target.value)}
                   />
                 </Field>
+                <Field label="Comprovante">
+                  <ComprovanteAnexo
+                    tabela="lancamentos_financeiros"
+                    valor={form.comprovante_path}
+                    onChange={(comprovante_path) => setForm({ ...form, comprovante_path })}
+                  />
+                </Field>
                 <Field
                   label={
                     form.tipo_fluxo === "despesa"
@@ -1033,6 +1055,7 @@ function Financeiro() {
                                     valor: l.valor,
                                     conta: combina?.conta ?? "",
                                     data: hojeISO(),
+                                    comprovante_path: null,
                                   });
                                 }}
                                 title="Dar baixa"
@@ -1113,6 +1136,15 @@ function Financeiro() {
                 onChange={(e) => setBaixa((b) => (b ? { ...b, data: e.target.value } : b))}
               />
             </Field>
+            <Field label="Comprovante (opcional)">
+              <ComprovanteAnexo
+                tabela="lancamentos_financeiros"
+                valor={baixa?.comprovante_path ?? null}
+                onChange={(comprovante_path) =>
+                  setBaixa((b) => (b ? { ...b, comprovante_path } : b))
+                }
+              />
+            </Field>
             {contasBancarias.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 Nenhuma conta bancária cadastrada. Cadastre em Saldos bancários para que o saldo
@@ -1132,7 +1164,12 @@ function Financeiro() {
               }
               onClick={() =>
                 baixa &&
-                marcarPago.mutate({ id: baixa.id, conta: baixa.conta, data: baixa.data })
+                marcarPago.mutate({
+                  id: baixa.id,
+                  conta: baixa.conta,
+                  data: baixa.data,
+                  comprovantePath: baixa.comprovante_path,
+                })
               }
             >
               Confirmar baixa

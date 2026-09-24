@@ -11,6 +11,7 @@ import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ComprovanteAnexo } from "@/components/comprovante-anexo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -549,12 +550,14 @@ function Contas() {
       dataPagamento,
       modo,
       contaBancaria,
+      comprovantePath,
     }: {
       id: string;
       valorPago: number;
       dataPagamento: string;
       modo: "quitar" | "saldo";
       contaBancaria: string;
+      comprovantePath: string | null;
     }) => {
       const { data: conta } = await supabase.from("contas").select("*").eq("id", id).single();
       if (!conta) throw new Error("Título não encontrado.");
@@ -571,14 +574,15 @@ function Contas() {
         const { error: errParcial } = await supabase
           .from("contas")
           .update({
-            status: "pago",
-            data_pagamento: dataPagamento,
-            valor: Number((valorPago - jurosPagos).toFixed(2)),
-            valor_juros: jurosPagos,
-            valor_pago: valorPago,
-            valor_desconto: 0,
-            conta_bancaria: contaBancaria || null,
-          })
+             status: "pago",
+             data_pagamento: dataPagamento,
+             valor: Number((valorPago - jurosPagos).toFixed(2)),
+             valor_juros: jurosPagos,
+             valor_pago: valorPago,
+             valor_desconto: 0,
+             conta_bancaria: contaBancaria || null,
+             comprovante_path: comprovantePath,
+           })
           .eq("id", id);
         if (errParcial) throw errParcial;
 
@@ -607,12 +611,13 @@ function Contas() {
         const { error } = await supabase
           .from("contas")
           .update({
-            status: "pago",
-            data_pagamento: dataPagamento,
-            valor_pago: valorPago,
-            valor_desconto: diferenca > 0.009 ? diferenca : 0,
-            conta_bancaria: contaBancaria || null,
-          })
+             status: "pago",
+             data_pagamento: dataPagamento,
+             valor_pago: valorPago,
+             valor_desconto: diferenca > 0.009 ? diferenca : 0,
+             conta_bancaria: contaBancaria || null,
+             comprovante_path: comprovantePath,
+           })
           .eq("id", id);
         if (error) throw error;
       }
@@ -1329,6 +1334,7 @@ function BaixaDialog({
     dataPagamento: string;
     modo: "quitar" | "saldo";
     contaBancaria: string;
+    comprovantePath: string | null;
   }) => void;
 }) {
   const total = conta ? Number(conta.valor) + Number(conta.valor_juros ?? 0) : 0;
@@ -1336,6 +1342,7 @@ function BaixaDialog({
   const [dataPagamento, setDataPagamento] = useState("");
   const [modo, setModo] = useState<"quitar" | "saldo">("quitar");
   const [contaBancaria, setContaBancaria] = useState("");
+  const [comprovantePath, setComprovantePath] = useState<string | null>(null);
 
   const aberto = !!conta;
   const chave = conta?.id ?? "";
@@ -1345,6 +1352,7 @@ function BaixaDialog({
     setValorPago(total.toFixed(2));
     setDataPagamento(new Date().toISOString().slice(0, 10));
     setModo("quitar");
+    setComprovantePath(null);
     const atual = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
     setContaBancaria(atual);
   }
@@ -1433,6 +1441,13 @@ function BaixaDialog({
                 </SelectContent>
               </Select>
             </Field>
+            <Field label="Comprovante (opcional)" className="sm:col-span-2">
+              <ComprovanteAnexo
+                tabela="contas"
+                valor={comprovantePath}
+                onChange={setComprovantePath}
+              />
+            </Field>
             {opcoesContas.length === 0 && (
               <p className="mt-1 text-xs text-muted-foreground">
                 Nenhuma conta bancária cadastrada. Você pode confirmar a baixa assim mesmo — o saldo
@@ -1454,7 +1469,7 @@ function BaixaDialog({
             }
             onClick={() =>
               conta &&
-              onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria })
+              onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria, comprovantePath })
             }
           >
             Confirmar baixa
@@ -1485,6 +1500,7 @@ type Conta = {
   obra_id?: string | null;
   funcionario_id?: string | null;
   cliente_id?: string | null;
+  comprovante_path?: string | null;
 };
 
 function Lista({
@@ -1673,6 +1689,9 @@ function Lista({
                     </Badge>
                   </TableCell>
                   <TableCell className={`text-right ${acoesFixas}`}><div className="flex justify-end gap-1">
+                    {c.comprovante_path ? (
+                      <ComprovanteAnexo tabela="contas" valor={c.comprovante_path} />
+                    ) : null}
                     {c.status !== "pago" ? (
                       <Button
                         size="icon"
