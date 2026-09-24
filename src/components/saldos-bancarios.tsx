@@ -67,10 +67,10 @@ export function SaldosBancarios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("tipo, valor, valor_pago, valor_desconto, valor_juros, conta_bancaria, status, data_pagamento")
+        .select("tipo, descricao, valor, valor_pago, valor_desconto, valor_juros, conta_bancaria, status, data_pagamento")
         .eq("data_pagamento", hoje);
       if (error) throw error;
-      return (data as { tipo: string; valor: number; valor_juros: number | null; valor_pago: number; valor_desconto: number; conta_bancaria: string | null; status: string }[])
+      return (data as { tipo: string; descricao: string; valor: number; valor_juros: number | null; valor_pago: number; valor_desconto: number; conta_bancaria: string | null; status: string }[])
         .filter((c) => ["pago", "pago_parcial"].includes(c.status.toLowerCase()));
     },
     refetchInterval: 5000,
@@ -82,10 +82,10 @@ export function SaldosBancarios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lancamentos_financeiros")
-        .select("tipo_fluxo, valor, conta_bancaria, status, data_pagamento")
+        .select("tipo_fluxo, descricao, valor, conta_bancaria, status, data_pagamento")
         .eq("data_pagamento", hoje);
       if (error) throw error;
-      return (data as { tipo_fluxo: string; valor: number; conta_bancaria: string | null; status: string }[])
+      return (data as { tipo_fluxo: string; descricao: string; valor: number; conta_bancaria: string | null; status: string }[])
         .filter((l) => ["pago", "pago_parcial"].includes(l.status.toLowerCase()));
     },
     refetchInterval: 5000,
