@@ -16,6 +16,7 @@ import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ComprovanteAnexo } from "@/components/comprovante-anexo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -104,6 +105,7 @@ function DetalhePedido() {
     valor: "",
     valor_origem: "",
     observacoes: "",
+    comprovante: null as string | null,
   });
 
   async function excluirRegistro() {
@@ -277,6 +279,7 @@ function DetalhePedido() {
         valor_origem: valorOrigem,
         retencao_financeira: retencaoFinanceira,
         observacoes: novoPag.observacoes || null,
+        comprovante_path: novoPag.comprovante,
         created_by: user?.id ?? null,
       } as never);
       if (error) throw error;
@@ -290,6 +293,7 @@ function DetalhePedido() {
         valor: "",
         valor_origem: "",
         observacoes: "",
+        comprovante: null,
       });
       invalidarFinanceiro();
     },
@@ -372,6 +376,7 @@ function DetalhePedido() {
     valor: string;
     valor_origem: string;
     observacoes: string;
+    comprovante_path: string | null;
   }>(null);
 
   const invalidarPedido = () => {
@@ -539,16 +544,17 @@ function DetalhePedido() {
       const valorOrigem = num(editPag.valor_origem) || valor;
       const { error } = await supabase
         .from("venda_pagamentos")
-        .update({
-          data_pagamento: editPag.data_pagamento,
-          forma_pagamento: editPag.forma_pagamento,
-          conta_bancaria: editPag.conta_bancaria || null,
-          valor,
-          valor_origem: valorOrigem,
-          retencao_financeira: Math.max(Number((valorOrigem - valor).toFixed(2)), 0),
-          observacoes: editPag.observacoes || null,
-        })
-        .eq("id", editPag.id);
+         .update({
+           data_pagamento: editPag.data_pagamento,
+           forma_pagamento: editPag.forma_pagamento,
+           conta_bancaria: editPag.conta_bancaria || null,
+           valor,
+           valor_origem: valorOrigem,
+           retencao_financeira: Math.max(Number((valorOrigem - valor).toFixed(2)), 0),
+           observacoes: editPag.observacoes || null,
+           comprovante_path: editPag.comprovante_path,
+         })
+         .eq("id", editPag.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1057,6 +1063,13 @@ function DetalhePedido() {
                 placeholder="Opcional"
               />
             </Field>
+            <Field label="Comprovante">
+              <ComprovanteAnexo
+                tabela="venda_pagamentos"
+                valor={novoPag.comprovante}
+                onChange={(comprovante) => setNovoPag({ ...novoPag, comprovante })}
+              />
+            </Field>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button
@@ -1115,6 +1128,7 @@ function DetalhePedido() {
                             valor: String(p.valor ?? ""),
                             valor_origem: String(p.valor_origem ?? p.valor ?? ""),
                             observacoes: p.observacoes ?? "",
+                            comprovante_path: p.comprovante_path ?? null,
                           })
                         }
                       >
@@ -1692,6 +1706,13 @@ function DetalhePedido() {
                 <Input
                   value={editPag.observacoes}
                   onChange={(e) => setEditPag({ ...editPag, observacoes: e.target.value })}
+                />
+              </Field>
+              <Field label="Comprovante" className="sm:col-span-2">
+                <ComprovanteAnexo
+                  tabela="venda_pagamentos"
+                  valor={editPag.comprovante_path}
+                  onChange={(comprovante_path) => setEditPag({ ...editPag, comprovante_path })}
                 />
               </Field>
             </div>
