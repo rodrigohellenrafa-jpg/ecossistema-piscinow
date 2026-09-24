@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -94,6 +94,20 @@ function AcessoCard({ to, children }: { to: "/agenda" | "/fluxo-caixa" | "/conta
 }
 
 type Detalhe = "mensagem" | "agenda" | "saldo" | "contas" | "equilibrio";
+
+// Cor de cada situação: agenda (azul), caixa (verde), vencimentos (laranja), equilíbrio (roxo)
+const acento = {
+  agenda: "var(--chart-4)",
+  saldo: "var(--success)",
+  contas: "var(--warning)",
+  equilibrio: "var(--chart-5)",
+} as const;
+
+const estiloCard = (cor: string): CSSProperties => ({
+  backgroundColor: `color-mix(in oklab, ${cor} 10%, var(--card))`,
+  borderColor: `color-mix(in oklab, ${cor} 40%, transparent)`,
+  borderTop: `3px solid ${cor}`,
+});
 
 function Dashboard() {
   const qc = useQueryClient();
@@ -377,17 +391,17 @@ function Dashboard() {
       )}
 
       <div
-        className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-4 [&>div]:cursor-pointer [&>div]:transition-colors [&>div:hover]:border-primary/50"
+        className="grid grid-cols-2 items-start gap-3 [&>div]:cursor-pointer [&>div]:transition-all [&>div:hover]:brightness-[0.97]"
         onClick={(e) => {
           if ((e.target as HTMLElement).closest("a,button")) return;
           const card = (e.target as HTMLElement).closest("[data-detalhe]") as HTMLElement | null;
           if (card) setDetalhe(card.dataset.detalhe as Detalhe);
         }}
       >
-        <Card data-detalhe="agenda" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="agenda" style={estiloCard(acento.agenda)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <CalendarDays className="size-3.5 shrink-0 text-primary" /> Agenda
+              <CalendarDays className="size-3.5 shrink-0" style={{ color: acento.agenda }} /> Agenda
             </CardTitle>
             <AcessoCard to="/agenda">Abrir</AcessoCard>
           </CardHeader>
@@ -430,10 +444,10 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="saldo" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="saldo" style={estiloCard(acento.saldo)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Landmark className="size-3.5 shrink-0 text-primary" /> Saldo · ontem
+              <Landmark className="size-3.5 shrink-0" style={{ color: acento.saldo }} /> Saldo · ontem
             </CardTitle>
             <AcessoCard to="/fluxo-caixa">Fluxo</AcessoCard>
           </CardHeader>
@@ -471,10 +485,10 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="contas" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="contas" style={estiloCard(acento.contas)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Waves className="size-3.5 shrink-0 text-primary" /> Venc. hoje
+              <Waves className="size-3.5 shrink-0" style={{ color: acento.contas }} /> Venc. hoje
             </CardTitle>
             <AcessoCard to="/contas">Contas</AcessoCard>
           </CardHeader>
@@ -515,10 +529,10 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="equilibrio" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="equilibrio" style={estiloCard(acento.equilibrio)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Scale className="size-3.5 shrink-0 text-primary" /> Equilíbrio
+              <Scale className="size-3.5 shrink-0" style={{ color: acento.equilibrio }} /> Equilíbrio
             </CardTitle>
             <AcessoCard to="/dre">DRE</AcessoCard>
           </CardHeader>
