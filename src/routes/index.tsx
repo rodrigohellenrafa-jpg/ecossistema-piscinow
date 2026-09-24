@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -8,9 +8,16 @@ import {
   ArrowUpCircle,
   CalendarDays,
   Landmark,
+  Maximize2,
+  MessageSquare,
+  Minimize2,
+  Pencil,
   Scale,
+  Trash2,
   Waves,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Bar,
   BarChart,
@@ -86,10 +93,24 @@ function AcessoCard({ to, children }: { to: "/agenda" | "/fluxo-caixa" | "/conta
   );
 }
 
+type Detalhe = "mensagem" | "agenda" | "saldo" | "contas" | "equilibrio";
+
 function Dashboard() {
   const qc = useQueryClient();
   const sincronizarFn = useServerFn(sincronizarNotas);
   const hoje = dataLocal(new Date());
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
+  const [expandido, setExpandido] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const [editandoAviso, setEditandoAviso] = useState(false);
+  const [rascunhoAviso, setRascunhoAviso] = useState("");
+  useEffect(() => {
+    setAviso(localStorage.getItem("piscinow-aviso-dia") ?? "");
+  }, []);
+  const salvarAviso = (valor: string) => {
+    localStorage.setItem("piscinow-aviso-dia", valor);
+    setAviso(valor);
+  };
   const ontemData = new Date();
   ontemData.setDate(ontemData.getDate() - 1);
   const ontem = dataLocal(ontemData);
@@ -343,9 +364,26 @@ function Dashboard() {
       <PageHeader
         title="Visão do dia"
         subtitle={`${new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })} · agenda, caixa e compromissos financeiros.`}
+        actions={
+          <Button size="sm" onClick={() => setDetalhe("mensagem")}>
+            <MessageSquare className="size-4" /> Mensagem do dia
+          </Button>
+        }
       />
+      {aviso && (
+        <button type="button" onClick={() => setDetalhe("mensagem")} className="w-full truncate rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-left text-sm">
+          <strong>Aviso:</strong> {aviso}
+        </button>
+      )}
 
-      <div className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div
+        className="grid items-start gap-3 md:grid-cols-2 lg:grid-cols-4 [&>div]:cursor-pointer [&>div]:transition-colors [&>div:hover]:border-primary/50"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("a,button")) return;
+          const card = (e.target as HTMLElement).closest("[data-detalhe]") as HTMLElement | null;
+          if (card) setDetalhe(card.dataset.detalhe as Detalhe);
+        }}
+      >
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
@@ -521,6 +559,139 @@ function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={detalhe !== null} onOpenChange={(aberto) => { if (!aberto) { setDetalhe(null); setExpandido(false); } }}>
+        <DialogContent className={expandido ? "max-h-[95vh] max-w-[95vw] overflow-y-auto" : "max-h-[85vh] max-w-lg overflow-y-auto"}>
+          <DialogHeader className="flex-row items-center justify-between gap-2 pr-8">
+            <DialogTitle>
+              {detalhe === "mensagem" && "Mensagem do dia"}
+              {detalhe === "agenda" && "Agenda da semana"}
+              {detalhe === "saldo" && "Saldo e fluxo de ontem"}
+              {detalhe === "contas" && "Contas que vencem hoje"}
+              {detalhe === "equilibrio" && "Ponto de equilíbrio do mês"}
+            </DialogTitle>
+            <Button size="icon" variant="ghost" className="size-7" onClick={() => setExpandido((v) => !v)} aria-label="Expandir">
+              {expandido ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </Button>
+          </DialogHeader>
+
+          {detalhe === "mensagem" && (
+            <div className="space-y-4 text-sm">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium">Aviso da equipe</p>
+                  {!editandoAviso ? (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => { setRascunhoAviso(aviso); setEditandoAviso(true); }}>
+                        <Pencil className="size-3.5" /> Editar
+                      </Button>
+                      {aviso && (
+                        <Button size="sm" variant="ghost" onClick={() => salvarAviso("")}>
+                          <Trash2 className="size-3.5" /> Excluir
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <Button size="sm" onClick={() => { salvarAviso(rascunhoAviso); setEditandoAviso(false); }}>Salvar</Button>
+                  )}
+                </div>
+                {editandoAviso ? (
+                  <Textarea rows={4} value={rascunhoAviso} onChange={(e) => setRascunhoAviso(e.target.value)} placeholder="Escreva o aviso do dia..." />
+                ) : (
+                  <p className="whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3">{aviso || "Nenhum aviso para hoje."}</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium">Resumo automático</p>
+                <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                  <li>{obrasHoje.length} etapa(s) de obra hoje e {agendaSemana.length} compromisso(s) na semana.</li>
+                  <li>Saldo nas contas: <strong className="text-foreground">{brl(saldoTotal)}</strong>. Ontem entrou {brl(fluxoOntem.entradas)} e saiu {brl(fluxoOntem.saidas)}.</li>
+                  <li>Hoje: {pagarHoje.length} conta(s) a pagar ({brl(totalPagarHoje)}) e {receberHoje.length} a receber ({brl(totalReceberHoje)}).</li>
+                  <li>Faturamento do mês {brl(faturamento)} de {brl(pontoEquilibrio)} para empatar ({percentualEquilibrio.toFixed(1)}%).</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {detalhe === "agenda" && (
+            <div className="space-y-1">
+              {agendaSemana.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum compromisso nesta semana.</p> : agendaSemana.map((item) => (
+                <div key={item.id} className={`flex gap-3 border-b border-border py-2 last:border-0 ${item.obra ? "border-l-2 border-l-primary pl-2" : ""}`}>
+                  <div className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                    {new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{item.titulo}</p>
+                    <p className="text-xs text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {detalhe === "saldo" && (
+            <div className="space-y-3">
+              <div className="divide-y divide-border">
+                <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
+                <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
+                <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
+              </div>
+              {saldosContas.map((conta) => (
+                <div key={conta.conta} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{conta.conta}</p>
+                    <p className="text-xs text-muted-foreground">{conta.banco || "Conta bancária"}</p>
+                  </div>
+                  <span className={`text-sm font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}>{brl(conta.saldo)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+                <span>Total</span><span className="tabular-nums">{brl(saldoTotal)}</span>
+              </div>
+            </div>
+          )}
+
+          {detalhe === "contas" && (
+            <div className="space-y-1">
+              {contasHoje.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma conta vence hoje.</p> : contasHoje.map((conta) => (
+                <div key={conta.id} className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{conta.descricao}</p>
+                    <p className="text-xs text-muted-foreground">{conta.parceiro || "Sem beneficiário"} · {conta.status}</p>
+                  </div>
+                  <span className={`shrink-0 text-sm font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}>
+                    {conta.tipo === "receber" ? "+" : "−"} {brl(numero(conta.valor))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {detalhe === "equilibrio" && (
+            <div className="divide-y divide-border text-sm">
+              {[
+                ["Faturamento do mês", faturamento],
+                ["Custos variáveis (produto, imposto, frete, M.O.)", custosVariaveis],
+                ["Despesas lançadas", despesasLancadas],
+                ["Contas pagas", despesasPagas],
+                ["Folha (salário base)", folha],
+                ["Taxas e retenções", taxas],
+                ["Despesas fixas totais", despesasFixas],
+                ["Ponto de equilíbrio", pontoEquilibrio],
+              ].map(([rotulo, valor]) => (
+                <div key={String(rotulo)} className="flex justify-between gap-2 py-2">
+                  <span className="text-muted-foreground">{rotulo}</span>
+                  <span className="font-medium tabular-nums">{brl(Number(valor))}</span>
+                </div>
+              ))}
+              <div className="flex justify-between gap-2 py-2">
+                <span className="text-muted-foreground">Margem de contribuição</span>
+                <span className="font-medium">{(margemContribuicao * 100).toFixed(1)}%</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
