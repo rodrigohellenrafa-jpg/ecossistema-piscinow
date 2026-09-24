@@ -13,3 +13,4 @@
 - [x] Integrar pagamentos realizados com movimentações e saldo da conta selecionada
 - [x] Impedir novas entradas e saídas realizadas sem conta bancária escolhida
 - [x] Reorganizar o menu lateral por títulos com opções em listas suspensas
+- [x] Resumir a tela inicial em agenda, saldo e fluxo, contas do dia e ponto de equilíbrio

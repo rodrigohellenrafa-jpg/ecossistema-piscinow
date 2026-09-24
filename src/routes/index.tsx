@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { sincronizarNotas } from "@/lib/focus-nfe.functions";
-import { brl, dataBR } from "@/lib/erp";
+import { brl } from "@/lib/erp";
 
 export const Route = createFileRoute("/")({
   staticData: { sitemap: true },
@@ -347,8 +347,8 @@ function Dashboard() {
       />
 
       <div className="grid items-start gap-4 xl:grid-cols-2">
-        <Card className="min-h-[31rem]">
-          <CardHeader className="flex-row items-center justify-between gap-3">
+        <Card className="min-w-0 overflow-hidden xl:min-h-[31rem]">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <CalendarDays className="size-4 text-primary" /> Agenda da semana
             </CardTitle>
@@ -393,8 +393,8 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-h-[31rem]">
-          <CardHeader className="flex-row items-center justify-between gap-3">
+        <Card className="min-w-0 overflow-hidden xl:min-h-[31rem]">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Landmark className="size-4 text-primary" /> Saldo e fluxo de ontem
             </CardTitle>
@@ -432,8 +432,8 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-h-[29rem]">
-          <CardHeader className="flex-row items-center justify-between gap-3">
+        <Card className="min-w-0 overflow-hidden xl:min-h-[29rem]">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Waves className="size-4 text-primary" /> Contas com vencimento hoje
             </CardTitle>
@@ -476,8 +476,8 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="min-h-[29rem]">
-          <CardHeader className="flex-row items-center justify-between gap-3">
+        <Card className="min-w-0 overflow-hidden xl:min-h-[29rem]">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Scale className="size-4 text-primary" /> Ponto de equilíbrio do mês
             </CardTitle>
