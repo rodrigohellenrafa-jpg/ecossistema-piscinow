@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { FileDown, Mail, Printer } from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "sonner";
+
 
 import { Button } from "@/components/ui/button";
 import { brl, dataBR } from "@/lib/erp";
@@ -55,35 +57,6 @@ const EMPRESA_PADRAO = {
   contato: "",
 };
 
-/** Monta o corpo do e-mail em texto simples com os itens da ordem. */
-const corpoEmail = (ordem: Ordem, itens: Item[], empresaNome: string) => {
-  const linhas = itens.map(
-    (i) =>
-      `- ${i.quantidade} ${i.unidade} | ${i.descricao}${i.codigo ? ` (cód. ${i.codigo})` : ""} | unit. ${brl(
-        Number(i.valor_unitario),
-      )} | total ${brl(Number(i.total))}`,
-  );
-  return [
-    "Olá,",
-    "",
-    `Segue nossa ordem de compra ${ordem.numero ?? ""} emitida em ${dataBR(ordem.data_pedido)}.`,
-    "",
-    "ITENS:",
-    ...linhas,
-    "",
-    `Valor total: ${brl(Number(ordem.valor_total))}`,
-    ordem.previsao_entrega ? `Previsão de entrega: ${dataBR(ordem.previsao_entrega)}` : "",
-    ordem.condicoes ? `Condições de pagamento: ${ordem.condicoes}` : "",
-    ordem.observacoes ? `Observações: ${ordem.observacoes}` : "",
-    "",
-    "Favor confirmar o recebimento e o prazo de entrega.",
-    "",
-    "Atenciosamente,",
-    empresaNome,
-  ]
-    .filter((l) => l !== "")
-    .join("\n");
-};
 
 export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Props) {
   const emp = { ...EMPRESA_PADRAO, ...(empresa ?? {}) };
@@ -106,9 +79,20 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
   }, [imprimindo]);
 
   const assunto = `Ordem de Compra ${ordem.numero ?? ""} - ${emp.nome}`;
+  const mensagemCurta = [
+    "Olá,",
+    "",
+    `Segue em anexo nossa ordem de compra ${ordem.numero ?? ""} emitida em ${dataBR(ordem.data_pedido)}.`,
+    `Valor total: ${brl(Number(ordem.valor_total))}`,
+    "",
+    "Favor confirmar o recebimento e o prazo de entrega.",
+    "",
+    emp.nome,
+  ].join("\n");
   const mailto = `mailto:${fornecedor?.email ?? ""}?subject=${encodeURIComponent(
     assunto,
-  )}&body=${encodeURIComponent(corpoEmail(ordem, itens, emp.nome))}`;
+  )}&body=${encodeURIComponent(mensagemCurta)}`;
+
 
   const valorNota = Number(ordem.valor_nota ?? 0);
   const valorPago = Number(ordem.valor_pago ?? 0);
@@ -224,13 +208,34 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
     doc.save(nomeArquivo);
   };
 
-  /** Baixa o PDF e em seguida abre o e-mail para anexá-lo. */
+  /** Compartilha o PDF já anexado; se não der, baixa o arquivo e abre o e-mail. */
   const enviarPorEmail = async () => {
-    await baixarPdf();
+    const doc = await gerarPdf();
+    const blob = doc.output("blob");
+    const arquivo = new File([blob], nomeArquivo, { type: "application/pdf" });
+
+    const nav = navigator as Navigator & {
+      canShare?: (data: ShareData) => boolean;
+      share?: (data: ShareData) => Promise<void>;
+    };
+
+    if (nav.share && nav.canShare?.({ files: [arquivo] })) {
+      try {
+        await nav.share({ files: [arquivo], title: assunto, text: mensagemCurta });
+        toast.success("Ordem de compra pronta em PDF para envio.");
+        return;
+      } catch (err) {
+        if ((err as DOMException)?.name === "AbortError") return;
+      }
+    }
+
+    doc.save(nomeArquivo);
+    toast.success("PDF baixado. Anexe o arquivo no e-mail que vai abrir.");
     window.setTimeout(() => {
       window.location.href = mailto;
-    }, 600);
+    }, 800);
   };
+
 
 
   const documento = (
