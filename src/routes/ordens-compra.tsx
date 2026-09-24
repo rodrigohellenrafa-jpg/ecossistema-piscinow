@@ -522,6 +522,15 @@ function OrdensCompra() {
       const valor = Number(baixaCompra.valor);
       if (!Number.isFinite(valor) || valor <= 0) throw new Error("Informe o valor pago");
       if (!baixaCompra.conta_bancaria) throw new Error("Escolha a conta de onde o dinheiro saiu");
+      const { data: pagos } = await supabase
+        .from("ordem_compra_pagamentos")
+        .select("valor")
+        .eq("ordem_id", ordemParaBaixar.id);
+      const jaPago = (pagos ?? []).reduce((s, p) => s + Number(p.valor ?? 0), 0);
+      const saldoAtual = Number(ordemParaBaixar.valor_total ?? 0) - jaPago;
+      if (saldoAtual <= 0.009) throw new Error("Esta ordem já foi paga. Nenhuma nova baixa foi feita.");
+      if (valor - saldoAtual > 0.009)
+        throw new Error(`O valor passa do que falta pagar (${saldoAtual.toFixed(2).replace(".", ",")}).`);
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase.from("ordem_compra_pagamentos").insert({
         ordem_id: ordemParaBaixar.id,
