@@ -398,10 +398,10 @@ function Dashboard() {
           if (card) setDetalhe(card.dataset.detalhe as Detalhe);
         }}
       >
-        <Card data-detalhe="agenda" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="agenda" style={estiloCard(acento.agenda)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <CalendarDays className="size-3.5 shrink-0 text-primary" /> Agenda
+              <CalendarDays className="size-3.5 shrink-0" style={{ color: acento.agenda }} /> Agenda
             </CardTitle>
             <AcessoCard to="/agenda">Abrir</AcessoCard>
           </CardHeader>
@@ -444,10 +444,10 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="saldo" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="saldo" style={estiloCard(acento.saldo)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Landmark className="size-3.5 shrink-0 text-primary" /> Saldo · ontem
+              <Landmark className="size-3.5 shrink-0" style={{ color: acento.saldo }} /> Saldo · ontem
             </CardTitle>
             <AcessoCard to="/fluxo-caixa">Fluxo</AcessoCard>
           </CardHeader>
@@ -485,10 +485,10 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="contas" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="contas" style={estiloCard(acento.contas)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Waves className="size-3.5 shrink-0 text-primary" /> Venc. hoje
+              <Waves className="size-3.5 shrink-0" style={{ color: acento.contas }} /> Venc. hoje
             </CardTitle>
             <AcessoCard to="/contas">Contas</AcessoCard>
           </CardHeader>
@@ -529,10 +529,10 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="equilibrio" className="min-w-0 overflow-hidden">
+        <Card data-detalhe="equilibrio" style={estiloCard(acento.equilibrio)} className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Scale className="size-3.5 shrink-0 text-primary" /> Equilíbrio
+              <Scale className="size-3.5 shrink-0" style={{ color: acento.equilibrio }} /> Equilíbrio
             </CardTitle>
             <AcessoCard to="/dre">DRE</AcessoCard>
           </CardHeader>
