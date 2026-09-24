@@ -14,3 +14,4 @@
 - [x] Impedir novas entradas e saídas realizadas sem conta bancária escolhida
 - [x] Reorganizar o menu lateral por títulos com opções em listas suspensas
 - [x] Resumir a tela inicial em agenda, saldo e fluxo, contas do dia e ponto de equilíbrio
+- [x] Integrar execução e baixa de ordens de compra com Contas a Pagar sem duplicidade

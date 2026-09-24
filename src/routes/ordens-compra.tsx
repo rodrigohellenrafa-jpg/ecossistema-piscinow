@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Save, Search, ShoppingCart, Trash2 } from "lucide-react";
+import { CreditCard, Pencil, Plus, Save, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -73,6 +73,7 @@ export const Route = createFileRoute("/ordens-compra")({
 const STATUS = [
   "sob_encomenda",
   "pendente",
+  "comprado",
   "enviada",
   "faturada",
   "concluida",
@@ -83,6 +84,7 @@ const STATUS = [
 const statusLabel: Record<string, string> = {
   sob_encomenda: "Sob encomenda",
   pendente: "A comprar",
+  comprado: "Comprado",
   enviada: "Enviada ao fornecedor",
   faturada: "Faturada pelo fornecedor",
   concluida: "Entregue",
@@ -92,11 +94,11 @@ const statusLabel: Record<string, string> = {
 
 
 /** Ordem das etapas do fluxo da O.C. */
-const FLUXO = ["pendente", "enviada", "faturada", "concluida"] as const;
+const FLUXO = ["pendente", "comprado", "enviada", "faturada", "concluida"] as const;
 
 const etapaAtual = (s: string) => {
   if (s === "sob_encomenda") return 0;
-  if (s === "recebida") return 3;
+  if (s === "recebida") return 4;
   const i = FLUXO.indexOf(s as (typeof FLUXO)[number]);
   return i < 0 ? 0 : i;
 };
@@ -396,6 +398,12 @@ function OrdensCompra() {
     observacoes: "",
   });
   const [editPagamentoId, setEditPagamentoId] = useState<string | null>(null);
+  const [ordemParaBaixar, setOrdemParaBaixar] = useState<Ordem | null>(null);
+  const [baixaCompra, setBaixaCompra] = useState({
+    data_pagamento: hojeISO(),
+    conta_bancaria: "",
+    valor: "",
+  });
 
   const totalPagoOrdem = pagamentosOrdem.reduce((s, p) => s + Number(p.valor ?? 0), 0);
 
@@ -486,6 +494,59 @@ function OrdensCompra() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const abrirBaixaCompra = (ordem: Ordem) => {
+    const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
+    const saldo = Math.max(Number(ordem.valor_total ?? 0) - pago, 0);
+    if (saldo <= 0) {
+      atualizarStatus.mutate({ id: ordem.id, status: "comprado" });
+      return;
+    }
+    setOrdemParaBaixar(ordem);
+    setBaixaCompra({
+      data_pagamento: hojeISO(),
+      conta_bancaria: "",
+      valor: String(saldo),
+    });
+  };
+
+  const baixarCompra = useMutation({
+    mutationFn: async () => {
+      if (!ordemParaBaixar) throw new Error("Ordem não encontrada");
+      const valor = Number(baixaCompra.valor);
+      if (!Number.isFinite(valor) || valor <= 0) throw new Error("Informe o valor pago");
+      if (!baixaCompra.conta_bancaria) throw new Error("Escolha a conta de onde o dinheiro saiu");
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase.from("ordem_compra_pagamentos").insert({
+        ordem_id: ordemParaBaixar.id,
+        data_pagamento: baixaCompra.data_pagamento || hojeISO(),
+        forma_pagamento: "Baixa ao marcar como comprado",
+        conta_bancaria: baixaCompra.conta_bancaria,
+        valor,
+        observacoes: "Baixa automática pelo status Comprado",
+        created_by: auth.user?.id ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Compra baixada e saldo da conta atualizado");
+      setOrdemParaBaixar(null);
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const alterarStatusOrdem = (ordem: Ordem, status: string) => {
+    if (status === "comprado") {
+      abrirBaixaCompra(ordem);
+      return;
+    }
+    atualizarStatus.mutate({ id: ordem.id, status });
+  };
 
 
 
@@ -1148,7 +1209,7 @@ function OrdensCompra() {
     setFaturaOpen(true);
   };
 
-  /** Faturamento: só aqui nasce o título no Contas a Pagar. */
+  /** Atualiza o título criado na execução com os dados da fatura do fornecedor. */
   const faturarOrdem = useMutation({
     mutationFn: async () => {
       if (!ordemDetalhe) throw new Error("Ordem não encontrada");
@@ -1161,24 +1222,25 @@ function OrdensCompra() {
       const { data: existentes, error: erroBusca } = await supabase
         .from("contas")
         .select("id")
-        .eq("ordem_compra_id" as never, ordemDetalhe.id as never);
+        .eq("ordem_compra_id" as never, ordemDetalhe.id as never)
+        .is("ordem_pagamento_id" as never, null);
       if (erroBusca) throw erroBusca;
-      if ((existentes ?? []).length > 0) {
-        throw new Error("Esta ordem já possui título no Contas a Pagar");
-      }
-
-      const { error: erroConta } = await supabase.from("contas").insert({
+      const tituloId = (existentes?.[0] as { id?: string } | undefined)?.id;
+      const dadosConta = {
         tipo: "pagar",
         descricao: `Ordem de compra ${ordemDetalhe.numero ?? ""} - ${ordemDetalhe.fornecedor_nome ?? "Fornecedor"}`,
         parceiro: ordemDetalhe.fornecedor_nome,
         categoria: "Compras",
         valor,
         vencimento: fatura.vencimento,
-        status: "pendente",
         observacoes: [fatura.forma, fatura.observacoes].filter(Boolean).join(" - ") || null,
         ordem_compra_id: ordemDetalhe.id,
         created_by: auth.user?.id ?? null,
-      } as never);
+        saldo_gerenciado_externamente: true,
+      };
+      const { error: erroConta } = tituloId
+        ? await supabase.from("contas").update(dadosConta as never).eq("id", tituloId)
+        : await supabase.from("contas").insert({ ...dadosConta, status: "aberto" } as never);
       if (erroConta) throw erroConta;
 
       const { error: erroOrdem } = await supabase
@@ -1192,7 +1254,7 @@ function OrdensCompra() {
       if (erroOrdem) throw erroOrdem;
     },
     onSuccess: () => {
-      toast.success("Ordem faturada e título lançado no Contas a Pagar");
+      toast.success("Faturamento atualizado no Contas a Pagar");
       setFaturaOpen(false);
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["contas"] });
@@ -1468,7 +1530,7 @@ function OrdensCompra() {
               const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
               const saldo = Number(ordem.valor_total ?? 0) - pago;
               return (
-                <Card key={ordem.id} className="overflow-hidden">
+                <Card key={ordem.id} className="overflow-hidden border-destructive/40 bg-destructive/5">
                   <CardHeader className="space-y-2 pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -1892,7 +1954,7 @@ function OrdensCompra() {
                     <TableCell>
                       <Select
                         value={ordem.status}
-                        onValueChange={(status) => atualizarStatus.mutate({ id: ordem.id, status })}
+                        onValueChange={(status) => alterarStatusOrdem(ordem, status)}
                       >
                         <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -2007,9 +2069,7 @@ function OrdensCompra() {
                   <p className="mb-1 text-xs text-muted-foreground">Status</p>
                   <Select
                     value={ordemDetalhe.status}
-                    onValueChange={(status) =>
-                      atualizarStatus.mutate({ id: ordemDetalhe.id, status })
-                    }
+                     onValueChange={(status) => alterarStatusOrdem(ordemDetalhe, status)}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -2340,7 +2400,7 @@ function OrdensCompra() {
                 <div>
                   <p className="text-sm font-medium">Fluxo da ordem de compra</p>
                   <p className="text-xs text-muted-foreground">
-                    A dívida no Contas a Pagar só é criada quando o fornecedor fatura o pedido.
+                     A despesa é criada no Contas a Pagar ao executar a ordem. Ao marcar como Comprado, escolha a conta para efetuar a baixa.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2673,6 +2733,54 @@ function OrdensCompra() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!ordemParaBaixar} onOpenChange={(aberto) => !aberto && setOrdemParaBaixar(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Baixar compra {ordemParaBaixar?.numero}</DialogTitle>
+            <DialogDescription>
+              Escolha a conta de onde o pagamento saiu. A despesa será baixada também em Contas a Pagar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Data do pagamento">
+              <Input
+                type="date"
+                value={baixaCompra.data_pagamento}
+                onChange={(e) => setBaixaCompra((atual) => ({ ...atual, data_pagamento: e.target.value }))}
+              />
+            </Field>
+            <Field label="Valor pago (R$)">
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={baixaCompra.valor}
+                onChange={(e) => setBaixaCompra((atual) => ({ ...atual, valor: e.target.value }))}
+              />
+            </Field>
+            <Field label="Conta que pagou" className="sm:col-span-2">
+              <Select
+                value={baixaCompra.conta_bancaria}
+                onValueChange={(conta_bancaria) => setBaixaCompra((atual) => ({ ...atual, conta_bancaria }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione a conta bancária" /></SelectTrigger>
+                <SelectContent>
+                  {contasBancarias.map((conta) => (
+                    <SelectItem key={conta} value={conta}>{conta}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrdemParaBaixar(null)}>Cancelar</Button>
+            <Button onClick={() => baixarCompra.mutate()} disabled={baixarCompra.isPending}>
+              <CreditCard /> Confirmar baixa
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

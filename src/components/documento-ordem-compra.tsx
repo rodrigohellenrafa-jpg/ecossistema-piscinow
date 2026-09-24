@@ -149,7 +149,7 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
     doc.text(`${emp.endereco} — ${emp.documento}`, m, y + 5);
 
     y += 12;
-    doc.setDrawColor(20, 83, 45).line(m, y, 196, y);
+    doc.setDrawColor(153, 27, 27).line(m, y, 196, y);
     y += 6;
 
     doc.setFont("helvetica", "bold").setFontSize(10);
@@ -177,9 +177,9 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
         brl(Number(i.valor_unitario)),
         brl(Number(i.total)),
       ]),
-      styles: { fontSize: 8, textColor: [15, 46, 24], lineColor: [20, 83, 45], lineWidth: 0.2 },
-      headStyles: { fillColor: [187, 247, 208], textColor: [15, 46, 24], fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [233, 249, 238] },
+      styles: { fontSize: 8, textColor: [69, 10, 10], lineColor: [153, 27, 27], lineWidth: 0.2 },
+      headStyles: { fillColor: [254, 202, 202], textColor: [69, 10, 10], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [254, 242, 242] },
       columnStyles: {
         3: { halign: "center" },
         4: { halign: "center" },
