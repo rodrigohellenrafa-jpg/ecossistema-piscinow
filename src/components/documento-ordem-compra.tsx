@@ -106,9 +106,20 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
   }, [imprimindo]);
 
   const assunto = `Ordem de Compra ${ordem.numero ?? ""} - ${emp.nome}`;
+  const mensagemCurta = [
+    "Olá,",
+    "",
+    `Segue em anexo nossa ordem de compra ${ordem.numero ?? ""} emitida em ${dataBR(ordem.data_pedido)}.`,
+    `Valor total: ${brl(Number(ordem.valor_total))}`,
+    "",
+    "Favor confirmar o recebimento e o prazo de entrega.",
+    "",
+    emp.nome,
+  ].join("\n");
   const mailto = `mailto:${fornecedor?.email ?? ""}?subject=${encodeURIComponent(
     assunto,
-  )}&body=${encodeURIComponent(corpoEmail(ordem, itens, emp.nome))}`;
+  )}&body=${encodeURIComponent(mensagemCurta)}`;
+
 
   const valorNota = Number(ordem.valor_nota ?? 0);
   const valorPago = Number(ordem.valor_pago ?? 0);
