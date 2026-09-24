@@ -109,6 +109,7 @@ export function LancarEmLote({ destino }: { destino: "contas" | "financeiro" }) 
             </SelectContent>
           </Select>
         </Field>}
+        <VinculoField value={l.vinculo} onChange={(v) => alterar(l.id, "vinculo", v)} />
         <Field label={tipo === "pagar" ? "Conta de saída" : "Conta de entrada"}>
           <Select value={l.conta || "nenhuma"} onValueChange={(v) => alterar(l.id, "conta", v === "nenhuma" ? "" : v)}>
             <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
