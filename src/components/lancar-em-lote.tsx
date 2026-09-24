@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/field";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { hojeISO, brl } from "@/lib/erp";
-const nova = () => ({ id: crypto.randomUUID(), descricao: "", valor: "", data: hojeISO(), categoria: "", parceiro: "", conta: "" });
+const nova = () => ({ id: crypto.randomUUID(), descricao: "", valor: "", data: hojeISO(), categoria: "", parceiro: "", conta: "", vinculo: "" });
 type Linha = ReturnType<typeof nova>;
 export function LancarEmLote({ destino }: { destino: "contas" | "financeiro" }) {
   const [open, setOpen] = useState(false);
