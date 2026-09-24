@@ -94,13 +94,24 @@ export function SaldosBancarios() {
   const valorBaixado = (c: typeof contasHoje[number]) => Number(c.valor_pago) || Math.max(0, Number(c.valor) + Number(c.valor_juros) - Number(c.valor_desconto));
   const ehEntrada = (t: string) => ["receber", "entrada", "receita"].includes(t.toLowerCase());
 
-  const entradasHoje =
-    contasHoje.filter((c) => ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
-    lancHoje.filter((l) => ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
-
-  const saidasHoje =
-    contasHoje.filter((c) => !ehEntrada(c.tipo)).reduce((s, c) => s + valorBaixado(c), 0) +
-    lancHoje.filter((l) => !ehEntrada(l.tipo_fluxo)).reduce((s, l) => s + Number(l.valor ?? 0), 0);
+  /** Movimentos de hoje, um a um, para exibir os valores separados. */
+  const movimentosHoje = [
+    ...contasHoje.map((c) => ({
+      descricao: c.descricao,
+      valor: valorBaixado(c),
+      entrada: ehEntrada(c.tipo),
+    })),
+    ...lancHoje.map((l) => ({
+      descricao: l.descricao,
+      valor: Number(l.valor ?? 0),
+      entrada: ehEntrada(l.tipo_fluxo),
+    })),
+  ];
+  const entradasLista = movimentosHoje.filter((m) => m.entrada);
+  const saidasLista = movimentosHoje.filter((m) => !m.entrada);
+  const entradasHoje = entradasLista.reduce((s, m) => s + m.valor, 0);
+  const saidasHoje = saidasLista.reduce((s, m) => s + m.valor, 0);
+  const saldoDia = entradasHoje - saidasHoje;
 
   /** Movimento do dia já identificado com a conta bancária informada. */
   const movimentoConta = (conta: string) =>
