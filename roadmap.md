@@ -12,3 +12,4 @@
 - [x] Mostrar produtos em duas linhas no histórico e permitir corrigir o valor cadastrado para recalcular o lucro
 - [x] Integrar pagamentos realizados com movimentações e saldo da conta selecionada
 - [x] Impedir novas entradas e saídas realizadas sem conta bancária escolhida
+- [x] Reorganizar o menu lateral por títulos com opções em listas suspensas
