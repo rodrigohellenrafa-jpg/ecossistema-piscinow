@@ -406,10 +406,12 @@ function Dashboard() {
                 {brl(saldoTotal)}
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-1.5">
-              <ResumoValor label="Entradas" valor={fluxoOntem.entradas} positivo />
-              <ResumoValor label="Saídas" valor={fluxoOntem.saidas} />
-              <ResumoValor label="Resultado" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
+            <div>
+              <div className="divide-y divide-border">
+                <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
+                <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
+                <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
+              </div>
             </div>
             <div className="space-y-1">
               {saldosContas.length === 0 ? (
@@ -434,7 +436,7 @@ function Dashboard() {
         <Card className="min-w-0 overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Waves className="size-3.5 shrink-0 text-primary" /> Vencem hoje
+              <Waves className="size-3.5 shrink-0 text-primary" /> Venc. hoje
             </CardTitle>
             <AcessoCard to="/contas">Contas</AcessoCard>
           </CardHeader>
@@ -525,9 +527,9 @@ function Dashboard() {
 
 function ResumoValor({ label, valor, positivo = false }: { label: string; valor: number; positivo?: boolean }) {
   return (
-    <div className="min-w-0 rounded-md border border-border p-1.5">
-      <p className="truncate text-[10px] text-muted-foreground">{label}</p>
-      <p className={`truncate text-[11px] font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
+    <div className="flex items-center justify-between gap-2 py-1.5">
+      <p className="min-w-0 text-[11px] text-muted-foreground">{label}</p>
+      <p className={`shrink-0 text-xs font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
         {brl(valor)}
       </p>
     </div>
