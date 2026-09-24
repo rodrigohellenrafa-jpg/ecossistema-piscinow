@@ -391,7 +391,7 @@ function Dashboard() {
       )}
 
       <div
-        className="grid grid-cols-2 items-start gap-3 [&>div]:cursor-pointer [&>div]:transition-all [&>div:hover]:brightness-[0.97]"
+        className="grid grid-cols-2 auto-rows-[1fr] items-stretch gap-3 [&>div]:h-[280px] sm:[&>div]:h-[300px] [&>div]:cursor-pointer [&>div]:transition-all [&>div:hover]:brightness-[0.97]"
         onClick={(e) => {
           if ((e.target as HTMLElement).closest("a,button")) return;
           const card = (e.target as HTMLElement).closest("[data-detalhe]") as HTMLElement | null;

@@ -204,8 +204,31 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
   };
 
   const baixarPdf = async () => {
-    const doc = await gerarPdf();
-    doc.save(nomeArquivo);
+    try {
+      const doc = await gerarPdf();
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nomeArquivo;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Fallback: abre o PDF em nova aba (útil quando o download é bloqueado)
+      window.setTimeout(() => {
+        try {
+          window.open(url, "_blank");
+        } catch {
+          /* ignore */
+        }
+      }, 300);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast.success("PDF da ordem de compra gerado.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Não foi possível gerar o PDF. Tente novamente.");
+    }
   };
 
   /** Compartilha o PDF já anexado; se não der, baixa o arquivo e abre o e-mail. */
