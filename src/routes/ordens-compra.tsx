@@ -245,7 +245,7 @@ function OrdensCompra() {
   const [coresCompra, setCoresCompra] = useState<Record<string, string>>({});
   const [modelosCompra, setModelosCompra] = useState<Record<string, string>>({});
   const [statusCompra, setStatusCompra] = useState<Record<string, string>>({});
-  const [vinculosCompra, setVinculosCompra] = useState<Record<string, string>>({});
+  const [vinculosCompra, setVinculosCompra] = useState<Record<string, string[]>>({});
   const salvamentosPendentes = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [produtoCompraEditando, setProdutoCompraEditando] = useState<Produto | null>(null);
   const [produtoCompraForm, setProdutoCompraForm] = useState({
@@ -750,6 +750,21 @@ function OrdensCompra() {
       : Math.max(Number(valor) || 0, 0);
   };
 
+  const vinculosDoProduto = (produto: Produto) => {
+    const quantidade = Math.max(0, Math.trunc(quantidadeCompra(produto)));
+    const salvos = vinculosCompra[produto.id];
+    if (salvos) return Array.from({ length: quantidade }, (_, indice) => salvos[indice] ?? "");
+
+    const demanda = demandaPorProduto.get(produto.id)?.pedidos ?? [];
+    const automaticos = demanda.flatMap((pedido) =>
+      Array.from({ length: Math.max(0, Math.trunc(pedido.quantidade)) }, () => pedido.id),
+    );
+    return Array.from(
+      { length: quantidade },
+      (_, indice) => automaticos[indice] ?? (indice === 0 ? produto.venda_vinculo_id ?? "" : ""),
+    );
+  };
+
   const valorCompra = (produto: Produto) => {
     const valor = valoresCompra[produto.id];
     return valor === undefined ? Number(produto.preco_custo) : Math.max(Number(valor) || 0, 0);
@@ -810,6 +825,15 @@ function OrdensCompra() {
       if (produtosSelecionados.some((produto) => quantidadeCompra(produto) <= 0)) {
         throw new Error("A quantidade dos produtos selecionados deve ser maior que zero");
       }
+      if (produtosSelecionados.some((produto) => !Number.isInteger(quantidadeCompra(produto)))) {
+        throw new Error("A quantidade deve ser inteira para permitir um vínculo por unidade");
+      }
+      const vinculosIncompletos = produtosSelecionados.filter(
+        (produto) => vinculosDoProduto(produto).length !== quantidadeCompra(produto),
+      );
+      if (vinculosIncompletos.length > 0) {
+        throw new Error("A quantidade de vínculos deve ser igual à quantidade de unidades");
+      }
 
       const { data: auth } = await supabase.auth.getUser();
       const { data: existentes, error: erroNumeros } = await supabase
@@ -866,32 +890,28 @@ function OrdensCompra() {
           .single();
         if (erroOrdem) throw erroOrdem;
 
-        const payload = itens.map((produto) => {
-          const vendaId =
-            vinculosCompra[produto.id] ||
-            produto.venda_vinculo_id ||
-            (demandaPorProduto.get(produto.id)?.pedidos.length === 1
-              ? demandaPorProduto.get(produto.id)!.pedidos[0]!.id
-              : "");
-          const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
-          const bruto = quantidadeCompra(produto) * valorCompra(produto);
-          const desconto = bruto * (percentualCompra(produto) / 100);
-          return {
-            ordem_id: ordem.id,
-            produto_id: produto.id,
-            codigo: produto.codigo,
-            descricao: produto.nome,
-            ncm: produto.ncm,
-            cst: produto.cst,
-            unidade: produto.unidade,
-            quantidade: quantidadeCompra(produto),
-            valor_unitario: valorCompra(produto),
-            desconto,
-            total: bruto - desconto,
-            cliente_id: venda?.cliente_id ?? null,
-            cliente_nome: venda?.cliente_nome ?? null,
-            venda_id: vendaId || null,
-          };
+        const payload = itens.flatMap((produto) => {
+          const valorUnitario = valorCompra(produto);
+          const descontoUnitario = valorUnitario * (percentualCompra(produto) / 100);
+          return vinculosDoProduto(produto).map((vendaId) => {
+            const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
+            return {
+              ordem_id: ordem.id,
+              produto_id: produto.id,
+              codigo: produto.codigo,
+              descricao: produto.nome,
+              ncm: produto.ncm,
+              cst: produto.cst,
+              unidade: produto.unidade,
+              quantidade: 1,
+              valor_unitario: valorUnitario,
+              desconto: descontoUnitario,
+              total: valorUnitario - descontoUnitario,
+              cliente_id: venda?.cliente_id ?? null,
+              cliente_nome: venda?.cliente_nome ?? null,
+              venda_id: vendaId || null,
+            };
+          });
         });
         const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
         if (erroItens) throw erroItens;
@@ -1743,7 +1763,7 @@ function OrdensCompra() {
                           className="ml-auto w-20 text-right"
                           type="number"
                           min="0"
-                          step="0.001"
+                          step="1"
                           value={quantidadesCompra[produto.id] ?? String(Number(produto.quantidade_compra ?? 1))}
                           onChange={(evento) => {
                             const valor = evento.target.value;
@@ -1803,39 +1823,45 @@ function OrdensCompra() {
                       </TableCell>
                       <TableCell className="text-right font-semibold">{brl(totalCompra(produto))}</TableCell>
                       <TableCell>
-                        <Select
-                          value={vinculosCompra[produto.id] || produto.venda_vinculo_id || SEM_CLIENTE}
-                          onValueChange={(valor) => {
-                            const vinculo = valor === SEM_CLIENTE ? "" : valor;
-                            setVinculosCompra((atual) => ({
-                              ...atual,
-                              [produto.id]: vinculo,
-                            }));
-                            salvarAutomaticamente(
-                              produto.id,
-                              "venda_vinculo_id",
-                              vinculo || (null as unknown as string),
-                              true,
-                            );
-                          }}
-                        >
-                          <SelectTrigger className="w-48">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={SEM_CLIENTE}>Estoque</SelectItem>
-                            {vendasVinculo.map((venda) => (
-                              <SelectItem key={venda.id} value={venda.id}>
-                                {venda.numero ?? "Pedido"} — {venda.cliente_nome ?? "Cliente"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-1.5">
+                          {vinculosDoProduto(produto).map((vinculoAtual, indice) => (
+                            <div key={`${produto.id}-vinculo-${indice}`} className="flex items-center gap-1.5">
+                              <span className="w-5 shrink-0 text-xs text-muted-foreground">{indice + 1}.</span>
+                              <Select
+                                value={vinculoAtual || SEM_CLIENTE}
+                                onValueChange={(valor) => {
+                                  const vinculo = valor === SEM_CLIENTE ? "" : valor;
+                                  const proximos = vinculosDoProduto(produto);
+                                  proximos[indice] = vinculo;
+                                  setVinculosCompra((atual) => ({ ...atual, [produto.id]: proximos }));
+                                  if (indice === 0) {
+                                    salvarAutomaticamente(
+                                      produto.id,
+                                      "venda_vinculo_id",
+                                      vinculo || (null as unknown as string),
+                                      true,
+                                    );
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-48" aria-label={`Vínculo ${indice + 1} de ${produto.nome}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={SEM_CLIENTE}>Estoque</SelectItem>
+                                  {vendasVinculo.map((venda) => (
+                                    <SelectItem key={venda.id} value={venda.id}>
+                                      {venda.numero ?? "Pedido"} — {venda.cliente_nome ?? "Cliente"}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ))}
+                        </div>
                         {(() => {
                           const demanda = demandaPorProduto.get(produto.id);
                           if (!demanda || demanda.pedidos.length === 0) return null;
-                          const vinculado = vinculosCompra[produto.id] || produto.venda_vinculo_id;
-                          if (vinculado) return null;
                           return (
                             <div className="mt-1 w-48 text-xs text-muted-foreground">
                               <p className="font-medium">
