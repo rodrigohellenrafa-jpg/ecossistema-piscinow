@@ -1500,6 +1500,7 @@ type Conta = {
   obra_id?: string | null;
   funcionario_id?: string | null;
   cliente_id?: string | null;
+  comprovante_path?: string | null;
 };
 
 function Lista({
@@ -1688,6 +1689,9 @@ function Lista({
                     </Badge>
                   </TableCell>
                   <TableCell className={`text-right ${acoesFixas}`}><div className="flex justify-end gap-1">
+                    {c.comprovante_path ? (
+                      <ComprovanteAnexo tabela="contas" valor={c.comprovante_path} />
+                    ) : null}
                     {c.status !== "pago" ? (
                       <Button
                         size="icon"
