@@ -378,6 +378,8 @@ function Financeiro() {
         .select("*")
         .eq("id", id)
         .single();
+      if (orig && String(orig.status ?? "").toLowerCase() === "pago")
+        throw new Error("Este lançamento já foi baixado. Nada foi alterado.");
 
       const { error } = await supabase
         .from("lancamentos_financeiros")
