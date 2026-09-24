@@ -509,7 +509,7 @@ function Dashboard() {
               {saldosContas.length === 0 ? (
                 <p className="py-4 text-center text-xs text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
               ) : (
-                saldosContas.slice(0, 4).map((conta) => (
+                saldosContas.slice(0, 2).map((conta) => (
                   <div key={conta.conta} className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5">
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium">{conta.conta}</p>
