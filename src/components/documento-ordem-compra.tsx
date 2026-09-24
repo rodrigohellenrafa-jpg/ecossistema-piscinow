@@ -206,13 +206,34 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
     doc.save(nomeArquivo);
   };
 
-  /** Baixa o PDF e em seguida abre o e-mail para anexá-lo. */
+  /** Compartilha o PDF já anexado; se não der, baixa o arquivo e abre o e-mail. */
   const enviarPorEmail = async () => {
-    await baixarPdf();
+    const doc = await gerarPdf();
+    const blob = doc.output("blob");
+    const arquivo = new File([blob], nomeArquivo, { type: "application/pdf" });
+
+    const nav = navigator as Navigator & {
+      canShare?: (data: ShareData) => boolean;
+      share?: (data: ShareData) => Promise<void>;
+    };
+
+    if (nav.share && nav.canShare?.({ files: [arquivo] })) {
+      try {
+        await nav.share({ files: [arquivo], title: assunto, text: mensagemCurta });
+        toast.success("Ordem de compra pronta em PDF para envio.");
+        return;
+      } catch (err) {
+        if ((err as DOMException)?.name === "AbortError") return;
+      }
+    }
+
+    doc.save(nomeArquivo);
+    toast.success("PDF baixado. Anexe o arquivo no e-mail que vai abrir.");
     window.setTimeout(() => {
       window.location.href = mailto;
-    }, 600);
+    }, 800);
   };
+
 
 
   const documento = (
