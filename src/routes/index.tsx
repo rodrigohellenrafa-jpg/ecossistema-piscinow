@@ -1,44 +1,36 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-
-import { sincronizarNotas } from "@/lib/focus-nfe.functions";
-
 import {
-  Area,
-  AreaChart,
+  ArrowDownCircle,
+  ArrowRight,
+  ArrowUpCircle,
+  CalendarDays,
+  Landmark,
+  Scale,
+  Waves,
+} from "lucide-react";
+import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
-  Pie,
-  PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  AlertTriangle,
-  ArrowRight,
-  ClipboardCheck,
-  Landmark,
-  ShoppingCart,
-  TrendingUp,
-  Wallet,
-  Waves,
-} from "lucide-react";
 
-import { PageHeader, Kpi } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, dataBR, diasAte, ETAPAS_OBRA, margem, mesLabel, pct } from "@/lib/erp";
+import { sincronizarNotas } from "@/lib/focus-nfe.functions";
+import { brl, dataBR } from "@/lib/erp";
 
 export const Route = createFileRoute("/")({
   staticData: { sitemap: true },
@@ -47,15 +39,15 @@ export const Route = createFileRoute("/")({
       { title: "Painel Executivo | Piscinow ERP" },
       {
         name: "description",
-        content:
-          "Visão executiva da Piscinow: faturamento, margem das obras, flight board, fluxo de caixa e alertas de estoque em tempo real.",
+        content: "Agenda, saldo, vencimentos e ponto de equilíbrio da Piscinow em uma visão diária.",
       },
       { property: "og:title", content: "Painel Executivo | Piscinow ERP" },
       {
         property: "og:description",
-        content:
-          "Indicadores de vendas, obras em campo, financeiro e reposição de estoque do ERP Piscinow.",
+        content: "Acompanhe a semana, o caixa, as contas do dia e o ponto de equilíbrio mensal.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: () => (
@@ -65,620 +57,481 @@ export const Route = createFileRoute("/")({
   ),
 });
 
-const inicioMes = () => {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+const numero = (valor: unknown) => Number(valor ?? 0);
+const texto = (valor: unknown) => String(valor ?? "");
+const dataLocal = (data: Date) =>
+  `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
+
+function intervaloAtual() {
+  const hoje = new Date();
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - hoje.getDay());
+  const fim = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + 6);
+  return { inicio: dataLocal(inicio), fim: dataLocal(fim) };
+}
+
+type AgendaItem = {
+  id: string;
+  data: string;
+  titulo: string;
+  detalhe: string;
+  obra: boolean;
 };
+
+function AcessoCard({ to, children }: { to: "/agenda" | "/fluxo-caixa" | "/contas" | "/dre"; children: string }) {
+  return (
+    <Button asChild size="sm" variant="ghost">
+      <Link to={to} search={to === "/contas" ? { periodo: "hoje", tipo: undefined } : undefined}>
+        {children} <ArrowRight />
+      </Link>
+    </Button>
+  );
+}
 
 function Dashboard() {
   const qc = useQueryClient();
   const sincronizarFn = useServerFn(sincronizarNotas);
+  const hoje = dataLocal(new Date());
+  const ontemData = new Date();
+  ontemData.setDate(ontemData.getDate() - 1);
+  const ontem = dataLocal(ontemData);
+  const mes = hoje.slice(0, 7);
+  const semana = intervaloAtual();
 
-  // Sincroniza o status das notas na Focus NFe ao abrir o painel.
   useEffect(() => {
-    let ativo = true;
     sincronizarFn()
-      .then((r) => {
-        if (ativo && r.ativo && r.atualizadas > 0) {
-          qc.invalidateQueries({ queryKey: ["dash-notas"] });
+      .then((resultado) => {
+        if (resultado.ativo && resultado.atualizadas > 0) {
           qc.invalidateQueries({ queryKey: ["notas_fiscais"] });
         }
       })
       .catch(() => undefined);
-    return () => {
-      ativo = false;
-    };
-  }, [sincronizarFn, qc]);
+  }, [qc, sincronizarFn]);
 
-
-  const { data: vendas = [] } = useQuery({
-    queryKey: ["dash-vendas"],
+  const { data: eventos = [] } = useQuery({
+    queryKey: ["dashboard-agenda", semana.inicio, semana.fim],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("vendas")
-        .select("*")
-        .order("data", { ascending: false })
-        .limit(500);
+        .from("agenda_eventos")
+        .select("id, titulo, inicio, cliente_nome, responsavel_nome, obra_id")
+        .neq("status", "cancelado")
+        .gte("inicio", `${semana.inicio}T00:00:00`)
+        .lte("inicio", `${semana.fim}T23:59:59`)
+        .order("inicio");
       if (error) throw error;
-      return data as Record<string, unknown>[];
+      return data;
+    },
+  });
+
+  const { data: ordens = [] } = useQuery({
+    queryKey: ["dashboard-ordens-semana", semana.inicio, semana.fim],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordens_servico")
+        .select("id, numero, tipo_servico, cliente_nome, data_agendada, responsavel")
+        .gte("data_agendada", semana.inicio)
+        .lte("data_agendada", semana.fim)
+        .order("data_agendada");
+      if (error) throw error;
+      return data;
     },
   });
 
   const { data: obras = [] } = useQuery({
-    queryKey: ["dash-obras"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("obras").select("*").limit(200);
-      if (error) throw error;
-      return data as Record<string, unknown>[];
-    },
-  });
-
-  const { data: produtos = [] } = useQuery({
-    queryKey: ["dash-produtos"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("produtos").select("*").limit(500);
-      if (error) throw error;
-      return data as Record<string, unknown>[];
-    },
-  });
-
-  const { data: lancamentos = [] } = useQuery({
-    queryKey: ["dash-lancamentos"],
+    queryKey: ["dashboard-obras-semana"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("lancamentos_financeiros")
-        .select("*")
-        .limit(1000);
+        .from("obras")
+        .select("id, numero, cliente_nome, tipo_servico, responsavel, data_limite, escavacao_inicio, escavacao_fim, instalacao_inicio, instalacao_fim")
+        .eq("selecionada", true);
       if (error) throw error;
-      return data as Record<string, unknown>[];
+      return data;
     },
   });
 
-  const { data: notasFiscais = [] } = useQuery({
-    queryKey: ["dash-notas-fiscais"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("notas_fiscais")
-        .select("*")
-        .order("data_emissao", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return data as Record<string, unknown>[];
-    },
-  });
-
-  // Saldos das contas bancárias: pega o registro mais recente de cada conta
-  // e atualiza em tempo real quando qualquer saldo muda.
   const { data: saldosContas = [] } = useQuery({
-    queryKey: ["saldos-bancarios", "dashboard"],
+    queryKey: ["saldos-bancarios", "dashboard-principal"],
     refetchInterval: 5000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saldos_bancarios")
-        .select("id, conta, banco, saldo, data_saldo")
+        .select("conta, banco, saldo, data_saldo")
         .order("data_saldo", { ascending: false });
       if (error) throw error;
-      const porConta = new Map<string, { conta: string; banco: string | null; saldo: number }>();
-      for (const r of (data ?? []) as {
-        conta: string;
-        banco: string | null;
-        saldo: number | string;
-      }[]) {
-        if (!porConta.has(r.conta)) {
-          porConta.set(r.conta, { conta: r.conta, banco: r.banco, saldo: Number(r.saldo) });
+      const unicas = new Map<string, { conta: string; banco: string | null; saldo: number }>();
+      for (const item of data ?? []) {
+        if (!unicas.has(item.conta)) {
+          unicas.set(item.conta, { conta: item.conta, banco: item.banco, saldo: numero(item.saldo) });
         }
       }
-      return [...porConta.values()];
+      return [...unicas.values()];
+    },
+  });
+
+  const { data: contas = [] } = useQuery({
+    queryKey: ["dashboard-contas-principal"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select("id, tipo, descricao, parceiro, valor, valor_pago, status, vencimento, data_pagamento");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: lancamentos = [] } = useQuery({
+    queryKey: ["dashboard-lancamentos-principal"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lancamentos_financeiros")
+        .select("id, tipo_fluxo, categoria, descricao, valor, status, data_competencia, data_pagamento");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: vendas = [] } = useQuery({
+    queryKey: ["dashboard-equilibrio-vendas", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("data, valor_total, custo_total, valor_impostos, valor_frete, valor_mao_obra")
+        .gte("data", `${mes}-01`);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: contasPagas = [] } = useQuery({
+    queryKey: ["dashboard-equilibrio-contas", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contas")
+        .select("valor, valor_juros, data_pagamento")
+        .eq("tipo", "pagar")
+        .eq("status", "pago")
+        .gte("data_pagamento", `${mes}-01`);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: retencoes = [] } = useQuery({
+    queryKey: ["dashboard-equilibrio-retencoes", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_pagamentos")
+        .select("retencao_financeira, data_pagamento")
+        .gte("data_pagamento", `${mes}-01`);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: funcionarios = [] } = useQuery({
+    queryKey: ["dashboard-equilibrio-folha"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("funcionarios")
+        .select("salario_base")
+        .eq("ativo", true);
+      if (error) throw error;
+      return data;
     },
   });
 
   useEffect(() => {
-    const channel = supabase
-      .channel("dash-saldos-bancarios")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "saldos_bancarios" },
-        () => {
-          qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-        },
-      )
+    const canal = supabase
+      .channel("dashboard-principal-saldos")
+      .on("postgres_changes", { event: "*", schema: "public", table: "saldos_bancarios" }, () => {
+        qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      })
       .subscribe();
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(canal);
     };
   }, [qc]);
 
-  const saldoTotalContas = saldosContas.reduce((a, c) => a + c.saldo, 0);
-
-  const { data: notasCompra = [] } = useQuery({
-    queryKey: ["dash-notas-compra"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("notas_compra")
-        .select("*")
-        .order("data_entrada", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return data as Record<string, unknown>[];
-    },
-  });
-
-  // Movimentações do dia: quantas ações foram registradas hoje em cada módulo.
-  const { data: atividadeHoje = [] } = useQuery({
-    queryKey: ["dash-atividade-hoje"],
-    refetchInterval: 60000,
-    queryFn: async () => {
-      const inicioDia = new Date();
-      inicioDia.setHours(0, 0, 0, 0);
-      const desde = inicioDia.toISOString();
-      const alvos = [
-        { tabela: "vendas", rotulo: "Vendas" },
-        { tabela: "ordens_servico", rotulo: "Ordens de serviço" },
-        { tabela: "obras", rotulo: "Obras" },
-        { tabela: "ordens_compra", rotulo: "Ordens de compra" },
-        { tabela: "notas_compra", rotulo: "Notas de compra" },
-        { tabela: "notas_fiscais", rotulo: "Notas fiscais" },
-        { tabela: "estoque_movimentos", rotulo: "Movimentos de estoque" },
-        { tabela: "contas", rotulo: "Contas a pagar/receber" },
-        { tabela: "lancamentos_financeiros", rotulo: "Lançamentos financeiros" },
-        { tabela: "venda_pagamentos", rotulo: "Pagamentos recebidos" },
-        { tabela: "clientes", rotulo: "Clientes cadastrados" },
-        { tabela: "produtos", rotulo: "Produtos cadastrados" },
-        { tabela: "fornecedores", rotulo: "Fornecedores cadastrados" },
-        { tabela: "agenda_eventos", rotulo: "Compromissos da agenda" },
-      ] as const;
-      const linhas = await Promise.all(
-        alvos.map(async (a) => {
-          const { count, error } = await supabase
-            .from(a.tabela)
-            .select("id", { count: "exact", head: true })
-            .gte("created_at", desde);
-          if (error) return { rotulo: a.rotulo, total: 0 };
-          return { rotulo: a.rotulo, total: count ?? 0 };
-        }),
-      );
-      return linhas;
-    },
-  });
-
-  const totalAcoesHoje = atividadeHoje.reduce((a, l) => a + l.total, 0);
-  const atividadeOrdenada = [...atividadeHoje].sort((a, b) => b.total - a.total);
-
-  const ini = inicioMes();
-  const n = (v: unknown) => Number(v ?? 0);
-  const s = (v: unknown) => String(v ?? "");
-
-  const vendasMes = vendas.filter((v) => s(v["data"]) >= ini);
-  const faturamentoMes = vendasMes.reduce((a, v) => a + n(v["valor_total"]), 0);
-  const custoMes = vendasMes.reduce((a, v) => a + n(v["custo_total"]), 0);
-  const margemMedia = margem(faturamentoMes, custoMes);
-  const ticket = vendasMes.length ? faturamentoMes / vendasMes.length : 0;
-
-  const obrasAtivas = obras.filter((o) => s(o["status_geral"]) !== "Concluído");
-  const atrasadas = obrasAtivas.filter((o) => {
-    const d = diasAte(s(o["data_limite"]) || null);
-    return d !== null && d < 0;
-  });
-
-  const receitas = lancamentos.filter((l) => s(l["tipo_fluxo"]) === "receita");
-  const despesas = lancamentos.filter((l) => s(l["tipo_fluxo"]) === "despesa");
-  const saldo =
-    receitas.reduce((a, l) => a + n(l["valor"]), 0) -
-    despesas.reduce((a, l) => a + n(l["valor"]), 0);
-
-  // Margem líquida do mês: faturamento - custo das vendas - despesas do mês.
-  const despesasMes = despesas
-    .filter((l) => s(l["data_competencia"]) >= ini)
-    .reduce((a, l) => a + n(l["valor"]), 0);
-  const lucroLiquidoMes = faturamentoMes - custoMes - despesasMes;
-  const margemLiquida = faturamentoMes > 0 ? lucroLiquidoMes / faturamentoMes : 0;
-
-  const nfMes = notasFiscais.filter((f) => s(f["data_emissao"]) >= ini);
-  const nfAutorizadas = nfMes.filter((f) => s(f["status"]) === "autorizada");
-  const nfValor = nfAutorizadas.reduce((a, f) => a + n(f["valor_total"]), 0);
-  const nfPendentes = nfMes.filter((f) =>
-    ["rascunho", "processando", "rejeitada"].includes(s(f["status"])),
-  );
-  const ncMes = notasCompra.filter((f) => s(f["data_entrada"]) >= ini);
-  const ncValor = ncMes.reduce((a, f) => a + n(f["valor_total"]), 0);
-
-  const criticos = produtos.filter(
-    (p) => n(p["estoque_atual"]) <= n(p["estoque_minimo"]) && s(p["tipo"]) !== "servico",
-  );
-
-
-  // Série mensal (últimos 6 meses) de faturamento x custo.
-  const serie = (() => {
-    const mapa = new Map<string, { mes: string; faturamento: number; custo: number }>();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(1);
-      d.setMonth(d.getMonth() - i);
-      const key = d.toISOString().slice(0, 7);
-      mapa.set(key, { mes: mesLabel(`${key}-01`), faturamento: 0, custo: 0 });
+  const agendaSemana = useMemo<AgendaItem[]>(() => {
+    const itens: AgendaItem[] = eventos.map((evento) => ({
+      id: `evento-${evento.id}`,
+      data: texto(evento.inicio).slice(0, 10),
+      titulo: evento.titulo,
+      detalhe: [evento.cliente_nome, evento.responsavel_nome].filter(Boolean).join(" · "),
+      obra: Boolean(evento.obra_id),
+    }));
+    for (const ordem of ordens) {
+      itens.push({
+        id: `ordem-${ordem.id}`,
+        data: texto(ordem.data_agendada).slice(0, 10),
+        titulo: `OS ${ordem.numero ?? ""} · ${ordem.tipo_servico}`,
+        detalhe: [ordem.cliente_nome, ordem.responsavel].filter(Boolean).join(" · "),
+        obra: false,
+      });
     }
-    for (const v of vendas) {
-      const key = s(v["data"]).slice(0, 7);
-      const item = mapa.get(key);
-      if (item) {
-        item.faturamento += n(v["valor_total"]);
-        item.custo += n(v["custo_total"]);
+    const etapas = [
+      ["escavacao_inicio", "Início da escavação"],
+      ["escavacao_fim", "Término da escavação"],
+      ["instalacao_inicio", "Início da instalação"],
+      ["instalacao_fim", "Término da instalação"],
+      ["data_limite", "Prazo da obra"],
+    ] as const;
+    for (const obra of obras) {
+      for (const [campo, rotulo] of etapas) {
+        const data = texto(obra[campo]).slice(0, 10);
+        if (!data || data < semana.inicio || data > semana.fim) continue;
+        itens.push({
+          id: `obra-${obra.id}-${campo}`,
+          data,
+          titulo: `${obra.numero ?? "Obra"} · ${rotulo}`,
+          detalhe: [obra.cliente_nome, obra.tipo_servico, obra.responsavel].filter(Boolean).join(" · "),
+          obra: true,
+        });
       }
     }
-    return [...mapa.values()];
-  })();
+    return itens.sort((a, b) => a.data.localeCompare(b.data));
+  }, [eventos, obras, ordens, semana.fim, semana.inicio]);
 
-  const funil = (() => {
-    const cont = new Map<string, number>();
-    for (const o of obras) {
-      const k = s(o["status_geral"]) || "Agendado";
-      cont.set(k, (cont.get(k) ?? 0) + 1);
+  const obrasHoje = agendaSemana.filter((item) => item.data === hoje && item.obra);
+  const contasHoje = contas.filter((conta) => conta.vencimento === hoje);
+  const pagarHoje = contasHoje.filter((conta) => conta.tipo === "pagar");
+  const receberHoje = contasHoje.filter((conta) => conta.tipo === "receber");
+  const totalPagarHoje = pagarHoje.reduce((soma, conta) => soma + numero(conta.valor), 0);
+  const totalReceberHoje = receberHoje.reduce((soma, conta) => soma + numero(conta.valor), 0);
+
+  const fluxoOntem = useMemo(() => {
+    let entradas = 0;
+    let saidas = 0;
+    for (const conta of contas) {
+      if (conta.status !== "pago" || texto(conta.data_pagamento).slice(0, 10) !== ontem) continue;
+      const valor = numero(conta.valor_pago) || numero(conta.valor);
+      if (conta.tipo === "receber") entradas += valor;
+      else saidas += valor;
     }
-    return [...cont.entries()].map(([name, value]) => ({ name, value }));
-  })();
+    for (const lancamento of lancamentos) {
+      if (lancamento.status !== "Pago" || texto(lancamento.data_pagamento).slice(0, 10) !== ontem) continue;
+      if (lancamento.tipo_fluxo === "receita") entradas += numero(lancamento.valor);
+      else saidas += numero(lancamento.valor);
+    }
+    return { entradas, saidas, resultado: entradas - saidas };
+  }, [contas, lancamentos, ontem]);
 
-  const coresPizza = [
-    "var(--chart-1)",
-    "var(--chart-2)",
-    "var(--chart-3)",
-    "var(--chart-4)",
-    "var(--chart-5)",
+  const saldoTotal = saldosContas.reduce((soma, conta) => soma + conta.saldo, 0);
+  const faturamento = vendas.reduce((soma, venda) => soma + numero(venda.valor_total), 0);
+  const custosVariaveis = vendas.reduce(
+    (soma, venda) =>
+      soma + numero(venda.custo_total) + numero(venda.valor_impostos) + numero(venda.valor_frete) + numero(venda.valor_mao_obra),
+    0,
+  );
+  const despesasLancadas = lancamentos
+    .filter((item) => item.tipo_fluxo === "despesa" && texto(item.data_competencia).startsWith(mes))
+    .reduce((soma, item) => soma + numero(item.valor), 0);
+  const despesasPagas = contasPagas.reduce(
+    (soma, conta) => soma + numero(conta.valor) + numero(conta.valor_juros),
+    0,
+  );
+  const folha = funcionarios.reduce((soma, funcionario) => soma + numero(funcionario.salario_base), 0);
+  const taxas = retencoes.reduce((soma, item) => soma + numero(item.retencao_financeira), 0);
+  const despesasFixas = despesasLancadas + despesasPagas + folha + taxas;
+  const margemContribuicao = faturamento > 0 ? Math.max(0, (faturamento - custosVariaveis) / faturamento) : 0;
+  const pontoEquilibrio = margemContribuicao > 0 ? despesasFixas / margemContribuicao : 0;
+  const percentualEquilibrio = pontoEquilibrio > 0 ? Math.min(100, (faturamento / pontoEquilibrio) * 100) : 0;
+  const dadosEquilibrio = [
+    { nome: "Mês atual", faturamento, equilibrio: pontoEquilibrio },
   ];
-
-  const progressoObra = (o: Record<string, unknown>) =>
-    (ETAPAS_OBRA.filter((e) => s(o[e.key]) === "concluido").length / ETAPAS_OBRA.length) * 100;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Painel Executivo"
-        subtitle="Piscinow — venda, fabricação, obra e financeiro em um só lugar."
-        actions={
-          <>
-            <Button asChild>
-              <Link to="/vendas/novo">
-                <ShoppingCart /> Novo pedido
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link to="/logistica">
-                <ClipboardCheck /> Flight Board
-              </Link>
-            </Button>
-          </>
-        }
+        title="Visão do dia"
+        subtitle={`${new Date(`${hoje}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })} · agenda, caixa e compromissos financeiros.`}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi
-          label="Faturamento do mês"
-          value={brl(faturamentoMes)}
-          hint={`${vendasMes.length} pedidos · ticket ${brl(ticket)}`}
-          tone="positive"
-          to="/vendas"
-        />
-        <Kpi
-          label="Margem bruta média"
-          value={pct(margemMedia)}
-          hint={`Custo de obra ${brl(custoMes)}`}
-          tone={margemMedia >= 0.25 ? "positive" : margemMedia >= 0.1 ? "warning" : "negative"}
-          to="/dre"
-        />
-        <Kpi
-          label="Obras em campo"
-          value={String(obrasAtivas.length)}
-          hint={`${atrasadas.length} fora do prazo`}
-          tone={atrasadas.length ? "negative" : "default"}
-          to="/logistica"
-        />
-        <Kpi
-          label="Saldo financeiro"
-          value={brl(saldo)}
-          hint="Receitas menos despesas lançadas"
-          tone={saldo >= 0 ? "positive" : "negative"}
-          to="/fluxo-caixa"
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi
-          label="Margem líquida do mês"
-          value={pct(margemLiquida)}
-          hint={`Lucro ${brl(lucroLiquidoMes)} · despesas ${brl(despesasMes)}`}
-          tone={margemLiquida >= 0.15 ? "positive" : margemLiquida >= 0 ? "warning" : "negative"}
-          to="/dre"
-        />
-        <Kpi
-          label="Notas emitidas no mês"
-          value={String(nfAutorizadas.length)}
-          hint={`${nfPendentes.length} pendentes de transmissão`}
-          tone={nfPendentes.length ? "warning" : "positive"}
-          to="/fiscal"
-        />
-        <Kpi
-          label="Valor autorizado (NF-e/NFS-e)"
-          value={brl(nfValor)}
-          hint="Somatório das notas autorizadas no mês"
-          to="/fiscal"
-        />
-        <Kpi
-          label="Notas recebidas no mês"
-          value={String(ncMes.length)}
-          hint={`${brl(ncValor)} em compras lançadas`}
-          to="/notas-compra"
-        />
-      </div>
-
-
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Landmark className="size-4 text-primary" /> Saldo nas contas
-          </CardTitle>
-          <Badge
-            variant="secondary"
-            className={saldoTotalContas >= 0 ? "" : "text-destructive"}
-          >
-            Total: {brl(saldoTotalContas)}
-          </Badge>
-        </CardHeader>
-        <CardContent>
-          {saldosContas.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhuma conta bancária cadastrada ainda. Cadastre os saldos em Fluxo de Caixa.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {saldosContas.map((c) => (
-                <div
-                  key={c.conta}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{c.conta}</p>
-                    {c.banco ? (
-                      <p className="truncate text-xs text-muted-foreground">{c.banco}</p>
-                    ) : null}
-                  </div>
-                  <span
-                    className={`shrink-0 tabular-nums font-semibold ${
-                      c.saldo >= 0 ? "text-emerald-600" : "text-destructive"
-                    }`}
-                  >
-                    {brl(c.saldo)}
-                  </span>
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <Card className="min-h-[31rem]">
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarDays className="size-4 text-primary" /> Agenda da semana
+            </CardTitle>
+            <AcessoCard to="/agenda">Abrir agenda</AcessoCard>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="font-medium">Obras de hoje</p>
+                <Badge>{obrasHoje.length}</Badge>
+              </div>
+              {obrasHoje.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma etapa de obra programada para hoje.</p>
+              ) : (
+                <div className="space-y-2">
+                  {obrasHoje.map((item) => (
+                    <div key={item.id} className="border-l-2 border-primary pl-3 text-sm">
+                      <p className="font-medium">{item.titulo}</p>
+                      <p className="text-xs text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              {agendaSemana.length === 0 ? (
+                <p className="py-12 text-center text-sm text-muted-foreground">Nenhum compromisso nesta semana.</p>
+              ) : (
+                agendaSemana.slice(0, 8).map((item) => (
+                  <div key={item.id} className="flex gap-3 border-b border-border py-2 last:border-0">
+                    <div className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                      {new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" })}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{item.titulo}</p>
+                      <p className="truncate text-xs text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ClipboardCheck className="size-4 text-primary" /> Movimentações de hoje
-          </CardTitle>
-          <Badge variant="secondary">{totalAcoesHoje} ações</Badge>
-        </CardHeader>
-        <CardContent>
-          {totalAcoesHoje === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhuma movimentação registrada hoje ainda.
-            </p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {atividadeOrdenada
-                .filter((l) => l.total > 0)
-                .map((l) => (
-                  <div
-                    key={l.rotulo}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
-                  >
-                    <span className="truncate text-muted-foreground">{l.rotulo}</span>
-                    <span className="shrink-0 tabular-nums font-semibold">{l.total}</span>
+        <Card className="min-h-[31rem]">
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Landmark className="size-4 text-primary" /> Saldo e fluxo de ontem
+            </CardTitle>
+            <AcessoCard to="/fluxo-caixa">Ver fluxo</AcessoCard>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Saldo atual nas contas</p>
+              <p className={`mt-1 text-3xl font-semibold tabular-nums ${saldoTotal < 0 ? "text-destructive" : "text-success"}`}>
+                {brl(saldoTotal)}
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
+              <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
+              <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
+            </div>
+            <div className="space-y-2">
+              {saldosContas.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
+              ) : (
+                saldosContas.map((conta) => (
+                  <div key={conta.conta} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{conta.conta}</p>
+                      <p className="truncate text-xs text-muted-foreground">{conta.banco || "Conta bancária"}</p>
+                    </div>
+                    <span className={`shrink-0 font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}>
+                      {brl(conta.saldo)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="min-h-[29rem]">
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Waves className="size-4 text-primary" /> Contas com vencimento hoje
+            </CardTitle>
+            <AcessoCard to="/contas">Abrir contas</AcessoCard>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border border-border p-3">
+                <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <ArrowDownCircle className="size-4 text-destructive" /> A pagar
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-destructive">{brl(totalPagarHoje)}</p>
+                <p className="text-xs text-muted-foreground">{pagarHoje.length} título(s)</p>
+              </div>
+              <div className="rounded-md border border-border p-3">
+                <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <ArrowUpCircle className="size-4 text-success" /> A receber
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-success">{brl(totalReceberHoje)}</p>
+                <p className="text-xs text-muted-foreground">{receberHoje.length} título(s)</p>
+              </div>
+            </div>
+            {contasHoje.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">Nenhuma conta vence hoje.</p>
+            ) : (
+              <div className="space-y-2">
+                {contasHoje.slice(0, 7).map((conta) => (
+                  <div key={conta.id} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{conta.descricao}</p>
+                      <p className="truncate text-xs text-muted-foreground">{conta.parceiro || "Sem beneficiário"} · {conta.status}</p>
+                    </div>
+                    <span className={`shrink-0 font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}>
+                      {conta.tipo === "receber" ? "+" : "−"} {brl(numero(conta.valor))}
+                    </span>
                   </div>
                 ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingUp className="size-4 text-primary" /> Faturamento x custo (6 meses)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={serie}>
-                <defs>
-                  <linearGradient id="gFat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.6} />
-                    <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="mes" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} width={80} />
-                <Tooltip
-                  formatter={(v: number) => brl(v)}
-                  contentStyle={{
-                    background: "var(--popover)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 12,
-                    color: "var(--popover-foreground)",
-                  }}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="faturamento"
-                  name="Faturamento"
-                  stroke="var(--chart-1)"
-                  fill="url(#gFat)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="custo"
-                  name="Custo"
-                  stroke="var(--chart-3)"
-                  fill="transparent"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Waves className="size-4 text-primary" /> Obras por status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-72">
-            {funil.length === 0 ? (
-              <p className="py-16 text-center text-sm text-muted-foreground">
-                Nenhuma obra cadastrada ainda.
-              </p>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={funil} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90}>
-                    {funil.map((_, i) => (
-                      <Cell key={i} fill={coresPizza[i % coresPizza.length]} />
-                    ))}
-                  </Pie>
-                  <Legend />
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--popover)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      color: "var(--popover-foreground)",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base">Obras em execução</CardTitle>
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/logistica">
-                Ver board <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+        <Card className="min-h-[29rem]">
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Scale className="size-4 text-primary" /> Ponto de equilíbrio do mês
+            </CardTitle>
+            <AcessoCard to="/dre">Abrir DRE</AcessoCard>
           </CardHeader>
           <CardContent className="space-y-3">
-            {obrasAtivas.slice(0, 5).map((o) => {
-              const d = diasAte(s(o["data_limite"]) || null);
-              return (
-                <div key={String(o["id"])} className="rounded-lg border border-border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium">
-                      {s(o["numero"]) || "Obra"} · {s(o["cliente_nome"]) || "Cliente"}
-                    </p>
-                    <Badge variant={d !== null && d < 0 ? "destructive" : "secondary"}>
-                      {d === null ? "sem prazo" : d < 0 ? `${Math.abs(d)}d atrasada` : `${d}d`}
-                    </Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {s(o["tipo_servico"])} · limite {dataBR(s(o["data_limite"]) || null)}
-                  </p>
-                  <Progress className="mt-2 h-1.5" value={progressoObra(o)} />
-                </div>
-              );
-            })}
-            {obrasAtivas.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Nenhuma obra ativa. Crie uma no Flight Board.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="size-4 text-warning" /> Reposição de estoque
-            </CardTitle>
-            <Button asChild size="sm" variant="ghost">
-              <Link to="/compras">
-                Central de compras <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {criticos.slice(0, 7).map((p) => (
-              <div
-                key={String(p["id"])}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
-              >
-                <span className="truncate">{s(p["nome"])}</span>
-                <span className="shrink-0 tabular-nums text-destructive">
-                  {n(p["estoque_atual"])} / mín {n(p["estoque_minimo"])}
-                </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Faturamento</p>
+                <p className="font-semibold tabular-nums text-success">{brl(faturamento)}</p>
               </div>
-            ))}
-            {criticos.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Estoque saudável — nenhum item abaixo do mínimo.
-              </p>
-            )}
+              <div>
+                <p className="text-xs text-muted-foreground">Necessário para empatar</p>
+                <p className="font-semibold tabular-nums">{brl(pontoEquilibrio)}</p>
+              </div>
+            </div>
+            <div className="h-64">
+              {faturamento === 0 && pontoEquilibrio === 0 ? (
+                <p className="py-20 text-center text-sm text-muted-foreground">Ainda não há dados suficientes neste mês.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dadosEquilibrio} margin={{ top: 16, right: 8, left: 8, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="nome" stroke="var(--muted-foreground)" fontSize={12} />
+                    <YAxis stroke="var(--muted-foreground)" fontSize={12} width={78} tickFormatter={(v) => `${Math.round(Number(v) / 1000)} mil`} />
+                    <Tooltip formatter={(v: number) => brl(Number(v))} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }} />
+                    <Legend />
+                    <ReferenceLine y={pontoEquilibrio} stroke="var(--destructive)" strokeDasharray="4 4" />
+                    <Bar dataKey="faturamento" name="Faturamento" fill="var(--success)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="equilibrio" name="Ponto de equilíbrio" fill="var(--chart-4)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-muted-foreground">Progresso até o equilíbrio</span>
+              <strong className={faturamento >= pontoEquilibrio && pontoEquilibrio > 0 ? "text-success" : "text-warning"}>
+                {percentualEquilibrio.toFixed(1)}%
+              </strong>
+            </div>
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
 
-      <Card>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Wallet className="size-4 text-primary" /> Últimos pedidos
-          </CardTitle>
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/vendas">
-              Histórico <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {vendas.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Nenhum pedido lançado. Comece pelo PDV.
-            </p>
-          ) : (
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={vendas.slice(0, 8).reverse().map((v) => ({
-                  nome: s(v["numero"]) || s(v["cliente_nome"]).slice(0, 10),
-                  total: n(v["valor_total"]),
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="nome" stroke="var(--muted-foreground)" fontSize={12} />
-                  <YAxis stroke="var(--muted-foreground)" fontSize={12} width={80} />
-                  <Tooltip
-                    formatter={(v: number) => brl(v)}
-                    contentStyle={{
-                      background: "var(--popover)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 12,
-                      color: "var(--popover-foreground)",
-                    }}
-                  />
-                  <Bar dataKey="total" name="Total" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+function ResumoValor({ label, valor, positivo = false }: { label: string; valor: number; positivo?: boolean }) {
+  return (
+    <div className="rounded-md border border-border p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-sm font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
+        {brl(valor)}
+      </p>
     </div>
   );
 }
