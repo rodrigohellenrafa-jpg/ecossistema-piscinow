@@ -221,7 +221,9 @@ function Contas() {
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
   const busca = Route.useSearch();
-  const [periodo, setPeriodo] = useState(busca.periodo ?? "todas");
+  const [periodo, setPeriodo] = useState(normalizarPeriodo(busca.periodo));
+  const [periodoDe, setPeriodoDe] = useState(hojeISO());
+  const [periodoAte, setPeriodoAte] = useState(hojeISO());
   const [aba, setAba] = useState<"pagar" | "receber">(busca.tipo ?? "pagar");
   const [baixando, setBaixando] = useState<Conta | null>(null);
 
@@ -743,7 +745,7 @@ function Contas() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo));
+  const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo, periodoDe, periodoAte));
   const pagar = filtradas.filter((c) => c.tipo === "pagar");
   // A receber: mostra apenas títulos em aberto; os baixados saem da tela.
   const receber = filtradas.filter((c) => c.tipo === "receber" && c.status !== "pago");
