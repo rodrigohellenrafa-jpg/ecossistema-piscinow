@@ -173,7 +173,7 @@ function ResumoPeriodo() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Resumo do período" description="Tudo o que entrou, saiu, foi vendido, comprado e movimentado no estoque no período escolhido." />
+      <PageHeader title="Resumo do período" subtitle="Tudo o que entrou, saiu, foi vendido, comprado e movimentado no estoque no período escolhido." />
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 pt-6">
           <div><label className="text-xs text-muted-foreground">De</label><Input type="date" value={de} onChange={(e) => setDe(e.target.value)} /></div>
