@@ -408,9 +408,9 @@ function FormularioOS() {
               className="border-b border-slate-900"
             />
             <Campo
-              label="Data do agendamento"
-              value={agendamento}
-              onChange={setAgendamento}
+              label="Descrição do serviço"
+              value={descricaoServico}
+              onChange={setDescricaoServico}
               className="col-span-4"
             />
           </div>
