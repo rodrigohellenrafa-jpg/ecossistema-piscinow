@@ -487,6 +487,46 @@ function Financeiro() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const abrirEdicao = (l: Lancamento) => {
+    setEditando(l);
+    const rateioAtual = rateios.filter((r) => r.lancamento_id === l.id);
+    if (l.categoria === "Rateio" && rateioAtual.length > 0) {
+      setRatear(true);
+      const linhas = rateioAtual.map((r) => ({ categoria: r.categoria, valor: String(r.valor) }));
+      while (linhas.length < 2) linhas.push({ categoria: "", valor: "" });
+      setRateio(linhas);
+    } else {
+      setRatear(false);
+      setRateio([
+        { categoria: "", valor: "" },
+        { categoria: "", valor: "" },
+      ]);
+    }
+    setForm({
+      obra_id: l.obra_id ?? "",
+      vinculo: "",
+      numero_documento: l.numero_documento ?? "",
+      tipo_fluxo: l.tipo_fluxo,
+      categoria: l.categoria === "Rateio" ? "" : l.categoria,
+      descricao: l.descricao,
+      valor: String(l.valor),
+      data_competencia: l.data_competencia || hojeISO(),
+      vencimento: l.vencimento ?? "",
+      data_pagamento: l.data_pagamento ?? "",
+      conta_bancaria: l.conta_bancaria ?? "",
+      forma_pagamento: l.forma_pagamento ?? FORMAS_PAGAMENTO[0],
+      venda_id: l.venda_id ?? "",
+      fornecedor_id: l.fornecedor_id ?? "",
+      funcionario_id: l.funcionario_id ?? "",
+      tipo_despesa: l.tipo_despesa ?? "",
+      recorrencia: l.recorrencia ?? "nenhuma",
+      status: l.status,
+      observacoes: l.observacoes ?? "",
+      comprovante_path: l.comprovante_path ?? null,
+    });
+    setOpen(true);
+  };
+
   const categorias = useMemo(
     () => Array.from(new Set(lancamentos.map((l) => l.categoria))).sort(),
     [lancamentos],
