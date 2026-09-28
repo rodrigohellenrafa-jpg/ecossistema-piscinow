@@ -295,7 +295,7 @@ function Financeiro() {
 
       const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
       const vinc = parseVinculo(form.vinculo);
-      const { data: criado, error } = await supabase.from("lancamentos_financeiros").insert({
+      const dados = {
         tipo_fluxo: form.tipo_fluxo,
         categoria: ratear ? "Rateio" : form.categoria.trim(),
         descricao: form.descricao.trim(),
@@ -316,16 +316,34 @@ function Financeiro() {
         comprovante_path: form.comprovante_path,
         obra_id: vinc.obra_id ?? (form.obra_id || null),
         numero_documento: form.numero_documento || null,
-        created_by: uid,
-      })
-        .select("id")
-        .single();
-      if (error) throw error;
+      };
 
-      if (ratear && criado) {
+      let destinoId = editando?.id ?? null;
+      if (editando) {
+        const { error } = await supabase
+          .from("lancamentos_financeiros")
+          .update(dados)
+          .eq("id", editando.id);
+        if (error) throw error;
+        const { error: errR } = await supabase
+          .from("lancamento_rateios")
+          .delete()
+          .eq("lancamento_id", editando.id);
+        if (errR) throw errR;
+      } else {
+        const { data: criado, error } = await supabase
+          .from("lancamentos_financeiros")
+          .insert({ ...dados, created_by: uid })
+          .select("id")
+          .single();
+        if (error) throw error;
+        destinoId = criado.id;
+      }
+
+      if (ratear && destinoId) {
         const { error: err2 } = await supabase.from("lancamento_rateios").insert(
           linhas.map((l) => ({
-            lancamento_id: criado.id,
+            lancamento_id: destinoId,
             categoria: l.categoria,
             valor: l.valor,
             created_by: uid,
@@ -335,7 +353,8 @@ function Financeiro() {
       }
     },
     onSuccess: () => {
-      toast.success("Lançamento criado!");
+      toast.success(editando ? "Lançamento atualizado!" : "Lançamento criado!");
+      setEditando(null);
       setForm(vazio);
       setRatear(false);
       setRateio([
