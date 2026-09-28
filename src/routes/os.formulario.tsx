@@ -82,6 +82,7 @@ type OrdemServico = {
   cliente_id: string | null;
   cliente_nome: string | null;
   venda_id: string | null;
+  vendas_ids: string[] | null;
   responsavel: string | null;
   data_agendada: string | null;
   descricao: string | null;
