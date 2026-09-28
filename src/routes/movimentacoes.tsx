@@ -203,6 +203,10 @@ export function Movimentacoes() {
   const saidasReal = soma((l) => l.sentido === "saida" && l.realizado);
   const entradasPrev = soma((l) => l.sentido === "entrada" && !l.realizado);
   const saidasPrev = soma((l) => l.sentido === "saida" && !l.realizado);
+  const periodoRotulo =
+    de || ate
+      ? `${de ? dataBR(de) : "início"} a ${ate ? dataBR(ate) : "hoje"}`
+      : "todos os períodos";
   const saldoBancos = (saldos as { conta: string; saldo: number }[]).reduce(
     (acc, s) => acc + Number(s.saldo ?? 0),
     0,
@@ -231,8 +235,8 @@ export function Movimentacoes() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Entradas realizadas" value={brl(entradasReal)} tone="positive" />
-        <Kpi label="Saídas realizadas" value={brl(saidasReal)} tone="negative" />
+        <Kpi label="Entradas realizadas" value={brl(entradasReal)} tone="positive" hint={`período: ${periodoRotulo}`} />
+        <Kpi label="Saídas realizadas" value={brl(saidasReal)} tone="negative" hint={`período: ${periodoRotulo}`} />
         <Kpi label="Entradas previstas" value={brl(entradasPrev)} hint="ainda não recebidas" />
         <Kpi label="Saídas previstas" value={brl(saidasPrev)} hint="ainda não pagas" />
         <Kpi
