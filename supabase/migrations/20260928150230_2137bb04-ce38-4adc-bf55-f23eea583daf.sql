@@ -1,0 +1,2 @@
+update public.ordens_compra set status='faturada', valor_nota=1100, faturada_em=now(), obs_pagamento=coalesce(obs_pagamento||' | ','')||'NF 228031 (meia nota R$ 1.100,00)' where id='998484a9-6cb7-4424-9054-3be891219758';
+update public.ordem_compra_itens set numero_nf='228031' where ordem_id='998484a9-6cb7-4424-9054-3be891219758';
