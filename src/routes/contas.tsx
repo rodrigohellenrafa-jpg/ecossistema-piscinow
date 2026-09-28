@@ -1342,6 +1342,7 @@ function Contas() {
         <TabsContent value="receber">
           <Lista
             expansivel
+            ehReceber
             titulo={`Em aberto: ${brl(soma(receber))}`}
             itens={receber}
             rateios={rateios}
