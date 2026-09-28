@@ -3,7 +3,7 @@ import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Link2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { CheckCircle2, Link2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
@@ -101,6 +101,11 @@ type Lancamento = {
   conciliado: boolean;
   observacoes: string | null;
   recorrencia?: string | null;
+  tipo_despesa?: string | null;
+  numero_documento?: string | null;
+  comprovante_path?: string | null;
+  obra_id?: string | null;
+  cliente_id?: string | null;
 };
 
 const RECORRENCIAS = [
@@ -153,6 +158,7 @@ function Financeiro() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
+  const [editando, setEditando] = useState<Lancamento | null>(null);
   const [form, setForm] = useState(vazio);
   const [baixa, setBaixa] = useState<{
     id: string;
