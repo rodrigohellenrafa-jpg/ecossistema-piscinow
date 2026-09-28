@@ -1556,6 +1556,7 @@ type Conta = {
 
 function Lista({
   expansivel = false,
+  ehReceber = false,
   titulo,
   itens,
   rateios = [],
@@ -1565,6 +1566,7 @@ function Lista({
   onReverter,
 }: {
   expansivel?: boolean;
+  ehReceber?: boolean;
   titulo: string;
   itens: Conta[];
   rateios?: { conta_id: string; categoria: string; valor: number }[];
