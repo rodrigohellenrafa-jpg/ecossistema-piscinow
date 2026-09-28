@@ -113,12 +113,6 @@ export function SaldosBancarios() {
   const saidasHoje = saidasLista.reduce((s, m) => s + m.valor, 0);
   const saldoDia = entradasHoje - saidasHoje;
 
-  /** Movimento do dia já identificado com a conta bancária informada. */
-  const movimentoConta = (conta: string) =>
-    contasHoje.filter((c) => (c.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
-      .reduce((s, c) => s + (ehEntrada(c.tipo) ? 1 : -1) * valorBaixado(c), 0) + lancHoje
-      .filter((l) => (l.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
-      .reduce((s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor ?? 0) : -Number(l.valor ?? 0)), 0);
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
 
