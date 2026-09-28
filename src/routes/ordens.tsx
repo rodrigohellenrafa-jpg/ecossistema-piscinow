@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { Field } from "@/components/field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,21 +106,46 @@ function Ordens() {
   const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => {
     setEditando(null);
-    setForm(vazio);
+    setForm(vazio); setVendasSel([]);
     setOpen(true);
   });
   const [form, setForm] = useState(vazio);
+  const [vendasSel, setVendasSel] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");
 
   const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes"],
+    queryKey: ["clientes", "os"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clientes").select("id, nome, endereco_obra").order("nome");
+      const { data, error } = await supabase.from("clientes").select("id, nome, endereco_obra, documento").order("nome");
       if (error) throw error;
       return data;
     },
   });
+
+  const { data: vendasTodas = [] } = useQuery({
+    queryKey: ["vendas", "os-vinculo"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendas")
+        .select("id, numero, data, cliente_id, cliente_nome, valor_total")
+        .order("data", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const vendasDoCliente = useMemo(() => {
+    const sel = clientes.find((c) => c.id === form.cliente_id);
+    if (!sel) return [];
+    const doc = (sel.documento ?? "").replace(/\D/g, "");
+    const ids = new Set(
+      clientes
+        .filter((c) => c.id === sel.id || (doc && (c.documento ?? "").replace(/\D/g, "") === doc))
+        .map((c) => c.id),
+    );
+    return vendasTodas.filter((v) => v.cliente_id && ids.has(v.cliente_id));
+  }, [clientes, vendasTodas, form.cliente_id]);
 
   const { data = [] } = useQuery({
     queryKey: ["ordens"],
@@ -174,6 +200,8 @@ function Ordens() {
         prioridade: form.prioridade,
         data_agendada: form.data_agendada || null,
         valor: Number(form.valor) || 0,
+        vendas_ids: vendasSel,
+        venda_id: vendasSel[0] ?? null,
       };
       if (editando) {
         const { error } = await supabase.from("ordens_servico").update(payload).eq("id", editando);
@@ -188,7 +216,7 @@ function Ordens() {
     },
     onSuccess: () => {
       toast.success(editando ? "Ordem de serviço atualizada!" : "Ordem de serviço criada!");
-      setForm(vazio);
+      setForm(vazio); setVendasSel([]);
       setEditando(null);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["ordens"] });
@@ -198,6 +226,8 @@ function Ordens() {
 
   const abrirEdicao = (o: (typeof data)[number]) => {
     setEditando(o.id);
+    const ids = (o as { vendas_ids?: string[] }).vendas_ids ?? [];
+    setVendasSel(ids.length ? ids : o.venda_id ? [o.venda_id] : []);
     setForm({
       numero: o.numero ?? "",
       cliente_id: o.cliente_id ?? "",
@@ -303,12 +333,12 @@ function Ordens() {
               setOpen(v);
               if (!v) {
                 setEditando(null);
-                setForm(vazio);
+                setForm(vazio); setVendasSel([]);
               }
             }}
           >
           <DialogTrigger asChild>
-            <Button onClick={() => { setEditando(null); setForm(vazio); }}>
+            <Button onClick={() => { setEditando(null); setForm(vazio); setVendasSel([]); }}>
               <Plus /> Nova OS
             </Button>
           </DialogTrigger>
@@ -396,6 +426,31 @@ function Ordens() {
                   onChange={(e) => set("descricao")(e.target.value)}
                 />
               </Field>
+              {form.cliente_id && (
+                <Field label="Pedidos deste cliente (mesmo CPF/CNPJ) nesta O.S." className="sm:col-span-2">
+                  {vendasDoCliente.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum pedido encontrado para este cliente.</p>
+                  ) : (
+                    <div className="grid gap-2 rounded-md border p-3">
+                      {vendasDoCliente.map((v) => (
+                        <label key={v.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={vendasSel.includes(v.id)}
+                            onCheckedChange={(c) =>
+                              setVendasSel((s) => (c ? [...s, v.id] : s.filter((x) => x !== v.id)))
+                            }
+                          />
+                          <span className="font-medium">{v.numero}</span>
+                          <span className="text-muted-foreground">
+                            {v.data ? new Date(v.data + "T12:00:00").toLocaleDateString("pt-BR") : ""} · {v.cliente_nome}
+                          </span>
+                          <span className="ml-auto">{Number(v.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </Field>
+              )}
             </div>
             <DialogFooter>
               <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
