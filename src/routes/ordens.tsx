@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { Field } from "@/components/field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,7 @@ function Ordens() {
   const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => {
     setEditando(null);
-    setForm(vazio);
+    setForm(vazio); setVendasSel([]);
     setOpen(true);
   });
   const [form, setForm] = useState(vazio);
@@ -215,7 +216,7 @@ function Ordens() {
     },
     onSuccess: () => {
       toast.success(editando ? "Ordem de serviço atualizada!" : "Ordem de serviço criada!");
-      setForm(vazio);
+      setForm(vazio); setVendasSel([]);
       setEditando(null);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["ordens"] });
@@ -332,12 +333,12 @@ function Ordens() {
               setOpen(v);
               if (!v) {
                 setEditando(null);
-                setForm(vazio);
+                setForm(vazio); setVendasSel([]);
               }
             }}
           >
           <DialogTrigger asChild>
-            <Button onClick={() => { setEditando(null); setForm(vazio); }}>
+            <Button onClick={() => { setEditando(null); setForm(vazio); setVendasSel([]); }}>
               <Plus /> Nova OS
             </Button>
           </DialogTrigger>
