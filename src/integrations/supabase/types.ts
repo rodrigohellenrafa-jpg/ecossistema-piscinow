@@ -1693,6 +1693,7 @@ export type Database = {
           updated_at: string
           valor: number
           venda_id: string | null
+          vendas_ids: string[]
         }
         Insert: {
           aceite_em?: string | null
@@ -1720,6 +1721,7 @@ export type Database = {
           updated_at?: string
           valor?: number
           venda_id?: string | null
+          vendas_ids?: string[]
         }
         Update: {
           aceite_em?: string | null
@@ -1747,6 +1749,7 @@ export type Database = {
           updated_at?: string
           valor?: number
           venda_id?: string | null
+          vendas_ids?: string[]
         }
         Relationships: [
           {

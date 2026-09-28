@@ -1,0 +1,2 @@
+alter table public.ordens_servico add column if not exists vendas_ids uuid[] not null default '{}';
+update public.ordens_servico set vendas_ids = array[venda_id] where venda_id is not null and vendas_ids = '{}';
