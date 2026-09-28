@@ -218,6 +218,7 @@ function FormularioOS() {
       setNumeroOS(obra.numero ?? "");
       if (obra.endereco_obra) setEndereco(obra.endereco_obra);
       if (obra.tipo_servico) setModelo(obra.tipo_servico);
+      setObservacoes(obra.observacoes ?? "");
     } else if (vendaSelecionada) {
       setCliente(vendaSelecionada.cliente_nome ?? "");
       setProfissional(vendaSelecionada.vendedor ?? "");
@@ -244,6 +245,25 @@ function FormularioOS() {
     const piscina = itensVenda.find((i) => /piscina|casco|spa/i.test(i.descricao));
     if (piscina) setModelo((atual) => atual || piscina.descricao);
   }, [itensVenda]);
+
+  useEffect(() => {
+    if (eventosAgenda.length === 0) return;
+    const agora = new Date();
+    const proximo =
+      eventosAgenda.find((e) => new Date(e.inicio) >= agora) ?? eventosAgenda[0];
+    const data = new Date(proximo.inicio);
+    const texto =
+      data.toLocaleDateString("pt-BR") +
+      " " +
+      data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) +
+      (proximo.titulo ? ` — ${proximo.titulo}` : "");
+    setAgendamento(texto);
+    if (proximo.descricao) {
+      setObservacoes((atual) =>
+        atual ? `${atual}\n${proximo.descricao}` : proximo.descricao!,
+      );
+    }
+  }, [eventosAgenda]);
 
   const formatarQtd = (q: number) => (Number(q) % 1 === 0 ? String(Number(q)) : Number(q).toFixed(2));
 
