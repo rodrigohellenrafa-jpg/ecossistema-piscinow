@@ -56,6 +56,16 @@ type Obra = {
   venda_id: string | null;
   endereco_obra: string | null;
   tipo_servico: string | null;
+  observacoes: string | null;
+};
+
+type EventoAgenda = {
+  id: string;
+  inicio: string;
+  fim: string | null;
+  titulo: string;
+  descricao: string | null;
+  local: string | null;
 };
 
 type Venda = {
@@ -102,6 +112,8 @@ function FormularioOS() {
   const [profissional, setProfissional] = useState("");
   const [inicio, setInicio] = useState("");
   const [termino, setTermino] = useState("");
+  const [agendamento, setAgendamento] = useState("");
+  const [observacoes, setObservacoes] = useState("");
   const [linhasApoio, setLinhasApoio] = useState<string[]>(LINHAS_APOIO_VAZIAS);
 
   const { data: obras = [] } = useQuery({
@@ -109,7 +121,7 @@ function FormularioOS() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("id, numero, cliente_id, cliente_nome, responsavel, venda_id, endereco_obra, tipo_servico")
+        .select("id, numero, cliente_id, cliente_nome, responsavel, venda_id, endereco_obra, tipo_servico, observacoes")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
@@ -165,6 +177,26 @@ function FormularioOS() {
     },
   });
 
+  const obraId = obra?.id ?? null;
+
+  const { data: eventosAgenda = [] } = useQuery({
+    queryKey: ["formulario-agenda", obraId, vendaId],
+    enabled: Boolean(obraId || vendaId),
+    queryFn: async () => {
+      let query = supabase
+        .from("agenda_eventos")
+        .select("id, inicio, fim, titulo, descricao, local")
+        .neq("status", "cancelado")
+        .order("inicio", { ascending: true });
+      query = obraId
+        ? query.eq("obra_id", obraId)
+        : query.eq("venda_id", vendaId!);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as EventoAgenda[];
+    },
+  });
+
   const { data: clienteDados } = useQuery({
     queryKey: ["formulario-cliente", clienteId],
     enabled: Boolean(clienteId),
@@ -186,6 +218,7 @@ function FormularioOS() {
       setNumeroOS(obra.numero ?? "");
       if (obra.endereco_obra) setEndereco(obra.endereco_obra);
       if (obra.tipo_servico) setModelo(obra.tipo_servico);
+      setObservacoes(obra.observacoes ?? "");
     } else if (vendaSelecionada) {
       setCliente(vendaSelecionada.cliente_nome ?? "");
       setProfissional(vendaSelecionada.vendedor ?? "");
@@ -212,6 +245,25 @@ function FormularioOS() {
     const piscina = itensVenda.find((i) => /piscina|casco|spa/i.test(i.descricao));
     if (piscina) setModelo((atual) => atual || piscina.descricao);
   }, [itensVenda]);
+
+  useEffect(() => {
+    if (eventosAgenda.length === 0) return;
+    const agora = new Date();
+    const proximo =
+      eventosAgenda.find((e) => new Date(e.inicio) >= agora) ?? eventosAgenda[0];
+    const data = new Date(proximo.inicio);
+    const texto =
+      data.toLocaleDateString("pt-BR") +
+      " " +
+      data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) +
+      (proximo.titulo ? ` — ${proximo.titulo}` : "");
+    setAgendamento(texto);
+    if (proximo.descricao) {
+      setObservacoes((atual) =>
+        atual ? `${atual}\n${proximo.descricao}` : proximo.descricao!,
+      );
+    }
+  }, [eventosAgenda]);
 
   const formatarQtd = (q: number) => (Number(q) % 1 === 0 ? String(Number(q)) : Number(q).toFixed(2));
 
@@ -316,15 +368,26 @@ function FormularioOS() {
               label="Profissional responsável"
               value={profissional}
               onChange={setProfissional}
-              className="col-span-2 border-r border-slate-900"
+              className="col-span-2 border-b border-r border-slate-900"
             />
             <Campo
               label="Início"
               value={inicio}
               onChange={setInicio}
-              className="border-r border-slate-900"
+              className="border-b border-r border-slate-900"
             />
-            <Campo label="Término" value={termino} onChange={setTermino} />
+            <Campo
+              label="Término"
+              value={termino}
+              onChange={setTermino}
+              className="border-b border-slate-900"
+            />
+            <Campo
+              label="Data do agendamento"
+              value={agendamento}
+              onChange={setAgendamento}
+              className="col-span-4"
+            />
           </div>
 
           {/* Desenho técnico */}
@@ -361,10 +424,14 @@ function FormularioOS() {
             <div className="border-b border-slate-900 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
               Observações da obra
             </div>
-            <div className="space-y-4 p-3">
-              <div className="border-b border-slate-900" />
-              <div className="border-b border-slate-900" />
-              <div className="border-b border-slate-900" />
+            <div className="p-3">
+              <textarea
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                rows={4}
+                placeholder="O que o técnico precisa saber antes de ir à casa do cliente..."
+                className="w-full resize-y bg-transparent text-[12px] font-medium leading-6 text-slate-900 outline-none placeholder:text-slate-400"
+              />
             </div>
           </div>
         </section>
