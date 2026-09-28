@@ -166,6 +166,7 @@ function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | n
 }
 
 const PERIODOS = [
+  { valor: "todas", rotulo: "Todas" },
   { valor: "diario", rotulo: "Diário" },
   { valor: "semanal", rotulo: "Semanal" },
   { valor: "mensal", rotulo: "Mensal" },
@@ -179,11 +180,11 @@ function hojeISO(): string {
 
 /** Normaliza valores antigos do filtro (links antigos: hoje/semana/mes). */
 function normalizarPeriodo(v: string | undefined): string {
-  if (!v) return "diario";
+  if (!v) return "todas";
   if (v === "hoje" || v === "diaria") return "diario";
   if (v === "semana") return "semanal";
   if (v === "mes") return "mensal";
-  return PERIODOS.some((p) => p.valor === v) ? v : "diario";
+  return PERIODOS.some((p) => p.valor === v) ? v : "todas";
 }
 
 function noPeriodo(vencimento: string, periodo: string, de: string, ate: string): boolean {
