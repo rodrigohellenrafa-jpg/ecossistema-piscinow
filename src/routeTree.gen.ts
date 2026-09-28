@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ResumoPeriodoRouteImport } from './routes/resumo-periodo'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
 import { Route as ReativacaoRouteImport } from './routes/reativacao'
@@ -52,6 +53,11 @@ import { Route as ApiPublicAgendaTokenRouteImport } from './routes/api/public/ag
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResumoPeriodoRoute = ResumoPeriodoRouteImport.update({
+  id: '/resumo-periodo',
+  path: '/resumo-periodo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -273,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/resumo-periodo': typeof ResumoPeriodoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
@@ -314,6 +321,7 @@ export interface FileRoutesByTo {
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/resumo-periodo': typeof ResumoPeriodoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
@@ -356,6 +364,7 @@ export interface FileRoutesById {
   '/reativacao': typeof ReativacaoRoute
   '/relatorio-contas': typeof RelatorioContasRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/resumo-periodo': typeof ResumoPeriodoRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/estoque/entradas': typeof EstoqueEntradasRoute
   '/estoque/inventario': typeof EstoqueInventarioRoute
@@ -399,6 +408,7 @@ export interface FileRouteTypes {
     | '/reativacao'
     | '/relatorio-contas'
     | '/reset-password'
+    | '/resumo-periodo'
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
@@ -440,6 +450,7 @@ export interface FileRouteTypes {
     | '/reativacao'
     | '/relatorio-contas'
     | '/reset-password'
+    | '/resumo-periodo'
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
@@ -481,6 +492,7 @@ export interface FileRouteTypes {
     | '/reativacao'
     | '/relatorio-contas'
     | '/reset-password'
+    | '/resumo-periodo'
     | '/sitemap.xml'
     | '/estoque/entradas'
     | '/estoque/inventario'
@@ -523,6 +535,7 @@ export interface RootRouteChildren {
   ReativacaoRoute: typeof ReativacaoRoute
   RelatorioContasRoute: typeof RelatorioContasRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ResumoPeriodoRoute: typeof ResumoPeriodoRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   EstoqueEntradasRoute: typeof EstoqueEntradasRoute
   EstoqueInventarioRoute: typeof EstoqueInventarioRoute
@@ -543,6 +556,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resumo-periodo': {
+      id: '/resumo-periodo'
+      path: '/resumo-periodo'
+      fullPath: '/resumo-periodo'
+      preLoaderRoute: typeof ResumoPeriodoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -853,6 +873,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReativacaoRoute: ReativacaoRoute,
   RelatorioContasRoute: RelatorioContasRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ResumoPeriodoRoute: ResumoPeriodoRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   EstoqueEntradasRoute: EstoqueEntradasRoute,
   EstoqueInventarioRoute: EstoqueInventarioRoute,
