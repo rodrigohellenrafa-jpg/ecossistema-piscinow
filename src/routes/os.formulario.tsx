@@ -76,6 +76,17 @@ type Venda = {
   vendedor: string | null;
 };
 
+type OrdemServico = {
+  id: string;
+  numero: string | null;
+  cliente_id: string | null;
+  cliente_nome: string | null;
+  venda_id: string | null;
+  responsavel: string | null;
+  data_agendada: string | null;
+  descricao: string | null;
+};
+
 function Campo({
   label,
   value,
@@ -142,12 +153,30 @@ function FormularioOS() {
     },
   });
 
+  const { data: ordens = [] } = useQuery({
+    queryKey: ["ordens-formulario"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ordens_servico")
+        .select("id, numero, cliente_id, cliente_nome, venda_id, responsavel, data_agendada, descricao")
+        .neq("status", "cancelada")
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data as OrdemServico[];
+    },
+  });
+
   const obra = selecao.startsWith("obra:")
     ? obras.find((o) => o.id === selecao.slice(5))
     : undefined;
 
   const vendaSelecionada = selecao.startsWith("venda:")
     ? vendas.find((v) => v.id === selecao.slice(6))
+    : undefined;
+
+  const ordemSelecionada = selecao.startsWith("os:")
+    ? ordens.find((o) => o.id === selecao.slice(3))
     : undefined;
 
   const vendaDaObra = obra
@@ -160,8 +189,8 @@ function FormularioOS() {
       null)
     : null;
 
-  const vendaId = vendaSelecionada?.id ?? vendaDaObra ?? null;
-  const clienteId = obra?.cliente_id ?? vendaSelecionada?.cliente_id ?? null;
+  const vendaId = ordemSelecionada?.venda_id ?? vendaSelecionada?.id ?? vendaDaObra ?? null;
+  const clienteId = ordemSelecionada?.cliente_id ?? obra?.cliente_id ?? vendaSelecionada?.cliente_id ?? null;
 
   const { data: itensVenda = ITENS_VAZIOS } = useQuery({
     queryKey: ["formulario-itens", vendaId],
@@ -198,9 +227,9 @@ function FormularioOS() {
   });
 
   const boardOsId = (obra as { board_os_id?: string | null } | undefined)?.board_os_id ?? null;
-  const { data: osDoc } = useQuery({
+  const { data: osDocVinculado } = useQuery({
     queryKey: ["formulario-os-doc", boardOsId, vendaId, clienteId],
-    enabled: Boolean(boardOsId || vendaId || clienteId),
+    enabled: !ordemSelecionada && Boolean(boardOsId || vendaId || clienteId),
     queryFn: async () => {
       let q = supabase
         .from("ordens_servico")
@@ -217,6 +246,7 @@ function FormularioOS() {
       return data?.[0] ?? null;
     },
   });
+  const osDoc = ordemSelecionada ?? osDocVinculado;
 
   const { data: clienteDados } = useQuery({
     queryKey: ["formulario-cliente", clienteId],
@@ -233,7 +263,18 @@ function FormularioOS() {
   });
 
   useEffect(() => {
-    if (obra) {
+    setInicio("");
+    setDescricaoServico("");
+    setObservacoes("");
+    setEndereco("");
+    setTelefone("");
+    setModelo("");
+    setTermino("");
+    if (ordemSelecionada) {
+      setCliente(ordemSelecionada.cliente_nome ?? "");
+      setProfissional(ordemSelecionada.responsavel ?? "");
+      setNumeroOS(ordemSelecionada.numero ?? "");
+    } else if (obra) {
       setCliente(obra.cliente_nome ?? "");
       setProfissional(obra.responsavel ?? "");
       setNumeroOS(obra.numero ?? "");
@@ -245,7 +286,7 @@ function FormularioOS() {
       setProfissional(vendaSelecionada.vendedor ?? "");
       setNumeroOS(vendaSelecionada.numero ?? "");
     }
-  }, [obra, vendaSelecionada]);
+  }, [obra, vendaSelecionada, ordemSelecionada]);
 
   useEffect(() => {
     if (!clienteDados) return;
@@ -313,6 +354,11 @@ function FormularioOS() {
               <SelectValue placeholder="Selecionar obra / pedido" />
             </SelectTrigger>
             <SelectContent>
+              {ordens.map((o) => (
+                <SelectItem key={o.id} value={`os:${o.id}`}>
+                  O.S. {(o.numero ?? "—") + " — " + (o.cliente_nome ?? "sem cliente")}
+                </SelectItem>
+              ))}
               {obras.map((o) => (
                 <SelectItem key={o.id} value={`obra:${o.id}`}>
                   Obra {(o.numero ?? "—") + " — " + (o.cliente_nome ?? "sem cliente")}
