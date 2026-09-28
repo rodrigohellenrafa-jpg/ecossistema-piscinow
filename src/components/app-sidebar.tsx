@@ -113,6 +113,7 @@ const groups: {
     area: "financeiro",
     items: [
       { title: "Movimentações", url: "/movimentacoes", icon: Wallet },
+      { title: "Resumo do Período", url: "/resumo-periodo", icon: BarChart3 },
       { title: "Fluxo de Caixa", url: "/fluxo-caixa", icon: Wallet },
       { title: "Lançamentos Financeiros", url: "/financeiro", icon: BadgeDollarSign },
       { title: "Contas a Pagar/Receber", url: "/contas", icon: Receipt },
