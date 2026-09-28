@@ -166,34 +166,51 @@ function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | n
 }
 
 const PERIODOS = [
-  { valor: "todas", rotulo: "Todas" },
-  { valor: "hoje", rotulo: "Hoje" },
-  { valor: "semana", rotulo: "Esta semana" },
-  { valor: "mes", rotulo: "Este mês" },
-  { valor: "trimestre", rotulo: "Este trimestre" },
-  { valor: "semestre", rotulo: "Este semestre" },
-  { valor: "ano", rotulo: "Este ano" },
+  { valor: "diario", rotulo: "Diário" },
+  { valor: "semanal", rotulo: "Semanal" },
+  { valor: "mensal", rotulo: "Mensal" },
+  { valor: "personalizado", rotulo: "Personalizado" },
 ];
 
-function noPeriodo(vencimento: string, periodo: string): boolean {
+function hojeISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Normaliza valores antigos do filtro (links antigos: hoje/semana/mes). */
+function normalizarPeriodo(v: string | undefined): string {
+  if (!v) return "diario";
+  if (v === "hoje" || v === "diaria") return "diario";
+  if (v === "semana") return "semanal";
+  if (v === "mes") return "mensal";
+  return PERIODOS.some((p) => p.valor === v) ? v : "diario";
+}
+
+function noPeriodo(vencimento: string, periodo: string, de: string, ate: string): boolean {
   if (periodo === "todas") return true;
   const d = new Date(`${vencimento}T00:00:00`);
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  if (periodo === "hoje") return d.getTime() === hoje.getTime();
-  if (periodo === "semana") {
+  if (periodo === "diario") return d.getTime() === hoje.getTime();
+  if (periodo === "semanal") {
     const inicio = new Date(hoje);
     inicio.setDate(hoje.getDate() - hoje.getDay()); // domingo
     const fim = new Date(inicio);
     fim.setDate(inicio.getDate() + 6);
     return d >= inicio && d <= fim;
   }
-  if (periodo === "mes") return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
-  if (periodo === "trimestre")
-    return Math.floor(d.getMonth() / 3) === Math.floor(hoje.getMonth() / 3) && d.getFullYear() === hoje.getFullYear();
-  if (periodo === "semestre")
-    return Math.floor(d.getMonth() / 6) === Math.floor(hoje.getMonth() / 6) && d.getFullYear() === hoje.getFullYear();
-  if (periodo === "ano") return d.getFullYear() === hoje.getFullYear();
+  if (periodo === "mensal") return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "personalizado") {
+    if (de) {
+      const ini = new Date(`${de}T00:00:00`);
+      if (d < ini) return false;
+    }
+    if (ate) {
+      const fim = new Date(`${ate}T00:00:00`);
+      if (d > fim) return false;
+    }
+    return true;
+  }
   return true;
 }
 
@@ -204,7 +221,9 @@ function Contas() {
   useAbrirModal("novo", () => setOpen(true));
   const [form, setForm] = useState(vazio);
   const busca = Route.useSearch();
-  const [periodo, setPeriodo] = useState(busca.periodo ?? "todas");
+  const [periodo, setPeriodo] = useState(normalizarPeriodo(busca.periodo));
+  const [periodoDe, setPeriodoDe] = useState(hojeISO());
+  const [periodoAte, setPeriodoAte] = useState(hojeISO());
   const [aba, setAba] = useState<"pagar" | "receber">(busca.tipo ?? "pagar");
   const [baixando, setBaixando] = useState<Conta | null>(null);
 
@@ -726,7 +745,7 @@ function Contas() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo));
+  const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo, periodoDe, periodoAte));
   const pagar = filtradas.filter((c) => c.tipo === "pagar");
   // A receber: mostra apenas títulos em aberto; os baixados saem da tela.
   const receber = filtradas.filter((c) => c.tipo === "receber" && c.status !== "pago");
@@ -1232,7 +1251,16 @@ function Contas() {
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">Período:</span>
-        <Select value={periodo} onValueChange={setPeriodo}>
+        <Select
+          value={periodo}
+          onValueChange={(v) => {
+            setPeriodo(v);
+            if (v === "personalizado") {
+              if (!periodoDe) setPeriodoDe(hojeISO());
+              if (!periodoAte) setPeriodoAte(hojeISO());
+            }
+          }}
+        >
           <SelectTrigger className="w-44">
             <SelectValue />
           </SelectTrigger>
@@ -1244,9 +1272,30 @@ function Contas() {
             ))}
           </SelectContent>
         </Select>
+        {periodo === "personalizado" && (
+          <>
+            <Input
+              type="date"
+              className="w-40"
+              value={periodoDe}
+              onChange={(e) => setPeriodoDe(e.target.value)}
+              aria-label="Vencimento de"
+            />
+            <span className="text-sm text-muted-foreground">até</span>
+            <Input
+              type="date"
+              className="w-40"
+              value={periodoAte}
+              onChange={(e) => setPeriodoAte(e.target.value)}
+              aria-label="Vencimento até"
+            />
+          </>
+        )}
         {periodo !== "todas" && (
           <span className="text-xs text-muted-foreground">
-            Filtrando por data de vencimento: {PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.
+            {periodo === "personalizado"
+              ? `Vencimento de ${periodoDe ? periodoDe.split("-").reverse().join("/") : "início"} a ${periodoAte ? periodoAte.split("-").reverse().join("/") : "hoje"}.`
+              : `Vencimento: ${PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.`}
           </span>
         )}
 
