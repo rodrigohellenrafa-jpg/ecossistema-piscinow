@@ -584,15 +584,17 @@ function Financeiro() {
           <>
           <LancarEmLote destino="financeiro" />
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+            <DialogTrigger asChild onClick={() => { setEditando(null); setForm(vazio); }}>
               <Button>
                 <Plus /> Novo lançamento
               </Button>
             </DialogTrigger>
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Novo lançamento</DialogTitle>
-                <DialogDescription>Receita ou despesa do fluxo de caixa.</DialogDescription>
+                <DialogTitle>{editando ? "Editar lançamento" : "Novo lançamento"}</DialogTitle>
+                <DialogDescription>
+                  {editando ? "Altere os dados e salve para atualizar o lançamento." : "Receita ou despesa do fluxo de caixa."}
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Dados do lançamento</h3>
@@ -903,7 +905,7 @@ function Financeiro() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                  {salvar.isPending ? "Salvando…" : "Salvar lançamento"}
+                  {salvar.isPending ? "Salvando…" : editando ? "Salvar alterações" : "Salvar lançamento"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1143,6 +1145,9 @@ function Financeiro() {
                                  <RotateCcw className="size-4" />
                                </Button>
                              )}
+                             <Button variant="ghost" size="icon" onClick={() => abrirEdicao(l)} title="Editar">
+                               <Pencil className="size-4" />
+                             </Button>
                              <Button variant="ghost" size="icon" onClick={() => excluir.mutate(l.id)} title="Excluir">
                               <Trash2 className="size-4" />
                             </Button>
