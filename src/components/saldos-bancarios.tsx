@@ -113,12 +113,6 @@ export function SaldosBancarios() {
   const saidasHoje = saidasLista.reduce((s, m) => s + m.valor, 0);
   const saldoDia = entradasHoje - saidasHoje;
 
-  /** Movimento do dia já identificado com a conta bancária informada. */
-  const movimentoConta = (conta: string) =>
-    contasHoje.filter((c) => (c.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
-      .reduce((s, c) => s + (ehEntrada(c.tipo) ? 1 : -1) * valorBaixado(c), 0) + lancHoje
-      .filter((l) => (l.conta_bancaria ?? "").trim().toLowerCase() === conta.trim().toLowerCase())
-      .reduce((s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor ?? 0) : -Number(l.valor ?? 0)), 0);
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
 
@@ -281,16 +275,9 @@ export function SaldosBancarios() {
                     <p className="text-xs text-muted-foreground">
                       {s.banco || "—"} · atualizado em {dataBR(s.data_saldo)}
                     </p>
-                    {movimentoConta(s.conta) !== 0 && (
-                      <p className="mt-1 text-xs tabular-nums">
-                        Hoje nesta conta:{" "}
-                        <span className={movimentoConta(s.conta) > 0 ? "text-emerald-500" : "text-destructive"}>
-                          {movimentoConta(s.conta) > 0 ? "+" : "−"}
-                          {brl(Math.abs(movimentoConta(s.conta)))}
-                        </span>{" "}
-                        · saldo {brl(Number(s.saldo ?? 0))}
-                      </p>
-                    )}
+                    <p className="mt-1 text-lg font-semibold tabular-nums">
+                      {brl(Number(s.saldo ?? 0))}
+                    </p>
                   </div>
                   <Button
                     size="icon"
