@@ -746,6 +746,8 @@ function Contas() {
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo, periodoDe, periodoAte));
+  const soma = (l: typeof data) =>
+    l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
   const pagar = filtradas.filter((c) => c.tipo === "pagar");
   // A receber: mantém também os recebimentos já feitos (status pago) para conferência por status.
   const receber = filtradas.filter((c) => c.tipo === "receber");
