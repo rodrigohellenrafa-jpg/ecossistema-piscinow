@@ -112,7 +112,7 @@ function FormularioOS() {
   const [profissional, setProfissional] = useState("");
   const [inicio, setInicio] = useState("");
   const [termino, setTermino] = useState("");
-  const [agendamento, setAgendamento] = useState("");
+  const [descricaoServico, setDescricaoServico] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [linhasApoio, setLinhasApoio] = useState<string[]>(LINHAS_APOIO_VAZIAS);
 
@@ -264,14 +264,12 @@ function FormularioOS() {
   }, [itensVenda]);
 
   useEffect(() => {
-    if (!osDoc?.data_agendada) return;
-    const [a, m, d] = osDoc.data_agendada.slice(0, 10).split("-");
-    setAgendamento(`${d}/${m}/${a}`);
-    if (osDoc.descricao) {
-      setObservacoes((atual) =>
-        atual.includes(osDoc.descricao!) ? atual : atual ? `${atual}\n${osDoc.descricao}` : osDoc.descricao!,
-      );
+    if (!osDoc) return;
+    if (osDoc.data_agendada) {
+      const [a, m, d] = osDoc.data_agendada.slice(0, 10).split("-");
+      setInicio((atual) => atual || `${d}/${m}/${a}`);
     }
+    if (osDoc.descricao) setDescricaoServico(osDoc.descricao);
   }, [osDoc]);
 
   useEffect(() => {
@@ -283,9 +281,8 @@ function FormularioOS() {
     const texto =
       data.toLocaleDateString("pt-BR") +
       " " +
-      data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) +
-      (proximo.titulo ? ` — ${proximo.titulo}` : "");
-    setAgendamento(texto);
+      data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    setInicio((atual) => atual || texto);
     if (proximo.descricao) {
       setObservacoes((atual) =>
         atual ? `${atual}\n${proximo.descricao}` : proximo.descricao!,
