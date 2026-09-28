@@ -166,34 +166,51 @@ function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | n
 }
 
 const PERIODOS = [
-  { valor: "todas", rotulo: "Todas" },
-  { valor: "hoje", rotulo: "Hoje" },
-  { valor: "semana", rotulo: "Esta semana" },
-  { valor: "mes", rotulo: "Este mês" },
-  { valor: "trimestre", rotulo: "Este trimestre" },
-  { valor: "semestre", rotulo: "Este semestre" },
-  { valor: "ano", rotulo: "Este ano" },
+  { valor: "diario", rotulo: "Diário" },
+  { valor: "semanal", rotulo: "Semanal" },
+  { valor: "mensal", rotulo: "Mensal" },
+  { valor: "personalizado", rotulo: "Personalizado" },
 ];
 
-function noPeriodo(vencimento: string, periodo: string): boolean {
+function hojeISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Normaliza valores antigos do filtro (links antigos: hoje/semana/mes). */
+function normalizarPeriodo(v: string | undefined): string {
+  if (!v) return "diario";
+  if (v === "hoje" || v === "diaria") return "diario";
+  if (v === "semana") return "semanal";
+  if (v === "mes") return "mensal";
+  return PERIODOS.some((p) => p.valor === v) ? v : "diario";
+}
+
+function noPeriodo(vencimento: string, periodo: string, de: string, ate: string): boolean {
   if (periodo === "todas") return true;
   const d = new Date(`${vencimento}T00:00:00`);
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  if (periodo === "hoje") return d.getTime() === hoje.getTime();
-  if (periodo === "semana") {
+  if (periodo === "diario") return d.getTime() === hoje.getTime();
+  if (periodo === "semanal") {
     const inicio = new Date(hoje);
     inicio.setDate(hoje.getDate() - hoje.getDay()); // domingo
     const fim = new Date(inicio);
     fim.setDate(inicio.getDate() + 6);
     return d >= inicio && d <= fim;
   }
-  if (periodo === "mes") return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
-  if (periodo === "trimestre")
-    return Math.floor(d.getMonth() / 3) === Math.floor(hoje.getMonth() / 3) && d.getFullYear() === hoje.getFullYear();
-  if (periodo === "semestre")
-    return Math.floor(d.getMonth() / 6) === Math.floor(hoje.getMonth() / 6) && d.getFullYear() === hoje.getFullYear();
-  if (periodo === "ano") return d.getFullYear() === hoje.getFullYear();
+  if (periodo === "mensal") return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "personalizado") {
+    if (de) {
+      const ini = new Date(`${de}T00:00:00`);
+      if (d < ini) return false;
+    }
+    if (ate) {
+      const fim = new Date(`${ate}T00:00:00`);
+      if (d > fim) return false;
+    }
+    return true;
+  }
   return true;
 }
 
