@@ -21,7 +21,8 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+   TableFooter,
+   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
