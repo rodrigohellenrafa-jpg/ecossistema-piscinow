@@ -514,7 +514,7 @@ function Financeiro() {
       vencimento: l.vencimento ?? "",
       data_pagamento: l.data_pagamento ?? "",
       conta_bancaria: l.conta_bancaria ?? "",
-      forma_pagamento: l.forma_pagamento ?? FORMAS_PAGAMENTO[0],
+      forma_pagamento: (l.forma_pagamento ?? FORMAS_PAGAMENTO[0]) as typeof vazio.forma_pagamento,
       venda_id: l.venda_id ?? "",
       fornecedor_id: l.fornecedor_id ?? "",
       funcionario_id: l.funcionario_id ?? "",
