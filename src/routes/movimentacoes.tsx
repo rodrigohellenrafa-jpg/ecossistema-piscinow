@@ -389,6 +389,31 @@ export function Movimentacoes() {
                 </TableRow>
               )}
             </TableBody>
+            {filtradas.length > 0 && (
+              <TableFooter>
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell colSpan={7} className="whitespace-nowrap">
+                    Total do período ({periodoRotulo})
+                  </TableCell>
+                  <TableCell className="text-right text-success">
+                    {brl(totalEntradas)}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {brl(totalSaidas)}
+                  </TableCell>
+                </TableRow>
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell colSpan={8} className="whitespace-nowrap">
+                    Saldo do período (entradas − saídas)
+                  </TableCell>
+                  <TableCell
+                    className={`text-right ${saldoPeriodo >= 0 ? "text-success" : "text-destructive"}`}
+                  >
+                    {brl(saldoPeriodo)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </CardContent>
       </Card>
