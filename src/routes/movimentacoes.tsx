@@ -203,6 +203,9 @@ export function Movimentacoes() {
   const saidasReal = soma((l) => l.sentido === "saida" && l.realizado);
   const entradasPrev = soma((l) => l.sentido === "entrada" && !l.realizado);
   const saidasPrev = soma((l) => l.sentido === "saida" && !l.realizado);
+  const totalEntradas = soma((l) => l.sentido === "entrada");
+  const totalSaidas = soma((l) => l.sentido === "saida");
+  const saldoPeriodo = totalEntradas - totalSaidas;
   const periodoRotulo =
     de || ate
       ? `${de ? dataBR(de) : "início"} a ${ate ? dataBR(ate) : "hoje"}`
