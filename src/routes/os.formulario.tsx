@@ -158,7 +158,7 @@ function FormularioOS() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ordens_servico")
-        .select("id, numero, cliente_id, cliente_nome, venda_id, responsavel, data_agendada, descricao")
+        .select("id, numero, cliente_id, cliente_nome, venda_id, vendas_ids, responsavel, data_agendada, descricao")
         .neq("status", "cancelada")
         .order("updated_at", { ascending: false })
         .limit(200);
@@ -191,15 +191,18 @@ function FormularioOS() {
 
   const vendaId = ordemSelecionada?.venda_id ?? vendaSelecionada?.id ?? vendaDaObra ?? null;
   const clienteId = ordemSelecionada?.cliente_id ?? obra?.cliente_id ?? vendaSelecionada?.cliente_id ?? null;
+  const vendasIds = Array.from(
+    new Set([...(ordemSelecionada?.vendas_ids ?? []), ...(vendaId ? [vendaId] : [])]),
+  );
 
   const { data: itensVenda = ITENS_VAZIOS } = useQuery({
-    queryKey: ["formulario-itens", vendaId],
-    enabled: Boolean(vendaId),
+    queryKey: ["formulario-itens", vendasIds.join(",")],
+    enabled: vendasIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("venda_itens")
         .select("descricao, quantidade")
-        .eq("venda_id", vendaId!)
+        .in("venda_id", vendasIds)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as Array<{ descricao: string; quantidade: number }>;
