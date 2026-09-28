@@ -1616,6 +1616,34 @@ function Lista({
   const Container = expansivel ? ExpandableCard : Card;
   const acoesFixas = expansivel ? "sticky right-0 z-10 bg-card" : "";
   const temFiltro = fDescricao || fParceiro || fVencimento || fValor || fStatus !== "todos";
+
+  const grupos = (() => {
+    const g = {
+      aberto: { n: 0, total: 0 },
+      vencido: { n: 0, total: 0 },
+      parcial: { n: 0, pago: 0 },
+      pago: { n: 0, pago: 0 },
+    };
+    for (const c of visiveis) {
+      const st = (c.status ?? "").toLowerCase();
+      const totalTitulo = Number(c.valor) + Number(c.valor_juros ?? 0);
+      if (st === "pago") {
+        g.pago.n++;
+        g.pago.pago += Number(c.valor_pago ?? 0);
+      } else if (st === "pago_parcial") {
+        g.parcial.n++;
+        g.parcial.pago += Number(c.valor_pago ?? 0);
+      } else if (c.vencimento < hoje) {
+        g.vencido.n++;
+        g.vencido.total += totalTitulo;
+      } else {
+        g.aberto.n++;
+        g.aberto.total += totalTitulo;
+      }
+    }
+    return g;
+  })();
+
   return (
     <Container className="mt-4">
       <CardHeader className="pr-12">
@@ -1625,6 +1653,28 @@ function Lista({
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {grupos.aberto.n > 0 && (
+            <span className="rounded-md border px-2 py-1 text-xs tabular-nums">
+              Em aberto: {grupos.aberto.n} · {brl(grupos.aberto.total)}
+            </span>
+          )}
+          {grupos.vencido.n > 0 && (
+            <span className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs tabular-nums text-destructive">
+              Vencido: {grupos.vencido.n} · {brl(grupos.vencido.total)}
+            </span>
+          )}
+          {grupos.parcial.n > 0 && (
+            <span className="rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-xs tabular-nums">
+              Pago parcial: {grupos.parcial.n} · já {ehReceber ? "recebido" : "pago"} {brl(grupos.parcial.pago)}
+            </span>
+          )}
+          {grupos.pago.n > 0 && (
+            <span className="rounded-md border border-success/40 bg-success/10 px-2 py-1 text-xs tabular-nums text-success-foreground">
+              {ehReceber ? "Recebido" : "Pago"}: {grupos.pago.n} · {brl(grupos.pago.pago)}
+            </span>
+          )}
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
