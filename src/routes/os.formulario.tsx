@@ -56,6 +56,16 @@ type Obra = {
   venda_id: string | null;
   endereco_obra: string | null;
   tipo_servico: string | null;
+  observacoes: string | null;
+};
+
+type EventoAgenda = {
+  id: string;
+  inicio: string;
+  fim: string | null;
+  titulo: string;
+  descricao: string | null;
+  local: string | null;
 };
 
 type Venda = {
@@ -102,6 +112,8 @@ function FormularioOS() {
   const [profissional, setProfissional] = useState("");
   const [inicio, setInicio] = useState("");
   const [termino, setTermino] = useState("");
+  const [agendamento, setAgendamento] = useState("");
+  const [observacoes, setObservacoes] = useState("");
   const [linhasApoio, setLinhasApoio] = useState<string[]>(LINHAS_APOIO_VAZIAS);
 
   const { data: obras = [] } = useQuery({
