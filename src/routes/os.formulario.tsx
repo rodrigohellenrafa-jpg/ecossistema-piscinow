@@ -121,7 +121,7 @@ function FormularioOS() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("id, numero, cliente_id, cliente_nome, responsavel, venda_id, endereco_obra, tipo_servico")
+        .select("id, numero, cliente_id, cliente_nome, responsavel, venda_id, endereco_obra, tipo_servico, observacoes")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
@@ -174,6 +174,26 @@ function FormularioOS() {
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as Array<{ descricao: string; quantidade: number }>;
+    },
+  });
+
+  const obraId = obra?.id ?? null;
+
+  const { data: eventosAgenda = [] } = useQuery({
+    queryKey: ["formulario-agenda", obraId, vendaId],
+    enabled: Boolean(obraId || vendaId),
+    queryFn: async () => {
+      let query = supabase
+        .from("agenda_eventos")
+        .select("id, inicio, fim, titulo, descricao, local")
+        .neq("status", "cancelado")
+        .order("inicio", { ascending: true });
+      query = obraId
+        ? query.eq("obra_id", obraId)
+        : query.eq("venda_id", vendaId!);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as EventoAgenda[];
     },
   });
 
