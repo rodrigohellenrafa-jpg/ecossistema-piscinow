@@ -121,7 +121,7 @@ function FormularioOS() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("id, numero, cliente_id, cliente_nome, responsavel, venda_id, endereco_obra, tipo_servico, observacoes")
+        .select("id, numero, cliente_id, cliente_nome, responsavel, venda_id, endereco_obra, tipo_servico, observacoes, board_os_id")
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw error;
@@ -197,6 +197,23 @@ function FormularioOS() {
     },
   });
 
+  const boardOsId = (obra as { board_os_id?: string | null } | undefined)?.board_os_id ?? null;
+  const { data: osDoc } = useQuery({
+    queryKey: ["formulario-os-doc", boardOsId, vendaId],
+    enabled: Boolean(boardOsId || vendaId),
+    queryFn: async () => {
+      let q = supabase
+        .from("ordens_servico")
+        .select("id, data_agendada, descricao, numero")
+        .not("data_agendada", "is", null)
+        .order("data_agendada", { ascending: true });
+      q = boardOsId ? q.eq("id", boardOsId) : q.eq("venda_id", vendaId!);
+      const { data, error } = await q.limit(1);
+      if (error) throw error;
+      return data?.[0] ?? null;
+    },
+  });
+
   const { data: clienteDados } = useQuery({
     queryKey: ["formulario-cliente", clienteId],
     enabled: Boolean(clienteId),
@@ -247,7 +264,18 @@ function FormularioOS() {
   }, [itensVenda]);
 
   useEffect(() => {
-    if (eventosAgenda.length === 0) return;
+    if (!osDoc?.data_agendada) return;
+    const [a, m, d] = osDoc.data_agendada.slice(0, 10).split("-");
+    setAgendamento(`${d}/${m}/${a}`);
+    if (osDoc.descricao) {
+      setObservacoes((atual) =>
+        atual.includes(osDoc.descricao!) ? atual : atual ? `${atual}\n${osDoc.descricao}` : osDoc.descricao!,
+      );
+    }
+  }, [osDoc]);
+
+  useEffect(() => {
+    if (eventosAgenda.length === 0 || osDoc?.data_agendada) return;
     const agora = new Date();
     const proximo =
       eventosAgenda.find((e) => new Date(e.inicio) >= agora) ?? eventosAgenda[0];
@@ -263,7 +291,7 @@ function FormularioOS() {
         atual ? `${atual}\n${proximo.descricao}` : proximo.descricao!,
       );
     }
-  }, [eventosAgenda]);
+  }, [eventosAgenda, osDoc]);
 
   const formatarQtd = (q: number) => (Number(q) % 1 === 0 ? String(Number(q)) : Number(q).toFixed(2));
 
