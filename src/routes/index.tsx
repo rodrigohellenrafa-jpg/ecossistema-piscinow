@@ -337,11 +337,15 @@ function Dashboard() {
     numero(conta.valor_pago) ||
     Math.max(0, numero(conta.valor) + numero(conta.valor_juros) - numero(conta.valor_desconto));
 
+  /** Baixas contam como movimento mesmo quando o título ainda tem saldo (pago parcial). */
+  const ehBaixado = (status: unknown) =>
+    ["pago", "pago_parcial"].includes(texto(status).toLowerCase());
+
   const fluxoOntem = useMemo(() => {
     let entradas = 0;
     let saidas = 0;
     for (const conta of contas) {
-      if (conta.status !== "pago" || texto(conta.data_pagamento).slice(0, 10) !== ontem) continue;
+      if (!ehBaixado(conta.status) || texto(conta.data_pagamento).slice(0, 10) !== ontem) continue;
       const valor = valorMovimentado(conta);
       if (conta.tipo === "receber") entradas += valor;
       else saidas += valor;
@@ -359,7 +363,7 @@ function Dashboard() {
     const entradas: { descricao: string; valor: number }[] = [];
     const saidas: { descricao: string; valor: number }[] = [];
     for (const conta of contas) {
-      if (conta.status !== "pago" || texto(conta.data_pagamento).slice(0, 10) !== hoje) continue;
+      if (!ehBaixado(conta.status) || texto(conta.data_pagamento).slice(0, 10) !== hoje) continue;
       const valor = valorMovimentado(conta);
       (conta.tipo === "receber" ? entradas : saidas).push({ descricao: texto(conta.descricao), valor });
     }
