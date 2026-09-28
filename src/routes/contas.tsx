@@ -1251,7 +1251,16 @@ function Contas() {
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">Período:</span>
-        <Select value={periodo} onValueChange={setPeriodo}>
+        <Select
+          value={periodo}
+          onValueChange={(v) => {
+            setPeriodo(v);
+            if (v === "personalizado") {
+              if (!periodoDe) setPeriodoDe(hojeISO());
+              if (!periodoAte) setPeriodoAte(hojeISO());
+            }
+          }}
+        >
           <SelectTrigger className="w-44">
             <SelectValue />
           </SelectTrigger>
@@ -1263,9 +1272,30 @@ function Contas() {
             ))}
           </SelectContent>
         </Select>
+        {periodo === "personalizado" && (
+          <>
+            <Input
+              type="date"
+              className="w-40"
+              value={periodoDe}
+              onChange={(e) => setPeriodoDe(e.target.value)}
+              aria-label="Vencimento de"
+            />
+            <span className="text-sm text-muted-foreground">até</span>
+            <Input
+              type="date"
+              className="w-40"
+              value={periodoAte}
+              onChange={(e) => setPeriodoAte(e.target.value)}
+              aria-label="Vencimento até"
+            />
+          </>
+        )}
         {periodo !== "todas" && (
           <span className="text-xs text-muted-foreground">
-            Filtrando por data de vencimento: {PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.
+            {periodo === "personalizado"
+              ? `Vencimento de ${periodoDe ? periodoDe.split("-").reverse().join("/") : "início"} a ${periodoAte ? periodoAte.split("-").reverse().join("/") : "hoje"}.`
+              : `Vencimento: ${PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.`}
           </span>
         )}
 
