@@ -3,7 +3,7 @@ import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Link2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { CheckCircle2, Link2, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
@@ -101,6 +101,11 @@ type Lancamento = {
   conciliado: boolean;
   observacoes: string | null;
   recorrencia?: string | null;
+  tipo_despesa?: string | null;
+  numero_documento?: string | null;
+  comprovante_path?: string | null;
+  obra_id?: string | null;
+  cliente_id?: string | null;
 };
 
 const RECORRENCIAS = [
@@ -153,6 +158,7 @@ function Financeiro() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
+  const [editando, setEditando] = useState<Lancamento | null>(null);
   const [form, setForm] = useState(vazio);
   const [baixa, setBaixa] = useState<{
     id: string;
@@ -289,7 +295,7 @@ function Financeiro() {
 
       const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
       const vinc = parseVinculo(form.vinculo);
-      const { data: criado, error } = await supabase.from("lancamentos_financeiros").insert({
+      const dados = {
         tipo_fluxo: form.tipo_fluxo,
         categoria: ratear ? "Rateio" : form.categoria.trim(),
         descricao: form.descricao.trim(),
@@ -310,16 +316,34 @@ function Financeiro() {
         comprovante_path: form.comprovante_path,
         obra_id: vinc.obra_id ?? (form.obra_id || null),
         numero_documento: form.numero_documento || null,
-        created_by: uid,
-      })
-        .select("id")
-        .single();
-      if (error) throw error;
+      };
 
-      if (ratear && criado) {
+      let destinoId = editando?.id ?? null;
+      if (editando) {
+        const { error } = await supabase
+          .from("lancamentos_financeiros")
+          .update(dados)
+          .eq("id", editando.id);
+        if (error) throw error;
+        const { error: errR } = await supabase
+          .from("lancamento_rateios")
+          .delete()
+          .eq("lancamento_id", editando.id);
+        if (errR) throw errR;
+      } else {
+        const { data: criado, error } = await supabase
+          .from("lancamentos_financeiros")
+          .insert({ ...dados, created_by: uid })
+          .select("id")
+          .single();
+        if (error) throw error;
+        destinoId = criado.id;
+      }
+
+      if (ratear && destinoId) {
         const { error: err2 } = await supabase.from("lancamento_rateios").insert(
           linhas.map((l) => ({
-            lancamento_id: criado.id,
+            lancamento_id: destinoId,
             categoria: l.categoria,
             valor: l.valor,
             created_by: uid,
@@ -329,7 +353,8 @@ function Financeiro() {
       }
     },
     onSuccess: () => {
-      toast.success("Lançamento criado!");
+      toast.success(editando ? "Lançamento atualizado!" : "Lançamento criado!");
+      setEditando(null);
       setForm(vazio);
       setRatear(false);
       setRateio([
@@ -462,6 +487,46 @@ function Financeiro() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const abrirEdicao = (l: Lancamento) => {
+    setEditando(l);
+    const rateioAtual = rateios.filter((r) => r.lancamento_id === l.id);
+    if (l.categoria === "Rateio" && rateioAtual.length > 0) {
+      setRatear(true);
+      const linhas = rateioAtual.map((r) => ({ categoria: r.categoria, valor: String(r.valor) }));
+      while (linhas.length < 2) linhas.push({ categoria: "", valor: "" });
+      setRateio(linhas);
+    } else {
+      setRatear(false);
+      setRateio([
+        { categoria: "", valor: "" },
+        { categoria: "", valor: "" },
+      ]);
+    }
+    setForm({
+      obra_id: l.obra_id ?? "",
+      vinculo: "",
+      numero_documento: l.numero_documento ?? "",
+      tipo_fluxo: l.tipo_fluxo,
+      categoria: l.categoria === "Rateio" ? "" : l.categoria,
+      descricao: l.descricao,
+      valor: String(l.valor),
+      data_competencia: l.data_competencia || hojeISO(),
+      vencimento: l.vencimento ?? "",
+      data_pagamento: l.data_pagamento ?? "",
+      conta_bancaria: l.conta_bancaria ?? "",
+      forma_pagamento: (l.forma_pagamento ?? FORMAS_PAGAMENTO[0]) as typeof vazio.forma_pagamento,
+      venda_id: l.venda_id ?? "",
+      fornecedor_id: l.fornecedor_id ?? "",
+      funcionario_id: l.funcionario_id ?? "",
+      tipo_despesa: l.tipo_despesa ?? "",
+      recorrencia: l.recorrencia ?? "nenhuma",
+      status: l.status,
+      observacoes: l.observacoes ?? "",
+      comprovante_path: l.comprovante_path ?? null,
+    });
+    setOpen(true);
+  };
+
   const categorias = useMemo(
     () => Array.from(new Set(lancamentos.map((l) => l.categoria))).sort(),
     [lancamentos],
@@ -519,15 +584,17 @@ function Financeiro() {
           <>
           <LancarEmLote destino="financeiro" />
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+            <DialogTrigger asChild onClick={() => { setEditando(null); setForm(vazio); }}>
               <Button>
                 <Plus /> Novo lançamento
               </Button>
             </DialogTrigger>
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Novo lançamento</DialogTitle>
-                <DialogDescription>Receita ou despesa do fluxo de caixa.</DialogDescription>
+                <DialogTitle>{editando ? "Editar lançamento" : "Novo lançamento"}</DialogTitle>
+                <DialogDescription>
+                  {editando ? "Altere os dados e salve para atualizar o lançamento." : "Receita ou despesa do fluxo de caixa."}
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 sm:grid-cols-2">
                 <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Dados do lançamento</h3>
@@ -838,7 +905,7 @@ function Financeiro() {
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                  {salvar.isPending ? "Salvando…" : "Salvar lançamento"}
+                  {salvar.isPending ? "Salvando…" : editando ? "Salvar alterações" : "Salvar lançamento"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1078,6 +1145,9 @@ function Financeiro() {
                                  <RotateCcw className="size-4" />
                                </Button>
                              )}
+                             <Button variant="ghost" size="icon" onClick={() => abrirEdicao(l)} title="Editar">
+                               <Pencil className="size-4" />
+                             </Button>
                              <Button variant="ghost" size="icon" onClick={() => excluir.mutate(l.id)} title="Excluir">
                               <Trash2 className="size-4" />
                             </Button>
