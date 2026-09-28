@@ -123,6 +123,7 @@ export const FORMAS_PAGAMENTO = [
   "Pix",
   "Dinheiro",
   "Cartão de Crédito",
+  "Cartão de Débito",
   "Boleto",
   "Financiamento bancário",
   "Transferência",

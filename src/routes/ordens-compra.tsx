@@ -2988,7 +2988,7 @@ function OrdensCompra() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["Boleto", "Pix", "Transferência", "Cartão de Crédito", "Dinheiro"].map((m) => (
+                  {["Boleto", "Pix", "Transferência", "Cartão de Crédito", "Cartão de Débito", "Dinheiro"].map((m) => (
                     <SelectItem key={m} value={m}>
                       {m}
                     </SelectItem>
