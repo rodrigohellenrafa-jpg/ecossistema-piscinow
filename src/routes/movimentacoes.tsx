@@ -21,7 +21,8 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TableHeader,
+   TableFooter,
+   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
@@ -203,6 +204,9 @@ export function Movimentacoes() {
   const saidasReal = soma((l) => l.sentido === "saida" && l.realizado);
   const entradasPrev = soma((l) => l.sentido === "entrada" && !l.realizado);
   const saidasPrev = soma((l) => l.sentido === "saida" && !l.realizado);
+  const totalEntradas = soma((l) => l.sentido === "entrada");
+  const totalSaidas = soma((l) => l.sentido === "saida");
+  const saldoPeriodo = totalEntradas - totalSaidas;
   const periodoRotulo =
     de || ate
       ? `${de ? dataBR(de) : "início"} a ${ate ? dataBR(ate) : "hoje"}`
@@ -386,6 +390,31 @@ export function Movimentacoes() {
                 </TableRow>
               )}
             </TableBody>
+            {filtradas.length > 0 && (
+              <TableFooter>
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell colSpan={7} className="whitespace-nowrap">
+                    Total do período ({periodoRotulo})
+                  </TableCell>
+                  <TableCell className="text-right text-success">
+                    {brl(totalEntradas)}
+                  </TableCell>
+                  <TableCell className="text-right text-destructive">
+                    {brl(totalSaidas)}
+                  </TableCell>
+                </TableRow>
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell colSpan={8} className="whitespace-nowrap">
+                    Saldo do período (entradas − saídas)
+                  </TableCell>
+                  <TableCell
+                    className={`text-right ${saldoPeriodo >= 0 ? "text-success" : "text-destructive"}`}
+                  >
+                    {brl(saldoPeriodo)}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </CardContent>
       </Card>
