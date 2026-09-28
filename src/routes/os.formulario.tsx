@@ -368,15 +368,26 @@ function FormularioOS() {
               label="Profissional responsável"
               value={profissional}
               onChange={setProfissional}
-              className="col-span-2 border-r border-slate-900"
+              className="col-span-2 border-b border-r border-slate-900"
             />
             <Campo
               label="Início"
               value={inicio}
               onChange={setInicio}
-              className="border-r border-slate-900"
+              className="border-b border-r border-slate-900"
             />
-            <Campo label="Término" value={termino} onChange={setTermino} />
+            <Campo
+              label="Término"
+              value={termino}
+              onChange={setTermino}
+              className="border-b border-slate-900"
+            />
+            <Campo
+              label="Data do agendamento"
+              value={agendamento}
+              onChange={setAgendamento}
+              className="col-span-4"
+            />
           </div>
 
           {/* Desenho técnico */}
@@ -413,10 +424,14 @@ function FormularioOS() {
             <div className="border-b border-slate-900 bg-slate-100 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-700">
               Observações da obra
             </div>
-            <div className="space-y-4 p-3">
-              <div className="border-b border-slate-900" />
-              <div className="border-b border-slate-900" />
-              <div className="border-b border-slate-900" />
+            <div className="p-3">
+              <textarea
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                rows={4}
+                placeholder="O que o técnico precisa saber antes de ir à casa do cliente..."
+                className="w-full resize-y bg-transparent text-[12px] font-medium leading-6 text-slate-900 outline-none placeholder:text-slate-400"
+              />
             </div>
           </div>
         </section>
