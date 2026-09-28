@@ -747,10 +747,8 @@ function Contas() {
 
   const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo, periodoDe, periodoAte));
   const pagar = filtradas.filter((c) => c.tipo === "pagar");
-  // A receber: mostra apenas títulos em aberto; os baixados saem da tela.
-  const receber = filtradas.filter((c) => c.tipo === "receber" && c.status !== "pago");
-  const soma = (l: typeof data) =>
-    l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
+  // A receber: mantém também os recebimentos já feitos (status pago) para conferência por status.
+  const receber = filtradas.filter((c) => c.tipo === "receber");
 
   return (
     <div className="space-y-6">
