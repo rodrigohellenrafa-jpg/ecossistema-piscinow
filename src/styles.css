@@ -444,11 +444,13 @@
   }
 
   /* Campos de escrita: sem caixa, apenas a linha de preenchimento */
-  .os-form-wrapper input {
+  .os-form-wrapper input,
+  .os-form-wrapper textarea {
     border: none !important;
     background: transparent !important;
     color: #0f172a !important;
     padding: 0 !important;
+    resize: none !important;
   }
 
   .os-form-wrapper .os-campo input {
