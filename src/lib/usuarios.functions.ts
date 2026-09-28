@@ -305,7 +305,7 @@ export const redefinirSenha = createServerFn({ method: "POST" })
     const db = await admin();
 
     const { error } = await db.auth.admin.updateUserById(data.userId, { password: data.senha });
-    if (error) throw new Error(msgAuth(error.message));
+    if (error) return { ok: false as const, erro: msgAuth(error.message) };
 
-    return { ok: true };
+    return { ok: true as const, erro: null };
   });

@@ -178,7 +178,11 @@ function AcessosAdmin() {
   });
 
   const trocarSenha = useMutation({
-    mutationFn: doRedefinirSenha,
+    mutationFn: async (v: Parameters<typeof doRedefinirSenha>[0]) => {
+      const r = await doRedefinirSenha(v);
+      if (!r.ok) throw new Error(r.erro ?? "Não foi possível alterar a senha.");
+      return r;
+    },
     onSuccess: () => {
       toast.success("Senha atualizada.");
       setTrocandoSenha(null);
