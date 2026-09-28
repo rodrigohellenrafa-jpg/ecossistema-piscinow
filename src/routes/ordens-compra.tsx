@@ -1564,10 +1564,45 @@ function OrdensCompra() {
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {ordensFiltradas.map((ordem) => {
               const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
-              const saldo = Number(ordem.valor_total ?? 0) - pago;
+              const total = Number(ordem.valor_total ?? 0);
+              const saldo = total - pago;
+              const pctPago = total > 0 ? Math.min(Math.max(pago / total, 0), 1) : 0;
+              const pctLabel = Math.round(pctPago * 100);
+              const tom =
+                pctPago >= 1
+                  ? {
+                      fill: "bg-emerald-500/15",
+                      border: "border-emerald-500/30",
+                      texto: "text-emerald-400",
+                      selo: "bg-emerald-500/20 border-emerald-500/40 text-emerald-400",
+                      sombra: "shadow-emerald-500/5",
+                    }
+                  : pctPago > 0
+                    ? {
+                        fill: "bg-amber-500/15",
+                        border: "border-amber-500/20",
+                        texto: "text-amber-400",
+                        selo: "bg-amber-500/20 border-amber-500/40 text-amber-400",
+                        sombra: "shadow-amber-500/5",
+                      }
+                    : {
+                        fill: "bg-red-500/10",
+                        border: "border-red-500/20",
+                        texto: "text-red-400",
+                        selo: "bg-red-500/20 border-red-500/40 text-red-400",
+                        sombra: "shadow-red-500/5",
+                      };
               return (
-                <Card key={ordem.id} className="overflow-hidden border-destructive/40 bg-destructive/5">
-                  <CardHeader className="space-y-2 pb-3">
+                <Card
+                  key={ordem.id}
+                  className={`relative overflow-hidden border ${tom.border} shadow-2xl ${tom.sombra}`}
+                >
+                  <div
+                    aria-hidden
+                    className={`absolute inset-y-0 left-0 ${tom.fill} transition-all duration-700`}
+                    style={{ width: `${pctLabel}%` }}
+                  />
+                  <CardHeader className="relative space-y-2 pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <CardTitle className="font-mono text-base">{ordem.numero ?? "O.C. sem número"}</CardTitle>
@@ -1575,18 +1610,25 @@ function OrdensCompra() {
                           {ordem.fornecedor_nome ?? "Fornecedor não definido"}
                         </p>
                       </div>
-                      <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tom.selo}`}
+                        >
+                          {pctLabel}% pago
+                        </span>
+                      </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="relative space-y-3">
                     <div className="grid grid-cols-3 gap-2 text-right">
                       <div>
                         <p className="text-[11px] text-muted-foreground">Total</p>
-                        <p className="text-sm font-semibold">{brl(Number(ordem.valor_total ?? 0))}</p>
+                        <p className="text-sm font-semibold">{brl(total)}</p>
                       </div>
                       <div>
                         <p className="text-[11px] text-muted-foreground">Pago</p>
-                        <p className="text-sm font-semibold">{brl(pago)}</p>
+                        <p className={`text-sm font-semibold ${tom.texto}`}>{brl(pago)}</p>
                       </div>
                       <div>
                         <p className="text-[11px] text-muted-foreground">Saldo</p>
