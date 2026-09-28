@@ -381,6 +381,8 @@ function NovoPedido() {
   const [entrada, setEntrada] = useState(0);
   /** Conta bancária em que a entrada paga no fechamento entra. */
   const [contaEntrada, setContaEntrada] = useState("");
+  /** Forma como a entrada será paga. */
+  const [formaEntrada, setFormaEntrada] = useState<string>("Dinheiro");
 
   /** Prazo de entrega e endereço de instalação impressos no pedido Splash. */
   const [prazoEntrega, setPrazoEntrega] = useState("");
@@ -552,6 +554,7 @@ function NovoPedido() {
     setCondicoes([]);
     setEntrada(0);
     setContaEntrada("");
+    setFormaEntrada("Dinheiro");
     setPrazoEntrega("");
     setEnderecoInstalacao("");
     setMateriais({
@@ -1014,7 +1017,7 @@ function NovoPedido() {
         pagamentos.unshift({
           venda_id: venda.id,
           data_pagamento: data,
-          forma_pagamento: condicoes[0]?.forma_pagamento || "Dinheiro",
+          forma_pagamento: formaEntrada || "Dinheiro",
           valor: entrada,
           conta_bancaria: contaEntrada || null,
           observacoes: "Entrada paga no fechamento do pedido",
@@ -1620,7 +1623,24 @@ function NovoPedido() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-3">
+                <Field label="Forma de pagamento da entrada">
+                  <Select
+                    value={formaEntrada}
+                    onValueChange={setFormaEntrada}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a forma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FORMAS_PAGAMENTO.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {f}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <Field label="Conta que recebe a entrada">
                   <Input
                     list="contas-bancarias-opcoes"
