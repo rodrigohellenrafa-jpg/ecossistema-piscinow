@@ -199,15 +199,19 @@ function FormularioOS() {
 
   const boardOsId = (obra as { board_os_id?: string | null } | undefined)?.board_os_id ?? null;
   const { data: osDoc } = useQuery({
-    queryKey: ["formulario-os-doc", boardOsId, vendaId],
-    enabled: Boolean(boardOsId || vendaId),
+    queryKey: ["formulario-os-doc", boardOsId, vendaId, clienteId],
+    enabled: Boolean(boardOsId || vendaId || clienteId),
     queryFn: async () => {
       let q = supabase
         .from("ordens_servico")
         .select("id, data_agendada, descricao, numero")
-        .not("data_agendada", "is", null)
-        .order("data_agendada", { ascending: true });
-      q = boardOsId ? q.eq("id", boardOsId) : q.eq("venda_id", vendaId!);
+        .neq("status", "cancelada")
+        .order("updated_at", { ascending: false });
+      q = boardOsId
+        ? q.eq("id", boardOsId)
+        : vendaId
+          ? q.eq("venda_id", vendaId)
+          : q.eq("cliente_id", clienteId!);
       const { data, error } = await q.limit(1);
       if (error) throw error;
       return data?.[0] ?? null;
