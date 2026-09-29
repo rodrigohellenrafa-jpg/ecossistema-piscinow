@@ -1443,6 +1443,7 @@ export type Database = {
           cliente_id: string | null
           cliente_nome: string | null
           codigo: string | null
+          cor: string | null
           created_at: string
           cst: string | null
           desconto: number
@@ -1462,6 +1463,7 @@ export type Database = {
           cliente_id?: string | null
           cliente_nome?: string | null
           codigo?: string | null
+          cor?: string | null
           created_at?: string
           cst?: string | null
           desconto?: number
@@ -1481,6 +1483,7 @@ export type Database = {
           cliente_id?: string | null
           cliente_nome?: string | null
           codigo?: string | null
+          cor?: string | null
           created_at?: string
           cst?: string | null
           desconto?: number
