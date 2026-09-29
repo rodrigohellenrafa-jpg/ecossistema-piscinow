@@ -305,7 +305,7 @@ function FormularioOS() {
       .filter(Boolean)
       .join(", ");
     setEndereco((atual) => atual || clienteDados.endereco_obra || completo);
-  }, [clienteDados]);
+  }, [clienteDados, obra, vendaSelecionada, ordemSelecionada]);
 
   useEffect(() => {
     const piscina = itensVenda.find((i) => /piscina|casco|spa/i.test(i.descricao));
