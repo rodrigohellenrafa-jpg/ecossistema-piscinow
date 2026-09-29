@@ -158,6 +158,7 @@ type Item = {
   venda_id?: string | null;
   numero_nf: string | null;
   cor: string | null;
+  pastilha: string | null;
 };
 
 type Fornecedor = {
@@ -212,6 +213,7 @@ type ItemForm = {
   venda_id?: string | null;
   numero_nf?: string | null;
   cor: string;
+  pastilha: string;
 };
 
 const novoItemVazio = {
@@ -221,6 +223,7 @@ const novoItemVazio = {
   desconto: "0",
   cliente_id: SEM_CLIENTE,
   cor: "",
+  pastilha: "",
 };
 
 function OrdensCompra() {
@@ -930,9 +933,10 @@ function OrdensCompra() {
               total: valorUnitario - descontoUnitario,
               cliente_id: venda?.cliente_id ?? null,
               cliente_nome: venda?.cliente_nome ?? null,
-              venda_id: vendaId || null,
-              cor: produto.cor_pastilha ?? null,
-            };
+               venda_id: vendaId || null,
+               cor: produto.cor_pastilha ?? null,
+               pastilha: produto.modelo_pastilha ?? null,
+             };
           });
         });
         const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
@@ -1074,6 +1078,7 @@ function OrdensCompra() {
         venda_id: i.venda_id ?? null,
         numero_nf: i.numero_nf ?? null,
         cor: i.cor ?? "",
+        pastilha: i.pastilha ?? "",
       })),
     });
     setModoEdicao(true);
@@ -1139,6 +1144,7 @@ function OrdensCompra() {
         venda_id: i.venda_id ?? null,
         numero_nf: i.numero_nf ?? null,
         cor: i.cor?.trim() || null,
+        pastilha: i.pastilha?.trim() || null,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
@@ -1175,6 +1181,7 @@ function OrdensCompra() {
       cliente_id: cliente?.id ?? null,
       cliente_nome: cliente?.nome ?? null,
       cor: novoItem.cor.trim() || produto.cor_pastilha || "",
+      pastilha: novoItem.pastilha.trim() || produto.modelo_pastilha || "",
     };
   };
 
@@ -1206,6 +1213,14 @@ function OrdensCompra() {
     setFormEdicao((f) => {
       const itens = [...f.itens];
       itens[idx] = { ...itens[idx], cor: valor };
+      return { ...f, itens };
+    });
+  };
+
+  const alterarPastilhaItemEdicao = (idx: number, valor: string) => {
+    setFormEdicao((f) => {
+      const itens = [...f.itens];
+      itens[idx] = { ...itens[idx], pastilha: valor };
       return { ...f, itens };
     });
   };
@@ -1527,6 +1542,7 @@ function OrdensCompra() {
         cliente_id: i.cliente_id,
         cliente_nome: i.cliente_nome,
         cor: i.cor?.trim() || null,
+        pastilha: i.pastilha?.trim() || null,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
@@ -2214,6 +2230,7 @@ function OrdensCompra() {
                       <TableCell className="font-mono text-xs">{i.codigo ?? "—"}</TableCell>
                       <TableCell>{i.descricao}</TableCell>
                       <TableCell>{i.cor ?? "—"}</TableCell>
+                      <TableCell>{i.pastilha ?? "—"}</TableCell>
                       <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
                       <TableCell>{i.ncm ?? "—"}</TableCell>
                       <TableCell>{i.cst ?? "—"}</TableCell>
