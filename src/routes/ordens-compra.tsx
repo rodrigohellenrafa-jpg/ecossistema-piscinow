@@ -2213,6 +2213,7 @@ function OrdensCompra() {
                     <TableHead>Cód</TableHead>
                     <TableHead>Descrição</TableHead>
                     <TableHead>Cor</TableHead>
+                    <TableHead>Pastilha</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>NCM</TableHead>
                     <TableHead>CST</TableHead>
@@ -2709,6 +2710,7 @@ function OrdensCompra() {
                         ...i,
                         produto_id: v,
                         cor: produtos.find((p) => p.id === v)?.cor_pastilha ?? i.cor,
+                        pastilha: produtos.find((p) => p.id === v)?.modelo_pastilha ?? i.pastilha,
                       }))
                     }
                   >
@@ -2760,6 +2762,12 @@ function OrdensCompra() {
                     value={novoItem.cor}
                     onChange={(e) => setNovoItem((i) => ({ ...i, cor: e.target.value }))}
                   />
+                  <Input
+                    placeholder="Pastilha (modelo)"
+                    aria-label="Modelo da pastilha do item"
+                    value={novoItem.pastilha}
+                    onChange={(e) => setNovoItem((i) => ({ ...i, pastilha: e.target.value }))}
+                  />
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={adicionarItemEdicao}>
                   <Plus className="size-4" /> Adicionar item
@@ -2771,6 +2779,7 @@ function OrdensCompra() {
                       <TableRow>
                         <TableHead>Produto</TableHead>
                         <TableHead>Cor</TableHead>
+                        <TableHead>Pastilha</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead className="text-right">Qtd</TableHead>
                         <TableHead className="text-right">Vlr Unit</TableHead>
@@ -2790,6 +2799,15 @@ function OrdensCompra() {
                               placeholder="Cor"
                               value={i.cor}
                               onChange={(e) => alterarCorItemEdicao(idx, e.target.value)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              aria-label={`Pastilha de ${i.descricao}`}
+                              className="w-32"
+                              placeholder="Pastilha"
+                              value={i.pastilha}
+                              onChange={(e) => alterarPastilhaItemEdicao(idx, e.target.value)}
                             />
                           </TableCell>
                           <TableCell>
