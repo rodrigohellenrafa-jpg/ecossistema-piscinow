@@ -2687,7 +2687,13 @@ function OrdensCompra() {
                 <div className="grid gap-2 sm:grid-cols-4">
                   <Select
                     value={novoItem.produto_id}
-                    onValueChange={(v) => setNovoItem((i) => ({ ...i, produto_id: v }))}
+                    onValueChange={(v) =>
+                      setNovoItem((i) => ({
+                        ...i,
+                        produto_id: v,
+                        cor: produtos.find((p) => p.id === v)?.cor_pastilha ?? i.cor,
+                      }))
+                    }
                   >
                     <SelectTrigger className="sm:col-span-2">
                       <SelectValue placeholder="Produto" />
@@ -2730,6 +2736,12 @@ function OrdensCompra() {
                     onChange={(e) =>
                       setNovoItem((i) => ({ ...i, valor_unitario: e.target.value }))
                     }
+                  />
+                  <Input
+                    placeholder="Cor (ex.: azul, areia)"
+                    aria-label="Cor do item"
+                    value={novoItem.cor}
+                    onChange={(e) => setNovoItem((i) => ({ ...i, cor: e.target.value }))}
                   />
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={adicionarItemEdicao}>
