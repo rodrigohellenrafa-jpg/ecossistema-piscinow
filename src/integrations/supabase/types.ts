@@ -1452,6 +1452,7 @@ export type Database = {
           ncm: string | null
           numero_nf: string | null
           ordem_id: string
+          pastilha: string | null
           produto_id: string | null
           quantidade: number
           total: number
@@ -1472,6 +1473,7 @@ export type Database = {
           ncm?: string | null
           numero_nf?: string | null
           ordem_id: string
+          pastilha?: string | null
           produto_id?: string | null
           quantidade?: number
           total?: number
@@ -1492,6 +1494,7 @@ export type Database = {
           ncm?: string | null
           numero_nf?: string | null
           ordem_id?: string
+          pastilha?: string | null
           produto_id?: string | null
           quantidade?: number
           total?: number
