@@ -1,0 +1,1 @@
+ALTER TABLE public.ordem_compra_itens ADD COLUMN IF NOT EXISTS pastilha text;
