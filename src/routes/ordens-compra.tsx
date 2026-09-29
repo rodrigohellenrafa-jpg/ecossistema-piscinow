@@ -208,6 +208,8 @@ type ItemForm = {
   desconto: number;
   cliente_id: string | null;
   cliente_nome: string | null;
+  venda_id?: string | null;
+  numero_nf?: string | null;
 };
 
 const novoItemVazio = {
@@ -1065,6 +1067,8 @@ function OrdensCompra() {
         desconto: Number(i.desconto),
         cliente_id: i.cliente_id ?? null,
         cliente_nome: i.cliente_nome ?? null,
+        venda_id: i.venda_id ?? null,
+        numero_nf: i.numero_nf ?? null,
       })),
     });
     setModoEdicao(true);
@@ -1127,6 +1131,8 @@ function OrdensCompra() {
         total: i.quantidade * i.valor_unitario - i.desconto,
         cliente_id: i.cliente_id,
         cliente_nome: i.cliente_nome,
+        venda_id: i.venda_id ?? null,
+        numero_nf: i.numero_nf ?? null,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
@@ -1135,7 +1141,7 @@ function OrdensCompra() {
       toast.success("Ordem de compra atualizada");
       setModoEdicao(false);
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
-      qc.invalidateQueries({ queryKey: ["ordem_compra_itens", detalheId] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
