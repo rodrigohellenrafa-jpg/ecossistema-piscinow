@@ -157,6 +157,7 @@ type Item = {
   cliente_nome: string | null;
   venda_id?: string | null;
   numero_nf: string | null;
+  cor: string | null;
 };
 
 type Fornecedor = {
@@ -210,6 +211,7 @@ type ItemForm = {
   cliente_nome: string | null;
   venda_id?: string | null;
   numero_nf?: string | null;
+  cor: string;
 };
 
 const novoItemVazio = {
@@ -218,6 +220,7 @@ const novoItemVazio = {
   valor_unitario: "0",
   desconto: "0",
   cliente_id: SEM_CLIENTE,
+  cor: "",
 };
 
 function OrdensCompra() {
@@ -928,6 +931,7 @@ function OrdensCompra() {
               cliente_id: venda?.cliente_id ?? null,
               cliente_nome: venda?.cliente_nome ?? null,
               venda_id: vendaId || null,
+              cor: produto.cor_pastilha ?? null,
             };
           });
         });
@@ -1069,6 +1073,7 @@ function OrdensCompra() {
         cliente_nome: i.cliente_nome ?? null,
         venda_id: i.venda_id ?? null,
         numero_nf: i.numero_nf ?? null,
+        cor: i.cor ?? "",
       })),
     });
     setModoEdicao(true);
@@ -1133,6 +1138,7 @@ function OrdensCompra() {
         cliente_nome: i.cliente_nome,
         venda_id: i.venda_id ?? null,
         numero_nf: i.numero_nf ?? null,
+        cor: i.cor?.trim() || null,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
@@ -1168,6 +1174,7 @@ function OrdensCompra() {
       desconto: Number(novoItem.desconto) || 0,
       cliente_id: cliente?.id ?? null,
       cliente_nome: cliente?.nome ?? null,
+      cor: novoItem.cor.trim() || produto.cor_pastilha || "",
     };
   };
 
@@ -1193,6 +1200,14 @@ function OrdensCompra() {
 
   const removerItemEdicao = (idx: number) => {
     setFormEdicao((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
+  };
+
+  const alterarCorItemEdicao = (idx: number, valor: string) => {
+    setFormEdicao((f) => {
+      const itens = [...f.itens];
+      itens[idx] = { ...itens[idx], cor: valor };
+      return { ...f, itens };
+    });
   };
 
   const alterarItemEdicao = (idx: number, campo: "quantidade" | "valor_unitario" | "desconto", valor: string) => {
@@ -1511,6 +1526,7 @@ function OrdensCompra() {
         total: i.quantidade * i.valor_unitario - i.desconto,
         cliente_id: i.cliente_id,
         cliente_nome: i.cliente_nome,
+        cor: i.cor?.trim() || null,
       }));
       const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
       if (erroItens) throw erroItens;
@@ -2180,6 +2196,7 @@ function OrdensCompra() {
                   <TableRow>
                     <TableHead>Cód</TableHead>
                     <TableHead>Descrição</TableHead>
+                    <TableHead>Cor</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>NCM</TableHead>
                     <TableHead>CST</TableHead>
@@ -2196,6 +2213,7 @@ function OrdensCompra() {
                     <TableRow key={i.id}>
                       <TableCell className="font-mono text-xs">{i.codigo ?? "—"}</TableCell>
                       <TableCell>{i.descricao}</TableCell>
+                      <TableCell>{i.cor ?? "—"}</TableCell>
                       <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
                       <TableCell>{i.ncm ?? "—"}</TableCell>
                       <TableCell>{i.cst ?? "—"}</TableCell>
@@ -2723,6 +2741,7 @@ function OrdensCompra() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Produto</TableHead>
+                        <TableHead>Cor</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead className="text-right">Qtd</TableHead>
                         <TableHead className="text-right">Vlr Unit</TableHead>
@@ -2735,6 +2754,15 @@ function OrdensCompra() {
                       {formEdicao.itens.map((i, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{i.descricao}</TableCell>
+                          <TableCell>
+                            <Input
+                              aria-label={`Cor de ${i.descricao}`}
+                              className="w-32"
+                              placeholder="Cor"
+                              value={i.cor}
+                              onChange={(e) => alterarCorItemEdicao(idx, e.target.value)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <Select
                               value={i.cliente_id ?? SEM_CLIENTE}
