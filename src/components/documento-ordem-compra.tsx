@@ -41,6 +41,7 @@ type Item = {
   desconto: number;
   total: number;
   cliente_nome: string | null;
+  cor?: string | null;
 };
 
 interface Props {
@@ -151,10 +152,11 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
     autoTable(doc, {
       startY: y + 6,
       margin: { left: m, right: 14 },
-      head: [["Código", "Descrição do produto", "Cliente / destino", "Un.", "Qtd", "Valor unit.", "Total"]],
+      head: [["Código", "Descrição do produto", "Cor", "Cliente / destino", "Un.", "Qtd", "Valor unit.", "Total"]],
       body: itens.map((i) => [
         i.codigo ?? "—",
         i.descricao,
+        i.cor ?? "—",
         i.cliente_nome ?? "Estoque",
         i.unidade,
         String(i.quantidade),
@@ -165,10 +167,10 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
       headStyles: { fillColor: [254, 202, 202], textColor: [69, 10, 10], fontStyle: "bold" },
       alternateRowStyles: { fillColor: [254, 242, 242] },
       columnStyles: {
-        3: { halign: "center" },
         4: { halign: "center" },
-        5: { halign: "right" },
+        5: { halign: "center" },
         6: { halign: "right" },
+        7: { halign: "right" },
       },
     });
 
@@ -305,6 +307,7 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
             <tr>
               <th style={{ width: "11%" }}>Código</th>
               <th>Descrição do produto</th>
+              <th style={{ width: "12%" }}>Cor</th>
               <th style={{ width: "16%" }}>Cliente / destino</th>
               <th style={{ width: "8%" }}>Un.</th>
               <th style={{ width: "8%" }}>Qtd</th>
@@ -317,6 +320,7 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
               <tr key={i.id}>
                 <td>{i.codigo ?? "—"}</td>
                 <td>{i.descricao}</td>
+                <td>{i.cor ?? "—"}</td>
                 <td>{i.cliente_nome ?? "Estoque"}</td>
                 <td className="doc-center">{i.unidade}</td>
                 <td className="doc-center">{i.quantidade}</td>
@@ -327,6 +331,7 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
             {Array.from({ length: Math.max(0, 8 - itens.length) }).map((_, idx) => (
               <tr key={`vazio-${idx}`}>
                 <td>&nbsp;</td>
+                <td />
                 <td />
                 <td />
                 <td />
