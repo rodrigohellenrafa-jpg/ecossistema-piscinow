@@ -43,6 +43,23 @@ import { brl, dataBR, diasAte, margem, STATUS_PEDIDO } from "@/lib/erp";
 /** Data em que o controle passou a valer; pedidos anteriores são só histórico. */
 const INICIO_CONTROLE = "2026-09-04";
 
+const hojeISO = () => new Date().toLocaleDateString("en-CA");
+
+const primeiroDiaMes = () => `${hojeISO().slice(0, 7)}-01`;
+
+const ultimoDiaMes = () => {
+  const [a, m] = hojeISO().slice(0, 7).split("-").map(Number);
+  return `${hojeISO().slice(0, 7)}-${String(new Date(a, m, 0).getDate()).padStart(2, "0")}`;
+};
+
+const mesAnterior = () => {
+  const [a, m] = hojeISO().slice(0, 7).split("-").map(Number);
+  const d = new Date(a, m - 2, 1);
+  const ini = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  const fim = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()).padStart(2, "0")}`;
+  return [ini, fim] as const;
+};
+
 const TIPOS_ATENDIMENTO = [
   { value: "in", label: "IN · Balcão" },
   { value: "out", label: "OUT · Serviço externo" },
@@ -97,8 +114,8 @@ function Vendas() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("todos");
   const [tipo, setTipo] = useState<string>("todos");
-  const [inicio, setInicio] = useState("");
-  const [fim, setFim] = useState("");
+  const [inicio, setInicio] = useState(primeiroDiaMes());
+  const [fim, setFim] = useState(ultimoDiaMes());
   const qc = useQueryClient();
   const validarMestra = useServerFn(validarSenhaMestra);
   const navigate = useNavigate();
@@ -362,7 +379,7 @@ function Vendas() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Os indicadores acima consideram pedidos a partir de {dataBR(INICIO_CONTROLE)}.
+            Os indicadores consideram o período filtrado abaixo {inicio || fim ? `(de ${dataBR(inicio || INICIO_CONTROLE)} a ${dataBR(fim || hojeISO())})` : "(todos os períodos desde o começo do controle)"}.
           </p>
 
           {pedidosHistoricos.length > 0 && (
@@ -396,6 +413,24 @@ function Vendas() {
                 </div>
                 <Input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="w-40" />
                 <Input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="w-40" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={inicio === primeiroDiaMes() && fim === ultimoDiaMes() ? "border-primary text-primary" : ""}
+                  onClick={() => { setInicio(primeiroDiaMes()); setFim(ultimoDiaMes()); }}
+                >
+                  Este mês
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { const [i, f] = mesAnterior(); setInicio(i); setFim(f); }}
+                >
+                  Mês anterior
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => { setInicio(""); setFim(""); }}>
+                  Todos
+                </Button>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Status" />

@@ -48,7 +48,7 @@ async function tudo(tabela: string, campos: string) {
 type Secao = { titulo: string; colunas: string[]; linhas: (string | number)[][]; total?: (string | number)[] };
 
 function ResumoPeriodo() {
-  const [de, setDe] = useState("2026-09-01");
+  const [de, setDe] = useState(inicioMes());
   const [ate, setAte] = useState(hoje());
 
   const { data, isLoading } = useQuery({
