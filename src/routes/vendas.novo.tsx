@@ -52,7 +52,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
-import { rotearEstoque } from "@/lib/venda-automacao";
+
 
 export const Route = createFileRoute("/vendas/novo")({
   staticData: { sitemap: false },
@@ -64,6 +64,8 @@ export const Route = createFileRoute("/vendas/novo")({
         content:
           "Ponto de venda Piscinow: monte itens, composição de kit de piscina e condições comerciais em um pedido único.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { property: "og:title", content: "Novo Pedido (PDV) | Piscinow ERP" },
       {
         property: "og:description",
@@ -208,7 +210,11 @@ const acrescimoCondicao = (c: CondicaoLinha) =>
   Math.max(0, cobradoCondicao(c) - c.valor);
 
 
-function NovoPedido() {
+export function ComparativoPedido({ vendaId }: { vendaId: string }) {
+  return <NovoPedido comparativoId={vendaId} />;
+}
+
+function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [rascunhoVendaId, setRascunhoVendaId] = useState<string | null>(() => {
@@ -422,8 +428,10 @@ function NovoPedido() {
   const [rascunhoPronto, setRascunhoPronto] = useState(false);
   /** Depois de concluir a venda o rascunho não volta a ser gravado. */
   const finalizadoRef = useRef(false);
+  const salvarPendenteRef = useRef(false);
 
   useEffect(() => {
+    if (comparativoId) return;
     try {
       const raw = localStorage.getItem(RASCUNHO_KEY);
       if (raw) {
@@ -469,7 +477,7 @@ function NovoPedido() {
   }, []);
 
   useEffect(() => {
-    if (!rascunhoPronto || finalizadoRef.current) return;
+    if (comparativoId || !rascunhoPronto || finalizadoRef.current) return;
     try {
       localStorage.setItem(
         RASCUNHO_KEY,
@@ -644,7 +652,7 @@ function NovoPedido() {
 
   // ----- Rascunho salvo no banco como orçamento não concluído -----
   useEffect(() => {
-    if (!rascunhoPronto) return;
+    if (comparativoId || !rascunhoPronto || finalizadoRef.current || salvarPendenteRef.current) return;
     // Só guarda rascunho quando já existe ao menos um produto — nunca grava venda vazia.
     if (!clienteId || itens.length === 0) return;
     const timer = setTimeout(async () => {
@@ -843,6 +851,7 @@ function NovoPedido() {
   const salvar = useMutation({
     mutationFn: async (modo: "pedido" | "venda" = "pedido") => {
       if (!clienteId) throw new Error("Selecione o cliente.");
+      salvarPendenteRef.current = true;
       if (itens.length === 0) throw new Error("Adicione ao menos um produto antes de salvar.");
       if (contasBancarias.length > 0) {
         const norm = (s: string) => s.trim().toLowerCase();
@@ -962,7 +971,7 @@ function NovoPedido() {
       const ctx = {
         numero: numeroFinal,
         data,
-        clienteId,
+        clienteId: selecaoCliente.id,
         clienteNome: cliente?.nome ?? null,
         userId,
       };
@@ -1034,28 +1043,23 @@ function NovoPedido() {
         queryClient.invalidateQueries({ queryKey: ["saldos-bancarios"] });
       }
 
-      // 2) Estoque: baixa o que tem saldo, encomenda automaticamente o que falta.
-      // Falhas aqui não podem derrubar a venda já gravada.
-      let roteamento: Awaited<ReturnType<typeof rotearEstoque>> = {
-        baixados: 0,
-        encomendados: 0,
-        ordensCriadas: [],
+      // Orçamentos não baixam estoque nem criam compras.
+      let roteamento: { baixados: number; encomendados: number; ordensCriadas: string[] } = {
+        baixados: 0, encomendados: 0, ordensCriadas: [],
       };
       let aviso: string | null = null;
-      try {
-        roteamento = await rotearEstoque(
-          ctx,
-          itens.map((i) => ({
-            produto_id: i.produto_id,
-            sku: i.sku,
-            descricao: i.descricao,
-            quantidade: i.quantidade,
-            preco_unitario: i.preco_unitario,
-            custo_unitario: i.custo_unitario,
-          })),
-        );
-      } catch {
-        aviso = "Pedido salvo, mas a baixa de estoque não pôde ser feita com o seu acesso.";
+      if (modo === "venda") {
+        const { data: resultado, error } = await supabase.rpc("processar_compra_estoque_venda", { p_venda_id: venda.id });
+        if (error) {
+          // Mantém o pedido disponível para corrigir fornecedor e confirmar novamente.
+          await supabase.from("vendas").update({ status_pedido: "orcamento" }).eq("id", venda.id);
+          aviso = `Pedido salvo como orçamento: ${error.message}`;
+        } else {
+          const r = resultado as { baixados?: number; ordensCriadas?: string[] } | null;
+          roteamento = { baixados: r?.baixados ?? 0, encomendados: 0, ordensCriadas: r?.ordensCriadas ?? [] };
+          queryClient.invalidateQueries({ queryKey: ["ordens_compra"] });
+          queryClient.invalidateQueries({ queryKey: ["produtos-select"] });
+        }
       }
 
       // 2b) Pagamento parcial: o que faltou virar dinheiro entra como título em
@@ -1135,12 +1139,59 @@ function NovoPedido() {
       navigate({ to: "/vendas/$id", params: { id } });
     },
 
+    onError: (e: Error) => { salvarPendenteRef.current = false; toast.error(e.message); },
+  });
+
+  const { data: comparativoSalvo } = useQuery({
+    queryKey: ["pedido-comparativo", comparativoId],
+    enabled: !!comparativoId,
+    queryFn: async () => {
+      if (!comparativoId) return null;
+      const { data, error } = await supabase.from("venda_kit").select("*").eq("venda_id", comparativoId).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  useEffect(() => {
+    if (!comparativoSalvo) return;
+    const d = comparativoSalvo.comparativo as Record<string, unknown>;
+    setCascoId(comparativoSalvo.casco_id ?? "");
+    setFiltroId(comparativoSalvo.filtro_id ?? "");
+    setAcessorios((comparativoSalvo.acessorios ?? []) as unknown as AcessorioLinha[]);
+    setCustoFrete(comparativoSalvo.custo_frete);
+    setCustoMaoObra(comparativoSalvo.custo_mao_obra);
+    setImpostosKit(comparativoSalvo.impostos);
+    setPrecoVendaKit(comparativoSalvo.preco_venda_kit);
+    setCustoCasco(Number(d.custoCasco ?? 0));
+    setCustoFiltro(Number(d.custoFiltro ?? 0));
+    setModeloTabela(String(d.modeloTabela ?? ""));
+    setLucroSugerido(Number(d.lucroSugerido ?? 0));
+  }, [comparativoSalvo]);
+  const salvarComparativo = useMutation({
+    mutationFn: async () => {
+      if (!comparativoId) return;
+      const payload = {
+        venda_id: comparativoId, casco_id: cascoId || null, filtro_id: filtroId || null,
+        acessorios: acessorios.map(a => ({ ...a })), custo_frete: custoFrete, custo_mao_obra: custoMaoObra,
+        impostos: impostosKit, custo_total_kit: custoTotalKit, preco_venda_kit: precoVendaKit,
+        comparativo: { custoCasco, custoFiltro, modeloTabela, lucroSugerido },
+      };
+      const res = comparativoSalvo
+        ? await supabase.from("venda_kit").update(payload).eq("id", comparativoSalvo.id)
+        : await supabase.from("venda_kit").insert(payload);
+      if (res.error) throw res.error;
+    },
+    onSuccess: () => {
+      toast.success("Comparativo salvo.");
+      queryClient.invalidateQueries({ queryKey: ["pedido-comparativo", comparativoId] });
+      queryClient.invalidateQueries({ queryKey: ["venda-kit", comparativoId] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {!comparativoId && <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Novo Pedido (PDV)" subtitle={`Pedido ${numero}`} />
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">Rascunho salvo automaticamente</span>
@@ -1148,10 +1199,11 @@ function NovoPedido() {
             Descartar rascunho
           </Button>
         </div>
-      </div>
+      </div>}
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className={comparativoId ? "grid gap-4 xl:grid-cols-3" : "space-y-4"}>
         <div className="space-y-4 xl:col-span-2">
+          {!comparativoId && <>
           <ExpandableCard>
             <CardHeader className="pr-12">
               <CardTitle>Identificação</CardTitle>
@@ -1471,7 +1523,8 @@ function NovoPedido() {
             </CardContent>
           </ExpandableCard>
 
-          {tipoAtendimento === "out" && (
+          </>}
+          {comparativoId && (
           <ExpandableCard>
             <CardHeader className="pr-12">
               <CardTitle>Composição da Piscina (Multipartido)</CardTitle>
@@ -1605,6 +1658,7 @@ function NovoPedido() {
           )}
 
 
+          {!comparativoId && <>
           <ExpandableCard>
             <CardHeader className="pr-12">
               <CardTitle>Condições de pagamento</CardTitle>
@@ -2004,9 +2058,11 @@ function NovoPedido() {
             "Vender" confirma a venda; se o total não for quitado, o saldo vira título em Contas a
             Receber automaticamente.
           </p>
+          </>}
+          {comparativoId && <div className="flex justify-end"><Button onClick={() => salvarComparativo.mutate()} disabled={salvarComparativo.isPending}>Salvar comparativo</Button></div>}
         </div>
 
-        <div className="space-y-4">
+        {comparativoId && <div className="space-y-4">
           <Card className="sticky top-4">
             <CardHeader>
               <CardTitle>Resumo do Kit</CardTitle>
@@ -2066,15 +2122,7 @@ function NovoPedido() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Totais do pedido</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Produtos</span>
-                <span>{brl(subtotalProdutos)}</span>
-              </div>
+        </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   Kit piscina (prévia — não soma ao total)
@@ -2088,7 +2136,7 @@ function NovoPedido() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div>}
       </div>
     </div>
   );
