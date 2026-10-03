@@ -656,6 +656,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
     // Só guarda rascunho quando já existe ao menos um produto — nunca grava venda vazia.
     if (!clienteId || itens.length === 0) return;
     const timer = setTimeout(async () => {
+      if (salvarPendenteRef.current || finalizadoRef.current) return;
       try {
         const cabecalho = {
           numero,
@@ -1101,7 +1102,9 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
     onSuccess: ({ id, roteamento, aviso, contaReceber, modo, obraCriada }) => {
 
       toast.success(
-        modo === "venda"
+        aviso?.startsWith("Pedido salvo como orçamento:")
+          ? "Pedido salvo; confira o aviso antes de confirmar a venda."
+          : modo === "venda"
           ? "Venda confirmada e financeiro lançado!"
           : tipoAtendimento === "in"
             ? "Pedido de balcão registrado e financeiro lançado!"
