@@ -379,7 +379,7 @@ function Vendas() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Os indicadores acima consideram pedidos a partir de {dataBR(INICIO_CONTROLE)}.
+            Os indicadores consideram o período filtrado abaixo {inicio || fim ? `(de ${dataBR(inicio || INICIO_CONTROLE)} a ${dataBR(fim || hojeISO())})` : "(todos os períodos desde o começo do controle)"}.
           </p>
 
           {pedidosHistoricos.length > 0 && (
