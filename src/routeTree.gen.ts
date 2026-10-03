@@ -9,180 +9,50 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AcessosRouteImport } from './routes/acessos'
-import { Route as AgendaRouteImport } from './routes/agenda'
-import { Route as AtalhosRouteImport } from './routes/atalhos'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as ClientesRouteImport } from './routes/clientes'
-import { Route as ComprasRouteImport } from './routes/compras'
-import { Route as ContasRouteImport } from './routes/contas'
-import { Route as DreRouteImport } from './routes/dre'
-import { Route as FinanceiroRouteImport } from './routes/financeiro'
-import { Route as FiscalRouteImport } from './routes/fiscal'
-import { Route as FluxoCaixaRouteImport } from './routes/fluxo-caixa'
-import { Route as FornecedoresRouteImport } from './routes/fornecedores'
-import { Route as FuncionariosRouteImport } from './routes/funcionarios'
-import { Route as HoleriteRouteImport } from './routes/holerite'
-import { Route as ImportacaoRouteImport } from './routes/importacao'
-import { Route as IndicadoresRouteImport } from './routes/indicadores'
-import { Route as LogisticaRouteImport } from './routes/logistica'
-import { Route as MovimentacoesRouteImport } from './routes/movimentacoes'
-import { Route as NotasCompraRouteImport } from './routes/notas-compra'
-import { Route as OrdensRouteImport } from './routes/ordens'
-import { Route as OrdensCompraRouteImport } from './routes/ordens-compra'
-import { Route as PrecificacaoRouteImport } from './routes/precificacao'
-import { Route as ProdutosRouteImport } from './routes/produtos'
-import { Route as ReativacaoRouteImport } from './routes/reativacao'
-import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as ResumoPeriodoRouteImport } from './routes/resumo-periodo'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as EstoqueEntradasRouteImport } from './routes/estoque.entradas'
-import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventario'
-import { Route as EstoqueRelatorioRouteImport } from './routes/estoque.relatorio'
-import { Route as FiscalConfigRouteImport } from './routes/fiscal.config'
-import { Route as ObrasIdRouteImport } from './routes/obras.$id'
-import { Route as OsFormularioRouteImport } from './routes/os.formulario'
+import { Route as ResumoPeriodoRouteImport } from './routes/resumo-periodo'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as RelatorioContasRouteImport } from './routes/relatorio-contas'
+import { Route as ReativacaoRouteImport } from './routes/reativacao'
+import { Route as ProdutosRouteImport } from './routes/produtos'
+import { Route as PrecificacaoRouteImport } from './routes/precificacao'
+import { Route as OrdensCompraRouteImport } from './routes/ordens-compra'
+import { Route as OrdensRouteImport } from './routes/ordens'
+import { Route as NotasCompraRouteImport } from './routes/notas-compra'
+import { Route as MovimentacoesRouteImport } from './routes/movimentacoes'
+import { Route as LogisticaRouteImport } from './routes/logistica'
+import { Route as IndicadoresRouteImport } from './routes/indicadores'
+import { Route as ImportacaoRouteImport } from './routes/importacao'
+import { Route as HoleriteRouteImport } from './routes/holerite'
+import { Route as FuncionariosRouteImport } from './routes/funcionarios'
+import { Route as FornecedoresRouteImport } from './routes/fornecedores'
+import { Route as FluxoCaixaRouteImport } from './routes/fluxo-caixa'
+import { Route as FiscalRouteImport } from './routes/fiscal'
+import { Route as FinanceiroRouteImport } from './routes/financeiro'
+import { Route as DreRouteImport } from './routes/dre'
+import { Route as ContasRouteImport } from './routes/contas'
+import { Route as ComprasRouteImport } from './routes/compras'
+import { Route as ClientesRouteImport } from './routes/clientes'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AtalhosRouteImport } from './routes/atalhos'
+import { Route as AgendaRouteImport } from './routes/agenda'
+import { Route as AcessosRouteImport } from './routes/acessos'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as VendasIndexRouteImport } from './routes/vendas.index'
-import { Route as VendasIdRouteImport } from './routes/vendas.$id'
-import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
 import { Route as VendasOrcamentosRouteImport } from './routes/vendas.orcamentos'
+import { Route as VendasNovoRouteImport } from './routes/vendas.novo'
+import { Route as VendasIdRouteImport } from './routes/vendas.$id'
+import { Route as OsFormularioRouteImport } from './routes/os.formulario'
+import { Route as ObrasIdRouteImport } from './routes/obras.$id'
+import { Route as FiscalConfigRouteImport } from './routes/fiscal.config'
+import { Route as EstoqueRelatorioRouteImport } from './routes/estoque.relatorio'
+import { Route as EstoqueInventarioRouteImport } from './routes/estoque.inventario'
+import { Route as EstoqueEntradasRouteImport } from './routes/estoque.entradas'
 import { Route as ApiPublicAgendaTokenRouteImport } from './routes/api/public/agenda.$token'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AcessosRoute = AcessosRouteImport.update({
-  id: '/acessos',
-  path: '/acessos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgendaRoute = AgendaRouteImport.update({
-  id: '/agenda',
-  path: '/agenda',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AtalhosRoute = AtalhosRouteImport.update({
-  id: '/atalhos',
-  path: '/atalhos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClientesRoute = ClientesRouteImport.update({
-  id: '/clientes',
-  path: '/clientes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ComprasRoute = ComprasRouteImport.update({
-  id: '/compras',
-  path: '/compras',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContasRoute = ContasRouteImport.update({
-  id: '/contas',
-  path: '/contas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DreRoute = DreRouteImport.update({
-  id: '/dre',
-  path: '/dre',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FinanceiroRoute = FinanceiroRouteImport.update({
-  id: '/financeiro',
-  path: '/financeiro',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FiscalRoute = FiscalRouteImport.update({
-  id: '/fiscal',
-  path: '/fiscal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FluxoCaixaRoute = FluxoCaixaRouteImport.update({
-  id: '/fluxo-caixa',
-  path: '/fluxo-caixa',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FornecedoresRoute = FornecedoresRouteImport.update({
-  id: '/fornecedores',
-  path: '/fornecedores',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FuncionariosRoute = FuncionariosRouteImport.update({
-  id: '/funcionarios',
-  path: '/funcionarios',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HoleriteRoute = HoleriteRouteImport.update({
-  id: '/holerite',
-  path: '/holerite',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ImportacaoRoute = ImportacaoRouteImport.update({
-  id: '/importacao',
-  path: '/importacao',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndicadoresRoute = IndicadoresRouteImport.update({
-  id: '/indicadores',
-  path: '/indicadores',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LogisticaRoute = LogisticaRouteImport.update({
-  id: '/logistica',
-  path: '/logistica',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MovimentacoesRoute = MovimentacoesRouteImport.update({
-  id: '/movimentacoes',
-  path: '/movimentacoes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotasCompraRoute = NotasCompraRouteImport.update({
-  id: '/notas-compra',
-  path: '/notas-compra',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrdensRoute = OrdensRouteImport.update({
-  id: '/ordens',
-  path: '/ordens',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrdensCompraRoute = OrdensCompraRouteImport.update({
-  id: '/ordens-compra',
-  path: '/ordens-compra',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrecificacaoRoute = PrecificacaoRouteImport.update({
-  id: '/precificacao',
-  path: '/precificacao',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProdutosRoute = ProdutosRouteImport.update({
-  id: '/produtos',
-  path: '/produtos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReativacaoRoute = ReativacaoRouteImport.update({
-  id: '/reativacao',
-  path: '/reativacao',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RelatorioContasRoute = RelatorioContasRouteImport.update({
-  id: '/relatorio-contas',
-  path: '/relatorio-contas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResumoPeriodoRoute = ResumoPeriodoRouteImport.update({
@@ -190,39 +60,139 @@ const ResumoPeriodoRoute = ResumoPeriodoRouteImport.update({
   path: '/resumo-periodo',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EstoqueEntradasRoute = EstoqueEntradasRouteImport.update({
-  id: '/estoque/entradas',
-  path: '/estoque/entradas',
+const RelatorioContasRoute = RelatorioContasRouteImport.update({
+  id: '/relatorio-contas',
+  path: '/relatorio-contas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EstoqueInventarioRoute = EstoqueInventarioRouteImport.update({
-  id: '/estoque/inventario',
-  path: '/estoque/inventario',
+const ReativacaoRoute = ReativacaoRouteImport.update({
+  id: '/reativacao',
+  path: '/reativacao',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EstoqueRelatorioRoute = EstoqueRelatorioRouteImport.update({
-  id: '/estoque/relatorio',
-  path: '/estoque/relatorio',
+const ProdutosRoute = ProdutosRouteImport.update({
+  id: '/produtos',
+  path: '/produtos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FiscalConfigRoute = FiscalConfigRouteImport.update({
-  id: '/config',
-  path: '/config',
-  getParentRoute: () => FiscalRoute,
-} as any)
-const ObrasIdRoute = ObrasIdRouteImport.update({
-  id: '/obras/$id',
-  path: '/obras/$id',
+const PrecificacaoRoute = PrecificacaoRouteImport.update({
+  id: '/precificacao',
+  path: '/precificacao',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OsFormularioRoute = OsFormularioRouteImport.update({
-  id: '/os/formulario',
-  path: '/os/formulario',
+const OrdensCompraRoute = OrdensCompraRouteImport.update({
+  id: '/ordens-compra',
+  path: '/ordens-compra',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdensRoute = OrdensRouteImport.update({
+  id: '/ordens',
+  path: '/ordens',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotasCompraRoute = NotasCompraRouteImport.update({
+  id: '/notas-compra',
+  path: '/notas-compra',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MovimentacoesRoute = MovimentacoesRouteImport.update({
+  id: '/movimentacoes',
+  path: '/movimentacoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogisticaRoute = LogisticaRouteImport.update({
+  id: '/logistica',
+  path: '/logistica',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndicadoresRoute = IndicadoresRouteImport.update({
+  id: '/indicadores',
+  path: '/indicadores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportacaoRoute = ImportacaoRouteImport.update({
+  id: '/importacao',
+  path: '/importacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HoleriteRoute = HoleriteRouteImport.update({
+  id: '/holerite',
+  path: '/holerite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FuncionariosRoute = FuncionariosRouteImport.update({
+  id: '/funcionarios',
+  path: '/funcionarios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FornecedoresRoute = FornecedoresRouteImport.update({
+  id: '/fornecedores',
+  path: '/fornecedores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FluxoCaixaRoute = FluxoCaixaRouteImport.update({
+  id: '/fluxo-caixa',
+  path: '/fluxo-caixa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FiscalRoute = FiscalRouteImport.update({
+  id: '/fiscal',
+  path: '/fiscal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceiroRoute = FinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DreRoute = DreRouteImport.update({
+  id: '/dre',
+  path: '/dre',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContasRoute = ContasRouteImport.update({
+  id: '/contas',
+  path: '/contas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComprasRoute = ComprasRouteImport.update({
+  id: '/compras',
+  path: '/compras',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientesRoute = ClientesRouteImport.update({
+  id: '/clientes',
+  path: '/clientes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtalhosRoute = AtalhosRouteImport.update({
+  id: '/atalhos',
+  path: '/atalhos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgendaRoute = AgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcessosRoute = AcessosRouteImport.update({
+  id: '/acessos',
+  path: '/acessos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VendasIndexRoute = VendasIndexRouteImport.update({
@@ -230,9 +200,9 @@ const VendasIndexRoute = VendasIndexRouteImport.update({
   path: '/vendas/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VendasIdRoute = VendasIdRouteImport.update({
-  id: '/vendas/$id',
-  path: '/vendas/$id',
+const VendasOrcamentosRoute = VendasOrcamentosRouteImport.update({
+  id: '/vendas/orcamentos',
+  path: '/vendas/orcamentos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VendasNovoRoute = VendasNovoRouteImport.update({
@@ -240,9 +210,39 @@ const VendasNovoRoute = VendasNovoRouteImport.update({
   path: '/vendas/novo',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VendasOrcamentosRoute = VendasOrcamentosRouteImport.update({
-  id: '/vendas/orcamentos',
-  path: '/vendas/orcamentos',
+const VendasIdRoute = VendasIdRouteImport.update({
+  id: '/vendas/$id',
+  path: '/vendas/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OsFormularioRoute = OsFormularioRouteImport.update({
+  id: '/os/formulario',
+  path: '/os/formulario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ObrasIdRoute = ObrasIdRouteImport.update({
+  id: '/obras/$id',
+  path: '/obras/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FiscalConfigRoute = FiscalConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
+  getParentRoute: () => FiscalRoute,
+} as any)
+const EstoqueRelatorioRoute = EstoqueRelatorioRouteImport.update({
+  id: '/estoque/relatorio',
+  path: '/estoque/relatorio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueInventarioRoute = EstoqueInventarioRouteImport.update({
+  id: '/estoque/inventario',
+  path: '/estoque/inventario',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstoqueEntradasRoute = EstoqueEntradasRouteImport.update({
+  id: '/estoque/entradas',
+  path: '/estoque/entradas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicAgendaTokenRoute = ApiPublicAgendaTokenRouteImport.update({
@@ -551,193 +551,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/acessos': {
-      id: '/acessos'
-      path: '/acessos'
-      fullPath: '/acessos'
-      preLoaderRoute: typeof AcessosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agenda': {
-      id: '/agenda'
-      path: '/agenda'
-      fullPath: '/agenda'
-      preLoaderRoute: typeof AgendaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/atalhos': {
-      id: '/atalhos'
-      path: '/atalhos'
-      fullPath: '/atalhos'
-      preLoaderRoute: typeof AtalhosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/clientes': {
-      id: '/clientes'
-      path: '/clientes'
-      fullPath: '/clientes'
-      preLoaderRoute: typeof ClientesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/compras': {
-      id: '/compras'
-      path: '/compras'
-      fullPath: '/compras'
-      preLoaderRoute: typeof ComprasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contas': {
-      id: '/contas'
-      path: '/contas'
-      fullPath: '/contas'
-      preLoaderRoute: typeof ContasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dre': {
-      id: '/dre'
-      path: '/dre'
-      fullPath: '/dre'
-      preLoaderRoute: typeof DreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/financeiro': {
-      id: '/financeiro'
-      path: '/financeiro'
-      fullPath: '/financeiro'
-      preLoaderRoute: typeof FinanceiroRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fiscal': {
-      id: '/fiscal'
-      path: '/fiscal'
-      fullPath: '/fiscal'
-      preLoaderRoute: typeof FiscalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fluxo-caixa': {
-      id: '/fluxo-caixa'
-      path: '/fluxo-caixa'
-      fullPath: '/fluxo-caixa'
-      preLoaderRoute: typeof FluxoCaixaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fornecedores': {
-      id: '/fornecedores'
-      path: '/fornecedores'
-      fullPath: '/fornecedores'
-      preLoaderRoute: typeof FornecedoresRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/funcionarios': {
-      id: '/funcionarios'
-      path: '/funcionarios'
-      fullPath: '/funcionarios'
-      preLoaderRoute: typeof FuncionariosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/holerite': {
-      id: '/holerite'
-      path: '/holerite'
-      fullPath: '/holerite'
-      preLoaderRoute: typeof HoleriteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/importacao': {
-      id: '/importacao'
-      path: '/importacao'
-      fullPath: '/importacao'
-      preLoaderRoute: typeof ImportacaoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/indicadores': {
-      id: '/indicadores'
-      path: '/indicadores'
-      fullPath: '/indicadores'
-      preLoaderRoute: typeof IndicadoresRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/logistica': {
-      id: '/logistica'
-      path: '/logistica'
-      fullPath: '/logistica'
-      preLoaderRoute: typeof LogisticaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/movimentacoes': {
-      id: '/movimentacoes'
-      path: '/movimentacoes'
-      fullPath: '/movimentacoes'
-      preLoaderRoute: typeof MovimentacoesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notas-compra': {
-      id: '/notas-compra'
-      path: '/notas-compra'
-      fullPath: '/notas-compra'
-      preLoaderRoute: typeof NotasCompraRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ordens': {
-      id: '/ordens'
-      path: '/ordens'
-      fullPath: '/ordens'
-      preLoaderRoute: typeof OrdensRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/ordens-compra': {
-      id: '/ordens-compra'
-      path: '/ordens-compra'
-      fullPath: '/ordens-compra'
-      preLoaderRoute: typeof OrdensCompraRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/precificacao': {
-      id: '/precificacao'
-      path: '/precificacao'
-      fullPath: '/precificacao'
-      preLoaderRoute: typeof PrecificacaoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/produtos': {
-      id: '/produtos'
-      path: '/produtos'
-      fullPath: '/produtos'
-      preLoaderRoute: typeof ProdutosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reativacao': {
-      id: '/reativacao'
-      path: '/reativacao'
-      fullPath: '/reativacao'
-      preLoaderRoute: typeof ReativacaoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/relatorio-contas': {
-      id: '/relatorio-contas'
-      path: '/relatorio-contas'
-      fullPath: '/relatorio-contas'
-      preLoaderRoute: typeof RelatorioContasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/resumo-periodo': {
@@ -747,53 +565,193 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResumoPeriodoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/estoque/entradas': {
-      id: '/estoque/entradas'
-      path: '/estoque/entradas'
-      fullPath: '/estoque/entradas'
-      preLoaderRoute: typeof EstoqueEntradasRouteImport
+    '/relatorio-contas': {
+      id: '/relatorio-contas'
+      path: '/relatorio-contas'
+      fullPath: '/relatorio-contas'
+      preLoaderRoute: typeof RelatorioContasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/estoque/inventario': {
-      id: '/estoque/inventario'
-      path: '/estoque/inventario'
-      fullPath: '/estoque/inventario'
-      preLoaderRoute: typeof EstoqueInventarioRouteImport
+    '/reativacao': {
+      id: '/reativacao'
+      path: '/reativacao'
+      fullPath: '/reativacao'
+      preLoaderRoute: typeof ReativacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/estoque/relatorio': {
-      id: '/estoque/relatorio'
-      path: '/estoque/relatorio'
-      fullPath: '/estoque/relatorio'
-      preLoaderRoute: typeof EstoqueRelatorioRouteImport
+    '/produtos': {
+      id: '/produtos'
+      path: '/produtos'
+      fullPath: '/produtos'
+      preLoaderRoute: typeof ProdutosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/fiscal/config': {
-      id: '/fiscal/config'
-      path: '/config'
-      fullPath: '/fiscal/config'
-      preLoaderRoute: typeof FiscalConfigRouteImport
-      parentRoute: typeof FiscalRoute
-    }
-    '/obras/$id': {
-      id: '/obras/$id'
-      path: '/obras/$id'
-      fullPath: '/obras/$id'
-      preLoaderRoute: typeof ObrasIdRouteImport
+    '/precificacao': {
+      id: '/precificacao'
+      path: '/precificacao'
+      fullPath: '/precificacao'
+      preLoaderRoute: typeof PrecificacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/os/formulario': {
-      id: '/os/formulario'
-      path: '/os/formulario'
-      fullPath: '/os/formulario'
-      preLoaderRoute: typeof OsFormularioRouteImport
+    '/ordens-compra': {
+      id: '/ordens-compra'
+      path: '/ordens-compra'
+      fullPath: '/ordens-compra'
+      preLoaderRoute: typeof OrdensCompraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ordens': {
+      id: '/ordens'
+      path: '/ordens'
+      fullPath: '/ordens'
+      preLoaderRoute: typeof OrdensRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notas-compra': {
+      id: '/notas-compra'
+      path: '/notas-compra'
+      fullPath: '/notas-compra'
+      preLoaderRoute: typeof NotasCompraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/movimentacoes': {
+      id: '/movimentacoes'
+      path: '/movimentacoes'
+      fullPath: '/movimentacoes'
+      preLoaderRoute: typeof MovimentacoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logistica': {
+      id: '/logistica'
+      path: '/logistica'
+      fullPath: '/logistica'
+      preLoaderRoute: typeof LogisticaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/indicadores': {
+      id: '/indicadores'
+      path: '/indicadores'
+      fullPath: '/indicadores'
+      preLoaderRoute: typeof IndicadoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/importacao': {
+      id: '/importacao'
+      path: '/importacao'
+      fullPath: '/importacao'
+      preLoaderRoute: typeof ImportacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/holerite': {
+      id: '/holerite'
+      path: '/holerite'
+      fullPath: '/holerite'
+      preLoaderRoute: typeof HoleriteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/funcionarios': {
+      id: '/funcionarios'
+      path: '/funcionarios'
+      fullPath: '/funcionarios'
+      preLoaderRoute: typeof FuncionariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fornecedores': {
+      id: '/fornecedores'
+      path: '/fornecedores'
+      fullPath: '/fornecedores'
+      preLoaderRoute: typeof FornecedoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fluxo-caixa': {
+      id: '/fluxo-caixa'
+      path: '/fluxo-caixa'
+      fullPath: '/fluxo-caixa'
+      preLoaderRoute: typeof FluxoCaixaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fiscal': {
+      id: '/fiscal'
+      path: '/fiscal'
+      fullPath: '/fiscal'
+      preLoaderRoute: typeof FiscalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/financeiro': {
+      id: '/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof FinanceiroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dre': {
+      id: '/dre'
+      path: '/dre'
+      fullPath: '/dre'
+      preLoaderRoute: typeof DreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contas': {
+      id: '/contas'
+      path: '/contas'
+      fullPath: '/contas'
+      preLoaderRoute: typeof ContasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compras': {
+      id: '/compras'
+      path: '/compras'
+      fullPath: '/compras'
+      preLoaderRoute: typeof ComprasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clientes': {
+      id: '/clientes'
+      path: '/clientes'
+      fullPath: '/clientes'
+      preLoaderRoute: typeof ClientesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/atalhos': {
+      id: '/atalhos'
+      path: '/atalhos'
+      fullPath: '/atalhos'
+      preLoaderRoute: typeof AtalhosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agenda': {
+      id: '/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/acessos': {
+      id: '/acessos'
+      path: '/acessos'
+      fullPath: '/acessos'
+      preLoaderRoute: typeof AcessosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/vendas/': {
@@ -803,11 +761,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VendasIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vendas/$id': {
-      id: '/vendas/$id'
-      path: '/vendas/$id'
-      fullPath: '/vendas/$id'
-      preLoaderRoute: typeof VendasIdRouteImport
+    '/vendas/orcamentos': {
+      id: '/vendas/orcamentos'
+      path: '/vendas/orcamentos'
+      fullPath: '/vendas/orcamentos'
+      preLoaderRoute: typeof VendasOrcamentosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/vendas/novo': {
@@ -817,11 +775,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VendasNovoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vendas/orcamentos': {
-      id: '/vendas/orcamentos'
-      path: '/vendas/orcamentos'
-      fullPath: '/vendas/orcamentos'
-      preLoaderRoute: typeof VendasOrcamentosRouteImport
+    '/vendas/$id': {
+      id: '/vendas/$id'
+      path: '/vendas/$id'
+      fullPath: '/vendas/$id'
+      preLoaderRoute: typeof VendasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/os/formulario': {
+      id: '/os/formulario'
+      path: '/os/formulario'
+      fullPath: '/os/formulario'
+      preLoaderRoute: typeof OsFormularioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/obras/$id': {
+      id: '/obras/$id'
+      path: '/obras/$id'
+      fullPath: '/obras/$id'
+      preLoaderRoute: typeof ObrasIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fiscal/config': {
+      id: '/fiscal/config'
+      path: '/config'
+      fullPath: '/fiscal/config'
+      preLoaderRoute: typeof FiscalConfigRouteImport
+      parentRoute: typeof FiscalRoute
+    }
+    '/estoque/relatorio': {
+      id: '/estoque/relatorio'
+      path: '/estoque/relatorio'
+      fullPath: '/estoque/relatorio'
+      preLoaderRoute: typeof EstoqueRelatorioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque/inventario': {
+      id: '/estoque/inventario'
+      path: '/estoque/inventario'
+      fullPath: '/estoque/inventario'
+      preLoaderRoute: typeof EstoqueInventarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estoque/entradas': {
+      id: '/estoque/entradas'
+      path: '/estoque/entradas'
+      fullPath: '/estoque/entradas'
+      preLoaderRoute: typeof EstoqueEntradasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/agenda/$token': {
