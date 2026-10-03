@@ -1193,7 +1193,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 [&_[data-slot=select-trigger]]:w-full [&_[data-slot=select-trigger]]:min-w-0 [&_[data-slot=select-value]]:truncate">
       {!comparativoId && <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Novo Pedido (PDV)" subtitle={`Pedido ${numero}`} />
         <div className="flex items-center gap-3">
@@ -1205,7 +1205,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
       </div>}
 
       <div className={comparativoId ? "grid gap-4 xl:grid-cols-3" : "space-y-4"}>
-        <div className="space-y-4 xl:col-span-2">
+        <div className="min-w-0 space-y-4 xl:col-span-2 [&_[data-slot=card-content]>div]:min-w-0 [&_[data-slot=card-content]>div>div]:min-w-0">
           {!comparativoId && <>
           <ExpandableCard>
             <CardHeader className="pr-12">
@@ -1222,18 +1222,13 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="in">
-                      IN — Balcão (produtos, baixa direta do estoque)
+                      IN — Balcão
                     </SelectItem>
                     <SelectItem value="out">
-                      OUT — Venda + serviço externo (gera ordem de serviço)
+                      OUT — Venda + serviço externo
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {tipoAtendimento === "in"
-                    ? "Ao salvar, os itens saem do estoque na hora e nenhuma obra é criada."
-                    : "Ao salvar, uma ordem de serviço é aberta para a instalação/obra deste pedido."}
-                </p>
               </Field>
 
               <Field label="Nº do pedido">
@@ -1309,8 +1304,8 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                   <CardTitle className="whitespace-nowrap text-xl tracking-tight">Itens do Pedido</CardTitle>
                 </div>
 
-                <div className="flex flex-1 items-center gap-3 lg:max-w-2xl">
-                  <Field label="Produto" className="flex-1">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 lg:max-w-2xl">
+                  <Field label="Produto" className="min-w-0 flex-1">
                     <div className="relative flex items-center gap-2">
                       <Popover open={produtoAberto} onOpenChange={setProdutoAberto}>
                         <PopoverTrigger asChild>
@@ -1318,7 +1313,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                             variant="outline"
                             role="combobox"
                             aria-expanded={produtoAberto}
-                            className="relative flex-1 justify-start bg-muted/50 pl-10 font-normal"
+                            className="relative min-w-0 flex-1 justify-start bg-muted/50 pl-10 font-normal"
                           >
                             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <span className="truncate text-left">

@@ -17,6 +17,7 @@
 - [x] Integrar execução e baixa de ordens de compra com Contas a Pagar sem duplicidade
 - [x] Exigir um vínculo de destino para cada unidade selecionada na ordem de compra
 - [x] Botão "Gerar compra"' no pedido: uma O.C. por fornecedor, com vínculo, cor e pastilha
-- [ ] Retirar composição e resumos da redação e preservar comparativos após salvar, junto ao histórico
-- [ ] Confirmar venda com baixa de estoque e compras por fornecedor, sem duplicidade
-- [ ] Verificar visualização e confirmação do pedido
+- [x] Retirar composição e resumos da redação e preservar comparativos após salvar, junto ao histórico
+- [x] Confirmar venda com baixa de estoque e compras por fornecedor, sem duplicidade
+- [x] Verificar visualização autenticada e bloqueio de pedido vazio
+- [ ] Executar confirmação real de novo pedido — aguarda uma venda de teste autorizada para não criar compras/baixar estoque real
