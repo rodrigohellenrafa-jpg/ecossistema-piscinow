@@ -11,6 +11,7 @@ import { AssinaturaDialog } from "@/components/assinatura-dialog";
 import { DocumentosVenda } from "@/components/documentos-venda";
 import { EnviarOrcamento } from "@/components/enviar-orcamento";
 import { HistoricoVenda } from "@/components/historico-venda";
+import { GerarCompraPedido } from "@/components/gerar-compra-pedido";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
@@ -655,6 +656,14 @@ function DetalhePedido() {
             condicoes={condicoes as never}
             empresa={{ nome: "Splash Jardim do Trevo" }}
           />
+          {venda.status_pedido !== "orcamento" && (
+            <GerarCompraPedido
+              vendaId={id}
+              vendaNumero={venda.numero}
+              clienteId={venda.cliente_id}
+              clienteNome={venda.cliente_nome}
+            />
+          )}
           <Button variant="ghost" onClick={() => window.print()}>
             <Printer /> Espelho fiscal
           </Button>
