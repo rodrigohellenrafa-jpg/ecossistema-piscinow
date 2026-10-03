@@ -645,7 +645,8 @@ function NovoPedido() {
   // ----- Rascunho salvo no banco como orçamento não concluído -----
   useEffect(() => {
     if (!rascunhoPronto) return;
-    if (!clienteId && itens.length === 0) return;
+    // Só guarda rascunho quando já existe ao menos um produto — nunca grava venda vazia.
+    if (!clienteId || itens.length === 0) return;
     const timer = setTimeout(async () => {
       try {
         const cabecalho = {
