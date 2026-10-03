@@ -413,6 +413,24 @@ function Vendas() {
                 </div>
                 <Input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="w-40" />
                 <Input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="w-40" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={inicio === primeiroDiaMes() && fim === ultimoDiaMes() ? "border-primary text-primary" : ""}
+                  onClick={() => { setInicio(primeiroDiaMes()); setFim(ultimoDiaMes()); }}
+                >
+                  Este mês
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { const [i, f] = mesAnterior(); setInicio(i); setFim(f); }}
+                >
+                  Mês anterior
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => { setInicio(""); setFim(""); }}>
+                  Todos
+                </Button>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Status" />
