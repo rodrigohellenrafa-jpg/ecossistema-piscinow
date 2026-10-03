@@ -73,9 +73,19 @@ export function GerarCompraPedido({
         .select("produto_id, quantidade")
         .eq("venda_id", vendaId);
       if (e2) throw e2;
+      const { data: baixas, error: erroBaixas } = await supabase
+        .from("estoque_movimentos")
+        .select("produto_id, quantidade")
+        .eq("origem", "venda")
+        .eq("tipo", "saida")
+        .eq("documento", vendaNumero ?? "");
+      if (erroBaixas) throw erroBaixas;
       const jaPorProduto = new Map<string, number>();
       for (const c of comprados ?? []) {
         if (c.produto_id) jaPorProduto.set(c.produto_id, (jaPorProduto.get(c.produto_id) ?? 0) + Number(c.quantidade));
+      }
+      for (const b of baixas ?? []) {
+        jaPorProduto.set(b.produto_id, (jaPorProduto.get(b.produto_id) ?? 0) + Number(b.quantidade));
       }
       const mapa = new Map<string, Linha>();
       for (const it of itens ?? []) {

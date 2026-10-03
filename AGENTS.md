@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Reuse the sales composition form for post-save comparisons; comparison writes must only update the kit reference, never sale totals or payments.
+- Run stock and supplier purchases atomically through the authenticated processar_compra_estoque_venda RPC, guarded per sale; only an explicit sale confirmation enables processing.
