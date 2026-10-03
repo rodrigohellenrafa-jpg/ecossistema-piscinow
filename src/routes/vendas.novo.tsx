@@ -843,7 +843,7 @@ function NovoPedido() {
   const salvar = useMutation({
     mutationFn: async (modo: "pedido" | "venda" = "pedido") => {
       if (!clienteId) throw new Error("Selecione o cliente.");
-      if (itens.length === 0 && !cascoId) throw new Error("Adicione ao menos um item ou monte o kit.");
+      if (itens.length === 0) throw new Error("Adicione ao menos um produto antes de salvar.");
       if (contasBancarias.length > 0) {
         const norm = (s: string) => s.trim().toLowerCase();
         const validas = new Set(contasBancarias.map(norm));
