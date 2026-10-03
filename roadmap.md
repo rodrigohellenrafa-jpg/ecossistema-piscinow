@@ -16,3 +16,4 @@
 - [x] Resumir a tela inicial em agenda, saldo e fluxo, contas do dia e ponto de equilíbrio
 - [x] Integrar execução e baixa de ordens de compra com Contas a Pagar sem duplicidade
 - [x] Exigir um vínculo de destino para cada unidade selecionada na ordem de compra
+- [ ] Botão 'Gerar compra' no pedido: uma O.C. por fornecedor, com vínculo, cor e pastilha
