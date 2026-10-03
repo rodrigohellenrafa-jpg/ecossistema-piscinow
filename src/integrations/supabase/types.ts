@@ -2318,6 +2318,7 @@ export type Database = {
         Row: {
           acessorios: Json
           casco_id: string | null
+          comparativo: Json
           created_at: string
           custo_frete: number
           custo_mao_obra: number
@@ -2332,6 +2333,7 @@ export type Database = {
         Insert: {
           acessorios?: Json
           casco_id?: string | null
+          comparativo?: Json
           created_at?: string
           custo_frete?: number
           custo_mao_obra?: number
@@ -2346,6 +2348,7 @@ export type Database = {
         Update: {
           acessorios?: Json
           casco_id?: string | null
+          comparativo?: Json
           created_at?: string
           custo_frete?: number
           custo_mao_obra?: number
@@ -2447,6 +2450,7 @@ export type Database = {
           assinatura_nome: string | null
           cliente_id: string | null
           cliente_nome: string | null
+          compra_estoque_processado_em: string | null
           created_at: string
           created_by: string | null
           custo_total: number
@@ -2486,6 +2490,7 @@ export type Database = {
           assinatura_nome?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
+          compra_estoque_processado_em?: string | null
           created_at?: string
           created_by?: string | null
           custo_total?: number
@@ -2525,6 +2530,7 @@ export type Database = {
           assinatura_nome?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
+          compra_estoque_processado_em?: string | null
           created_at?: string
           created_by?: string | null
           custo_total?: number
@@ -2588,6 +2594,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      processar_compra_estoque_venda: {
+        Args: { p_venda_id: string }
+        Returns: Json
       }
       proximo_numero_venda: { Args: never; Returns: string }
       selecionar_obra_board: {
