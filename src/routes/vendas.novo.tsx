@@ -2122,20 +2122,6 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
             </CardContent>
           </Card>
 
-        </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Kit piscina (prévia — não soma ao total)
-                </span>
-                <span>{brl(precoVendaKit)}</span>
-              </div>
-
-              <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
-                <span>Total</span>
-                <span>{brl(valorTotal)}</span>
-              </div>
-            </CardContent>
-          </Card>
         </div>}
       </div>
     </div>
