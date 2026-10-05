@@ -469,6 +469,10 @@ function OrdensCompra() {
       if (!Number.isFinite(valor) || valor === 0) throw new Error("Informe o valor do pagamento");
       if (!novoPagamento.conta_bancaria)
         throw new Error("Escolha a conta de onde o dinheiro saiu");
+      if ((novoPagamento.data_pagamento || hojeISO()) > hojeISO())
+        throw new Error(
+          "Pagamento com data futura (ex.: boleto a vencer) não é pagamento realizado. Deixe o valor em aberto em Contas a Pagar e registre aqui só quando pagar.",
+        );
       const payload = {
         ordem_id: detalheId,
         data_pagamento: novoPagamento.data_pagamento || hojeISO(),
@@ -1278,6 +1282,27 @@ function OrdensCompra() {
 
   const removerItemEdicao = (idx: number) => {
     setFormEdicao((f) => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
+  };
+
+  /** Separa unidades de um item em linhas próprias, cada uma com seu vínculo (individual ou lote). */
+  const separarItemEdicao = (idx: number, todas: boolean) => {
+    setFormEdicao((f) => {
+      const itens = [...f.itens];
+      const item = itens[idx];
+      const qtd = Math.trunc(Number(item.quantidade) || 0);
+      if (qtd < 2) return f;
+      const descUnit = Number(item.desconto || 0) / Number(item.quantidade);
+      const copia = (q: number) => {
+        const { id: _id, ...resto } = item as typeof item & { id?: string };
+        return { ...resto, quantidade: q, desconto: Number((descUnit * q).toFixed(2)) };
+      };
+      const novos = todas
+        ? Array.from({ length: qtd }, () => copia(1))
+        : [copia(qtd - 1), { ...copia(1), cliente_id: null, cliente_nome: null }];
+      if (!todas) novos[0] = { ...item, quantidade: qtd - 1, desconto: Number((descUnit * (qtd - 1)).toFixed(2)) };
+      itens.splice(idx, 1, ...novos);
+      return { ...f, itens };
+    });
   };
 
   const alterarCorItemEdicao = (idx: number, valor: string) => {
@@ -3103,13 +3128,35 @@ function OrdensCompra() {
                             {brl(i.quantidade * i.valor_unitario - i.desconto)}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removerItemEdicao(idx)}
-                            >
-                              <Trash2 className="text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              {Math.trunc(Number(i.quantidade)) >= 2 ? (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    title="Separa 1 unidade em outra linha para dar outro vínculo (repita para formar lotes)"
+                                    onClick={() => separarItemEdicao(idx, false)}
+                                  >
+                                    Separar 1
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    title="Cria uma linha por unidade, cada uma com seu vínculo"
+                                    onClick={() => separarItemEdicao(idx, true)}
+                                  >
+                                    1 por un.
+                                  </Button>
+                                </>
+                              ) : null}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => removerItemEdicao(idx)}
+                              >
+                                <Trash2 className="text-destructive" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
