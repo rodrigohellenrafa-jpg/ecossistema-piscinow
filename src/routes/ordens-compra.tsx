@@ -1075,6 +1075,8 @@ function OrdensCompra() {
             produtoCompraForm.fornecedor_id === SEM_CLIENTE
               ? null
               : produtoCompraForm.fornecedor_id,
+          ncm: produtoCompraForm.ncm.trim() || null,
+          cst: produtoCompraForm.cst.trim() || null,
         })
         .eq("id", produtoCompraEditando.id);
       if (error) throw error;
@@ -2372,6 +2374,7 @@ function OrdensCompra() {
                     <TableHead>NCM</TableHead>
                     <TableHead>CST</TableHead>
                     <TableHead>Unid.</TableHead>
+                    <TableHead className="print:hidden">Ações</TableHead>
                     <TableHead className="text-right">Qtd</TableHead>
                     <TableHead className="text-right">Vlr Unit</TableHead>
                     <TableHead className="text-right">Desconto</TableHead>
