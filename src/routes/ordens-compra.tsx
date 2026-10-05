@@ -161,6 +161,13 @@ type Item = {
   pastilha: string | null;
 };
 
+type NotaOrdem = {
+  id: string;
+  ordem_id: string;
+  numero_nf: string | null;
+  valor: number;
+};
+
 type Fornecedor = {
   id: string;
   nome: string;
@@ -376,6 +383,21 @@ function OrdensCompra() {
         .order("data_pagamento");
       if (error) throw error;
       return data;
+    },
+  });
+
+  /** Notas fiscais lançadas na ordem aberta (meia nota / múltiplas notas). */
+  const notasOrdem = useQuery({
+    queryKey: ["ordem_compra_notas", detalheId],
+    enabled: !!detalheId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("ordem_compra_notas")
+        .select("*")
+        .eq("ordem_id", detalheId!)
+        .order("created_at");
+      if (error) throw error;
+      return data as NotaOrdem[];
     },
   });
 
