@@ -1622,6 +1622,9 @@ function OrdensCompra() {
                 ))}
               </SelectContent>
             </Select>
+            <Button onClick={() => setNovaOpen(true)}>
+              <Plus /> Nova ordem de compra
+            </Button>
           </div>
         }
       />
