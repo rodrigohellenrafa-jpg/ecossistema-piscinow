@@ -1533,6 +1533,38 @@ export type Database = {
           },
         ]
       }
+      ordem_compra_notas: {
+        Row: {
+          created_at: string
+          id: string
+          numero_nf: string | null
+          ordem_id: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          numero_nf?: string | null
+          ordem_id: string
+          valor?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          numero_nf?: string | null
+          ordem_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordem_compra_notas_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ordem_compra_pagamentos: {
         Row: {
           comprovante_path: string | null

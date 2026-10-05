@@ -161,6 +161,13 @@ type Item = {
   pastilha: string | null;
 };
 
+type NotaOrdem = {
+  id: string;
+  ordem_id: string;
+  numero_nf: string | null;
+  valor: number;
+};
+
 type Fornecedor = {
   id: string;
   nome: string;
@@ -376,6 +383,21 @@ function OrdensCompra() {
         .order("data_pagamento");
       if (error) throw error;
       return data;
+    },
+  });
+
+  /** Notas fiscais lançadas na ordem aberta (meia nota / múltiplas notas). */
+  const notasOrdem = useQuery({
+    queryKey: ["ordem_compra_notas", detalheId],
+    enabled: !!detalheId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("ordem_compra_notas")
+        .select("*")
+        .eq("ordem_id", detalheId!)
+        .order("created_at");
+      if (error) throw error;
+      return data as NotaOrdem[];
     },
   });
 
@@ -759,6 +781,14 @@ function OrdensCompra() {
   const fornecedorDetalhe = ordemDetalhe?.fornecedor_id
     ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
     : null;
+
+  /** Total faturado nas notas da ordem; sem notas lançadas, cai para o valor único antigo. */
+  const notasLista = notasOrdem.data ?? [];
+  const totalNotas =
+    notasLista.length > 0
+      ? notasLista.reduce((s, n) => s + Number(n.valor ?? 0), 0)
+      : Number(ordemDetalhe?.valor_nota ?? 0);
+
 
   const fornecedorDaCompra = (produto: Produto) => {
     const categoria = normalizar(produto.categoria ?? "");
@@ -1397,6 +1427,88 @@ function OrdensCompra() {
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
+
+  /** Recalcula o valor faturado na nota (soma das NFs lançadas) e grava na ordem. */
+  const sincronizarValorNota = async (ordemId: string) => {
+    const { data: notas } = await (supabase as any)
+      .from("ordem_compra_notas")
+      .select("valor")
+      .eq("ordem_id", ordemId);
+    const total = (notas ?? []).reduce(
+      (s: number, n: { valor: number | string | null }) => s + Number(n.valor ?? 0),
+      0,
+    );
+    const { error } = await supabase
+      .from("ordens_compra")
+      .update({ valor_nota: total } as never)
+      .eq("id", ordemId);
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+  };
+
+  const adicionarNota = useMutation({
+    mutationFn: async () => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const primeira = (notasOrdem.data ?? []).length === 0;
+      const { error } = await (supabase as any).from("ordem_compra_notas").insert({
+        ordem_id: ordemDetalhe.id,
+        valor: primeira ? Number(ordemDetalhe.valor_nota ?? 0) : 0,
+      });
+      if (error) throw error;
+      await sincronizarValorNota(ordemDetalhe.id);
+    },
+    onSuccess: () => {
+      toast.success("Nota adicionada");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_notas", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const atualizarNota = useMutation({
+    mutationFn: async ({
+      id,
+      campo,
+      valor,
+    }: {
+      id: string;
+      campo: "numero_nf" | "valor";
+      valor: string;
+    }) => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const patch =
+        campo === "valor"
+          ? { valor: Number(valor) || 0 }
+          : { numero_nf: valor.trim() || null };
+      const { error } = await (supabase as any)
+        .from("ordem_compra_notas")
+        .update(patch)
+        .eq("id", id);
+      if (error) throw error;
+      await sincronizarValorNota(ordemDetalhe.id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ordem_compra_notas", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const excluirNota = useMutation({
+    mutationFn: async (id: string) => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const { error } = await (supabase as any)
+        .from("ordem_compra_notas")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      await sincronizarValorNota(ordemDetalhe.id);
+    },
+    onSuccess: () => {
+      toast.success("Nota removida");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_notas", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
 
   /** Salva automaticamente quantidade, valor, desconto e status de compra do produto. */
   const atualizarCompra = useMutation({
@@ -2338,19 +2450,74 @@ function OrdensCompra() {
                     diferença fica registrada como pagamento fora da nota.
                   </p>
                 </div>
-                <Field label="Valor faturado na nota (R$)">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    defaultValue={Number(ordemDetalhe.valor_nota ?? 0)}
-                    onBlur={(e) =>
-                      atualizarIcms.mutate({
-                        id: ordemDetalhe.id,
-                        valor_nota: Number(e.target.value) || 0,
-                      })
-                    }
-                  />
-                </Field>
+                <div className="sm:col-span-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Notas fiscais do fornecedor</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => adicionarNota.mutate()}
+                      disabled={adicionarNota.isPending}
+                    >
+                      <Plus className="size-4" /> Adicionar nota
+                    </Button>
+                  </div>
+                  {notasLista.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Nenhuma nota lançada. Clique em "Adicionar nota" para lançar o valor
+                      faturado de cada NF — a primeira já vem com o valor atual.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {notasLista.map((nota, idx) => (
+                        <div key={nota.id} className="flex flex-wrap items-center gap-2">
+                          <Input
+                            className="max-w-52"
+                            placeholder={`Número da NF ${idx + 1}`}
+                            defaultValue={nota.numero_nf ?? ""}
+                            onBlur={(e) => {
+                              if ((nota.numero_nf ?? "") !== e.target.value)
+                                atualizarNota.mutate({
+                                  id: nota.id,
+                                  campo: "numero_nf",
+                                  valor: e.target.value,
+                                });
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="max-w-40"
+                            aria-label={`Valor da NF ${idx + 1}`}
+                            defaultValue={Number(nota.valor ?? 0)}
+                            onBlur={(e) => {
+                              if (Number(nota.valor ?? 0) !== Number(e.target.value))
+                                atualizarNota.mutate({
+                                  id: nota.id,
+                                  campo: "valor",
+                                  valor: e.target.value,
+                                });
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`Excluir NF ${idx + 1}`}
+                            onClick={() => excluirNota.mutate(nota.id)}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between border-t border-border pt-2 text-xs">
+                    <span className="text-muted-foreground">Total faturado em notas</span>
+                    <span className="font-medium">{brl(totalNotas)}</span>
+                  </div>
+                </div>
                 <Field label="Valor pago ao fornecedor (R$)">
                   <Input
                     type="number"
@@ -2367,9 +2534,7 @@ function OrdensCompra() {
                 <div>
                   <p className="text-xs text-muted-foreground">Diferença fora da nota</p>
                   <p className="font-medium">
-                    {brl(
-                      Number(ordemDetalhe.valor_pago ?? 0) - Number(ordemDetalhe.valor_nota ?? 0),
-                    )}
+                    {brl(Number(ordemDetalhe.valor_pago ?? 0) - totalNotas)}
                   </p>
                 </div>
                 <Field label="Observação do pagamento" className="sm:col-span-3">
