@@ -3440,6 +3440,183 @@ function OrdensCompra() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={novaOpen} onOpenChange={setNovaOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Nova ordem de compra</DialogTitle>
+            <DialogDescription>
+              Itens com Cliente "Estoque (sem cliente)" entram como reposição de estoque.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Fornecedor">
+              <Select
+                value={novaOrdem.fornecedor_id}
+                onValueChange={(v) => setNovaOrdem((f) => ({ ...f, fornecedor_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fornecedores.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Previsão de entrega">
+              <Input
+                type="date"
+                value={novaOrdem.previsao_entrega}
+                onChange={(e) => setNovaOrdem((f) => ({ ...f, previsao_entrega: e.target.value }))}
+              />
+            </Field>
+            <Field label="Condições">
+              <Input
+                value={novaOrdem.condicoes}
+                onChange={(e) => setNovaOrdem((f) => ({ ...f, condicoes: e.target.value }))}
+                placeholder="30/60 dias, boleto..."
+              />
+            </Field>
+            <Field label="Observações">
+              <Input
+                value={novaOrdem.observacoes}
+                onChange={(e) => setNovaOrdem((f) => ({ ...f, observacoes: e.target.value }))}
+              />
+            </Field>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <p className="text-sm font-medium">Adicionar item</p>
+            <div className="grid gap-2 sm:grid-cols-4">
+              <Select
+                value={novoItem.produto_id}
+                onValueChange={(v) =>
+                  setNovoItem((i) => ({
+                    ...i,
+                    produto_id: v,
+                    valor_unitario: String(produtos.find((p) => p.id === v)?.preco_custo ?? i.valor_unitario),
+                    cor: produtos.find((p) => p.id === v)?.cor_pastilha ?? i.cor,
+                    pastilha: produtos.find((p) => p.id === v)?.modelo_pastilha ?? i.pastilha,
+                  }))
+                }
+              >
+                <SelectTrigger className="sm:col-span-2">
+                  <SelectValue placeholder="Produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {produtos.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.codigo ? `${p.codigo} — ` : ""}
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={novoItem.cliente_id}
+                onValueChange={(v) => setNovoItem((i) => ({ ...i, cliente_id: v }))}
+              >
+                <SelectTrigger className="sm:col-span-2">
+                  <SelectValue placeholder="Cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SEM_CLIENTE}>Estoque (sem cliente)</SelectItem>
+                  {clientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                placeholder="Qtd"
+                aria-label="Quantidade"
+                value={novoItem.quantidade}
+                onChange={(e) => setNovoItem((i) => ({ ...i, quantidade: e.target.value }))}
+              />
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Vlr unitário"
+                aria-label="Valor unitário"
+                value={novoItem.valor_unitario}
+                onChange={(e) => setNovoItem((i) => ({ ...i, valor_unitario: e.target.value }))}
+              />
+              <Input
+                placeholder="Cor"
+                value={novoItem.cor}
+                onChange={(e) => setNovoItem((i) => ({ ...i, cor: e.target.value }))}
+              />
+              <Input
+                placeholder="Pastilha"
+                value={novoItem.pastilha}
+                onChange={(e) => setNovoItem((i) => ({ ...i, pastilha: e.target.value }))}
+              />
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={adicionarItemNovaOrdem}>
+              <Plus className="size-4" /> Adicionar item
+            </Button>
+            {itensNovaOrdem.length > 0 && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Qtd</TableHead>
+                    <TableHead className="text-right">Vlr Unit</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {itensNovaOrdem.map((i, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{i.descricao}</TableCell>
+                      <TableCell>{i.cliente_nome ?? "Estoque"}</TableCell>
+                      <TableCell className="text-right">{i.quantidade}</TableCell>
+                      <TableCell className="text-right">{brl(i.valor_unitario)}</TableCell>
+                      <TableCell className="text-right">
+                        {brl(i.quantidade * i.valor_unitario - i.desconto)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Remover item"
+                          onClick={() =>
+                            setItensNovaOrdem((it) => it.filter((_, k) => k !== idx))
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            <p className="text-right text-sm font-semibold">
+              Total:{" "}
+              {brl(
+                itensNovaOrdem.reduce((s, i) => s + i.quantidade * i.valor_unitario - i.desconto, 0),
+              )}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNovaOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => criarOrdem.mutate()} disabled={criarOrdem.isPending}>
+              <Save className="size-4" /> Criar ordem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
