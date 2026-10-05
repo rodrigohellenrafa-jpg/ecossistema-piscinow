@@ -3269,6 +3269,24 @@ function OrdensCompra() {
                 }
               />
             </Field>
+            <Field label="NCM">
+              <Input
+                value={produtoCompraForm.ncm}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, ncm: evento.target.value }))
+                }
+                placeholder="Ex.: 32091010"
+              />
+            </Field>
+            <Field label="CST">
+              <Input
+                value={produtoCompraForm.cst}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, cst: evento.target.value }))
+                }
+                placeholder="Ex.: 010"
+              />
+            </Field>
             <Field label="Fornecedor" className="sm:col-span-2">
               <Select
                 value={produtoCompraForm.fornecedor_id}
