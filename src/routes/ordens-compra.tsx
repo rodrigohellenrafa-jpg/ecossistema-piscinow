@@ -780,12 +780,27 @@ function OrdensCompra() {
   };
 
   const produtosFiltrados = useMemo(() => {
-    const busca = normalizar(buscaFornecedor.trim());
-    if (!busca) return produtos;
-    return produtos.filter((produto) =>
-      normalizar(fornecedorDaCompra(produto)?.nome ?? "").includes(busca),
-    );
-  }, [produtos, fornecedores, buscaFornecedor]);
+    if (!termoBusca) return produtos;
+    return produtos.filter((produto) => {
+      if (normalizar(fornecedorDaCompra(produto)?.nome ?? "").includes(termoBusca)) return true;
+      if (
+        normalizar(produto.nome).includes(termoBusca) ||
+        normalizar(produto.codigo ?? "").includes(termoBusca)
+      )
+        return true;
+      const vendaVinculo = produto.venda_vinculo_id
+        ? vendaPorId.get(produto.venda_vinculo_id)
+        : undefined;
+      if (
+        vendaVinculo &&
+        (normalizar(vendaVinculo.numero ?? "").includes(termoBusca) ||
+          normalizar(vendaVinculo.cliente_nome ?? "").includes(termoBusca))
+      )
+        return true;
+      const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
+      return pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
+    });
+  }, [produtos, fornecedores, termoBusca, vendaPorId, demandaPorProduto]);
 
   const quantidadeCompra = (produto: Produto) => {
     const valor = quantidadesCompra[produto.id];
@@ -1587,9 +1602,9 @@ function OrdensCompra() {
             <div className="relative min-w-56 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                aria-label="Buscar por fornecedor"
-                className="pl-9 sm:w-64"
-                placeholder="Buscar por fornecedor"
+                aria-label="Buscar por fornecedor, cliente, produto ou vínculo"
+                className="pl-9 sm:w-72"
+                placeholder="Buscar por fornecedor, cliente, produto ou vínculo"
                 value={buscaFornecedor}
                 onChange={(evento) => setBuscaFornecedor(evento.target.value)}
               />
