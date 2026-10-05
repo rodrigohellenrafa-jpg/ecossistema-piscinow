@@ -782,6 +782,14 @@ function OrdensCompra() {
     ? (fornecedores.find((f) => f.id === ordemDetalhe.fornecedor_id) ?? null)
     : null;
 
+  /** Total faturado nas notas da ordem; sem notas lançadas, cai para o valor único antigo. */
+  const notasLista = notasOrdem.data ?? [];
+  const totalNotas =
+    notasLista.length > 0
+      ? notasLista.reduce((s, n) => s + Number(n.valor ?? 0), 0)
+      : Number(ordemDetalhe?.valor_nota ?? 0);
+
+
   const fornecedorDaCompra = (produto: Produto) => {
     const categoria = normalizar(produto.categoria ?? "");
     const nome = normalizar(produto.nome);
