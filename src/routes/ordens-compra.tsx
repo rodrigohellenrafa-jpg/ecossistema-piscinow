@@ -1428,6 +1428,88 @@ function OrdensCompra() {
     onError: (erro: Error) => toast.error(erro.message),
   });
 
+  /** Recalcula o valor faturado na nota (soma das NFs lançadas) e grava na ordem. */
+  const sincronizarValorNota = async (ordemId: string) => {
+    const { data: notas } = await (supabase as any)
+      .from("ordem_compra_notas")
+      .select("valor")
+      .eq("ordem_id", ordemId);
+    const total = (notas ?? []).reduce(
+      (s: number, n: { valor: number | string | null }) => s + Number(n.valor ?? 0),
+      0,
+    );
+    const { error } = await supabase
+      .from("ordens_compra")
+      .update({ valor_nota: total } as never)
+      .eq("id", ordemId);
+    if (error) throw error;
+    qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+  };
+
+  const adicionarNota = useMutation({
+    mutationFn: async () => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const primeira = (notasOrdem.data ?? []).length === 0;
+      const { error } = await (supabase as any).from("ordem_compra_notas").insert({
+        ordem_id: ordemDetalhe.id,
+        valor: primeira ? Number(ordemDetalhe.valor_nota ?? 0) : 0,
+      });
+      if (error) throw error;
+      await sincronizarValorNota(ordemDetalhe.id);
+    },
+    onSuccess: () => {
+      toast.success("Nota adicionada");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_notas", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const atualizarNota = useMutation({
+    mutationFn: async ({
+      id,
+      campo,
+      valor,
+    }: {
+      id: string;
+      campo: "numero_nf" | "valor";
+      valor: string;
+    }) => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const patch =
+        campo === "valor"
+          ? { valor: Number(valor) || 0 }
+          : { numero_nf: valor.trim() || null };
+      const { error } = await (supabase as any)
+        .from("ordem_compra_notas")
+        .update(patch)
+        .eq("id", id);
+      if (error) throw error;
+      await sincronizarValorNota(ordemDetalhe.id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ordem_compra_notas", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const excluirNota = useMutation({
+    mutationFn: async (id: string) => {
+      if (!ordemDetalhe) throw new Error("Ordem não encontrada");
+      const { error } = await (supabase as any)
+        .from("ordem_compra_notas")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      await sincronizarValorNota(ordemDetalhe.id);
+    },
+    onSuccess: () => {
+      toast.success("Nota removida");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_notas", detalheId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
   /** Salva automaticamente quantidade, valor, desconto e status de compra do produto. */
   const atualizarCompra = useMutation({
     mutationFn: async ({ id, campo, valor }: { id: string; campo: string; valor: number | string }) => {
