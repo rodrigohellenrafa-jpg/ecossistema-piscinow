@@ -649,14 +649,34 @@ function OrdensCompra() {
   }, [consumoItens, vendaPorId]);
 
 
+  const termoBusca = useMemo(() => normalizar(buscaFornecedor.trim()), [buscaFornecedor]);
+
   const ordensFiltradas = useMemo(() => {
-    const busca = normalizar(buscaFornecedor.trim());
-    return ordens.filter(
-      (ordem) =>
-        (filtroStatus === "todas" || ordem.status === filtroStatus) &&
-        (!busca || normalizar(ordem.fornecedor_nome ?? "").includes(busca)),
-    );
-  }, [ordens, filtroStatus, buscaFornecedor]);
+    const casaStatus = (ordem: Ordem) =>
+      filtroStatus === "todas" || ordem.status === filtroStatus;
+    if (!termoBusca) return ordens.filter(casaStatus);
+
+    const itensPorOrdem = new Map<string, Item[]>();
+    for (const it of itensTodos) {
+      const lista = itensPorOrdem.get(it.ordem_id) ?? [];
+      lista.push(it);
+      itensPorOrdem.set(it.ordem_id, lista);
+    }
+    return ordens.filter((ordem) => {
+      if (!casaStatus(ordem)) return false;
+      if (normalizar(ordem.fornecedor_nome ?? "").includes(termoBusca)) return true;
+      if (normalizar(ordem.numero ?? "").includes(termoBusca)) return true;
+      return (itensPorOrdem.get(ordem.id) ?? []).some((it) => {
+        const venda = it.venda_id ? vendaPorId.get(it.venda_id) : undefined;
+        return (
+          normalizar(it.descricao ?? "").includes(termoBusca) ||
+          normalizar(it.codigo ?? "").includes(termoBusca) ||
+          normalizar(it.cliente_nome ?? venda?.cliente_nome ?? "").includes(termoBusca) ||
+          normalizar(venda?.numero ?? "").includes(termoBusca)
+        );
+      });
+    });
+  }, [ordens, filtroStatus, termoBusca, itensTodos, vendaPorId]);
 
   /** Produto comprado, com a ordem e o pedido de venda vinculados. */
   type LinhaProduto = {
