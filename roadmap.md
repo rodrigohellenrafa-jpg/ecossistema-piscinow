@@ -21,3 +21,4 @@
 - [x] Confirmar venda com baixa de estoque e compras por fornecedor, sem duplicidade
 - [x] Verificar visualização autenticada e bloqueio de pedido vazio
 - [ ] Executar confirmação real de novo pedido — aguarda uma venda de teste autorizada para não criar compras/baixar estoque real
+- [x] Orientar OC-003: itens extras da nota entram pela edição da O.C. com vínculo Estoque; pagamentos já feitos são preservados e o restante fica em aberto
