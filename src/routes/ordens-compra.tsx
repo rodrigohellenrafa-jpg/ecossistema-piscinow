@@ -271,6 +271,8 @@ function OrdensCompra() {
     unidade: "UN",
     preco_custo: "0",
     fornecedor_id: SEM_CLIENTE,
+    ncm: "",
+    cst: "",
   });
 
   const { data: ordens = [] } = useQuery({
@@ -1052,6 +1054,8 @@ function OrdensCompra() {
       unidade: produto.unidade,
       preco_custo: String(Number(produto.preco_custo ?? 0)),
       fornecedor_id: produto.fornecedor_id ?? SEM_CLIENTE,
+      ncm: produto.ncm ?? "",
+      cst: produto.cst ?? "",
     });
   };
 
