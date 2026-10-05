@@ -2393,6 +2393,32 @@ function OrdensCompra() {
                       <TableCell>{i.ncm ?? "—"}</TableCell>
                       <TableCell>{i.cst ?? "—"}</TableCell>
                       <TableCell>{i.unidade}</TableCell>
+                      <TableCell className="print:hidden">
+                        {(() => {
+                          const produto = i.produto_id
+                            ? produtos.find((p) => p.id === i.produto_id)
+                            : undefined;
+                          return (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              aria-label={`Editar produto ${i.descricao}`}
+                              title={
+                                produto
+                                  ? "Editar cadastro do produto"
+                                  : "Item sem cadastro de produto"
+                              }
+                              disabled={!produto}
+                              onClick={() => {
+                                if (produto) abrirEdicaoProdutoCompra(produto);
+                              }}
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell className="text-right">{i.quantidade}</TableCell>
                       <TableCell className="text-right">{brl(Number(i.valor_unitario))}</TableCell>
                       <TableCell className="text-right">{brl(Number(i.desconto))}</TableCell>
