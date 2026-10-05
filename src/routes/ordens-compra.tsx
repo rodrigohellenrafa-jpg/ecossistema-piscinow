@@ -271,6 +271,8 @@ function OrdensCompra() {
     unidade: "UN",
     preco_custo: "0",
     fornecedor_id: SEM_CLIENTE,
+    ncm: "",
+    cst: "",
   });
 
   const { data: ordens = [] } = useQuery({
@@ -1052,6 +1054,8 @@ function OrdensCompra() {
       unidade: produto.unidade,
       preco_custo: String(Number(produto.preco_custo ?? 0)),
       fornecedor_id: produto.fornecedor_id ?? SEM_CLIENTE,
+      ncm: produto.ncm ?? "",
+      cst: produto.cst ?? "",
     });
   };
 
@@ -1071,6 +1075,8 @@ function OrdensCompra() {
             produtoCompraForm.fornecedor_id === SEM_CLIENTE
               ? null
               : produtoCompraForm.fornecedor_id,
+          ncm: produtoCompraForm.ncm.trim() || null,
+          cst: produtoCompraForm.cst.trim() || null,
         })
         .eq("id", produtoCompraEditando.id);
       if (error) throw error;
@@ -2368,6 +2374,7 @@ function OrdensCompra() {
                     <TableHead>NCM</TableHead>
                     <TableHead>CST</TableHead>
                     <TableHead>Unid.</TableHead>
+                    <TableHead className="print:hidden">Ações</TableHead>
                     <TableHead className="text-right">Qtd</TableHead>
                     <TableHead className="text-right">Vlr Unit</TableHead>
                     <TableHead className="text-right">Desconto</TableHead>
@@ -2386,6 +2393,32 @@ function OrdensCompra() {
                       <TableCell>{i.ncm ?? "—"}</TableCell>
                       <TableCell>{i.cst ?? "—"}</TableCell>
                       <TableCell>{i.unidade}</TableCell>
+                      <TableCell className="print:hidden">
+                        {(() => {
+                          const produto = i.produto_id
+                            ? produtos.find((p) => p.id === i.produto_id)
+                            : undefined;
+                          return (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              aria-label={`Editar produto ${i.descricao}`}
+                              title={
+                                produto
+                                  ? "Editar cadastro do produto"
+                                  : "Item sem cadastro de produto"
+                              }
+                              disabled={!produto}
+                              onClick={() => {
+                                if (produto) abrirEdicaoProdutoCompra(produto);
+                              }}
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell className="text-right">{i.quantidade}</TableCell>
                       <TableCell className="text-right">{brl(Number(i.valor_unitario))}</TableCell>
                       <TableCell className="text-right">{brl(Number(i.desconto))}</TableCell>
@@ -3234,6 +3267,24 @@ function OrdensCompra() {
                     preco_custo: evento.target.value,
                   }))
                 }
+              />
+            </Field>
+            <Field label="NCM">
+              <Input
+                value={produtoCompraForm.ncm}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, ncm: evento.target.value }))
+                }
+                placeholder="Ex.: 32091010"
+              />
+            </Field>
+            <Field label="CST">
+              <Input
+                value={produtoCompraForm.cst}
+                onChange={(evento) =>
+                  setProdutoCompraForm((atual) => ({ ...atual, cst: evento.target.value }))
+                }
+                placeholder="Ex.: 010"
               />
             </Field>
             <Field label="Fornecedor" className="sm:col-span-2">
