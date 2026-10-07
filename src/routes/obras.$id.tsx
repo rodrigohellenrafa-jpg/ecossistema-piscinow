@@ -110,8 +110,8 @@ function DetalheObra() {
           actions={
             <div className="flex gap-2">
               <Button variant="outline" asChild>
-                <Link to="/logistica">
-                  <ArrowLeft /> Voltar ao Flight Board
+                <Link to="/ordens">
+                  <ArrowLeft /> Voltar às Ordens de Serviço
                 </Link>
               </Button>
               <Button onClick={() => window.print()}>

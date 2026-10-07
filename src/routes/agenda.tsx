@@ -518,7 +518,7 @@ function Agenda() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Kpi label="Compromissos hoje" value={String(kpis.hoje)} to="/ordens" />
         <Kpi label="Sob sua responsabilidade" value={String(kpis.meus)} tone="positive" to="/ordens" />
-        <Kpi label="Total no período" value={String(kpis.total)} to="/logistica" />
+        <Kpi label="Total no período" value={String(kpis.total)} to="/ordens" />
       </div>
 
       <AgendaCalendario itens={itens} ehMeu={(item) => ehMeu(itens.find((i) => i.id === item.id) as Item)} />

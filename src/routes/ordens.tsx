@@ -303,7 +303,7 @@ function Ordens() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Obra criada no Flight Board!");
+      toast.success("Obra criada!");
       qc.invalidateQueries({ queryKey: ["obras"] });
       qc.invalidateQueries({ queryKey: ["obras-codigos"] });
     },
@@ -318,7 +318,7 @@ function Ordens() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Ordens de Serviço</h1>
           <p className="text-sm text-muted-foreground">
-            Abertura de OS vinculada ao cliente e ao Flight Board.
+            Abertura e controle de Ordens de Serviço vinculadas ao cliente.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -598,13 +598,6 @@ function Ordens() {
       </Card>
 
       <Dialog open={!!registro} onOpenChange={v=>{if(!v)setRegistro(null);}}><DialogContent><DialogHeader><DialogTitle>Registro de execução</DialogTitle></DialogHeader><Field label="Materiais utilizados"><Textarea value={registro?.materiais ?? ""} onChange={e=>registro && setRegistro({...registro,materiais:e.target.value})}/></Field><Field label="Horas trabalhadas"><Input type="number" min="0" step="0.25" value={registro?.horas ?? "0"} onChange={e=>registro && setRegistro({...registro,horas:e.target.value})}/></Field><Button disabled={gravando} onClick={async()=>{if(!registro)return;const horas=Number(registro.horas);if(!Number.isFinite(horas)||horas<0){toast.error("Informe horas válidas.");return;}setGravando(true);try{const {error}=await supabase.from("ordens_servico").update({materiais_utilizados:registro.materiais,horas_trabalhadas:horas}).eq("id",registro.id);if(error)throw error;await qc.invalidateQueries({queryKey:["ordens"]});setRegistro(null);toast.success("Execução registrada.");}catch(e){toast.error(e instanceof Error?e.message:"Não foi possível salvar.");}finally{setGravando(false);}}}>Salvar</Button></DialogContent></Dialog>
-      <p className="text-xs text-muted-foreground">
-        Acompanhe as obras geradas em{" "}
-        <Link to="/logistica" className="underline">
-          Flight Board
-        </Link>
-        .
-      </p>
     </div>
   );
 }

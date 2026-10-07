@@ -49,7 +49,7 @@ const grupos: { grupo: string; itens: Atalho[] }[] = [
     grupo: "Logística & Obras",
     itens: [
       { titulo: "Novo compromisso na agenda", to: "/agenda", abrir: "novo" },
-      { titulo: "Nova obra", to: "/logistica", abrir: "novo" },
+      { titulo: "Nova obra", to: "/ordens", abrir: "novo" },
       { titulo: "Nova ordem de serviço", to: "/ordens", abrir: "novo" },
       { titulo: "Registro de execução (materiais e horas)", to: "/ordens", nota: "Abra pelo botão da ordem desejada" },
     ],

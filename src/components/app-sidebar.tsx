@@ -8,7 +8,6 @@ import {
   Truck,
   ShoppingCart,
   Wallet,
-  KanbanSquare,
   Waves,
   ClipboardList,
   Receipt,
@@ -92,7 +91,6 @@ const groups: {
     area: "logistica",
     items: [
       { title: "Agenda da Equipe", url: "/agenda", icon: CalendarDays },
-      { title: "Flight Board", url: "/logistica", icon: KanbanSquare },
       { title: "Ordens de Serviço", url: "/ordens", icon: ClipboardCheck },
     ],
   },

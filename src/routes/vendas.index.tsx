@@ -375,7 +375,7 @@ function Vendas() {
               tone={margemMedia >= 0.25 ? "positive" : margemMedia < 0.1 ? "negative" : "warning"}
               to="/dre"
             />
-            <Kpi label="Pedidos em aberto" value={String(emAberto)} to="/logistica" />
+            <Kpi label="Pedidos em aberto" value={String(emAberto)} to="/ordens" />
           </div>
 
           <p className="text-xs text-muted-foreground">
