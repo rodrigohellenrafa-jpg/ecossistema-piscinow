@@ -28,10 +28,16 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
-  return new Response(renderErrorPage(), {
+  const captured = consumeLastCapturedError();
+  const errorObj = captured ?? new Error(`h3 swallowed SSR error: ${body}`);
+  console.error(errorObj);
+  const errMsg = errorObj instanceof Error ? `${errorObj.message}\n${errorObj.stack || ""}` : String(errorObj);
+  return new Response(renderErrorPage(errorObj), {
     status: 500,
-    headers: { "content-type": "text/html; charset=utf-8" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "x-ssr-error": encodeURIComponent(errMsg.slice(0, 500)),
+    },
   });
 }
 
@@ -46,15 +52,33 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    if (env && typeof env === "object") {
+      try {
+        if (typeof process === "undefined") {
+          (globalThis as unknown as { process: { env: Record<string, string> } }).process = { env: {} };
+        } else if (!process.env) {
+          (process as unknown as { env: Record<string, string> }).env = {};
+        }
+        for (const [key, val] of Object.entries(env)) {
+          if (typeof val === "string" && !process.env[key]) {
+            process.env[key] = val;
+          }
+        }
+      } catch {}
+    }
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
+      const errMsg = error instanceof Error ? `${error.message}\n${error.stack || ""}` : String(error);
+      return new Response(renderErrorPage(error), {
         status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "x-ssr-error": encodeURIComponent(errMsg.slice(0, 500)),
+        },
       });
     }
   },

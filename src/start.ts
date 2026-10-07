@@ -11,9 +11,13 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
       throw error;
     }
     console.error(error);
-    return new Response(renderErrorPage(), {
+    const errMsg = error instanceof Error ? `${error.message}\n${error.stack || ""}` : String(error);
+    return new Response(renderErrorPage(error), {
       status: 500,
-      headers: { "content-type": "text/html; charset=utf-8" },
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "x-ssr-error": encodeURIComponent(errMsg.slice(0, 500)),
+      },
     });
   }
 });
