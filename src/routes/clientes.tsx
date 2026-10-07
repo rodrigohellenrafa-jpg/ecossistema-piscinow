@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Minus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { FileText, Minus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ConverterLeadDialog } from "@/components/converter-lead-dialog";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -155,6 +156,7 @@ function Clientes() {
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Cliente | null>(null);
+  const [convertendo, setConvertendo] = useState<Cliente | null>(null);
   const [form, setForm] = useState(vazio);
   const [mostrarInstalacao, setMostrarInstalacao] = useState(false);
   const [cepObra, setCepObra] = useState("");
@@ -307,6 +309,11 @@ function Clientes() {
 
   return (
     <div className="space-y-6">
+      <ConverterLeadDialog
+        lead={convertendo}
+        clientes={data as never}
+        onClose={() => setConvertendo(null)}
+      />
       <PageHeader
         title="Clientes"
         subtitle="Cadastro salvo no banco de dados da equipe."
@@ -619,6 +626,16 @@ function Clientes() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
+                      {c.etapa !== "Pós-venda" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConvertendo(c)}
+                          title="Converter em cliente / gerar orçamento"
+                        >
+                          <FileText className="size-4" /> Orçamento
+                        </Button>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"
