@@ -241,6 +241,20 @@ function DetalhePedido() {
     },
   });
 
+  const { data: historicoLancamentos = [] } = useQuery({
+    queryKey: ["historico-venda", id, venda?.cliente_id],
+    queryFn: async () => {
+      const filtro = venda?.cliente_id
+        ? `venda_id.eq.${id},and(venda_id.is.null,cliente_id.eq.${venda.cliente_id})`
+        : null;
+      let q = supabase.from("venda_historico").select("*");
+      q = filtro ? q.or(filtro) : q.eq("venda_id", id);
+      const { data, error } = await q.order("data").order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   /** Contas bancárias cadastradas (para escolher onde o recurso entra). */
   const { data: contasBancarias = [] } = useQuery({
     queryKey: ["saldos-bancarios", "contas-select"],
@@ -606,13 +620,38 @@ function DetalhePedido() {
   );
   const statusPag = totalPago <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
 
-  // Base de custo: custos dos itens + custos do kit (casco, filtro, frete, mão
-  // de obra e impostos). Serve apenas para apurar lucro/prejuízo da venda.
+  // Base de custo consolidada da venda: soma exata de todos os custos listados no extrato
+  // (produtos do pedido, frete, mão de obra, impostos, acessórios do kit e saídas/débitos lançados).
+  const custoProdutos = itens.reduce(
+    (s, i) => s + Number(i.custo_unitario ?? 0) * Number(i.quantidade ?? 0),
+    0,
+  );
+  const custoFrete = Number(venda?.valor_frete ?? 0);
+  const custoMaoObra = Number(venda?.valor_mao_obra ?? 0);
+  const custoImposto = Number(venda?.valor_impostos ?? 0);
+  const acessoriosKit = (
+    Array.isArray(kit?.acessorios) ? kit.acessorios : []
+  ) as Array<{ valor?: number; nome?: string }>;
+  const custoAcessorios = acessoriosKit.reduce(
+    (s, a) => s + Number(a?.valor ?? 0),
+    0,
+  );
+  const custoDebitosExtrato = historicoLancamentos
+    .filter((l) => l.natureza === "saida")
+    .reduce((s, l) => s + Number(l.valor ?? 0), 0);
+
   const custoItens = Number(
-    itens.reduce((s, i) => s + Number(i.custo_unitario ?? 0) * Number(i.quantidade ?? 0), 0).toFixed(2),
+    (
+      custoProdutos +
+      custoFrete +
+      custoMaoObra +
+      custoImposto +
+      custoAcessorios +
+      custoDebitosExtrato
+    ).toFixed(2),
   );
   const custoKit = Number(Number(kit?.custo_total_kit ?? 0).toFixed(2));
-  const custoTotalVenda = Number((custoItens + custoKit).toFixed(2));
+  const custoTotalVenda = custoItens;
   const lucroVenda = Number((totalVenda - custoTotalVenda).toFixed(2));
   const margemVenda = totalVenda > 0 ? lucroVenda / totalVenda : 0;
 
@@ -1285,8 +1324,8 @@ function DetalhePedido() {
           <div className="sm:col-span-4">
             <p className="font-semibold">Resultado da venda</p>
             <p className="text-xs text-muted-foreground">
-              O kit de piscina não entra no pedido nem na base de cálculo — os números abaixo são
-              apenas base de custo para apurar lucro ou prejuízo.
+              O kit de piscina não entra no pedido nem na base de cálculo — os custos abaixo refletem
+              a apuração consolidada de todos os custos listados no extrato da venda.
             </p>
           </div>
           <div>
@@ -1296,6 +1335,16 @@ function DetalhePedido() {
           <div>
             <p className="text-xs text-muted-foreground">Custo dos itens</p>
             <p className="font-medium">{brl(custoItens)}</p>
+            {(custoFrete > 0 || custoMaoObra > 0 || custoImposto > 0 || custoAcessorios > 0 || custoDebitosExtrato > 0) && (
+              <p className="text-[11px] text-muted-foreground">
+                Produtos: {brl(custoProdutos)}
+                {custoAcessorios > 0 && ` · Acessórios: ${brl(custoAcessorios)}`}
+                {custoFrete > 0 && ` · Frete: ${brl(custoFrete)}`}
+                {custoMaoObra > 0 && ` · M.O.: ${brl(custoMaoObra)}`}
+                {custoImposto > 0 && ` · Impostos: ${brl(custoImposto)}`}
+                {custoDebitosExtrato > 0 && ` · Extrato: ${brl(custoDebitosExtrato)}`}
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Custo do kit (referência)</p>

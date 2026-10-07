@@ -15,6 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExpandableCard } from "@/components/expandable-card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -111,6 +118,32 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
   const [filtroObra, setFiltroObra] = useState("todas");
   const [custosEditados, setCustosEditados] = useState<Record<string, string>>({});
   const [extrasEditados, setExtrasEditados] = useState<Record<string, string>>({});
+  const [acessoriosEditados, setAcessoriosEditados] = useState<Record<string, string>>({});
+  const [addAcessorioAberto, setAddAcessorioAberto] = useState(false);
+  const [novoAcessorioNome, setNovoAcessorioNome] = useState("");
+  const [novoAcessorioValor, setNovoAcessorioValor] = useState("");
+
+  const { data: kit } = useQuery({
+    queryKey: ["venda-kit", vendaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_kit")
+        .select("*")
+        .eq("venda_id", vendaId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const acessoriosKit = useMemo(() => {
+    if (!kit?.acessorios || !Array.isArray(kit.acessorios)) return [];
+    return kit.acessorios as Array<{
+      produto_id?: string;
+      nome: string;
+      valor: number;
+    }>;
+  }, [kit?.acessorios]);
 
   const { data: obras = [] } = useQuery({
     queryKey: ["historico-obras", vendaId, clienteId],
@@ -270,6 +303,93 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const salvarCustoAcessorio = useMutation({
+    mutationFn: async ({ index, valorTotal }: { index: number; valorTotal: string }) => {
+      if (!kit?.id) return;
+      const v = num(valorTotal);
+      if (v < 0) throw new Error("O valor não pode ser negativo.");
+      const novos = [...acessoriosKit];
+      const antigoValor = Number(novos[index]?.valor ?? 0);
+      novos[index] = { ...novos[index], valor: v };
+      const novoTotalKit = Number(kit.custo_total_kit ?? 0) - antigoValor + v;
+      const { error } = await supabase
+        .from("venda_kit")
+        .update({ acessorios: novos, custo_total_kit: novoTotalKit })
+        .eq("id", kit.id);
+      if (error) throw error;
+    },
+    onSuccess: (_, variaveis) => {
+      toast.success("Custo do acessório atualizado.");
+      setAcessoriosEditados((atual) => {
+        const proximo = { ...atual };
+        delete proximo[String(variaveis.index)];
+        return proximo;
+      });
+      qc.invalidateQueries({ queryKey: ["venda-kit", vendaId] });
+      qc.invalidateQueries({ queryKey: ["venda", vendaId] });
+      qc.invalidateQueries({ queryKey: ["pedido-comparativo", vendaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const adicionarAcessorio = useMutation({
+    mutationFn: async ({ nome, valor }: { nome: string; valor: number }) => {
+      if (!nome.trim()) throw new Error("Informe o nome do acessório.");
+      if (valor < 0) throw new Error("O valor não pode ser negativo.");
+      const novos = [...acessoriosKit, { nome: nome.trim(), valor }];
+      if (kit?.id) {
+        const novoTotalKit = Number(kit.custo_total_kit ?? 0) + valor;
+        const { error } = await supabase
+          .from("venda_kit")
+          .update({ acessorios: novos, custo_total_kit: novoTotalKit })
+          .eq("id", kit.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("venda_kit").insert({
+          venda_id: vendaId,
+          acessorios: novos,
+          custo_frete: Number(venda?.valor_frete ?? 0),
+          custo_mao_obra: Number(venda?.valor_mao_obra ?? 0),
+          impostos: Number(venda?.valor_impostos ?? 0),
+          custo_total_kit: valor,
+          preco_venda_kit: 0,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Acessório adicionado ao multipartido.");
+      setNovoAcessorioNome("");
+      setNovoAcessorioValor("");
+      setAddAcessorioAberto(false);
+      qc.invalidateQueries({ queryKey: ["venda-kit", vendaId] });
+      qc.invalidateQueries({ queryKey: ["venda", vendaId] });
+      qc.invalidateQueries({ queryKey: ["pedido-comparativo", vendaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removerAcessorio = useMutation({
+    mutationFn: async (index: number) => {
+      if (!kit?.id) return;
+      const removidoValor = Number(acessoriosKit[index]?.valor ?? 0);
+      const novos = acessoriosKit.filter((_, i) => i !== index);
+      const novoTotalKit = Math.max(0, Number(kit.custo_total_kit ?? 0) - removidoValor);
+      const { error } = await supabase
+        .from("venda_kit")
+        .update({ acessorios: novos, custo_total_kit: novoTotalKit })
+        .eq("id", kit.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Acessório removido.");
+      qc.invalidateQueries({ queryKey: ["venda-kit", vendaId] });
+      qc.invalidateQueries({ queryKey: ["venda", vendaId] });
+      qc.invalidateQueries({ queryKey: ["pedido-comparativo", vendaId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filtrados = useMemo(
     () =>
       filtroObra === "todas"
@@ -290,6 +410,11 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       return { ...l, mov, saldo };
     });
   }, [filtrados]);
+
+  const debitosExtrato = useMemo(
+    () => filtrados.filter((l) => l.natureza === "saida"),
+    [filtrados],
+  );
 
   const totalEntradas = extrato.reduce((s, l) => s + (l.mov > 0 ? l.mov : 0), 0);
   const totalRetencoes = pagamentos.reduce(
@@ -315,7 +440,7 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     { campo: "imposto" as const, label: "Imposto", padrao: String(venda?.valor_impostos ?? 0) },
   ];
 
-  /** Linhas com saldo acumulado: Recebido → cada produto → Frete/M.O./Imposto. */
+  /** Linhas com saldo acumulado: Recebido → cada produto → cada acessório → Frete/M.O./Imposto → débitos do extrato. */
   const linhas = useMemo(() => {
     const arr: Array<{ key: string; custo: number; saldo: number }> = [];
     let saldo = totalRecebido;
@@ -325,14 +450,25 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       saldo -= custo;
       arr.push({ key: item.id, custo, saldo });
     }
+    for (let i = 0; i < acessoriosKit.length; i++) {
+      const a = acessoriosKit[i];
+      const custo = num(acessoriosEditados[String(i)] ?? String(a.valor ?? 0));
+      saldo -= custo;
+      arr.push({ key: `acessorio-${i}`, custo, saldo });
+    }
     for (const ex of extrasLinhas) {
       const custo = num(extrasEditados[ex.campo] ?? ex.padrao);
       saldo -= custo;
       arr.push({ key: ex.campo, custo, saldo });
     }
+    for (const deb of debitosExtrato) {
+      const custo = Number(deb.valor ?? 0);
+      saldo -= custo;
+      arr.push({ key: `debito-${deb.id}`, custo, saldo });
+    }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itens, totalRecebido, custoFrete, custoMaoObra, custoImposto, custosEditados, extrasEditados, venda]);
+  }, [itens, totalRecebido, custoFrete, custoMaoObra, custoImposto, custosEditados, extrasEditados, venda, acessoriosKit, acessoriosEditados, debitosExtrato]);
 
   const saldoDe = Object.fromEntries(linhas.map((l) => [l.key, l.saldo]));
   const custoTotalGeral = linhas.reduce((s, l) => s + l.custo, 0);
@@ -367,7 +503,8 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     TIPOS_HISTORICO.find((x) => x.valor === t)?.label ?? t;
 
   return (
-    <ExpandableCard className="print:hidden">
+    <>
+      <ExpandableCard className="print:hidden">
       <CardHeader className="pr-12">
         <CardTitle>Histórico da venda (extrato)</CardTitle>
         <p className="text-sm text-muted-foreground">
@@ -377,18 +514,29 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3">
-          <div>
-            <p className="font-medium">Multipartido da venda</p>
-            <p className="text-sm text-muted-foreground">
-              Produto · venda recebida · (−) custo · (=) total acumulado. Digite o custo de cada
-              linha e clique fora (ou Enter) para salvar — o lucro é recalculado na hora.
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-medium">Multipartido da venda</p>
+              <p className="text-sm text-muted-foreground">
+                Produto · venda recebida · (−) custo · (=) total acumulado. Digite o custo de cada
+                linha e clique fora (ou Enter) para salvar — o lucro é recalculado na hora.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setAddAcessorioAberto(true)}
+              className="gap-1.5"
+            >
+              <Plus className="size-3.5" /> Adicionar acessório
+            </Button>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Produto</TableHead>
+                  <TableHead>Produto / Item de custo</TableHead>
                   <TableHead className="text-right">Venda rec.</TableHead>
                   <TableHead className="text-right">(−) Custo</TableHead>
                   <TableHead className="text-right">(=) Total</TableHead>
@@ -401,10 +549,10 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
                   <TableCell className="text-right text-muted-foreground">—</TableCell>
                   <TableCell className="text-right font-medium">{brl(totalRecebido)}</TableCell>
                 </TableRow>
-                {itens.length === 0 && (
+                {itens.length === 0 && acessoriosKit.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      Nenhum produto registrado nesta venda.
+                      Nenhum produto ou acessório registrado nesta venda.
                     </TableCell>
                   </TableRow>
                 )}
@@ -443,6 +591,65 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
                     </TableRow>
                   );
                 })}
+                {acessoriosKit.map((acessorio, idx) => {
+                  const chave = `acessorio-${idx}`;
+                  const valorPadrao = String(acessorio.valor ?? 0);
+                  const valor = acessoriosEditados[String(idx)] ?? valorPadrao;
+                  return (
+                    <TableRow key={chave}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            Acessório
+                          </Badge>
+                          <span>{acessorio.nome || `Acessório ${idx + 1}`}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-6 text-muted-foreground hover:text-destructive"
+                            title="Remover acessório"
+                            onClick={() => removerAcessorio.mutate(idx)}
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell />
+                      <TableCell className="text-right">
+                        <Input
+                          className="ml-auto h-8 w-28 text-right"
+                          inputMode="decimal"
+                          aria-label={`Custo de ${acessorio.nome}`}
+                          value={valor}
+                          onChange={(e) =>
+                            setAcessoriosEditados((atual) => ({
+                              ...atual,
+                              [String(idx)]: e.target.value,
+                            }))
+                          }
+                          onBlur={() => {
+                            if (acessoriosEditados[String(idx)] !== undefined)
+                              salvarCustoAcessorio.mutate({
+                                index: idx,
+                                valorTotal: acessoriosEditados[String(idx)],
+                              });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              salvarCustoAcessorio.mutate({
+                                index: idx,
+                                valorTotal: valor,
+                              });
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {brl(saldoDe[chave] ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {extrasLinhas.map((ex) => {
                   const valor = extrasEditados[ex.campo] ?? ex.padrao;
                   return (
@@ -472,6 +679,28 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
                       </TableCell>
                       <TableCell className="text-right">
                         {brl(saldoDe[ex.campo] ?? 0)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {debitosExtrato.map((deb) => {
+                  const chave = `debito-${deb.id}`;
+                  return (
+                    <TableRow key={chave}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="border-destructive/30 text-xs text-destructive">
+                            Débito extrato
+                          </Badge>
+                          <span>{deb.descricao}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell />
+                      <TableCell className="text-right font-medium text-destructive">
+                        {brl(Number(deb.valor ?? 0))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {brl(saldoDe[chave] ?? 0)}
                       </TableCell>
                     </TableRow>
                   );
@@ -728,5 +957,55 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
         )}
       </CardContent>
     </ExpandableCard>
+
+    <Dialog open={addAcessorioAberto} onOpenChange={setAddAcessorioAberto}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Adicionar acessório ao multipartido</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <Field label="Nome / Descrição do acessório">
+            <Input
+              placeholder="Ex.: Cascata em inox, LED RGB, etc."
+              value={novoAcessorioNome}
+              onChange={(e) => setNovoAcessorioNome(e.target.value)}
+            />
+          </Field>
+          <Field label="Custo do acessório (R$)">
+            <Input
+              inputMode="decimal"
+              placeholder="0,00"
+              value={novoAcessorioValor}
+              onChange={(e) => setNovoAcessorioValor(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  adicionarAcessorio.mutate({
+                    nome: novoAcessorioNome,
+                    valor: num(novoAcessorioValor),
+                  });
+                }
+              }}
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setAddAcessorioAberto(false)}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={adicionarAcessorio.isPending}
+            onClick={() =>
+              adicionarAcessorio.mutate({
+                nome: novoAcessorioNome,
+                valor: num(novoAcessorioValor),
+              })
+            }
+          >
+            Adicionar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
