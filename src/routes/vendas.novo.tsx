@@ -159,7 +159,7 @@ function MoedaInput({
       type="text"
       inputMode="decimal"
       placeholder="0,00"
-      className={`text-white ${className}`}
+      className={className}
       value={texto}
       onChange={(e) => {
         setTexto(e.target.value);
@@ -1412,7 +1412,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                           <Input
                             type="number"
                             min={1}
-                            className="h-8 w-16 border-border bg-muted/50 text-center text-white"
+                            className="h-8 w-16 border-border bg-muted/50 text-center text-foreground"
                             value={i.quantidade}
                             onChange={(e) => atualizarItem(i.key, { quantidade: num(e.target.value) || 1 })}
                           />
@@ -1421,7 +1421,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                           <MoedaInput
                             value={i.preco_unitario}
                             onChange={(n) => atualizarItem(i.key, { preco_unitario: n })}
-                            className="h-8 w-28 border-border bg-muted/50 text-right text-white"
+                            className="h-8 w-28 border-border bg-muted/50 text-right text-foreground"
                           />
                         </TableCell>
                         <TableCell className="px-6 py-4 text-center">
@@ -1429,7 +1429,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                             type="text"
                             inputMode="decimal"
                             placeholder="0,00"
-                            className="h-8 w-20 border-border bg-muted/50 text-center text-white"
+                            className="h-8 w-20 border-border bg-muted/50 text-center text-foreground"
                             value={descontoPctInputs[i.key] ?? (i.desconto_pct ? i.desconto_pct.toString() : "")}
                             onChange={(e) => {
                               const raw = e.target.value;
@@ -1451,7 +1451,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                               const max = subtotalBrutoItem(i);
                               atualizarItem(i.key, { desconto_valor: Math.min(n, max) });
                             }}
-                            className="h-8 w-24 border-border bg-muted/50 text-right text-white"
+                            className="h-8 w-24 border-border bg-muted/50 text-right text-foreground"
                           />
                         </TableCell>
                         <TableCell className="whitespace-nowrap px-6 py-4 text-right">
