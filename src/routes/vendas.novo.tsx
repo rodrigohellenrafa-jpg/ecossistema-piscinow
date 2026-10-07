@@ -473,6 +473,18 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
     } catch {
       /* rascunho inválido é ignorado */
     }
+    // Conversão de lead (tela de Clientes): já entra com o titular selecionado.
+    try {
+      const conv = localStorage.getItem("piscinow:conversao-lead");
+      if (conv) {
+        localStorage.removeItem("piscinow:conversao-lead");
+        const c = JSON.parse(conv) as { titularId?: string; nota?: string };
+        if (c.titularId) setClienteId(c.titularId);
+        if (c.nota) setObservacoes((prev) => (prev ? `${prev}\n${c.nota}` : c.nota!));
+      }
+    } catch {
+      /* ignora */
+    }
     setRascunhoPronto(true);
   }, []);
 
