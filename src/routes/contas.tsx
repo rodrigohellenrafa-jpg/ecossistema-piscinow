@@ -130,21 +130,37 @@ function proximaData(iso: string, recorrencia: string): string | null {
   const d = new Date(`${iso}T12:00:00`);
   if (Number.isNaN(d.getTime())) return null;
   switch (recorrencia) {
-    case "diaria": d.setDate(d.getDate() + 1); break;
-    case "semanal": d.setDate(d.getDate() + 7); break;
-    case "quinzenal": d.setDate(d.getDate() + 15); break;
-    case "mensal": d.setMonth(d.getMonth() + 1); break;
-    case "bimestral": d.setMonth(d.getMonth() + 2); break;
-    case "trimestral": d.setMonth(d.getMonth() + 3); break;
-    case "semestral": d.setMonth(d.getMonth() + 6); break;
-    case "anual": d.setFullYear(d.getFullYear() + 1); break;
-    default: return null;
+    case "diaria":
+      d.setDate(d.getDate() + 1);
+      break;
+    case "semanal":
+      d.setDate(d.getDate() + 7);
+      break;
+    case "quinzenal":
+      d.setDate(d.getDate() + 15);
+      break;
+    case "mensal":
+      d.setMonth(d.getMonth() + 1);
+      break;
+    case "bimestral":
+      d.setMonth(d.getMonth() + 2);
+      break;
+    case "trimestral":
+      d.setMonth(d.getMonth() + 3);
+      break;
+    case "semestral":
+      d.setMonth(d.getMonth() + 6);
+      break;
+    case "anual":
+      d.setFullYear(d.getFullYear() + 1);
+      break;
+    default:
+      return null;
   }
   return d.toISOString().slice(0, 10);
 }
 
-const rotuloRecorrencia = (v: string) =>
-  RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
+const rotuloRecorrencia = (v: string) => RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
 
 /** Próximos vencimentos de uma recorrência: até 12 parcelas, limitadas a 12 meses à frente. */
 function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | null) {
@@ -166,10 +182,11 @@ function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | n
 }
 
 const PERIODOS = [
-  { valor: "todas", rotulo: "Todas" },
-  { valor: "diario", rotulo: "Diário" },
+  { valor: "vigente_vencidas", rotulo: "Mês vigente + Vencidas (Padrão)" },
+  { valor: "todas", rotulo: "Todas as contas" },
+  { valor: "diario", rotulo: "Hoje / Diário" },
   { valor: "semanal", rotulo: "Semanal" },
-  { valor: "mensal", rotulo: "Mensal" },
+  { valor: "mensal", rotulo: "Apenas mês vigente" },
   { valor: "personalizado", rotulo: "Personalizado" },
 ];
 
@@ -178,29 +195,49 @@ function hojeISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Normaliza valores antigos do filtro (links antigos: hoje/semana/mes). */
+/** Normaliza valores do filtro de período (padrão automático: mês vigente + vencidas). */
 function normalizarPeriodo(v: string | undefined): string {
-  if (!v) return "todas";
+  if (!v) return "vigente_vencidas";
   if (v === "hoje" || v === "diaria") return "diario";
   if (v === "semana") return "semanal";
   if (v === "mes") return "mensal";
-  return PERIODOS.some((p) => p.valor === v) ? v : "todas";
+  if (v === "todas") return "todas";
+  if (v === "vigente_vencidas" || v === "padrao") return "vigente_vencidas";
+  return PERIODOS.some((p) => p.valor === v) ? v : "vigente_vencidas";
 }
 
-function noPeriodo(vencimento: string, periodo: string, de: string, ate: string): boolean {
+function noPeriodo(
+  conta: { vencimento: string; status?: string | null },
+  periodo: string,
+  de: string,
+  ate: string,
+): boolean {
   if (periodo === "todas") return true;
-  const d = new Date(`${vencimento}T00:00:00`);
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  if (periodo === "diario") return d.getTime() === hoje.getTime();
+  const hoje = hojeISO();
+  const mesAtual = hoje.slice(0, 7);
+  const v = conta.vencimento ? String(conta.vencimento).slice(0, 10) : "";
+  const st = (conta.status ?? "").toLowerCase();
+  const vencida = st !== "pago" && v < hoje;
+
+  // Filtro padrão: registros do mês vigente junto com todas as contas vencidas
+  if (periodo === "vigente_vencidas") {
+    const noMesVigente = v.slice(0, 7) === mesAtual;
+    return noMesVigente || vencida;
+  }
+
+  const d = new Date(`${v}T00:00:00`);
+  const hojeData = new Date();
+  hojeData.setHours(0, 0, 0, 0);
+
+  if (periodo === "diario") return d.getTime() === hojeData.getTime();
   if (periodo === "semanal") {
-    const inicio = new Date(hoje);
-    inicio.setDate(hoje.getDate() - hoje.getDay()); // domingo
+    const inicio = new Date(hojeData);
+    inicio.setDate(hojeData.getDate() - hojeData.getDay()); // domingo
     const fim = new Date(inicio);
     fim.setDate(inicio.getDate() + 6);
     return d >= inicio && d <= fim;
   }
-  if (periodo === "mensal") return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+  if (periodo === "mensal") return v.slice(0, 7) === mesAtual;
   if (periodo === "personalizado") {
     if (de) {
       const ini = new Date(`${de}T00:00:00`);
@@ -291,10 +328,7 @@ function Contas() {
     },
   });
 
-  const saldoTotalContas = contasBancarias.reduce(
-    (acc, c) => acc + (Number(c.saldo) || 0),
-    0,
-  );
+  const saldoTotalContas = contasBancarias.reduce((acc, c) => acc + (Number(c.saldo) || 0), 0);
 
   const [parceiroOpen, setParceiroOpen] = useState(false);
   const [parceiroBusca, setParceiroBusca] = useState("");
@@ -432,9 +466,7 @@ function Contas() {
             conta_bancaria: form.conta_bancaria || null,
             recorrencia: form.recorrencia,
             recorrencia_fim:
-              form.recorrencia !== "nenhuma" && form.recorrencia_fim
-                ? form.recorrencia_fim
-                : null,
+              form.recorrencia !== "nenhuma" && form.recorrencia_fim ? form.recorrencia_fim : null,
             tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
           })
           .eq("id", editando);
@@ -581,7 +613,8 @@ function Contas() {
     }) => {
       const { data: conta } = await supabase.from("contas").select("*").eq("id", id).single();
       if (!conta) throw new Error("Título não encontrado.");
-      if (conta.status === "pago") throw new Error("Este título já foi baixado. Nada foi alterado.");
+      if (conta.status === "pago")
+        throw new Error("Este título já foi baixado. Nada foi alterado.");
 
       const total = Number(conta.valor) + Number(conta.valor_juros ?? 0);
       const diferenca = Number((total - valorPago).toFixed(2));
@@ -595,15 +628,15 @@ function Contas() {
         const { error: errParcial } = await supabase
           .from("contas")
           .update({
-             status: "pago",
-             data_pagamento: dataPagamento,
-             valor: Number((valorPago - jurosPagos).toFixed(2)),
-             valor_juros: jurosPagos,
-             valor_pago: valorPago,
-             valor_desconto: 0,
-             conta_bancaria: contaBancaria || null,
-             comprovante_path: comprovantePath,
-           })
+            status: "pago",
+            data_pagamento: dataPagamento,
+            valor: Number((valorPago - jurosPagos).toFixed(2)),
+            valor_juros: jurosPagos,
+            valor_pago: valorPago,
+            valor_desconto: 0,
+            conta_bancaria: contaBancaria || null,
+            comprovante_path: comprovantePath,
+          })
           .eq("id", id);
         if (errParcial) throw errParcial;
 
@@ -632,13 +665,13 @@ function Contas() {
         const { error } = await supabase
           .from("contas")
           .update({
-             status: "pago",
-             data_pagamento: dataPagamento,
-             valor_pago: valorPago,
-             valor_desconto: diferenca > 0.009 ? diferenca : 0,
-             conta_bancaria: contaBancaria || null,
-             comprovante_path: comprovantePath,
-           })
+            status: "pago",
+            data_pagamento: dataPagamento,
+            valor_pago: valorPago,
+            valor_desconto: diferenca > 0.009 ? diferenca : 0,
+            conta_bancaria: contaBancaria || null,
+            comprovante_path: comprovantePath,
+          })
           .eq("id", id);
         if (error) throw error;
       }
@@ -731,9 +764,7 @@ function Contas() {
     const linhasExistentes = rateios.filter((r) => r.conta_id === c.id);
     if (linhasExistentes.length > 0) {
       setRatear(true);
-      setRateio(
-        linhasExistentes.map((r) => ({ categoria: r.categoria, valor: String(r.valor) })),
-      );
+      setRateio(linhasExistentes.map((r) => ({ categoria: r.categoria, valor: String(r.valor) })));
     } else {
       setRatear(false);
       setRateio([
@@ -746,7 +777,7 @@ function Contas() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const filtradas = data.filter((c) => noPeriodo(c.vencimento, periodo, periodoDe, periodoAte));
+  const filtradas = data.filter((c) => noPeriodo(c, periodo, periodoDe, periodoAte));
   const soma = (l: typeof data) =>
     l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
   const pagar = filtradas.filter((c) => c.tipo === "pagar");
@@ -787,7 +818,9 @@ function Contas() {
               <DialogDescription>Conta a pagar ou a receber.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 sm:grid-cols-2">
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Dados do lançamento</h3>
+              <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                Dados do lançamento
+              </h3>
               <Field label="Tipo">
                 <Select value={form.tipo} onValueChange={set("tipo")}>
                   <SelectTrigger>
@@ -816,7 +849,10 @@ function Contas() {
                           <ChevronsUpDown className="opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <PopoverContent
+                        className="w-[--radix-popover-trigger-width] p-0"
+                        align="start"
+                      >
                         <Command>
                           <CommandInput
                             placeholder="Digite o nome…"
@@ -839,7 +875,14 @@ function Contas() {
                               </CommandGroup>
                             )}
                             {[
-                              { titulo: "Fornecedores", itens: fornecedores.map((f) => ({ id: f.id, nome: f.nome, extra: "" })) },
+                              {
+                                titulo: "Fornecedores",
+                                itens: fornecedores.map((f) => ({
+                                  id: f.id,
+                                  nome: f.nome,
+                                  extra: "",
+                                })),
+                              },
                               {
                                 titulo: "Colaboradores",
                                 itens: colaboradores.map((c) => ({
@@ -848,7 +891,14 @@ function Contas() {
                                   extra: c.cargo ?? "",
                                 })),
                               },
-                              { titulo: "Clientes", itens: clientesSelect.map((c) => ({ id: c.id, nome: c.nome, extra: "" })) },
+                              {
+                                titulo: "Clientes",
+                                itens: clientesSelect.map((c) => ({
+                                  id: c.id,
+                                  nome: c.nome,
+                                  extra: "",
+                                })),
+                              },
                             ]
                               .filter((g) => g.itens.length > 0)
                               .map((grupo) => (
@@ -892,9 +942,7 @@ function Contas() {
                       <DialogContent className="sm:max-w-md">
                         <DialogHeader>
                           <DialogTitle>Novo fornecedor</DialogTitle>
-                          <DialogDescription>
-                            Cadastre o fornecedor rapidamente.
-                          </DialogDescription>
+                          <DialogDescription>Cadastre o fornecedor rapidamente.</DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <Field label="Nome / Razão social" className="sm:col-span-2">
@@ -971,12 +1019,9 @@ function Contas() {
                           {c.nome}
                         </SelectItem>
                       ))}
-                      {form.parceiro &&
-                        !clientesSelect.some((c) => c.nome === form.parceiro) && (
-                          <SelectItem value={form.parceiro}>
-                            {form.parceiro} (atual)
-                          </SelectItem>
-                        )}
+                      {form.parceiro && !clientesSelect.some((c) => c.nome === form.parceiro) && (
+                        <SelectItem value={form.parceiro}>{form.parceiro} (atual)</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 )}
@@ -984,57 +1029,63 @@ function Contas() {
               <Field label="Descrição" className="sm:col-span-2">
                 <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
               </Field>
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Valores e categorias</h3>
+              <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                Valores e categorias
+              </h3>
               {!ratear && (
-              <Field label="Categoria">
-                <div className="flex gap-1">
-                  <Select value={form.categoria} onValueChange={set("categoria")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias
-                        .filter((c) => c.tipo === "ambas" || c.tipo === form.tipo)
-                        .map((c) => (
-                          <SelectItem key={c.id} value={c.nome}>
-                            {c.nome}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  <Dialog open={catOpen} onOpenChange={setCatOpen}>
-                    <DialogTrigger asChild>
-                      <Button type="button" variant="outline" size="icon" title="Nova categoria">
-                        <Plus />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-sm">
-                      <DialogHeader>
-                        <DialogTitle>Nova categoria</DialogTitle>
-                        <DialogDescription>
-                          Cadastre uma categoria de {form.tipo === "pagar" ? "contas a pagar" : "contas a receber"}.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <Input
-                        value={novaCategoria}
-                        onChange={(e) => setNovaCategoria(e.target.value)}
-                        placeholder="Ex.: Combustível"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            salvarCategoria.mutate();
-                          }
-                        }}
-                      />
-                      <DialogFooter>
-                        <Button onClick={() => salvarCategoria.mutate()} disabled={salvarCategoria.isPending}>
-                          Salvar categoria
+                <Field label="Categoria">
+                  <div className="flex gap-1">
+                    <Select value={form.categoria} onValueChange={set("categoria")}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categorias
+                          .filter((c) => c.tipo === "ambas" || c.tipo === form.tipo)
+                          .map((c) => (
+                            <SelectItem key={c.id} value={c.nome}>
+                              {c.nome}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Dialog open={catOpen} onOpenChange={setCatOpen}>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline" size="icon" title="Nova categoria">
+                          <Plus />
                         </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </Field>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-sm">
+                        <DialogHeader>
+                          <DialogTitle>Nova categoria</DialogTitle>
+                          <DialogDescription>
+                            Cadastre uma categoria de{" "}
+                            {form.tipo === "pagar" ? "contas a pagar" : "contas a receber"}.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <Input
+                          value={novaCategoria}
+                          onChange={(e) => setNovaCategoria(e.target.value)}
+                          placeholder="Ex.: Combustível"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              salvarCategoria.mutate();
+                            }
+                          }}
+                        />
+                        <DialogFooter>
+                          <Button
+                            onClick={() => salvarCategoria.mutate()}
+                            disabled={salvarCategoria.isPending}
+                          >
+                            Salvar categoria
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </Field>
               )}
               <Field label="Valor (R$)">
                 <Input
@@ -1052,7 +1103,8 @@ function Contas() {
                   onChange={(e) => set("valor_juros")(e.target.value)}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Total do lançamento: {brl((Number(form.valor) || 0) + (Number(form.valor_juros) || 0))}
+                  Total do lançamento:{" "}
+                  {brl((Number(form.valor) || 0) + (Number(form.valor_juros) || 0))}
                 </p>
               </Field>
               <div className="rounded-lg border p-3 sm:col-span-2">
@@ -1141,7 +1193,9 @@ function Contas() {
                   </div>
                 )}
               </div>
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Pagamento e recorrência</h3>
+              <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                Pagamento e recorrência
+              </h3>
               <Field label="Vencimento">
                 <Input
                   type="date"
@@ -1164,7 +1218,8 @@ function Contas() {
                 </Select>
                 {form.recorrencia !== "nenhuma" && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Ao dar baixa, o próximo vencimento ({rotuloRecorrencia(form.recorrencia)?.toLowerCase()}) é gerado automaticamente.
+                    Ao dar baixa, o próximo vencimento (
+                    {rotuloRecorrencia(form.recorrencia)?.toLowerCase()}) é gerado automaticamente.
                   </p>
                 )}
               </Field>
@@ -1201,11 +1256,25 @@ function Contas() {
                   </Select>
                 </Field>
               )}
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
-              <VinculoField value={form.vinculo} onChange={(v: string)=>setForm(f=>({...f,vinculo:v}))} />
-              <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
+              <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                Vínculos e documento
+              </h3>
+              <VinculoField
+                value={form.vinculo}
+                onChange={(v: string) => setForm((f) => ({ ...f, vinculo: v }))}
+              />
+              <Field label="Número do documento / NF-e">
+                <Input
+                  value={form.numero_documento}
+                  onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
+                />
+              </Field>
               <Field
-                label={form.tipo === "pagar" ? "De onde o recurso sai (conta)" : "Onde o recurso entra (conta)"}
+                label={
+                  form.tipo === "pagar"
+                    ? "De onde o recurso sai (conta)"
+                    : "Onde o recurso entra (conta)"
+                }
                 className="sm:col-span-2"
               >
                 <Select
@@ -1219,7 +1288,8 @@ function Contas() {
                     <SelectItem value="nenhuma">Sem conta vinculada</SelectItem>
                     {contasBancarias.map((c) => (
                       <SelectItem key={c.id} value={c.conta}>
-                        {c.conta}{c.banco ? ` — ${c.banco}` : ""}
+                        {c.conta}
+                        {c.banco ? ` — ${c.banco}` : ""}
                       </SelectItem>
                     ))}
                     {form.conta_bancaria &&
@@ -1231,7 +1301,7 @@ function Contas() {
                   </SelectContent>
                 </Select>
               </Field>
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
+              <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
               <Field label="Observações" className="sm:col-span-2">
                 <Textarea
                   rows={3}
@@ -1241,9 +1311,15 @@ function Contas() {
               </Field>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
               <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                {salvar.isPending ? "Salvando…" : editando ? "Salvar alterações" : "Salvar lançamento"}
+                {salvar.isPending
+                  ? "Salvando…"
+                  : editando
+                    ? "Salvar alterações"
+                    : "Salvar lançamento"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1262,7 +1338,7 @@ function Contas() {
             }
           }}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-60">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1273,6 +1349,17 @@ function Contas() {
             ))}
           </SelectContent>
         </Select>
+
+        <Button
+          type="button"
+          size="sm"
+          variant={periodo === "todas" ? "secondary" : "outline"}
+          onClick={() => setPeriodo(periodo === "todas" ? "vigente_vencidas" : "todas")}
+          className="h-9 gap-1 text-xs"
+        >
+          {periodo === "todas" ? "Filtrar mês vigente + vencidas" : "Ver todas as contas"}
+        </Button>
+
         {periodo === "personalizado" && (
           <>
             <Input
@@ -1292,13 +1379,15 @@ function Contas() {
             />
           </>
         )}
-        {periodo !== "todas" && (
-          <span className="text-xs text-muted-foreground">
-            {periodo === "personalizado"
-              ? `Vencimento de ${periodoDe ? periodoDe.split("-").reverse().join("/") : "início"} a ${periodoAte ? periodoAte.split("-").reverse().join("/") : "hoje"}.`
-              : `Vencimento: ${PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.`}
-          </span>
-        )}
+        <span className="text-xs text-muted-foreground">
+          {periodo === "vigente_vencidas"
+            ? `Filtrando automaticamente títulos de ${new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })} e contas vencidas pendentes.`
+            : periodo === "todas"
+              ? "Exibindo todas as contas (histórico completo). Use as colunas da tabela para refinar."
+              : periodo === "personalizado"
+                ? `Vencimento de ${periodoDe ? periodoDe.split("-").reverse().join("/") : "início"} a ${periodoAte ? periodoAte.split("-").reverse().join("/") : "hoje"}.`
+                : `Vencimento: ${PERIODOS.find((p) => p.valor === periodo)?.rotulo.toLowerCase()}.`}
+        </span>
 
         <div
           className="ml-auto flex items-center gap-3 rounded-lg border bg-card px-3 py-1.5"
@@ -1308,14 +1397,14 @@ function Contas() {
         >
           <span className="text-xs text-muted-foreground">Saldo em conta</span>
           <div className="flex flex-col items-end leading-tight">
-            <span className={`text-sm font-semibold tabular-nums ${saldoTotalContas < 0 ? "text-red-600" : ""}`}>
+            <span
+              className={`text-sm font-semibold tabular-nums ${saldoTotalContas < 0 ? "text-red-600" : ""}`}
+            >
               {brl(saldoTotalContas)}
             </span>
             {contasBancarias.length > 0 && (
               <span className="text-[10px] text-muted-foreground">
-                {contasBancarias
-                  .map((c) => `${c.conta}: ${brl(Number(c.saldo) || 0)}`)
-                  .join(" • ")}
+                {contasBancarias.map((c) => `${c.conta}: ${brl(Number(c.saldo) || 0)}`).join(" • ")}
               </span>
             )}
           </div>
@@ -1336,7 +1425,8 @@ function Contas() {
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
             onReverter={(c) => {
-              if (window.confirm(`Reverter a baixa de "${c.descricao}"?`)) reverterBaixa.mutate(c.id);
+              if (window.confirm(`Reverter a baixa de "${c.descricao}"?`))
+                reverterBaixa.mutate(c.id);
             }}
           />
         </TabsContent>
@@ -1351,7 +1441,8 @@ function Contas() {
             onEditar={abrirEdicao}
             onExcluir={(id) => excluir.mutate(id)}
             onReverter={(c) => {
-              if (window.confirm(`Reverter a baixa de "${c.descricao}"?`)) reverterBaixa.mutate(c.id);
+              if (window.confirm(`Reverter a baixa de "${c.descricao}"?`))
+                reverterBaixa.mutate(c.id);
             }}
           />
         </TabsContent>
@@ -1409,7 +1500,8 @@ function BaixaDialog({
     setContaBancaria(atual);
   }
 
-  const contaAtualTitulo = (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
+  const contaAtualTitulo =
+    (conta as { conta_bancaria?: string | null } | null)?.conta_bancaria ?? "";
   const opcoesContas = [
     ...contasBancarias,
     ...(contaAtualTitulo && !contasBancarias.some((b) => b.conta === contaAtualTitulo)
@@ -1514,14 +1606,18 @@ function BaixaDialog({
           </Button>
           <Button
             disabled={
-              pendente ||
-              pago <= 0 ||
-              !dataPagamento ||
-              (opcoesContas.length > 0 && !contaBancaria)
+              pendente || pago <= 0 || !dataPagamento || (opcoesContas.length > 0 && !contaBancaria)
             }
             onClick={() =>
               conta &&
-              onConfirmar({ id: conta.id, valorPago: pago, dataPagamento, modo, contaBancaria, comprovantePath })
+              onConfirmar({
+                id: conta.id,
+                valorPago: pago,
+                dataPagamento,
+                modo,
+                contaBancaria,
+                comprovantePath,
+              })
             }
           >
             Confirmar baixa
@@ -1604,9 +1700,7 @@ function Lista({
     }
     if (fValor) {
       const alvo = norm(fValor);
-      const total = (Number(c.valor) + Number(c.valor_juros ?? 0))
-        .toFixed(2)
-        .replace(".", ",");
+      const total = (Number(c.valor) + Number(c.valor_juros ?? 0)).toFixed(2).replace(".", ",");
       const parcela = Number(c.valor).toFixed(2).replace(".", ",");
       if (!norm(total).includes(alvo) && !norm(parcela).includes(alvo)) return false;
     }
@@ -1667,7 +1761,8 @@ function Lista({
           )}
           {grupos.parcial.n > 0 && (
             <span className="rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-xs tabular-nums">
-              Pago parcial: {grupos.parcial.n} · já {ehReceber ? "recebido" : "pago"} {brl(grupos.parcial.pago)}
+              Pago parcial: {grupos.parcial.n} · já {ehReceber ? "recebido" : "pago"}{" "}
+              {brl(grupos.parcial.pago)}
             </span>
           )}
           {grupos.pago.n > 0 && (
@@ -1728,7 +1823,10 @@ function Lista({
               </TableHead>
               <TableHead className="py-1">
                 <Select value={fStatus} onValueChange={setFStatus}>
-                  <SelectTrigger className="h-8 text-xs font-normal" aria-label="Filtrar por status">
+                  <SelectTrigger
+                    className="h-8 text-xs font-normal"
+                    aria-label="Filtrar por status"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1788,54 +1886,60 @@ function Lista({
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={c.status === "pago" ? "secondary" : vencido ? "destructive" : "outline"}>
+                    <Badge
+                      variant={
+                        c.status === "pago" ? "secondary" : vencido ? "destructive" : "outline"
+                      }
+                    >
                       {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
                     </Badge>
                   </TableCell>
-                  <TableCell className={`text-right ${acoesFixas}`}><div className="flex justify-end gap-1">
-                    {c.comprovante_path ? (
-                      <ComprovanteAnexo tabela="contas" valor={c.comprovante_path} />
-                    ) : null}
-                    {c.status !== "pago" ? (
+                  <TableCell className={`text-right ${acoesFixas}`}>
+                    <div className="flex justify-end gap-1">
+                      {c.comprovante_path ? (
+                        <ComprovanteAnexo tabela="contas" valor={c.comprovante_path} />
+                      ) : null}
+                      {c.status !== "pago" ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => onBaixar(c)}
+                          aria-label="Dar baixa"
+                        >
+                          <CheckCircle2 className="size-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => onReverter(c)}
+                          title="Reverter baixa"
+                          aria-label="Reverter baixa"
+                        >
+                          <RotateCcw className="size-4" />
+                        </Button>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => onBaixar(c)}
-                        aria-label="Dar baixa"
+                        onClick={() => onEditar(c)}
+                        title="Editar lançamento"
+                        aria-label="Editar lançamento"
                       >
-                        <CheckCircle2 className="size-4" />
+                        <Pencil className="size-4" />
                       </Button>
-                    ) : (
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => onReverter(c)}
-                        title="Reverter baixa"
-                        aria-label="Reverter baixa"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => onExcluir(c.id)}
+                        title="Excluir lançamento"
+                        aria-label="Excluir"
                       >
-                        <RotateCcw className="size-4" />
+                        <Trash2 className="size-4" />
                       </Button>
-                    )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => onEditar(c)}
-                      title="Editar lançamento"
-                      aria-label="Editar lançamento"
-                    >
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => onExcluir(c.id)}
-                      title="Excluir lançamento"
-                      aria-label="Excluir"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div></TableCell>
+                    </div>
+                  </TableCell>
                 </TableRow>
               );
             })}
