@@ -65,7 +65,8 @@ export const Route = createFileRoute("/financeiro")({
       { title: "Fluxo de Caixa | Piscinow ERP" },
       {
         name: "description",
-        content: "Lançamentos financeiros, fluxo de caixa mensal e conciliação bancária da Piscinow.",
+        content:
+          "Lançamentos financeiros, fluxo de caixa mensal e conciliação bancária da Piscinow.",
       },
       { property: "og:title", content: "Fluxo de Caixa | Piscinow ERP" },
       {
@@ -123,7 +124,13 @@ const RECORRENCIAS = [
 function proximaData(iso: string, recorrencia: string): string {
   const d = new Date(iso + "T12:00:00");
   const dias: Record<string, number> = { diaria: 1, semanal: 7, quinzenal: 15 };
-  const meses: Record<string, number> = { mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 };
+  const meses: Record<string, number> = {
+    mensal: 1,
+    bimestral: 2,
+    trimestral: 3,
+    semestral: 6,
+    anual: 12,
+  };
   if (dias[recorrencia]) d.setDate(d.getDate() + dias[recorrencia]);
   else if (meses[recorrencia]) d.setMonth(d.getMonth() + meses[recorrencia]);
   return d.toISOString().slice(0, 10);
@@ -269,7 +276,10 @@ function Financeiro() {
   const rotuloPedido = useMemo(() => {
     const mapa = new Map<string, string>();
     for (const p of pedidos) {
-      mapa.set(p.id, `${p.numero ?? p.id.slice(0, 8)}${p.cliente_nome ? ` · ${p.cliente_nome}` : ""}`);
+      mapa.set(
+        p.id,
+        `${p.numero ?? p.id.slice(0, 8)}${p.cliente_nome ? ` · ${p.cliente_nome}` : ""}`,
+      );
     }
     return mapa;
   }, [pedidos]);
@@ -475,7 +485,6 @@ function Financeiro() {
 
       const { error } = await supabase.from("lancamentos_financeiros").delete().eq("id", id);
       if (error) throw error;
-
     },
     onSuccess: () => {
       toast.success("Lançamento excluído.");
@@ -549,23 +558,28 @@ function Financeiro() {
   const hoje = new Date();
   const mesAtual = hoje.toISOString().slice(0, 7);
   const doMes = lancamentos.filter((l) => l.data_competencia.slice(0, 7) === mesAtual);
-  const receitaMes = doMes.filter((l) => l.tipo_fluxo === "receita").reduce((s, l) => s + Number(l.valor), 0);
-  const despesaMes = doMes.filter((l) => l.tipo_fluxo === "despesa").reduce((s, l) => s + Number(l.valor), 0);
+  const ehEntrada = (t: string) => ["receita", "entrada"].includes(t?.toLowerCase());
+  const receitaMes = doMes
+    .filter((l) => ehEntrada(l.tipo_fluxo))
+    .reduce((s, l) => s + Number(l.valor), 0);
+  const despesaMes = doMes
+    .filter((l) => !ehEntrada(l.tipo_fluxo))
+    .reduce((s, l) => s + Number(l.valor), 0);
   const saldoMes = receitaMes - despesaMes;
   const previsto = doMes.reduce(
-    (s, l) => s + (l.tipo_fluxo === "receita" ? Number(l.valor) : -Number(l.valor)),
+    (s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor) : -Number(l.valor)),
     0,
   );
   const realizado = doMes
     .filter((l) => l.status?.toLowerCase() === "pago")
-    .reduce((s, l) => s + (l.tipo_fluxo === "receita" ? Number(l.valor) : -Number(l.valor)), 0);
+    .reduce((s, l) => s + (ehEntrada(l.tipo_fluxo) ? Number(l.valor) : -Number(l.valor)), 0);
 
   const grafico = useMemo(() => {
     const meses: Record<string, { mes: string; receita: number; despesa: number }> = {};
     for (const l of lancamentos) {
       const key = l.data_competencia.slice(0, 7);
       if (!meses[key]) meses[key] = { mes: mesLabel(l.data_competencia), receita: 0, despesa: 0 };
-      if (l.tipo_fluxo === "receita") meses[key].receita += Number(l.valor);
+      if (ehEntrada(l.tipo_fluxo)) meses[key].receita += Number(l.valor);
       else meses[key].despesa += Number(l.valor);
     }
     return Object.entries(meses)
@@ -582,342 +596,414 @@ function Financeiro() {
         subtitle="Lançamentos financeiros, evolução mensal e conciliação bancária."
         actions={
           <>
-          <LancarEmLote destino="financeiro" />
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild onClick={() => { setEditando(null); setForm(vazio); }}>
-              <Button>
-                <Plus /> Novo lançamento
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{editando ? "Editar lançamento" : "Novo lançamento"}</DialogTitle>
-                <DialogDescription>
-                  {editando ? "Altere os dados e salve para atualizar o lançamento." : "Receita ou despesa do fluxo de caixa."}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Dados do lançamento</h3>
-<Field label="Tipo">
-                  <Select value={form.tipo_fluxo} onValueChange={set("tipo_fluxo")}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="receita">Receita</SelectItem>
-                      <SelectItem value="despesa">Despesa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Fornecedor">
-                  <Select
-                    value={form.fornecedor_id || "none"}
-                    onValueChange={(v) => set("fornecedor_id")(v === "none" ? "" : v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {fornecedores.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                 </Field>
-                                 <Field label="Descrição" className="sm:col-span-2">
-                  <Input value={form.descricao} onChange={(e) => set("descricao")(e.target.value)} />
-                </Field>
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Valores e categorias</h3>
-                {!ratear && (
-                <Field label="Categoria">
-                  <Select value={form.categoria} onValueChange={set("categoria")}>
-                    <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
-                    <SelectContent>
-                      {categoriasDb.filter(c => c.tipo === "ambas" || c.tipo === (form.tipo_fluxo === "despesa" ? "pagar" : "receber")).map(c => <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                )}
-                <Field label="Valor (R$)">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.valor}
-                    onChange={(e) => set("valor")(e.target.value)}
-                  />
-                </Field>
-                <div className="rounded-lg border p-3 sm:col-span-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium">Rateio de categorias</p>
-                      <p className="text-xs text-muted-foreground">
-                        Um único lançamento dividido entre várias categorias no DRE e nos relatórios.
-                      </p>
-                    </div>
-                    <Switch checked={ratear} onCheckedChange={setRatear} aria-label="Ativar rateio" />
-                  </div>
-
-                  {ratear && (
-                    <div className="mt-3 space-y-2">
-                      {rateio.map((linha, i) => (
-                        <div key={i} className="flex items-end gap-2">
-                          <div className="flex-1">
-                            <Select
-                              value={linha.categoria}
-                              onValueChange={(v) =>
-                                setRateio((r) =>
-                                  r.map((x, j) => (j === i ? { ...x, categoria: v } : x)),
-                                )
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Categoria" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {categoriasDb
-                                  .filter(
-                                    (c) =>
-                                      c.tipo === "ambas" ||
-                                      (form.tipo_fluxo === "despesa" ? c.tipo === "pagar" : c.tipo === "receber"),
-                                  )
-                                  .map((c) => (
-                                    <SelectItem key={c.id} value={c.nome}>
-                                      {c.nome}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Input
-                            className="w-32"
-                            type="number"
-                            step="0.01"
-                            placeholder="0,00"
-                            value={linha.valor}
-                            onChange={(e) =>
-                              setRateio((r) =>
-                                r.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)),
-                              )
-                            }
-                          />
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            aria-label="Remover linha"
-                            onClick={() => setRateio((r) => r.filter((_, j) => j !== i))}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setRateio((r) => [...r, { categoria: "", valor: "" }])}
-                        >
-                          <Plus /> Adicionar categoria
-                        </Button>
-                        <p
-                          className={
-                            Math.abs(diferencaRateio) > 0.005
-                              ? "text-xs font-medium text-destructive"
-                              : "text-xs font-medium text-emerald-600"
-                          }
-                        >
-                          Rateado {brl(somaRateio)} de {brl(totalLancamento)}
-                          {Math.abs(diferencaRateio) > 0.005
-                            ? ` — faltam ${brl(diferencaRateio)}`
-                            : " — valores conferem"}
+            <LancarEmLote destino="financeiro" />
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger
+                asChild
+                onClick={() => {
+                  setEditando(null);
+                  setForm(vazio);
+                }}
+              >
+                <Button>
+                  <Plus /> Novo lançamento
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>{editando ? "Editar lançamento" : "Novo lançamento"}</DialogTitle>
+                  <DialogDescription>
+                    {editando
+                      ? "Altere os dados e salve para atualizar o lançamento."
+                      : "Receita ou despesa do fluxo de caixa."}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                    Dados do lançamento
+                  </h3>
+                  <Field label="Tipo">
+                    <Select value={form.tipo_fluxo} onValueChange={set("tipo_fluxo")}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="receita">Receita</SelectItem>
+                        <SelectItem value="despesa">Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Fornecedor">
+                    <Select
+                      value={form.fornecedor_id || "none"}
+                      onValueChange={(v) => set("fornecedor_id")(v === "none" ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nenhum" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {fornecedores.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Descrição" className="sm:col-span-2">
+                    <Input
+                      value={form.descricao}
+                      onChange={(e) => set("descricao")(e.target.value)}
+                    />
+                  </Field>
+                  <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                    Valores e categorias
+                  </h3>
+                  {!ratear && (
+                    <Field label="Categoria">
+                      <Select value={form.categoria} onValueChange={set("categoria")}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categoriasDb
+                            .filter(
+                              (c) =>
+                                c.tipo === "ambas" ||
+                                c.tipo === (form.tipo_fluxo === "despesa" ? "pagar" : "receber"),
+                            )
+                            .map((c) => (
+                              <SelectItem key={c.id} value={c.nome}>
+                                {c.nome}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+                  <Field label="Valor (R$)">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={form.valor}
+                      onChange={(e) => set("valor")(e.target.value)}
+                    />
+                  </Field>
+                  <div className="rounded-lg border p-3 sm:col-span-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">Rateio de categorias</p>
+                        <p className="text-xs text-muted-foreground">
+                          Um único lançamento dividido entre várias categorias no DRE e nos
+                          relatórios.
                         </p>
                       </div>
+                      <Switch
+                        checked={ratear}
+                        onCheckedChange={setRatear}
+                        aria-label="Ativar rateio"
+                      />
                     </div>
-                  )}
-                </div>
 
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Pagamento e recorrência</h3>
-                <Field label="Status">
-                  <Select value={form.status} onValueChange={set("status")}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Pendente">Pendente</SelectItem>
-                      <SelectItem value="Pago">Pago</SelectItem>
-                      <SelectItem value="Cancelado">Cancelado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Competência">
-                  <Input
-                    type="date"
-                    value={form.data_competencia}
-                    onChange={(e) => set("data_competencia")(e.target.value)}
-                  />
-                </Field>
-                <Field label="Vencimento">
-                  <Input
-                    type="date"
-                    value={form.vencimento}
-                    onChange={(e) => set("vencimento")(e.target.value)}
-                  />
-                </Field>
-                <Field label="Recorrência">
-                  <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RECORRENCIAS.map((r) => (
-                        <SelectItem key={r.v} value={r.v}>
-                          {r.r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {form.recorrencia !== "nenhuma" && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Ao marcar como pago, o próximo lançamento é gerado automaticamente.
-                    </p>
-                  )}
-                </Field>
-                <Field label="Data de pagamento">
-                  <Input
-                    type="date"
-                    value={form.data_pagamento}
-                    onChange={(e) => set("data_pagamento")(e.target.value)}
-                  />
-                </Field>
-                <Field label="Comprovante">
-                  <ComprovanteAnexo
-                    tabela="lancamentos_financeiros"
-                    valor={form.comprovante_path}
-                    onChange={(comprovante_path) => setForm({ ...form, comprovante_path })}
-                  />
-                </Field>
-                <Field
-                  label={
-                    form.tipo_fluxo === "despesa"
-                      ? "De onde o recurso sai (conta)"
-                      : "Onde o recurso entra (conta)"
-                  }
-                >
-                  <Select
-                    value={form.conta_bancaria}
-                    onValueChange={(v) => set("conta_bancaria")(v)}
+                    {ratear && (
+                      <div className="mt-3 space-y-2">
+                        {rateio.map((linha, i) => (
+                          <div key={i} className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <Select
+                                value={linha.categoria}
+                                onValueChange={(v) =>
+                                  setRateio((r) =>
+                                    r.map((x, j) => (j === i ? { ...x, categoria: v } : x)),
+                                  )
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Categoria" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {categoriasDb
+                                    .filter(
+                                      (c) =>
+                                        c.tipo === "ambas" ||
+                                        (form.tipo_fluxo === "despesa"
+                                          ? c.tipo === "pagar"
+                                          : c.tipo === "receber"),
+                                    )
+                                    .map((c) => (
+                                      <SelectItem key={c.id} value={c.nome}>
+                                        {c.nome}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Input
+                              className="w-32"
+                              type="number"
+                              step="0.01"
+                              placeholder="0,00"
+                              value={linha.valor}
+                              onChange={(e) =>
+                                setRateio((r) =>
+                                  r.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)),
+                                )
+                              }
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              aria-label="Remover linha"
+                              onClick={() => setRateio((r) => r.filter((_, j) => j !== i))}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setRateio((r) => [...r, { categoria: "", valor: "" }])}
+                          >
+                            <Plus /> Adicionar categoria
+                          </Button>
+                          <p
+                            className={
+                              Math.abs(diferencaRateio) > 0.005
+                                ? "text-xs font-medium text-destructive"
+                                : "text-xs font-medium text-emerald-600"
+                            }
+                          >
+                            Rateado {brl(somaRateio)} de {brl(totalLancamento)}
+                            {Math.abs(diferencaRateio) > 0.005
+                              ? ` — faltam ${brl(diferencaRateio)}`
+                              : " — valores conferem"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                    Pagamento e recorrência
+                  </h3>
+                  <Field label="Status">
+                    <Select value={form.status} onValueChange={set("status")}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Pendente">Pendente</SelectItem>
+                        <SelectItem value="Pago">Pago</SelectItem>
+                        <SelectItem value="Cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Competência">
+                    <Input
+                      type="date"
+                      value={form.data_competencia}
+                      onChange={(e) => set("data_competencia")(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Vencimento">
+                    <Input
+                      type="date"
+                      value={form.vencimento}
+                      onChange={(e) => set("vencimento")(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Recorrência">
+                    <Select value={form.recorrencia} onValueChange={set("recorrencia")}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RECORRENCIAS.map((r) => (
+                          <SelectItem key={r.v} value={r.v}>
+                            {r.r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.recorrencia !== "nenhuma" && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Ao marcar como pago, o próximo lançamento é gerado automaticamente.
+                      </p>
+                    )}
+                  </Field>
+                  <Field label="Data de pagamento">
+                    <Input
+                      type="date"
+                      value={form.data_pagamento}
+                      onChange={(e) => set("data_pagamento")(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Comprovante">
+                    <ComprovanteAnexo
+                      tabela="lancamentos_financeiros"
+                      valor={form.comprovante_path}
+                      onChange={(comprovante_path) => setForm({ ...form, comprovante_path })}
+                    />
+                  </Field>
+                  <Field
+                    label={
+                      form.tipo_fluxo === "despesa"
+                        ? "De onde o recurso sai (conta)"
+                        : "Onde o recurso entra (conta)"
+                    }
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a conta" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contasBancarias.map((c) => (
-                        <SelectItem key={c.id} value={c.conta}>
-                          {c.conta}
-                          {c.banco ? ` — ${c.banco}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Forma de pagamento">
-                  <Select value={form.forma_pagamento} onValueChange={set("forma_pagamento")}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FORMAS_PAGAMENTO.map((f) => (
-                        <SelectItem key={f} value={f}>
-                          {f}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Vínculos e documento</h3>
-                <Field label="Pedido vinculado">
-                  <Select value={form.venda_id || "none"} onValueChange={(v) => set("venda_id")(v === "none" ? "" : v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {pedidos.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.numero ?? p.id.slice(0, 8)} · {p.cliente_nome ?? "—"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-{form.tipo_fluxo === "despesa" && (
-                   <Field label="Tipo de despesa">
-                     <Select
-                       value={form.tipo_despesa || "none"}
-                       onValueChange={(v) => set("tipo_despesa")(v === "none" ? "" : v)}
-                     >
-                       <SelectTrigger>
-                         <SelectValue placeholder="Selecione" />
-                       </SelectTrigger>
-                       <SelectContent>
-                         <SelectItem value="none">Não classificado</SelectItem>
-                         <SelectItem value="fixa">Despesa fixa</SelectItem>
-                         <SelectItem value="variavel">Despesa variável</SelectItem>
+                    <Select
+                      value={form.conta_bancaria}
+                      onValueChange={(v) => set("conta_bancaria")(v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a conta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contasBancarias.map((c) => (
+                          <SelectItem key={c.id} value={c.conta}>
+                            {c.conta}
+                            {c.banco ? ` — ${c.banco}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Forma de pagamento">
+                    <Select value={form.forma_pagamento} onValueChange={set("forma_pagamento")}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FORMAS_PAGAMENTO.map((f) => (
+                          <SelectItem key={f} value={f}>
+                            {f}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">
+                    Vínculos e documento
+                  </h3>
+                  <Field label="Pedido vinculado">
+                    <Select
+                      value={form.venda_id || "none"}
+                      onValueChange={(v) => set("venda_id")(v === "none" ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nenhum" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {pedidos.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.numero ?? p.id.slice(0, 8)} · {p.cliente_nome ?? "—"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  {form.tipo_fluxo === "despesa" && (
+                    <Field label="Tipo de despesa">
+                      <Select
+                        value={form.tipo_despesa || "none"}
+                        onValueChange={(v) => set("tipo_despesa")(v === "none" ? "" : v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Não classificado</SelectItem>
+                          <SelectItem value="fixa">Despesa fixa</SelectItem>
+                          <SelectItem value="variavel">Despesa variável</SelectItem>
                           <SelectItem value="operacional">Despesa operacional</SelectItem>
                           <SelectItem value="pessoal">Despesa pessoal</SelectItem>
-                       </SelectContent>
-                     </Select>
-                   </Field>
-                 )}
-                 <Field label="Funcionário vinculado">
-                  <Select
-                    value={form.funcionario_id || "none"}
-                    onValueChange={(v) => set("funcionario_id")(v === "none" ? "" : v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nenhum" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {funcionarios.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <VinculoField value={form.vinculo} onChange={v=>setForm(f=>({...f,vinculo:v}))} />
-              <Field label="Número do documento / NF-e"><Input value={form.numero_documento} onChange={e=>setForm(f=>({...f,numero_documento:e.target.value}))}/></Field>
-<h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
-              <Field label="Observações" className="sm:col-span-2">
-                  <Textarea
-                    rows={3}
-                    value={form.observacoes}
-                    onChange={(e) => set("observacoes")(e.target.value)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+                  <Field label="Funcionário vinculado">
+                    <Select
+                      value={form.funcionario_id || "none"}
+                      onValueChange={(v) => set("funcionario_id")(v === "none" ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nenhum" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {funcionarios.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <VinculoField
+                    value={form.vinculo}
+                    onChange={(v) => setForm((f) => ({ ...f, vinculo: v }))}
                   />
-                </Field>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                  {salvar.isPending ? "Salvando…" : editando ? "Salvar alterações" : "Salvar lançamento"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  <Field label="Número do documento / NF-e">
+                    <Input
+                      value={form.numero_documento}
+                      onChange={(e) => setForm((f) => ({ ...f, numero_documento: e.target.value }))}
+                    />
+                  </Field>
+                  <h3 className="border-b pb-2 text-sm font-semibold sm:col-span-2">Observações</h3>
+                  <Field label="Observações" className="sm:col-span-2">
+                    <Textarea
+                      rows={3}
+                      value={form.observacoes}
+                      onChange={(e) => set("observacoes")(e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+                    {salvar.isPending
+                      ? "Salvando…"
+                      : editando
+                        ? "Salvar alterações"
+                        : "Salvar lançamento"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Receitas do mês" value={brl(receitaMes)} tone="positive" to="/contas" search={{ periodo: "mes", tipo: "receber" }} />
-        <Kpi label="Despesas do mês" value={brl(despesaMes)} tone="negative" to="/contas" search={{ periodo: "mes", tipo: "pagar" }} />
-        <Kpi label="Saldo do mês" value={brl(saldoMes)} tone={saldoMes >= 0 ? "positive" : "negative"} to="/fluxo-caixa" />
+        <Kpi
+          label="Receitas do mês"
+          value={brl(receitaMes)}
+          tone="positive"
+          to="/contas"
+          search={{ periodo: "mes", tipo: "receber" }}
+        />
+        <Kpi
+          label="Despesas do mês"
+          value={brl(despesaMes)}
+          tone="negative"
+          to="/contas"
+          search={{ periodo: "mes", tipo: "pagar" }}
+        />
+        <Kpi
+          label="Saldo do mês"
+          value={brl(saldoMes)}
+          tone={saldoMes >= 0 ? "positive" : "negative"}
+          to="/fluxo-caixa"
+        />
         <Kpi
           label="Previsto x Realizado"
           value={`${brl(realizado)} / ${brl(previsto)}`}
@@ -926,7 +1012,9 @@ function Financeiro() {
         />
       </div>
 
-      <TelaPermitida tela="saldos"><SaldosBancarios /></TelaPermitida>
+      <TelaPermitida tela="saldos">
+        <SaldosBancarios />
+      </TelaPermitida>
 
       <Tabs defaultValue="lancamentos">
         <TabsList>
@@ -959,8 +1047,18 @@ function Financeiro() {
                     }}
                   />
                   <Legend />
-                  <Bar dataKey="receita" name="Receita" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="despesa" name="Despesa" fill="var(--chart-3)" radius={[6, 6, 0, 0]} />
+                  <Bar
+                    dataKey="receita"
+                    name="Receita"
+                    fill="var(--chart-1)"
+                    radius={[6, 6, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="despesa"
+                    name="Despesa"
+                    fill="var(--chart-3)"
+                    radius={[6, 6, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -1066,7 +1164,7 @@ function Financeiro() {
                           </Badge>
                         </TableCell>
                         <TableCell>{l.categoria}</TableCell>
-                         <TableCell className="max-w-[220px] truncate">
+                        <TableCell className="max-w-[220px] truncate">
                           {l.descricao}
                           {rotuloRecorrencia(l.recorrencia) && (
                             <Badge variant="outline" className="ml-2 text-[10px]">
@@ -1093,7 +1191,15 @@ function Financeiro() {
                           {brl(l.valor)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={l.status?.toLowerCase() === "pago" ? "secondary" : l.status === "Cancelado" ? "outline" : "default"}>
+                          <Badge
+                            variant={
+                              l.status?.toLowerCase() === "pago"
+                                ? "secondary"
+                                : l.status === "Cancelado"
+                                  ? "outline"
+                                  : "default"
+                            }
+                          >
                             {l.status}
                           </Badge>
                         </TableCell>
@@ -1101,7 +1207,9 @@ function Financeiro() {
                           <Button
                             variant={l.conciliado ? "secondary" : "outline"}
                             size="sm"
-                            onClick={() => toggleConciliado.mutate({ id: l.id, valor: !l.conciliado })}
+                            onClick={() =>
+                              toggleConciliado.mutate({ id: l.id, valor: !l.conciliado })
+                            }
                           >
                             <Link2 className="size-3.5" /> {l.conciliado ? "Sim" : "Não"}
                           </Button>
@@ -1131,24 +1239,34 @@ function Financeiro() {
                               >
                                 <CheckCircle2 className="size-4" />
                               </Button>
-                             )}
-                             {l.status === "Pago" && (
-                               <Button
-                                 variant="ghost"
-                                 size="icon"
-                                 onClick={() => {
-                                   if (window.confirm(`Reverter a baixa de "${l.descricao}"?`))
-                                     reverterBaixa.mutate(l.id);
-                                 }}
-                                 title="Reverter baixa"
-                               >
-                                 <RotateCcw className="size-4" />
-                               </Button>
-                             )}
-                             <Button variant="ghost" size="icon" onClick={() => abrirEdicao(l)} title="Editar">
-                               <Pencil className="size-4" />
-                             </Button>
-                             <Button variant="ghost" size="icon" onClick={() => excluir.mutate(l.id)} title="Excluir">
+                            )}
+                            {l.status === "Pago" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  if (window.confirm(`Reverter a baixa de "${l.descricao}"?`))
+                                    reverterBaixa.mutate(l.id);
+                                }}
+                                title="Reverter baixa"
+                              >
+                                <RotateCcw className="size-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => abrirEdicao(l)}
+                              title="Editar"
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => excluir.mutate(l.id)}
+                              title="Excluir"
+                            >
                               <Trash2 className="size-4" />
                             </Button>
                           </div>
@@ -1170,7 +1288,10 @@ function Financeiro() {
         </TabsContent>
 
         <TabsContent value="conciliacao">
-          <Conciliacao lancamentos={lancamentos} onConciliar={(id) => toggleConciliado.mutate({ id, valor: true })} />
+          <Conciliacao
+            lancamentos={lancamentos}
+            onConciliar={(id) => toggleConciliado.mutate({ id, valor: true })}
+          />
         </TabsContent>
       </Tabs>
 
@@ -1230,9 +1351,7 @@ function Financeiro() {
             </Button>
             <Button
               disabled={
-                !baixa ||
-                marcarPago.isPending ||
-                (contasBancarias.length > 0 && !baixa.conta)
+                !baixa || marcarPago.isPending || (contasBancarias.length > 0 && !baixa.conta)
               }
               onClick={() =>
                 baixa &&
@@ -1300,8 +1419,8 @@ function Conciliacao({
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Cole ou envie um extrato simples no formato <code>data;descricao;valor</code> (uma linha por
-            transação, data no formato AAAA-MM-DD).
+            Cole ou envie um extrato simples no formato <code>data;descricao;valor</code> (uma linha
+            por transação, data no formato AAAA-MM-DD).
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Input

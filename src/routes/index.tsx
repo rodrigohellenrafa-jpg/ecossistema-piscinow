@@ -45,7 +45,8 @@ export const Route = createFileRoute("/")({
       { title: "Painel Executivo | Piscinow ERP" },
       {
         name: "description",
-        content: "Agenda, saldo, vencimentos e ponto de equilíbrio da Piscinow em uma visão diária.",
+        content:
+          "Agenda, saldo, vencimentos e ponto de equilíbrio da Piscinow em uma visão diária.",
       },
       { property: "og:title", content: "Painel Executivo | Piscinow ERP" },
       {
@@ -83,9 +84,20 @@ type AgendaItem = {
   obra: boolean;
 };
 
-function AcessoCard({ to, children }: { to: "/agenda" | "/fluxo-caixa" | "/contas" | "/dre"; children: string }) {
+function AcessoCard({
+  to,
+  children,
+}: {
+  to: "/agenda" | "/fluxo-caixa" | "/contas" | "/dre";
+  children: string;
+}) {
   return (
-    <Button asChild size="sm" variant="ghost" className="h-7 shrink-0 gap-1 rounded-md px-2 text-xs">
+    <Button
+      asChild
+      size="sm"
+      variant="ghost"
+      className="h-7 shrink-0 gap-1 rounded-md px-2 text-xs"
+    >
       <Link to={to} search={to === "/contas" ? { periodo: "hoje", tipo: undefined } : undefined}>
         {children} <ArrowRight className="size-3.5" />
       </Link>
@@ -175,7 +187,9 @@ function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("obras")
-        .select("id, numero, cliente_nome, tipo_servico, responsavel, data_limite, escavacao_inicio, escavacao_fim, instalacao_inicio, instalacao_fim")
+        .select(
+          "id, numero, cliente_nome, tipo_servico, responsavel, data_limite, escavacao_inicio, escavacao_fim, instalacao_inicio, instalacao_fim",
+        )
         .eq("selecionada", true);
       if (error) throw error;
       return data;
@@ -194,7 +208,11 @@ function Dashboard() {
       const unicas = new Map<string, { conta: string; banco: string | null; saldo: number }>();
       for (const item of data ?? []) {
         if (!unicas.has(item.conta)) {
-          unicas.set(item.conta, { conta: item.conta, banco: item.banco, saldo: numero(item.saldo) });
+          unicas.set(item.conta, {
+            conta: item.conta,
+            banco: item.banco,
+            saldo: numero(item.saldo),
+          });
         }
       }
       return [...unicas.values()];
@@ -206,7 +224,9 @@ function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("id, tipo, descricao, parceiro, valor, valor_pago, valor_juros, valor_desconto, status, vencimento, data_pagamento");
+        .select(
+          "id, tipo, descricao, parceiro, valor, valor_pago, valor_juros, valor_desconto, status, vencimento, data_pagamento",
+        );
       if (error) throw error;
       return data;
     },
@@ -217,7 +237,9 @@ function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lancamentos_financeiros")
-        .select("id, tipo_fluxo, categoria, descricao, valor, status, data_competencia, data_pagamento");
+        .select(
+          "id, tipo_fluxo, categoria, descricao, valor, status, data_competencia, data_pagamento",
+        );
       if (error) throw error;
       return data;
     },
@@ -317,7 +339,9 @@ function Dashboard() {
           id: `obra-${obra.id}-${campo}`,
           data,
           titulo: `${obra.numero ?? "Obra"} · ${rotulo}`,
-          detalhe: [obra.cliente_nome, obra.tipo_servico, obra.responsavel].filter(Boolean).join(" · "),
+          detalhe: [obra.cliente_nome, obra.tipo_servico, obra.responsavel]
+            .filter(Boolean)
+            .join(" · "),
           obra: true,
         });
       }
@@ -351,8 +375,10 @@ function Dashboard() {
       else saidas += valor;
     }
     for (const lancamento of lancamentos) {
-      if (lancamento.status !== "Pago" || texto(lancamento.data_pagamento).slice(0, 10) !== ontem) continue;
-      if (lancamento.tipo_fluxo === "receita") entradas += numero(lancamento.valor);
+      if (lancamento.status !== "Pago" || texto(lancamento.data_pagamento).slice(0, 10) !== ontem)
+        continue;
+      const ehReceita = ["receita", "entrada"].includes(texto(lancamento.tipo_fluxo).toLowerCase());
+      if (ehReceita) entradas += numero(lancamento.valor);
       else saidas += numero(lancamento.valor);
     }
     return { entradas, saidas, resultado: entradas - saidas };
@@ -365,11 +391,16 @@ function Dashboard() {
     for (const conta of contas) {
       if (!ehBaixado(conta.status) || texto(conta.data_pagamento).slice(0, 10) !== hoje) continue;
       const valor = valorMovimentado(conta);
-      (conta.tipo === "receber" ? entradas : saidas).push({ descricao: texto(conta.descricao), valor });
+      (conta.tipo === "receber" ? entradas : saidas).push({
+        descricao: texto(conta.descricao),
+        valor,
+      });
     }
     for (const lancamento of lancamentos) {
-      if (lancamento.status !== "Pago" || texto(lancamento.data_pagamento).slice(0, 10) !== hoje) continue;
-      (lancamento.tipo_fluxo === "receita" ? entradas : saidas).push({
+      if (lancamento.status !== "Pago" || texto(lancamento.data_pagamento).slice(0, 10) !== hoje)
+        continue;
+      const ehReceita = ["receita", "entrada"].includes(texto(lancamento.tipo_fluxo).toLowerCase());
+      (ehReceita ? entradas : saidas).push({
         descricao: texto(lancamento.descricao),
         valor: numero(lancamento.valor),
       });
@@ -383,7 +414,11 @@ function Dashboard() {
   const faturamento = vendas.reduce((soma, venda) => soma + numero(venda.valor_total), 0);
   const custosVariaveis = vendas.reduce(
     (soma, venda) =>
-      soma + numero(venda.custo_total) + numero(venda.valor_impostos) + numero(venda.valor_frete) + numero(venda.valor_mao_obra),
+      soma +
+      numero(venda.custo_total) +
+      numero(venda.valor_impostos) +
+      numero(venda.valor_frete) +
+      numero(venda.valor_mao_obra),
     0,
   );
   const despesasLancadas = lancamentos
@@ -393,15 +428,18 @@ function Dashboard() {
     (soma, conta) => soma + numero(conta.valor) + numero(conta.valor_juros),
     0,
   );
-  const folha = funcionarios.reduce((soma, funcionario) => soma + numero(funcionario.salario_base), 0);
+  const folha = funcionarios.reduce(
+    (soma, funcionario) => soma + numero(funcionario.salario_base),
+    0,
+  );
   const taxas = retencoes.reduce((soma, item) => soma + numero(item.retencao_financeira), 0);
   const despesasFixas = despesasLancadas + despesasPagas + folha + taxas;
-  const margemContribuicao = faturamento > 0 ? Math.max(0, (faturamento - custosVariaveis) / faturamento) : 0;
+  const margemContribuicao =
+    faturamento > 0 ? Math.max(0, (faturamento - custosVariaveis) / faturamento) : 0;
   const pontoEquilibrio = margemContribuicao > 0 ? despesasFixas / margemContribuicao : 0;
-  const percentualEquilibrio = pontoEquilibrio > 0 ? Math.min(100, (faturamento / pontoEquilibrio) * 100) : 0;
-  const dadosEquilibrio = [
-    { nome: "Mês atual", faturamento, equilibrio: pontoEquilibrio },
-  ];
+  const percentualEquilibrio =
+    pontoEquilibrio > 0 ? Math.min(100, (faturamento / pontoEquilibrio) * 100) : 0;
+  const dadosEquilibrio = [{ nome: "Mês atual", faturamento, equilibrio: pontoEquilibrio }];
 
   return (
     <div className="space-y-3">
@@ -415,7 +453,11 @@ function Dashboard() {
         }
       />
       {aviso && (
-        <button type="button" onClick={() => setDetalhe("mensagem")} className="w-full truncate rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-left text-sm">
+        <button
+          type="button"
+          onClick={() => setDetalhe("mensagem")}
+          className="w-full truncate rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-left text-sm"
+        >
           <strong>Aviso:</strong> {aviso}
         </button>
       )}
@@ -428,7 +470,11 @@ function Dashboard() {
           if (card) setDetalhe(card.dataset.detalhe as Detalhe);
         }}
       >
-        <Card data-detalhe="agenda" style={estiloCard(acento.agenda)} className="min-w-0 overflow-hidden">
+        <Card
+          data-detalhe="agenda"
+          style={estiloCard(acento.agenda)}
+          className="min-w-0 overflow-hidden"
+        >
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
               <CalendarDays className="size-3.5 shrink-0" style={{ color: acento.agenda }} /> Agenda
@@ -448,7 +494,9 @@ function Dashboard() {
                   {obrasHoje.slice(0, 3).map((item) => (
                     <div key={item.id} className="border-l-2 border-primary pl-2">
                       <p className="truncate text-xs font-medium">{item.titulo}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {item.detalhe || "Sem detalhes"}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -456,16 +504,26 @@ function Dashboard() {
             </div>
             <div className="space-y-0.5">
               {agendaSemana.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">Nenhum compromisso nesta semana.</p>
+                <p className="py-6 text-center text-xs text-muted-foreground">
+                  Nenhum compromisso nesta semana.
+                </p>
               ) : (
                 agendaSemana.slice(0, 6).map((item) => (
-                  <div key={item.id} className="flex gap-2 border-b border-border py-1.5 last:border-0">
+                  <div
+                    key={item.id}
+                    className="flex gap-2 border-b border-border py-1.5 last:border-0"
+                  >
                     <div className="w-12 shrink-0 text-[11px] font-medium text-muted-foreground">
-                      {new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" })}
+                      {new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", {
+                        weekday: "short",
+                        day: "2-digit",
+                      })}
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium">{item.titulo}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {item.detalhe || "Sem detalhes"}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -474,17 +532,26 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="saldo" style={estiloCard(acento.saldo)} className="min-w-0 overflow-hidden">
+        <Card
+          data-detalhe="saldo"
+          style={estiloCard(acento.saldo)}
+          className="min-w-0 overflow-hidden"
+        >
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Landmark className="size-3.5 shrink-0" style={{ color: acento.saldo }} /> Saldo · ontem
+              <Landmark className="size-3.5 shrink-0" style={{ color: acento.saldo }} /> Saldo ·
+              ontem
             </CardTitle>
             <AcessoCard to="/fluxo-caixa">Fluxo</AcessoCard>
           </CardHeader>
           <CardContent className="space-y-2 p-3 pt-2">
             <div>
-              <p className="text-[11px] font-medium uppercase text-muted-foreground">Saldo nas contas</p>
-              <p className={`text-xl font-semibold tabular-nums ${saldoTotal < 0 ? "text-destructive" : "text-success"}`}>
+              <p className="text-[11px] font-medium uppercase text-muted-foreground">
+                Saldo nas contas
+              </p>
+              <p
+                className={`text-xl font-semibold tabular-nums ${saldoTotal < 0 ? "text-destructive" : "text-success"}`}
+              >
                 {brl(saldoTotal)}
               </p>
             </div>
@@ -492,39 +559,64 @@ function Dashboard() {
               <div className="divide-y divide-border">
                 <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
                 <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
-                <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
+                <ResumoValor
+                  label="Resultado ontem"
+                  valor={fluxoOntem.resultado}
+                  positivo={fluxoOntem.resultado >= 0}
+                />
               </div>
             </div>
             {(fluxoHoje.entradas.length > 0 || fluxoHoje.saidas.length > 0) && (
               <div className="space-y-0.5">
                 <p className="text-[11px] font-medium uppercase text-muted-foreground">Hoje</p>
                 {fluxoHoje.entradas.length > 0 && (
-                  <p className="truncate text-[11px] tabular-nums text-success" title={fluxoHoje.entradas.map((m) => `${m.descricao} ${brl(m.valor)}`).join(" · ")}>
+                  <p
+                    className="truncate text-[11px] tabular-nums text-success"
+                    title={fluxoHoje.entradas
+                      .map((m) => `${m.descricao} ${brl(m.valor)}`)
+                      .join(" · ")}
+                  >
                     + {fluxoHoje.entradas.map((m) => brl(m.valor)).join(" · ")}
                   </p>
                 )}
                 {fluxoHoje.saidas.length > 0 && (
-                  <p className="truncate text-[11px] tabular-nums text-destructive" title={fluxoHoje.saidas.map((m) => `${m.descricao} ${brl(m.valor)}`).join(" · ")}>
+                  <p
+                    className="truncate text-[11px] tabular-nums text-destructive"
+                    title={fluxoHoje.saidas
+                      .map((m) => `${m.descricao} ${brl(m.valor)}`)
+                      .join(" · ")}
+                  >
                     − {fluxoHoje.saidas.map((m) => brl(m.valor)).join(" · ")}
                   </p>
                 )}
                 <p className="text-[11px] tabular-nums text-muted-foreground">
                   Saldo do dia:{" "}
-                  <strong className={fluxoHoje.saldo >= 0 ? "text-success" : "text-destructive"}>{brl(fluxoHoje.saldo)}</strong>
+                  <strong className={fluxoHoje.saldo >= 0 ? "text-success" : "text-destructive"}>
+                    {brl(fluxoHoje.saldo)}
+                  </strong>
                 </p>
               </div>
             )}
             <div className="space-y-1">
               {saldosContas.length === 0 ? (
-                <p className="py-4 text-center text-xs text-muted-foreground">Nenhuma conta bancária cadastrada.</p>
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                  Nenhuma conta bancária cadastrada.
+                </p>
               ) : (
                 saldosContas.slice(0, 2).map((conta) => (
-                  <div key={conta.conta} className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5">
+                  <div
+                    key={conta.conta}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5"
+                  >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium">{conta.conta}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">{conta.banco || "Conta bancária"}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {conta.banco || "Conta bancária"}
+                      </p>
                     </div>
-                    <span className={`shrink-0 text-xs font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}>
+                    <span
+                      className={`shrink-0 text-xs font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}
+                    >
                       {brl(conta.saldo)}
                     </span>
                   </div>
@@ -534,7 +626,11 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="contas" style={estiloCard(acento.contas)} className="min-w-0 overflow-hidden">
+        <Card
+          data-detalhe="contas"
+          style={estiloCard(acento.contas)}
+          className="min-w-0 overflow-hidden"
+        >
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
               <Waves className="size-3.5 shrink-0" style={{ color: acento.contas }} /> Venc. hoje
@@ -547,28 +643,41 @@ function Dashboard() {
                 <p className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                   <ArrowDownCircle className="size-3 text-destructive" /> A pagar
                 </p>
-                <p className="text-sm font-semibold tabular-nums text-destructive">{brl(totalPagarHoje)}</p>
+                <p className="text-sm font-semibold tabular-nums text-destructive">
+                  {brl(totalPagarHoje)}
+                </p>
                 <p className="text-[11px] text-muted-foreground">{pagarHoje.length} título(s)</p>
               </div>
               <div className="rounded-md border border-border p-2">
                 <p className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                   <ArrowUpCircle className="size-3 text-success" /> A receber
                 </p>
-                <p className="text-sm font-semibold tabular-nums text-success">{brl(totalReceberHoje)}</p>
+                <p className="text-sm font-semibold tabular-nums text-success">
+                  {brl(totalReceberHoje)}
+                </p>
                 <p className="text-[11px] text-muted-foreground">{receberHoje.length} título(s)</p>
               </div>
             </div>
             {contasHoje.length === 0 ? (
-              <p className="py-6 text-center text-xs text-muted-foreground">Nenhuma conta vence hoje.</p>
+              <p className="py-6 text-center text-xs text-muted-foreground">
+                Nenhuma conta vence hoje.
+              </p>
             ) : (
               <div className="space-y-0.5">
                 {contasHoje.slice(0, 6).map((conta) => (
-                  <div key={conta.id} className="flex items-center justify-between gap-2 border-b border-border py-1.5 last:border-0">
+                  <div
+                    key={conta.id}
+                    className="flex items-center justify-between gap-2 border-b border-border py-1.5 last:border-0"
+                  >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-medium">{conta.descricao}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">{conta.parceiro || "Sem beneficiário"} · {conta.status}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {conta.parceiro || "Sem beneficiário"} · {conta.status}
+                      </p>
                     </div>
-                    <span className={`shrink-0 text-xs font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}>
+                    <span
+                      className={`shrink-0 text-xs font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}
+                    >
                       {conta.tipo === "receber" ? "+" : "−"} {brl(numero(conta.valor))}
                     </span>
                   </div>
@@ -578,10 +687,15 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card data-detalhe="equilibrio" style={estiloCard(acento.equilibrio)} className="min-w-0 overflow-hidden">
+        <Card
+          data-detalhe="equilibrio"
+          style={estiloCard(acento.equilibrio)}
+          className="min-w-0 overflow-hidden"
+        >
           <CardHeader className="flex-row items-center justify-between gap-2 border-b border-border p-3 pb-2">
             <CardTitle className="flex min-w-0 items-center gap-1.5 truncate text-sm">
-              <Scale className="size-3.5 shrink-0" style={{ color: acento.equilibrio }} /> Equilíbrio
+              <Scale className="size-3.5 shrink-0" style={{ color: acento.equilibrio }} />{" "}
+              Equilíbrio
             </CardTitle>
             <AcessoCard to="/dre">DRE</AcessoCard>
           </CardHeader>
@@ -589,33 +703,81 @@ function Dashboard() {
             <div className="grid grid-cols-2 gap-2">
               <div className="min-w-0">
                 <p className="text-[11px] text-muted-foreground">Faturamento</p>
-                <p className="truncate text-xs font-semibold tabular-nums text-success">{brl(faturamento)}</p>
+                <p className="truncate text-xs font-semibold tabular-nums text-success">
+                  {brl(faturamento)}
+                </p>
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] text-muted-foreground">Para empatar</p>
-                <p className="truncate text-xs font-semibold tabular-nums">{brl(pontoEquilibrio)}</p>
+                <p className="truncate text-xs font-semibold tabular-nums">
+                  {brl(pontoEquilibrio)}
+                </p>
               </div>
             </div>
             <div className="h-28">
               {faturamento === 0 && pontoEquilibrio === 0 ? (
-                <p className="py-8 text-center text-xs text-muted-foreground">Ainda não há dados suficientes neste mês.</p>
+                <p className="py-8 text-center text-xs text-muted-foreground">
+                  Ainda não há dados suficientes neste mês.
+                </p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dadosEquilibrio} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+                  <BarChart
+                    data={dadosEquilibrio}
+                    margin={{ top: 8, right: 4, left: 4, bottom: 0 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                    <XAxis dataKey="nome" stroke="var(--muted-foreground)" fontSize={10} tickLine={false} />
-                    <YAxis stroke="var(--muted-foreground)" fontSize={10} width={52} tickFormatter={(v) => `${Math.round(Number(v) / 1000)} mil`} tickLine={false} />
-                    <Tooltip formatter={(v: number) => brl(Number(v))} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
-                    <ReferenceLine y={pontoEquilibrio} stroke="var(--destructive)" strokeDasharray="4 4" />
-                    <Bar dataKey="faturamento" name="Faturamento" fill="var(--success)" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="equilibrio" name="Ponto de equilíbrio" fill="var(--chart-4)" radius={[3, 3, 0, 0]} />
+                    <XAxis
+                      dataKey="nome"
+                      stroke="var(--muted-foreground)"
+                      fontSize={10}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      stroke="var(--muted-foreground)"
+                      fontSize={10}
+                      width={52}
+                      tickFormatter={(v) => `${Math.round(Number(v) / 1000)} mil`}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => brl(Number(v))}
+                      contentStyle={{
+                        background: "var(--card)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8,
+                        fontSize: 11,
+                      }}
+                    />
+                    <ReferenceLine
+                      y={pontoEquilibrio}
+                      stroke="var(--destructive)"
+                      strokeDasharray="4 4"
+                    />
+                    <Bar
+                      dataKey="faturamento"
+                      name="Faturamento"
+                      fill="var(--success)"
+                      radius={[3, 3, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="equilibrio"
+                      name="Ponto de equilíbrio"
+                      fill="var(--chart-4)"
+                      radius={[3, 3, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
             <div className="flex items-center justify-between gap-2 text-xs">
               <span className="text-muted-foreground">Progresso até o equilíbrio</span>
-              <strong className={faturamento >= pontoEquilibrio && pontoEquilibrio > 0 ? "text-success" : "text-warning"}>
+              <strong
+                className={
+                  faturamento >= pontoEquilibrio && pontoEquilibrio > 0
+                    ? "text-success"
+                    : "text-warning"
+                }
+              >
                 {percentualEquilibrio.toFixed(1)}%
               </strong>
             </div>
@@ -623,8 +785,22 @@ function Dashboard() {
         </Card>
       </div>
 
-      <Dialog open={detalhe !== null} onOpenChange={(aberto) => { if (!aberto) { setDetalhe(null); setExpandido(false); } }}>
-        <DialogContent className={expandido ? "max-h-[95vh] max-w-[95vw] overflow-y-auto" : "max-h-[85vh] max-w-lg overflow-y-auto"}>
+      <Dialog
+        open={detalhe !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) {
+            setDetalhe(null);
+            setExpandido(false);
+          }
+        }}
+      >
+        <DialogContent
+          className={
+            expandido
+              ? "max-h-[95vh] max-w-[95vw] overflow-y-auto"
+              : "max-h-[85vh] max-w-lg overflow-y-auto"
+          }
+        >
           <DialogHeader className="flex-row items-center justify-between gap-2 pr-8">
             <DialogTitle>
               {detalhe === "mensagem" && "Mensagem do dia"}
@@ -633,7 +809,13 @@ function Dashboard() {
               {detalhe === "contas" && "Contas que vencem hoje"}
               {detalhe === "equilibrio" && "Ponto de equilíbrio do mês"}
             </DialogTitle>
-            <Button size="icon" variant="ghost" className="size-7" onClick={() => setExpandido((v) => !v)} aria-label="Expandir">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              onClick={() => setExpandido((v) => !v)}
+              aria-label="Expandir"
+            >
               {expandido ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
             </Button>
           </DialogHeader>
@@ -645,7 +827,14 @@ function Dashboard() {
                   <p className="font-medium">Aviso da equipe</p>
                   {!editandoAviso ? (
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => { setRascunhoAviso(aviso); setEditandoAviso(true); }}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setRascunhoAviso(aviso);
+                          setEditandoAviso(true);
+                        }}
+                      >
                         <Pencil className="size-3.5" /> Editar
                       </Button>
                       {aviso && (
@@ -655,22 +844,49 @@ function Dashboard() {
                       )}
                     </div>
                   ) : (
-                    <Button size="sm" onClick={() => { salvarAviso(rascunhoAviso); setEditandoAviso(false); }}>Salvar</Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        salvarAviso(rascunhoAviso);
+                        setEditandoAviso(false);
+                      }}
+                    >
+                      Salvar
+                    </Button>
                   )}
                 </div>
                 {editandoAviso ? (
-                  <Textarea rows={4} value={rascunhoAviso} onChange={(e) => setRascunhoAviso(e.target.value)} placeholder="Escreva o aviso do dia..." />
+                  <Textarea
+                    rows={4}
+                    value={rascunhoAviso}
+                    onChange={(e) => setRascunhoAviso(e.target.value)}
+                    placeholder="Escreva o aviso do dia..."
+                  />
                 ) : (
-                  <p className="whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3">{aviso || "Nenhum aviso para hoje."}</p>
+                  <p className="whitespace-pre-wrap rounded-md border border-border bg-muted/40 p-3">
+                    {aviso || "Nenhum aviso para hoje."}
+                  </p>
                 )}
               </div>
               <div className="space-y-1">
                 <p className="font-medium">Resumo automático</p>
                 <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-                  <li>{obrasHoje.length} etapa(s) de obra hoje e {agendaSemana.length} compromisso(s) na semana.</li>
-                  <li>Saldo nas contas: <strong className="text-foreground">{brl(saldoTotal)}</strong>. Ontem entrou {brl(fluxoOntem.entradas)} e saiu {brl(fluxoOntem.saidas)}.</li>
-                  <li>Hoje: {pagarHoje.length} conta(s) a pagar ({brl(totalPagarHoje)}) e {receberHoje.length} a receber ({brl(totalReceberHoje)}).</li>
-                  <li>Faturamento do mês {brl(faturamento)} de {brl(pontoEquilibrio)} para empatar ({percentualEquilibrio.toFixed(1)}%).</li>
+                  <li>
+                    {obrasHoje.length} etapa(s) de obra hoje e {agendaSemana.length} compromisso(s)
+                    na semana.
+                  </li>
+                  <li>
+                    Saldo nas contas: <strong className="text-foreground">{brl(saldoTotal)}</strong>
+                    . Ontem entrou {brl(fluxoOntem.entradas)} e saiu {brl(fluxoOntem.saidas)}.
+                  </li>
+                  <li>
+                    Hoje: {pagarHoje.length} conta(s) a pagar ({brl(totalPagarHoje)}) e{" "}
+                    {receberHoje.length} a receber ({brl(totalReceberHoje)}).
+                  </li>
+                  <li>
+                    Faturamento do mês {brl(faturamento)} de {brl(pontoEquilibrio)} para empatar (
+                    {percentualEquilibrio.toFixed(1)}%).
+                  </li>
                 </ul>
               </div>
             </div>
@@ -678,97 +894,159 @@ function Dashboard() {
 
           {detalhe === "agenda" && (
             <div className="space-y-1">
-              {agendaSemana.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum compromisso nesta semana.</p> : agendaSemana.map((item) => (
-                <div key={item.id} className={`flex gap-3 border-b border-border py-2 last:border-0 ${item.obra ? "border-l-2 border-l-primary pl-2" : ""}`}>
-                  <div className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
-                    {new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}
+              {agendaSemana.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum compromisso nesta semana.</p>
+              ) : (
+                agendaSemana.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`flex gap-3 border-b border-border py-2 last:border-0 ${item.obra ? "border-l-2 border-l-primary pl-2" : ""}`}
+                  >
+                    <div className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                      {new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR", {
+                        weekday: "short",
+                        day: "2-digit",
+                        month: "2-digit",
+                      })}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{item.titulo}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.detalhe || "Sem detalhes"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{item.titulo}</p>
-                    <p className="text-xs text-muted-foreground">{item.detalhe || "Sem detalhes"}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
-          {detalhe === "saldo" && (() => {
-            const principal =
-              saldosContas.find((c) => c.conta.toUpperCase().includes("RS C6")) ?? saldosContas[0];
-            const outras = saldosContas.filter((c) => c.conta !== principal?.conta);
-            return (
-              <div className="space-y-3">
-                {principal && (
-                  <div className="rounded-lg border-2 border-success/50 bg-success/10 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Conta principal</p>
-                    <p className="truncate text-base font-semibold">{principal.conta}</p>
-                    <p className="text-xs text-muted-foreground">{principal.banco || "Conta bancária"}</p>
-                    <p className={`mt-1 text-2xl font-bold tabular-nums ${principal.saldo < 0 ? "text-destructive" : "text-success"}`}>
-                      {brl(principal.saldo)}
-                    </p>
-                  </div>
-                )}
-                <div className="divide-y divide-border">
-                  <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
-                  <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
-                  <ResumoValor label="Resultado ontem" valor={fluxoOntem.resultado} positivo={fluxoOntem.resultado >= 0} />
-                </div>
-                <div className="space-y-1 rounded-md border border-border p-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Movimentos de hoje</p>
-                  {fluxoHoje.entradas.length === 0 && fluxoHoje.saidas.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum movimento realizado hoje.</p>
-                  ) : (
-                    <>
-                      {fluxoHoje.entradas.map((m, i) => (
-                        <div key={`e-${i}`} className="flex items-center justify-between gap-2 text-xs">
-                          <span className="min-w-0 truncate">{m.descricao}</span>
-                          <span className="shrink-0 font-medium tabular-nums text-success">+{brl(m.valor)}</span>
-                        </div>
-                      ))}
-                      {fluxoHoje.saidas.map((m, i) => (
-                        <div key={`s-${i}`} className="flex items-center justify-between gap-2 text-xs">
-                          <span className="min-w-0 truncate">{m.descricao}</span>
-                          <span className="shrink-0 font-medium tabular-nums text-destructive">−{brl(m.valor)}</span>
-                        </div>
-                      ))}
-                      <div className="flex items-center justify-between border-t border-border pt-1 text-xs font-semibold">
-                        <span>Saldo do dia</span>
-                        <span className={`tabular-nums ${fluxoHoje.saldo >= 0 ? "text-success" : "text-destructive"}`}>
-                          {brl(fluxoHoje.saldo)}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                {outras.map((conta) => (
-                  <div key={conta.conta} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{conta.conta}</p>
-                      <p className="text-xs text-muted-foreground">{conta.banco || "Conta bancária"}</p>
+          {detalhe === "saldo" &&
+            (() => {
+              const principal =
+                saldosContas.find((c) => c.conta.toUpperCase().includes("RS C6")) ??
+                saldosContas[0];
+              const outras = saldosContas.filter((c) => c.conta !== principal?.conta);
+              return (
+                <div className="space-y-3">
+                  {principal && (
+                    <div className="rounded-lg border-2 border-success/50 bg-success/10 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Conta principal
+                      </p>
+                      <p className="truncate text-base font-semibold">{principal.conta}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {principal.banco || "Conta bancária"}
+                      </p>
+                      <p
+                        className={`mt-1 text-2xl font-bold tabular-nums ${principal.saldo < 0 ? "text-destructive" : "text-success"}`}
+                      >
+                        {brl(principal.saldo)}
+                      </p>
                     </div>
-                    <span className={`text-sm font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}>{brl(conta.saldo)}</span>
+                  )}
+                  <div className="divide-y divide-border">
+                    <ResumoValor label="Entradas ontem" valor={fluxoOntem.entradas} positivo />
+                    <ResumoValor label="Saídas ontem" valor={fluxoOntem.saidas} />
+                    <ResumoValor
+                      label="Resultado ontem"
+                      valor={fluxoOntem.resultado}
+                      positivo={fluxoOntem.resultado >= 0}
+                    />
                   </div>
-                ))}
-                <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
-                  <span>Total</span><span className="tabular-nums">{brl(saldoTotal)}</span>
+                  <div className="space-y-1 rounded-md border border-border p-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Movimentos de hoje
+                    </p>
+                    {fluxoHoje.entradas.length === 0 && fluxoHoje.saidas.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Nenhum movimento realizado hoje.
+                      </p>
+                    ) : (
+                      <>
+                        {fluxoHoje.entradas.map((m, i) => (
+                          <div
+                            key={`e-${i}`}
+                            className="flex items-center justify-between gap-2 text-xs"
+                          >
+                            <span className="min-w-0 truncate">{m.descricao}</span>
+                            <span className="shrink-0 font-medium tabular-nums text-success">
+                              +{brl(m.valor)}
+                            </span>
+                          </div>
+                        ))}
+                        {fluxoHoje.saidas.map((m, i) => (
+                          <div
+                            key={`s-${i}`}
+                            className="flex items-center justify-between gap-2 text-xs"
+                          >
+                            <span className="min-w-0 truncate">{m.descricao}</span>
+                            <span className="shrink-0 font-medium tabular-nums text-destructive">
+                              −{brl(m.valor)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between border-t border-border pt-1 text-xs font-semibold">
+                          <span>Saldo do dia</span>
+                          <span
+                            className={`tabular-nums ${fluxoHoje.saldo >= 0 ? "text-success" : "text-destructive"}`}
+                          >
+                            {brl(fluxoHoje.saldo)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {outras.map((conta) => (
+                    <div
+                      key={conta.conta}
+                      className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{conta.conta}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {conta.banco || "Conta bancária"}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-sm font-semibold tabular-nums ${conta.saldo < 0 ? "text-destructive" : "text-success"}`}
+                      >
+                        {brl(conta.saldo)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between border-t border-border pt-2 text-sm font-semibold">
+                    <span>Total</span>
+                    <span className="tabular-nums">{brl(saldoTotal)}</span>
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
           {detalhe === "contas" && (
             <div className="space-y-1">
-              {contasHoje.length === 0 ? <p className="text-sm text-muted-foreground">Nenhuma conta vence hoje.</p> : contasHoje.map((conta) => (
-                <div key={conta.id} className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{conta.descricao}</p>
-                    <p className="text-xs text-muted-foreground">{conta.parceiro || "Sem beneficiário"} · {conta.status}</p>
+              {contasHoje.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma conta vence hoje.</p>
+              ) : (
+                contasHoje.map((conta) => (
+                  <div
+                    key={conta.id}
+                    className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{conta.descricao}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {conta.parceiro || "Sem beneficiário"} · {conta.status}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 text-sm font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}
+                    >
+                      {conta.tipo === "receber" ? "+" : "−"} {brl(numero(conta.valor))}
+                    </span>
                   </div>
-                  <span className={`shrink-0 text-sm font-medium tabular-nums ${conta.tipo === "receber" ? "text-success" : "text-destructive"}`}>
-                    {conta.tipo === "receber" ? "+" : "−"} {brl(numero(conta.valor))}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           )}
 
@@ -801,11 +1079,21 @@ function Dashboard() {
   );
 }
 
-function ResumoValor({ label, valor, positivo = false }: { label: string; valor: number; positivo?: boolean }) {
+function ResumoValor({
+  label,
+  valor,
+  positivo = false,
+}: {
+  label: string;
+  valor: number;
+  positivo?: boolean;
+}) {
   return (
     <div className="flex items-center justify-between gap-2 py-1.5">
       <p className="min-w-0 text-[11px] text-muted-foreground">{label}</p>
-      <p className={`shrink-0 text-xs font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}>
+      <p
+        className={`shrink-0 text-xs font-semibold tabular-nums ${positivo ? "text-success" : "text-destructive"}`}
+      >
         {brl(valor)}
       </p>
     </div>

@@ -126,7 +126,7 @@ function FluxoCaixa() {
         (pago ? l.data_pagamento : null) ?? l.vencimento ?? l.data_competencia,
       ).slice(0, 10);
       const valor = Number(l.valor ?? 0);
-      const receita = l.tipo_fluxo === "receita";
+      const receita = l.tipo_fluxo === "receita" || l.tipo_fluxo === "entrada";
       if (l.status === "Cancelado") continue;
       lista.push({
         id: `lanc-${l.id}`,
@@ -246,8 +246,20 @@ function FluxoCaixa() {
           to="/financeiro"
           tone={saldoAtual >= 0 ? "positive" : "negative"}
         />
-        <Kpi label="Entradas do mês" value={brl(entradasMes)} hint="Previsto + realizado" tone="positive" to="/contas" />
-        <Kpi label="Saídas do mês" value={brl(saidasMes)} hint="Previsto + realizado" tone="negative" to="/contas" />
+        <Kpi
+          label="Entradas do mês"
+          value={brl(entradasMes)}
+          hint="Previsto + realizado"
+          tone="positive"
+          to="/contas"
+        />
+        <Kpi
+          label="Saídas do mês"
+          value={brl(saidasMes)}
+          hint="Previsto + realizado"
+          tone="negative"
+          to="/contas"
+        />
         <Kpi
           label={`Saldo projetado (${horizonte} dias)`}
           value={brl(saldoProjetado)}
@@ -257,7 +269,9 @@ function FluxoCaixa() {
         />
       </div>
 
-      <TelaPermitida tela="saldos"><SaldosBancarios /></TelaPermitida>
+      <TelaPermitida tela="saldos">
+        <SaldosBancarios />
+      </TelaPermitida>
 
       <ConciliacaoBancaria />
 
@@ -285,8 +299,18 @@ function FluxoCaixa() {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="entradas" name="Entradas" fill="var(--success)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="saidas" name="Saídas" fill="var(--destructive)" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="entradas"
+                  name="Entradas"
+                  fill="var(--success)"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="saidas"
+                  name="Saídas"
+                  fill="var(--destructive)"
+                  radius={[4, 4, 0, 0]}
+                />
                 <Line
                   type="monotone"
                   dataKey="saldo"
@@ -328,7 +352,11 @@ function FluxoCaixa() {
                     <TableRow key={d.data}>
                       <TableCell className={d.data < hoje ? "text-destructive" : undefined}>
                         {dataBR(d.data)}
-                        {d.data < hoje && <Badge variant="destructive" className="ml-2">Vencido</Badge>}
+                        {d.data < hoje && (
+                          <Badge variant="destructive" className="ml-2">
+                            Vencido
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right text-success">
                         {d.entradas ? brl(d.entradas) : "—"}
@@ -433,7 +461,9 @@ function FluxoCaixa() {
                       >
                         {brl(m.resultado)}
                       </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{brl(m.saldo)}</TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {brl(m.saldo)}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {porMes.length === 0 && (

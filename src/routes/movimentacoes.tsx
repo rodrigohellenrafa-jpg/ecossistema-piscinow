@@ -21,8 +21,8 @@ import {
   TableBody,
   TableCell,
   TableHead,
-   TableFooter,
-   TableHeader,
+  TableFooter,
+  TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
@@ -87,10 +87,20 @@ export function Movimentacoes() {
     const canal = supabase
       .channel("movimentacoes-financeiras")
       .on("postgres_changes", { event: "*", schema: "public", table: "contas" }, atualizar)
-      .on("postgres_changes", { event: "*", schema: "public", table: "lancamentos_financeiros" }, atualizar)
-      .on("postgres_changes", { event: "*", schema: "public", table: "saldos_bancarios" }, atualizar)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "lancamentos_financeiros" },
+        atualizar,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "saldos_bancarios" },
+        atualizar,
+      )
       .subscribe();
-    return () => { void supabase.removeChannel(canal); };
+    return () => {
+      void supabase.removeChannel(canal);
+    };
   }, [qc]);
 
   const { data: contas = [] } = useQuery({
@@ -146,12 +156,13 @@ export function Movimentacoes() {
     for (const l of lancamentos as unknown as Record<string, string | number | null>[]) {
       if (l.status === "Cancelado") continue;
       const pago = l.status === "Pago";
-      const receita = l.tipo_fluxo === "receita";
+      const receita = l.tipo_fluxo === "receita" || l.tipo_fluxo === "entrada";
       lista.push({
         id: `lanc-${l.id}`,
-        data: String(
-          (pago ? l.data_pagamento : null) ?? l.vencimento ?? l.data_competencia,
-        ).slice(0, 10),
+        data: String((pago ? l.data_pagamento : null) ?? l.vencimento ?? l.data_competencia).slice(
+          0,
+          10,
+        ),
         descricao: String(l.descricao ?? "—"),
         parceiro: "—",
         origem: receita ? "Receita lançada" : "Despesa lançada",
@@ -167,10 +178,7 @@ export function Movimentacoes() {
     return lista.sort((a, b) => (a.data < b.data ? 1 : -1));
   }, [contas, lancamentos]);
 
-  const origens = useMemo(
-    () => Array.from(new Set(linhas.map((l) => l.origem))).sort(),
-    [linhas],
-  );
+  const origens = useMemo(() => Array.from(new Set(linhas.map((l) => l.origem))).sort(), [linhas]);
   const contasLista = useMemo(
     () => Array.from(new Set(linhas.map((l) => l.conta).filter((c) => c && c !== "—"))).sort(),
     [linhas],
@@ -239,8 +247,18 @@ export function Movimentacoes() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Entradas realizadas" value={brl(entradasReal)} tone="positive" hint={`período: ${periodoRotulo}`} />
-        <Kpi label="Saídas realizadas" value={brl(saidasReal)} tone="negative" hint={`período: ${periodoRotulo}`} />
+        <Kpi
+          label="Entradas realizadas"
+          value={brl(entradasReal)}
+          tone="positive"
+          hint={`período: ${periodoRotulo}`}
+        />
+        <Kpi
+          label="Saídas realizadas"
+          value={brl(saidasReal)}
+          tone="negative"
+          hint={`período: ${periodoRotulo}`}
+        />
         <Kpi label="Entradas previstas" value={brl(entradasPrev)} hint="ainda não recebidas" />
         <Kpi label="Saídas previstas" value={brl(saidasPrev)} hint="ainda não pagas" />
         <Kpi
@@ -396,12 +414,8 @@ export function Movimentacoes() {
                   <TableCell colSpan={7} className="whitespace-nowrap">
                     Total do período ({periodoRotulo})
                   </TableCell>
-                  <TableCell className="text-right text-success">
-                    {brl(totalEntradas)}
-                  </TableCell>
-                  <TableCell className="text-right text-destructive">
-                    {brl(totalSaidas)}
-                  </TableCell>
+                  <TableCell className="text-right text-success">{brl(totalEntradas)}</TableCell>
+                  <TableCell className="text-right text-destructive">{brl(totalSaidas)}</TableCell>
                 </TableRow>
                 <TableRow className="bg-muted/50 font-semibold">
                   <TableCell colSpan={8} className="whitespace-nowrap">
