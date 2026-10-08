@@ -23,7 +23,14 @@ const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <tbody ref={ref} className={cn("[&_tr:last-child]:border-0", className)} {...props} />
+  <tbody
+    ref={ref}
+    className={cn(
+      "[&_tr:last-child]:border-0 [&>tr:nth-child(even):not([data-state=selected])]:bg-muted/40 hover:[&>tr:nth-child(even):not([data-state=selected])]:bg-muted/65 [&>tr:nth-child(odd):not([data-state=selected])]:bg-card hover:[&>tr:nth-child(odd):not([data-state=selected])]:bg-muted/30",
+      className,
+    )}
+    {...props}
+  />
 ));
 TableBody.displayName = "TableBody";
 

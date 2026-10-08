@@ -1709,7 +1709,7 @@ function Lista({
   });
 
   const Container = expansivel ? ExpandableCard : Card;
-  const acoesFixas = expansivel ? "sticky right-0 z-10 bg-card" : "";
+  const acoesFixas = expansivel ? "sticky right-0 z-10 bg-inherit" : "";
   const temFiltro = fDescricao || fParceiro || fVencimento || fValor || fStatus !== "todos";
 
   const grupos = (() => {

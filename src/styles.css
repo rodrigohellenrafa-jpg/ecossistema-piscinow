@@ -444,3 +444,20 @@
   }
 }
 
+/* Linhas de cores alternadas em todas as tabelas (zebra striping) para facilitar a leitura */
+:where(tbody > tr:nth-child(even):not([data-state="selected"])) {
+  background-color: color-mix(in oklch, var(--muted) 40%, transparent);
+}
+
+:where(tbody > tr:nth-child(even):not([data-state="selected"]):hover) {
+  background-color: color-mix(in oklch, var(--muted) 65%, transparent);
+}
+
+:where(tbody > tr:nth-child(odd):not([data-state="selected"])) {
+  background-color: var(--card);
+}
+
+:where(tbody > tr:nth-child(odd):not([data-state="selected"]):hover) {
+  background-color: color-mix(in oklch, var(--muted) 30%, transparent);
+}
+
