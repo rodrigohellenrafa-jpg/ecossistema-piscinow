@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layers, Plus, Trash2, Wrench, Package } from "lucide-react";
+import { Layers, Plus, Trash2, Wrench, Package, Hammer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,9 +26,11 @@ import { brl, CATEGORIAS_PRODUTO } from "@/lib/erp";
 
 const SEM_FORNECEDOR = "__nenhum__";
 
+export type TipoItemLote = "servico" | "produto" | "uso_geral";
+
 export interface LinhaProdutoLote {
   id: string;
-  tipo: "servico" | "produto";
+  tipo: TipoItemLote;
   nome: string;
   categoria: string;
   unidade: string;
@@ -40,11 +42,16 @@ export interface LinhaProdutoLote {
   descricao: string;
 }
 
-const criarLinha = (tipoPadrao: "servico" | "produto" = "servico"): LinhaProdutoLote => ({
+const criarLinha = (tipoPadrao: TipoItemLote = "servico"): LinhaProdutoLote => ({
   id: crypto.randomUUID(),
   tipo: tipoPadrao,
   nome: "",
-  categoria: tipoPadrao === "servico" ? "Serviços" : "Piscinas",
+  categoria:
+    tipoPadrao === "servico"
+      ? "Serviços"
+      : tipoPadrao === "uso_geral"
+        ? "Ferramentas"
+        : "Piscinas",
   unidade: tipoPadrao === "servico" ? "SV" : "UN",
   preco_custo: "0",
   preco_venda: "0",
@@ -86,6 +93,10 @@ export function LancarProdutosEmLote() {
             atualizado.categoria = "Serviços";
             atualizado.unidade = "SV";
             atualizado.sob_encomenda = false;
+          } else if (valor === "uso_geral") {
+            atualizado.categoria = "Ferramentas";
+            atualizado.unidade = "UN";
+            atualizado.sob_encomenda = false;
           } else {
             if (r.categoria === "Serviços") atualizado.categoria = "Piscinas";
             atualizado.unidade = "UN";
@@ -103,7 +114,9 @@ export function LancarProdutosEmLote() {
 
       for (const [idx, l] of linhas.entries()) {
         if (!l.nome.trim()) {
-          throw new Error(`Linha ${idx + 1}: informe o nome do ${l.tipo === "servico" ? "serviço" : "produto"}.`);
+          const rotulo =
+            l.tipo === "servico" ? "serviço" : l.tipo === "uso_geral" ? "item de uso geral" : "produto";
+          throw new Error(`Linha ${idx + 1}: informe o nome do ${rotulo}.`);
         }
         const precoVenda = Number(l.preco_venda);
         if (!Number.isFinite(precoVenda) || precoVenda < 0) {
@@ -120,13 +133,15 @@ export function LancarProdutosEmLote() {
       const payload = linhas.map((l) => ({
         tipo: l.tipo,
         nome: l.nome.trim(),
-        categoria: l.categoria.trim() || (l.tipo === "servico" ? "Serviços" : null),
+        categoria:
+          l.categoria.trim() ||
+          (l.tipo === "servico" ? "Serviços" : l.tipo === "uso_geral" ? "Ferramentas" : null),
         unidade: l.unidade.trim().toUpperCase() || (l.tipo === "servico" ? "SV" : "UN"),
         preco_custo: Number(l.preco_custo) || 0,
         preco_venda: Number(l.preco_venda) || 0,
         fornecedor_id: l.fornecedor_id === SEM_FORNECEDOR ? null : l.fornecedor_id,
         estoque_atual: 0,
-        estoque_minimo: l.tipo === "produto" ? Number(l.estoque_minimo) || 0 : 0,
+        estoque_minimo: l.tipo !== "servico" ? Number(l.estoque_minimo) || 0 : 0,
         sob_encomenda: l.tipo === "produto" ? l.sob_encomenda : false,
         descricao: l.descricao.trim() || null,
         ativo: true,
@@ -147,7 +162,7 @@ export function LancarProdutosEmLote() {
     },
   });
 
-  const adicionarLinha = (tipo: "servico" | "produto") => {
+  const adicionarLinha = (tipo: TipoItemLote) => {
     setLinhas((r) => [...r, criarLinha(tipo)]);
   };
 
@@ -161,7 +176,6 @@ export function LancarProdutosEmLote() {
         if (salvar.isPending) return;
         setOpen(v);
         if (v && !linhas.length) {
-          // Inicia com 2 linhas de exemplo (serviço e produto)
           setLinhas([criarLinha("servico"), criarLinha("servico")]);
         }
       }}
@@ -175,10 +189,10 @@ export function LancarProdutosEmLote() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="size-5 text-primary" />
-            Lançamento em Lote de Produtos e Serviços
+            Lançamento em Lote de Produtos, Serviços e Uso Geral
           </DialogTitle>
           <DialogDescription>
-            Cadastre rapidamente múltiplos serviços, manutenções, mão de obra ou produtos com seus
+            Cadastre rapidamente múltiplos serviços, ferramentas, peças ou produtos com seus
             detalhes pertinentes em uma única operação.
           </DialogDescription>
         </DialogHeader>
@@ -195,6 +209,15 @@ export function LancarProdutosEmLote() {
             className="gap-1.5"
           >
             <Wrench className="size-3.5 text-blue-500" /> + Serviço
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => adicionarLinha("uso_geral")}
+            className="gap-1.5"
+          >
+            <Hammer className="size-3.5 text-purple-500" /> + Peça / Ferramenta (Uso Geral)
           </Button>
           <Button
             type="button"
@@ -219,7 +242,11 @@ export function LancarProdutosEmLote() {
                     {i + 1}
                   </span>
                   <span className="text-sm font-semibold text-foreground">
-                    {l.tipo === "servico" ? "Serviço / Mão de Obra" : "Produto / Material"}
+                    {l.tipo === "servico"
+                      ? "Serviço / Mão de Obra"
+                      : l.tipo === "uso_geral"
+                        ? "Uso Geral (Peça / Ferramenta)"
+                        : "Produto / Material"}
                   </span>
                 </div>
                 <Button
@@ -234,30 +261,33 @@ export function LancarProdutosEmLote() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-12">
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <Field label="Tipo">
                     <Select
                       value={l.tipo}
-                      onValueChange={(v: "servico" | "produto") => alterar(l.id, "tipo", v)}
+                      onValueChange={(v: TipoItemLote) => alterar(l.id, "tipo", v)}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="servico">Serviço</SelectItem>
+                        <SelectItem value="uso_geral">Uso Geral</SelectItem>
                         <SelectItem value="produto">Produto</SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
                 </div>
 
-                <div className="sm:col-span-6">
+                <div className="sm:col-span-5">
                   <Field label="Nome / Título do Item *">
                     <Input
                       placeholder={
                         l.tipo === "servico"
                           ? "Ex: Instalação de Piscina, Troca de Areia, Visita Técnica"
-                          : "Ex: Registro de Esfera 50mm, Cloro Granulado 10kg"
+                          : l.tipo === "uso_geral"
+                            ? "Ex: Martelete Rompedor Bosch, Chave Grifo 18pol, Rotor Bomba 1/2CV"
+                            : "Ex: Registro de Esfera 50mm, Cloro Granulado 10kg"
                       }
                       value={l.nome}
                       onChange={(e) => alterar(l.id, "nome", e.target.value)}
@@ -290,7 +320,7 @@ export function LancarProdutosEmLote() {
                 <div className="sm:col-span-2">
                   <Field label="Unidade">
                     <Input
-                      placeholder="UN, SV, HR, M2"
+                      placeholder="UN, SV, HR, M2, PC"
                       value={l.unidade}
                       onChange={(e) => alterar(l.id, "unidade", e.target.value)}
                     />
@@ -348,7 +378,11 @@ export function LancarProdutosEmLote() {
               <div>
                 <Field label="Detalhes pertinentes / Escopo / Observações">
                   <Input
-                    placeholder="Descreva detalhes específicos do serviço, mão de obra inclusa, prazos, especificações ou garantias."
+                    placeholder={
+                      l.tipo === "uso_geral"
+                        ? "Ex: Ferramenta da equipe de escavação, voltagem 220V, número de série ou local no depósito."
+                        : "Descreva detalhes específicos do serviço, mão de obra inclusa, prazos ou especificações."
+                    }
                     value={l.descricao}
                     onChange={(e) => alterar(l.id, "descricao", e.target.value)}
                   />
@@ -359,7 +393,7 @@ export function LancarProdutosEmLote() {
 
           {linhas.length === 0 && (
             <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-              Nenhum item na lista. Clique abaixo para adicionar um serviço ou produto.
+              Nenhum item na lista. Clique abaixo para adicionar um serviço, ferramenta/peça ou produto.
             </div>
           )}
 
@@ -371,6 +405,14 @@ export function LancarProdutosEmLote() {
               className="gap-2"
             >
               <Plus className="size-4" /> Adicionar Serviço
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => adicionarLinha("uso_geral")}
+              className="gap-2"
+            >
+              <Plus className="size-4" /> Adicionar Uso Geral (Peça / Ferramenta)
             </Button>
             <Button
               type="button"

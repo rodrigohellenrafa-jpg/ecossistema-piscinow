@@ -89,6 +89,8 @@ export const CATEGORIAS_PRODUTO = [
   "Dispositivos",
   "Iluminação",
   "Acabamento",
+  "Peças",
+  "Ferramentas",
   "Serviços",
 ] as const;
 

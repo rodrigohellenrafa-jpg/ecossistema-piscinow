@@ -136,6 +136,7 @@ export function ProdutoRapidoDialog({ onCreated, iconOnly = false }: Props) {
               <SelectContent>
                 <SelectItem value="produto">Produto</SelectItem>
                 <SelectItem value="servico">Serviço</SelectItem>
+                <SelectItem value="uso_geral">Uso Geral</SelectItem>
               </SelectContent>
             </Select>
           </Field>

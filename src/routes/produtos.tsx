@@ -270,6 +270,8 @@ function Produtos() {
       if (filtroTipo === "todos") return true;
       if (filtroTipo === "splash")
         return p.codigo?.startsWith("SPL-") || p.nome?.toLowerCase().includes("splash");
+      if (filtroTipo === "uso_geral")
+        return p.tipo === "uso_geral" || p.categoria === "Peças" || p.categoria === "Ferramentas";
       return p.tipo === filtroTipo;
     })
     .filter((p) =>
@@ -337,6 +339,7 @@ function Produtos() {
                     <SelectContent>
                       <SelectItem value="produto">Produto</SelectItem>
                       <SelectItem value="servico">Serviço</SelectItem>
+                      <SelectItem value="uso_geral">Uso Geral</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -405,7 +408,7 @@ function Produtos() {
                 <Field label="CFOP">
                   <Input value={form.cfop} onChange={(e) => set("cfop")(e.target.value)} />
                 </Field>
-                {form.tipo === "produto" && (
+                {(form.tipo === "produto" || form.tipo === "uso_geral") && (
                   <>
                     <Field label="Estoque atual">
                       <Input
@@ -591,13 +594,14 @@ function Produtos() {
               />
             </div>
             <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="w-56">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os tipos</SelectItem>
                 <SelectItem value="produto">Apenas Produtos</SelectItem>
                 <SelectItem value="servico">Apenas Serviços</SelectItem>
+                <SelectItem value="uso_geral">Uso Geral (Peças & Ferramentas)</SelectItem>
                 <SelectItem value="splash">Piscinas Splash</SelectItem>
               </SelectContent>
             </Select>
@@ -633,8 +637,9 @@ function Produtos() {
             <TableBody>
               {lista.map((p) => {
                 const encomenda = Boolean((p as { sob_encomenda?: boolean }).sob_encomenda);
+                const controlaEstoque = p.tipo === "produto" || p.tipo === "uso_geral";
                 const baixo =
-                  p.tipo === "produto" &&
+                  controlaEstoque &&
                   !encomenda &&
                   Number(p.estoque_atual) <= Number(p.estoque_minimo);
                 const custoTotal =
@@ -650,7 +655,20 @@ function Produtos() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1">
-                        <Badge variant="secondary">{p.tipo}</Badge>
+                        <Badge
+                          variant={p.tipo === "uso_geral" ? "outline" : "secondary"}
+                          className={
+                            p.tipo === "uso_geral"
+                              ? "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium"
+                              : undefined
+                          }
+                        >
+                          {p.tipo === "uso_geral"
+                            ? "Uso geral"
+                            : p.tipo === "servico"
+                              ? "Serviço"
+                              : "Produto"}
+                        </Badge>
                         {encomenda && (
                           <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-500">
                             Sob encomenda
