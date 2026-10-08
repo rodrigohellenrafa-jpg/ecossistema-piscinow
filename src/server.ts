@@ -19,7 +19,7 @@ function makeSafeCreateRequire(orig: (p: string | URL) => NodeRequire) {
       const stub = ((id: string) => {
         throw new Error(`Cannot require '${id}' in this runtime`);
       }) as unknown as NodeRequire;
-      stub.resolve = (id: string) => id;
+      stub.resolve = ((id: string) => id) as NodeRequire["resolve"];
       return stub;
     }
   };
