@@ -4,14 +4,37 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
-// Polyfill createRequire for Cloudflare Workers / Nitro runtime where import.meta.url is undefined
+// Polyfill createRequire for Cloudflare Workers / Nitro runtime where import.meta.url is undefined.
+// Some bundles call createRequire(undefined); node:module throws on that, so we normalize the
+// argument and fall back to a no-op require when the real one cannot be built.
+const FALLBACK_REQUIRE_URL = "file:///worker.js";
+
+function makeSafeCreateRequire(orig: (p: string | URL) => NodeRequire) {
+  return function safeCreateRequire(path: unknown): NodeRequire {
+    const target = (typeof path === "string" && path) || path instanceof URL ? (path as string | URL) : FALLBACK_REQUIRE_URL;
+    try {
+      return orig.call(nodeModule, target);
+    } catch {
+      // Last-resort stub: never throw on module resolution in the worker runtime.
+      const stub = ((id: string) => {
+        throw new Error(`Cannot require '${id}' in this runtime`);
+      }) as unknown as NodeRequire;
+      stub.resolve = (id: string) => id;
+      return stub;
+    }
+  };
+}
+
 try {
   if (nodeModule && typeof nodeModule.createRequire === "function") {
-    const origCreateRequire = nodeModule.createRequire;
-    nodeModule.createRequire = function (path: unknown) {
-      const target = (path || "file:///worker.js") as string | URL;
-      return origCreateRequire.call(this, target);
-    };
+    const safe = makeSafeCreateRequire(nodeModule.createRequire.bind(nodeModule));
+    try {
+      nodeModule.createRequire = safe;
+    } catch {
+      // node:module immutable in this runtime — expose the shim globally instead.
+    }
+    const g = globalThis as { createRequire?: unknown };
+    if (typeof g.createRequire !== "function") g.createRequire = safe;
     if (typeof (nodeModule as { syncBuiltinESMExports?: () => void }).syncBuiltinESMExports === "function") {
       (nodeModule as { syncBuiltinESMExports: () => void }).syncBuiltinESMExports();
     }
