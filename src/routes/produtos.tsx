@@ -635,7 +635,7 @@ function Produtos() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {lista.map((p) => {
+              {lista.map((p, idx) => {
                 const encomenda = Boolean((p as { sob_encomenda?: boolean }).sob_encomenda);
                 const controlaEstoque = p.tipo === "produto" || p.tipo === "uso_geral";
                 const baixo =
@@ -646,7 +646,16 @@ function Produtos() {
                   Number(p.custo_fabricacao) + Number(p.custo_logistico) || Number(p.preco_custo);
                 const m = margem(Number(p.preco_venda), custoTotal);
                 return (
-                  <TableRow key={p.id} className={baixo ? "bg-destructive/5" : undefined}>
+                  <TableRow
+                    key={p.id}
+                    className={
+                      baixo
+                        ? "bg-destructive/10"
+                        : idx % 2 === 0
+                          ? "bg-muted/20"
+                          : "bg-background"
+                    }
+                  >
                     <TableCell className="font-medium">
                       {p.nome}
                       {p.codigo && (

@@ -128,6 +128,8 @@ export function ModalTabelaSplash({
         unidade: item.unidade,
         preco_custo: item.preco_custo,
         preco_venda: item.preco_venda,
+        custo_fabricacao: item.custoFabricacao ?? 0,
+        custo_logistico: item.custoLogistico ?? 0,
         estoque_atual: 0,
         estoque_minimo: 0,
         sob_encomenda: true,
@@ -155,7 +157,10 @@ export function ModalTabelaSplash({
               await supabase
                 .from("produtos")
                 .update({
+                  preco_custo: item.preco_custo,
                   preco_venda: item.preco_venda,
+                  custo_fabricacao: item.custo_fabricacao,
+                  custo_logistico: item.custo_logistico,
                   sob_encomenda: true,
                   categoria: item.categoria,
                   fornecedor_id: splashFornecedorId,
@@ -200,6 +205,8 @@ export function ModalTabelaSplash({
         unidade: item.unidade,
         preco_custo: item.preco_custo,
         preco_venda: item.preco_venda,
+        custo_fabricacao: item.custoFabricacao ?? 0,
+        custo_logistico: item.custoLogistico ?? 0,
         estoque_atual: 0,
         estoque_minimo: 0,
         sob_encomenda: true,
@@ -300,27 +307,45 @@ export function ModalTabelaSplash({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-32">Código</TableHead>
+                  <TableHead className="w-28">Código</TableHead>
                   <TableHead>Modelo / Piscina</TableHead>
                   <TableHead>Dimensões</TableHead>
-                  <TableHead>Acabamento / Detalhes</TableHead>
-                  <TableHead className="text-right">Preço Tabela 2026</TableHead>
-                  <TableHead className="text-center w-28">Status</TableHead>
-                  <TableHead className="text-right w-24">Ação</TableHead>
+                  <TableHead>Acabamento</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Custo s/ Margem</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Margem / Lucro</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Preço de Venda</TableHead>
+                  <TableHead className="text-center w-24">Status</TableHead>
+                  <TableHead className="text-right w-20">Ação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {itensFiltrados.map((item) => {
+                {itensFiltrados.map((item, idx) => {
                   const cadastrado = estaCadastrado(item);
                   return (
-                    <TableRow key={item.codigo} className={cadastrado ? "bg-emerald-500/[0.02]" : ""}>
+                    <TableRow
+                      key={item.codigo}
+                      className={
+                        cadastrado
+                          ? idx % 2 === 0
+                            ? "bg-emerald-500/[0.04]"
+                            : "bg-emerald-500/[0.08]"
+                          : idx % 2 === 0
+                            ? "bg-muted/20"
+                            : "bg-background"
+                      }
+                    >
                       <TableCell className="font-mono text-xs font-semibold text-muted-foreground">
                         {item.codigo}
                       </TableCell>
                       <TableCell className="font-medium text-foreground">
-                        {item.nome}
+                        <div>{item.nome}</div>
+                        {item.custoCasco ? (
+                          <div className="text-[11px] text-muted-foreground font-normal mt-0.5">
+                            Casco {brl(item.custoCasco)} + Filtro {brl(item.custoFiltro ?? 0)} + Frete {brl(item.custoFrete ?? 0)} + Inst. {brl(item.custoInstalacao ?? 0)} + Imp. {brl(item.custoImposto ?? 0)}
+                          </div>
+                        ) : null}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {item.dimensoes}
                       </TableCell>
                       <TableCell className="text-xs">
@@ -329,7 +354,7 @@ export function ModalTabelaSplash({
                             {item.acabamento}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground">Padrão Splash</span>
+                          <span className="text-muted-foreground">Padrão</span>
                         )}
                         {item.opcionalPower && (
                           <span className="block text-[11px] text-amber-600 mt-0.5">
@@ -337,7 +362,25 @@ export function ModalTabelaSplash({
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-foreground">
+                      <TableCell className="text-right font-mono text-xs">
+                        {item.preco_custo > 0 ? (
+                          <span className="font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                            {brl(item.preco_custo)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {item.lucroProjetado ? (
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                            +{brl(item.lucroProjetado)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-foreground whitespace-nowrap">
                         {brl(item.preco_venda)}
                       </TableCell>
                       <TableCell className="text-center">
@@ -370,7 +413,7 @@ export function ModalTabelaSplash({
                 })}
                 {itensFiltrados.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                       Nenhum modelo encontrado para a busca "{busca}".
                     </TableCell>
                   </TableRow>
