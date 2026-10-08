@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
+import { LancarProdutosEmLote } from "@/components/lancar-produtos-em-lote";
+import { ModalTabelaSplash } from "@/components/modal-tabela-splash";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +127,7 @@ function Produtos() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState<string>(TODAS_CATEGORIAS);
+  const [filtroTipo, setFiltroTipo] = useState<string>("todos");
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Produto | null>(null);
@@ -257,10 +260,22 @@ function Produtos() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["produtos"] }),
   });
 
+  const totalSplashNoBanco = data.filter(
+    (p) => p.codigo?.startsWith("SPL-") || p.nome?.toLowerCase().includes("splash"),
+  ).length;
+
   const lista = data
     .filter((p) => filtroCategoria === TODAS_CATEGORIAS || p.categoria === filtroCategoria)
+    .filter((p) => {
+      if (filtroTipo === "todos") return true;
+      if (filtroTipo === "splash")
+        return p.codigo?.startsWith("SPL-") || p.nome?.toLowerCase().includes("splash");
+      return p.tipo === filtroTipo;
+    })
     .filter((p) =>
-      `${p.nome} ${p.codigo ?? ""} ${p.categoria ?? ""}`.toLowerCase().includes(q.toLowerCase()),
+      `${p.nome} ${p.codigo ?? ""} ${p.categoria ?? ""} ${p.descricao ?? ""}`
+        .toLowerCase()
+        .includes(q.toLowerCase()),
     );
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -273,18 +288,21 @@ function Produtos() {
         title="Produtos e Serviços"
         subtitle="Catálogo, preços, custos e estoque no banco."
         actions={
-          <Dialog
-            open={open}
-            onOpenChange={(v) => {
-              setOpen(v);
-              if (!v) setEditando(null);
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button onClick={abrirNovo}>
-                <Plus /> Novo item
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-wrap items-center gap-2">
+            <ModalTabelaSplash produtosExistentes={data} />
+            <LancarProdutosEmLote />
+            <Dialog
+              open={open}
+              onOpenChange={(v) => {
+                setOpen(v);
+                if (!v) setEditando(null);
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button onClick={abrirNovo}>
+                  <Plus /> Novo item
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>{editando ? "Editar item" : "Novo produto ou serviço"}</DialogTitle>
@@ -531,14 +549,39 @@ function Produtos() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        }
+        </div>
+      }
       />
+
+      {totalSplashNoBanco === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-foreground">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="size-5 text-amber-500 shrink-0" />
+            <div>
+              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                Tabela Oficial Splash Piscinas by iGUI 2026:
+              </span>{" "}
+              <span>
+                116 modelos oficiais com preços da nova tabela estão disponíveis para sincronização no catálogo.
+              </span>
+            </div>
+          </div>
+          <ModalTabelaSplash produtosExistentes={data} />
+        </div>
+      )}
 
       <Card>
         <CardHeader className="gap-3">
-          <CardTitle>Catálogo ({lista.length})</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Catálogo ({lista.length})</CardTitle>
+            {totalSplashNoBanco > 0 && (
+              <Badge variant="outline" className="text-xs bg-muted/40 font-normal">
+                {totalSplashNoBanco} piscinas Splash no sistema
+              </Badge>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative max-w-sm flex-1">
+            <div className="relative max-w-sm flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
@@ -547,6 +590,17 @@ function Produtos() {
                 onChange={(e) => setQ(e.target.value)}
               />
             </div>
+            <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os tipos</SelectItem>
+                <SelectItem value="produto">Apenas Produtos</SelectItem>
+                <SelectItem value="servico">Apenas Serviços</SelectItem>
+                <SelectItem value="splash">Piscinas Splash</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
               <SelectTrigger className="w-52">
                 <SelectValue />
