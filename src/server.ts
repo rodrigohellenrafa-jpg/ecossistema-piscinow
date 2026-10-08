@@ -1,7 +1,24 @@
+import nodeModule from "node:module";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+
+// Polyfill createRequire for Cloudflare Workers / Nitro runtime where import.meta.url is undefined
+try {
+  if (nodeModule && typeof nodeModule.createRequire === "function") {
+    const origCreateRequire = nodeModule.createRequire;
+    nodeModule.createRequire = function (path: unknown) {
+      const target = (path || "file:///worker.js") as string | URL;
+      return origCreateRequire.call(this, target);
+    };
+    if (typeof (nodeModule as { syncBuiltinESMExports?: () => void }).syncBuiltinESMExports === "function") {
+      (nodeModule as { syncBuiltinESMExports: () => void }).syncBuiltinESMExports();
+    }
+  }
+} catch {
+  // Ignore in runtimes where node:module is immutable
+}
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;

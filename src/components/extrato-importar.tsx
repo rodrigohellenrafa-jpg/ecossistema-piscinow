@@ -1,8 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -176,7 +174,7 @@ export function ExtratoImportar({
       }
       let registros: Record<string, unknown>[] = [];
       if (/\.csv$/i.test(file.name)) {
-
+        const Papa = (await import("papaparse")).default;
         const texto = await file.text();
         const r = Papa.parse<Record<string, unknown>>(texto, {
           header: true,
@@ -184,6 +182,7 @@ export function ExtratoImportar({
         });
         registros = r.data;
       } else {
+        const XLSX = await import("xlsx");
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]!]!;

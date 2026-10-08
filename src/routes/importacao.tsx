@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -107,7 +105,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
   const [arquivo, setArquivo] = useState<string | null>(null);
   const [abas, setAbas] = useState<string[]>([]);
   const [abaAtiva, setAbaAtiva] = useState<string | null>(null);
-  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [workbook, setWorkbook] = useState<any | null>(null);
   const [cabecalhos, setCabecalhos] = useState<string[]>([]);
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [mapaManual, setMapaManual] = useState<Record<string, string>>({});
@@ -189,9 +187,10 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
   );
 
   const carregarAba = useCallback(
-    (wb: XLSX.WorkBook, nomeAba: string) => {
+    async (wb: any, nomeAba: string) => {
       const sheet = wb.Sheets[nomeAba];
       if (!sheet) return;
+      const XLSX = await import("xlsx");
       const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
         defval: "",
         raw: false,
@@ -221,6 +220,7 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
       const nome = file.name.toLowerCase();
       setLogs([]);
       if (nome.endsWith(".xlsx") || nome.endsWith(".xls")) {
+        const XLSX = await import("xlsx");
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array", cellDates: false });
         setArquivo(file.name);
@@ -230,13 +230,14 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
           wb.SheetNames.find((s) =>
             s.toLowerCase().includes(entidade.id.slice(0, 5).toLowerCase()),
           ) ?? wb.SheetNames[0];
-        if (preferida) carregarAba(wb, preferida);
+        if (preferida) void carregarAba(wb, preferida);
         return;
       }
       if (!nome.endsWith(".csv")) {
         toast.error("Envie um arquivo .csv, .xlsx ou .xls");
         return;
       }
+      const Papa = (await import("papaparse")).default;
       Papa.parse<Linha>(file, {
         header: true,
         skipEmptyLines: "greedy",
@@ -457,7 +458,8 @@ function PainelImport({ entidade }: { entidade: EntidadeImport }) {
         <CardDescription>{entidade.descricao}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <Button variant="outline" disabled={ocupado} onClick={() => {
+        <Button variant="outline" disabled={ocupado} onClick={async () => {
+          const XLSX = await import("xlsx");
           const wb = XLSX.utils.book_new();
           const ws = XLSX.utils.aoa_to_sheet([entidade.campos.map(c => c.coluna)]);
           ws["!cols"] = entidade.campos.map(() => ({ wch: 24 }));

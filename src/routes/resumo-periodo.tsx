@@ -2,9 +2,6 @@ import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { FileDown, FileSpreadsheet } from "lucide-react";
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -135,8 +132,9 @@ function ResumoPeriodo() {
   const fmt = (v: string | number) => (typeof v === "number" ? brl(v) : v);
   const nomeArq = `resumo-${de}-a-${ate}`;
 
-  const exportarXlsx = () => {
+  const exportarXlsx = async () => {
     if (!r) return;
+    const XLSX = await import("xlsx");
     const wb = XLSX.utils.book_new();
     for (const s of r.secoes) {
       const ws = XLSX.utils.aoa_to_sheet([s.colunas, ...s.linhas, ...(s.total ? [s.total] : [])]);
@@ -145,8 +143,10 @@ function ResumoPeriodo() {
     XLSX.writeFile(wb, `${nomeArq}.xlsx`);
   };
 
-  const exportarPdf = () => {
+  const exportarPdf = async () => {
     if (!r) return;
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
     const doc = new jsPDF({ orientation: "landscape" });
     doc.setFontSize(14);
     doc.text(`Piscinow — Resumo de ${dataBR(de)} a ${dataBR(ate)}`, 14, 14);
