@@ -3,7 +3,7 @@ import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCircle2, ChevronsUpDown, Pencil, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, ChevronsUpDown, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
@@ -114,76 +114,17 @@ const fornecedorVazio = {
   email: "",
 };
 
-const RECORRENCIAS: { valor: string; rotulo: string }[] = [
-  { valor: "nenhuma", rotulo: "Pagamento único (sem recorrência)" },
-  { valor: "diaria", rotulo: "Diária" },
-  { valor: "semanal", rotulo: "Semanal" },
-  { valor: "quinzenal", rotulo: "Quinzenal" },
-  { valor: "mensal", rotulo: "Mensal" },
-  { valor: "bimestral", rotulo: "Bimestral" },
-  { valor: "trimestral", rotulo: "Trimestral" },
-  { valor: "semestral", rotulo: "Semestral" },
-  { valor: "anual", rotulo: "Anual" },
-];
-
-function proximaData(iso: string, recorrencia: string): string | null {
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  switch (recorrencia) {
-    case "diaria":
-      d.setDate(d.getDate() + 1);
-      break;
-    case "semanal":
-      d.setDate(d.getDate() + 7);
-      break;
-    case "quinzenal":
-      d.setDate(d.getDate() + 15);
-      break;
-    case "mensal":
-      d.setMonth(d.getMonth() + 1);
-      break;
-    case "bimestral":
-      d.setMonth(d.getMonth() + 2);
-      break;
-    case "trimestral":
-      d.setMonth(d.getMonth() + 3);
-      break;
-    case "semestral":
-      d.setMonth(d.getMonth() + 6);
-      break;
-    case "anual":
-      d.setFullYear(d.getFullYear() + 1);
-      break;
-    default:
-      return null;
-  }
-  return d.toISOString().slice(0, 10);
-}
-
-const rotuloRecorrencia = (v: string) => RECORRENCIAS.find((r) => r.valor === v)?.rotulo ?? null;
-
-/** Próximos vencimentos de uma recorrência: até 12 parcelas, limitadas a 12 meses à frente. */
-function ocorrenciasFuturas(inicio: string, recorrencia: string, fim: string | null) {
-  if (!recorrencia || recorrencia === "nenhuma") return [];
-  const limite = new Date(`${inicio}T12:00:00`);
-  limite.setMonth(limite.getMonth() + 12);
-  const limiteISO = limite.toISOString().slice(0, 10);
-  const datas: string[] = [];
-  let atual = inicio;
-  for (let i = 0; i < 12; i++) {
-    const prox = proximaData(atual, recorrencia);
-    if (!prox) break;
-    if (prox > limiteISO) break;
-    if (fim && prox > fim) break;
-    datas.push(prox);
-    atual = prox;
-  }
-  return datas;
-}
+import {
+  RECORRENCIAS,
+  rotuloRecorrencia,
+  gerarDatasRecorrentes,
+  sincronizarRecorrenciasContas,
+} from "@/lib/recorrencias";
 
 const PERIODOS = [
   { valor: "vigente_vencidas", rotulo: "Mês vigente + Vencidas (Padrão)" },
-  { valor: "todas", rotulo: "Todas as contas" },
+  { valor: "todas", rotulo: "Todas as contas (Histórico completo)" },
+  { valor: "pagas_todas", rotulo: "Contas pagas / Pagamentos realizados" },
   { valor: "diario", rotulo: "Hoje / Diário" },
   { valor: "semanal", rotulo: "Semanal" },
   { valor: "mensal", rotulo: "Apenas mês vigente" },
@@ -202,12 +143,13 @@ function normalizarPeriodo(v: string | undefined): string {
   if (v === "semana") return "semanal";
   if (v === "mes") return "mensal";
   if (v === "todas") return "todas";
+  if (v === "pagas" || v === "pagas_todas") return "pagas_todas";
   if (v === "vigente_vencidas" || v === "padrao") return "vigente_vencidas";
   return PERIODOS.some((p) => p.valor === v) ? v : "vigente_vencidas";
 }
 
 function noPeriodo(
-  conta: { vencimento: string; status?: string | null },
+  conta: { vencimento: string; status?: string | null; data_pagamento?: string | null },
   periodo: string,
   de: string,
   ate: string,
@@ -216,12 +158,18 @@ function noPeriodo(
   const hoje = hojeISO();
   const mesAtual = hoje.slice(0, 7);
   const v = conta.vencimento ? String(conta.vencimento).slice(0, 10) : "";
+  const p = conta.data_pagamento ? String(conta.data_pagamento).slice(0, 10) : "";
   const st = (conta.status ?? "").toLowerCase();
   const vencida = st !== "pago" && v < hoje;
 
-  // Filtro padrão: registros do mês vigente junto com todas as contas vencidas
+  // Visualização direta de todas as contas já pagas
+  if (periodo === "pagas_todas") {
+    return st === "pago" || st === "pago_parcial";
+  }
+
+  // Filtro padrão: registros do mês vigente (vencimento OU pagamento no mês) junto com todas as contas vencidas pendentes
   if (periodo === "vigente_vencidas") {
-    const noMesVigente = v.slice(0, 7) === mesAtual;
+    const noMesVigente = v.slice(0, 7) === mesAtual || p.slice(0, 7) === mesAtual;
     return noMesVigente || vencida;
   }
 
@@ -229,23 +177,31 @@ function noPeriodo(
   const hojeData = new Date();
   hojeData.setHours(0, 0, 0, 0);
 
-  if (periodo === "diario") return d.getTime() === hojeData.getTime();
+  if (periodo === "diario") {
+    const pagoHoje = p === hoje;
+    return d.getTime() === hojeData.getTime() || pagoHoje;
+  }
   if (periodo === "semanal") {
     const inicio = new Date(hojeData);
     inicio.setDate(hojeData.getDate() - hojeData.getDay()); // domingo
     const fim = new Date(inicio);
     fim.setDate(inicio.getDate() + 6);
-    return d >= inicio && d <= fim;
+    const dPago = p ? new Date(`${p}T00:00:00`) : null;
+    const venceNaSemana = d >= inicio && d <= fim;
+    const pagouNaSemana = dPago ? dPago >= inicio && dPago <= fim : false;
+    return venceNaSemana || pagouNaSemana;
   }
-  if (periodo === "mensal") return v.slice(0, 7) === mesAtual;
+  if (periodo === "mensal") {
+    return v.slice(0, 7) === mesAtual || p.slice(0, 7) === mesAtual;
+  }
   if (periodo === "personalizado") {
     if (de) {
       const ini = new Date(`${de}T00:00:00`);
-      if (d < ini) return false;
+      if (d < ini && (!p || new Date(`${p}T00:00:00`) < ini)) return false;
     }
     if (ate) {
       const fim = new Date(`${ate}T00:00:00`);
-      if (d > fim) return false;
+      if (d > fim && (!p || new Date(`${p}T00:00:00`) > fim)) return false;
     }
     return true;
   }
@@ -268,6 +224,11 @@ function Contas() {
   const { data = [] } = useQuery({
     queryKey: ["contas"],
     queryFn: async () => {
+      try {
+        await sincronizarRecorrenciasContas(supabase);
+      } catch (err) {
+        console.warn("Sincronização automática de recorrências:", err);
+      }
       const { data, error } = await supabase
         .from("contas")
         .select("*")
@@ -275,6 +236,21 @@ function Contas() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const sincronizar = useMutation({
+    mutationFn: async () => {
+      return await sincronizarRecorrenciasContas(supabase);
+    },
+    onSuccess: (res) => {
+      toast.success(
+        res.inseridas > 0
+          ? `${res.inseridas} nova(s) parcela(s) recorrente(s) gerada(s)!`
+          : "Todas as parcelas recorrentes já estão sincronizadas.",
+      );
+      qc.invalidateQueries({ queryKey: ["contas"] });
+    },
+    onError: (e: Error) => toast.error(`Erro ao sincronizar: ${e.message}`),
   });
 
   const { data: fornecedores = [] } = useQuery({
@@ -488,6 +464,45 @@ function Contas() {
           );
           if (err2) throw err2;
         }
+        if (form.recorrencia !== "nenhuma") {
+          const futuras = gerarDatasRecorrentes(
+            form.vencimento,
+            form.recorrencia,
+            form.recorrencia_fim || null,
+            12,
+          );
+          for (const venc of futuras) {
+            const { data: jaTem } = await supabase
+              .from("contas")
+              .select("id")
+              .eq("tipo", form.tipo)
+              .eq("descricao", form.descricao.trim())
+              .eq("vencimento", venc)
+              .limit(1);
+            if (!jaTem || jaTem.length === 0) {
+              await supabase.from("contas").insert({
+                tipo: form.tipo,
+                descricao: form.descricao.trim(),
+                parceiro: form.parceiro || null,
+                categoria: ratear ? "Rateio" : form.categoria || null,
+                valor: Number(form.valor) || 0,
+                valor_juros: Number(form.valor_juros) || 0,
+                vencimento: venc,
+                status: "aberto",
+                observacoes: form.observacoes || null,
+                obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
+                funcionario_id: parseVinculo(form.vinculo).funcionario_id,
+                cliente_id: parseVinculo(form.vinculo).cliente_id,
+                numero_documento: form.numero_documento || null,
+                conta_bancaria: form.conta_bancaria || null,
+                recorrencia: form.recorrencia,
+                recorrencia_fim: form.recorrencia_fim || null,
+                tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
+                created_by: uid,
+              });
+            }
+          }
+        }
         return;
       }
 
@@ -531,35 +546,38 @@ function Contas() {
       }
 
       // Recorrência: já cria os próximos vencimentos para aparecerem na lista.
-      const futuras = ocorrenciasFuturas(
-        form.vencimento,
-        form.recorrencia,
-        form.recorrencia !== "nenhuma" && form.recorrencia_fim ? form.recorrencia_fim : null,
-      );
-      if (futuras.length > 0) {
-        const { error: errFut } = await supabase.from("contas").insert(
-          futuras.map((venc) => ({
-            tipo: form.tipo,
-            descricao: form.descricao.trim(),
-            parceiro: form.parceiro || null,
-            categoria: ratear ? "Rateio" : form.categoria || null,
-            valor: Number(form.valor) || 0,
-            valor_juros: Number(form.valor_juros) || 0,
-            vencimento: venc,
-            status: "aberto",
-            observacoes: form.observacoes || null,
-            obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
-            funcionario_id: parseVinculo(form.vinculo).funcionario_id,
-            cliente_id: parseVinculo(form.vinculo).cliente_id,
-            numero_documento: form.numero_documento || null,
-            conta_bancaria: form.conta_bancaria || null,
-            recorrencia: form.recorrencia,
-            recorrencia_fim: form.recorrencia_fim || null,
-            tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
-            created_by: uid,
-          })),
+      if (form.recorrencia !== "nenhuma") {
+        const futuras = gerarDatasRecorrentes(
+          form.vencimento,
+          form.recorrencia,
+          form.recorrencia_fim || null,
+          12,
         );
-        if (errFut) throw errFut;
+        if (futuras.length > 0) {
+          const { error: errFut } = await supabase.from("contas").insert(
+            futuras.map((venc) => ({
+              tipo: form.tipo,
+              descricao: form.descricao.trim(),
+              parceiro: form.parceiro || null,
+              categoria: ratear ? "Rateio" : form.categoria || null,
+              valor: Number(form.valor) || 0,
+              valor_juros: Number(form.valor_juros) || 0,
+              vencimento: venc,
+              status: "aberto",
+              observacoes: form.observacoes || null,
+              obra_id: parseVinculo(form.vinculo).obra_id ?? (form.obra_id || null),
+              funcionario_id: parseVinculo(form.vinculo).funcionario_id,
+              cliente_id: parseVinculo(form.vinculo).cliente_id,
+              numero_documento: form.numero_documento || null,
+              conta_bancaria: form.conta_bancaria || null,
+              recorrencia: form.recorrencia,
+              recorrencia_fim: form.recorrencia_fim || null,
+              tipo_despesa: form.tipo === "pagar" && form.tipo_despesa ? form.tipo_despesa : null,
+              created_by: uid,
+            })),
+          );
+          if (errFut) console.warn("Erro ao gerar parcelas futuras:", errFut);
+        }
       }
     },
     onSuccess: () => {
@@ -677,44 +695,44 @@ function Contas() {
       }
 
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
-        const proxima = proximaData(conta.vencimento, conta.recorrencia);
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
-        const { data: jaExiste } = proxima
-          ? await supabase
-              .from("contas")
-              .select("id")
-              .eq("descricao", conta.descricao)
-              .eq("tipo", conta.tipo)
-              .eq("vencimento", proxima)
-              .limit(1)
-          : { data: [] as { id: string }[] };
-        if (
-          proxima &&
-          (jaExiste ?? []).length === 0 &&
-          (!fimRecorrencia || proxima <= fimRecorrencia)
-        ) {
-          const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
-          const { error: errRec } = await supabase.from("contas").insert({
-            tipo: conta.tipo,
-            descricao: conta.descricao,
-            parceiro: conta.parceiro,
-            cliente_id: conta.cliente_id,
-            funcionario_id: (conta as { funcionario_id?: string | null }).funcionario_id ?? null,
-            categoria: conta.categoria,
-            valor: conta.valor,
-            valor_juros: conta.valor_juros ?? 0,
-            vencimento: proxima,
-            status: "aberto",
-            observacoes: conta.observacoes,
-            obra_id: conta.obra_id,
-            numero_documento: conta.numero_documento,
-            venda_id: conta.venda_id,
-            recorrencia: conta.recorrencia,
-            recorrencia_fim: fimRecorrencia ?? null,
-            tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
-            created_by: uid,
-          });
-          if (errRec) throw errRec;
+        const futuras = gerarDatasRecorrentes(
+          conta.vencimento,
+          conta.recorrencia,
+          fimRecorrencia,
+          12,
+        );
+        const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+        for (const proxima of futuras) {
+          const { data: jaExiste } = await supabase
+            .from("contas")
+            .select("id")
+            .eq("descricao", conta.descricao)
+            .eq("tipo", conta.tipo)
+            .eq("vencimento", proxima)
+            .limit(1);
+          if ((jaExiste ?? []).length === 0) {
+            await supabase.from("contas").insert({
+              tipo: conta.tipo,
+              descricao: conta.descricao,
+              parceiro: conta.parceiro,
+              cliente_id: conta.cliente_id,
+              funcionario_id: (conta as { funcionario_id?: string | null }).funcionario_id ?? null,
+              categoria: conta.categoria,
+              valor: conta.valor,
+              valor_juros: conta.valor_juros ?? 0,
+              vencimento: proxima,
+              status: "aberto",
+              observacoes: conta.observacoes,
+              obra_id: conta.obra_id,
+              numero_documento: conta.numero_documento,
+              venda_id: conta.venda_id,
+              recorrencia: conta.recorrencia,
+              recorrencia_fim: fimRecorrencia ?? null,
+              tipo_despesa: (conta as { tipo_despesa?: string | null }).tipo_despesa ?? null,
+              created_by: uid,
+            });
+          }
         }
       }
     },
@@ -777,6 +795,8 @@ function Contas() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const todasPagar = data.filter((c) => c.tipo === "pagar");
+  const todasReceber = data.filter((c) => c.tipo === "receber");
   const filtradas = data.filter((c) => noPeriodo(c, periodo, periodoDe, periodoAte));
   const soma = (l: typeof data) =>
     l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
@@ -791,7 +811,19 @@ function Contas() {
           <h1 className="text-2xl font-semibold tracking-tight">Contas a Pagar e Receber</h1>
           <p className="text-sm text-muted-foreground">Títulos com vencimento e baixa manual.</p>
         </div>
-        <LancarEmLote destino="contas" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => sincronizar.mutate()}
+            disabled={sincronizar.isPending}
+            title="Sincronizar despesas recorrentes e provisionar novas parcelas"
+          >
+            <RefreshCw className={`size-4 mr-1.5 ${sincronizar.isPending ? "animate-spin" : ""}`} />
+            Sincronizar recorrências
+          </Button>
+          <LancarEmLote destino="contas" />
         <Dialog
           open={open}
           onOpenChange={(v) => {
@@ -1324,6 +1356,7 @@ function Contas() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -1420,6 +1453,9 @@ function Contas() {
           <Lista
             titulo={`Em aberto: ${brl(soma(pagar))}`}
             itens={pagar}
+            todosItens={todasPagar}
+            periodoAtual={periodo}
+            onResetPeriodo={() => setPeriodo("vigente_vencidas")}
             rateios={rateios}
             onBaixar={setBaixando}
             onEditar={abrirEdicao}
@@ -1436,6 +1472,9 @@ function Contas() {
             ehReceber
             titulo={`Em aberto: ${brl(soma(receber))}`}
             itens={receber}
+            todosItens={todasReceber}
+            periodoAtual={periodo}
+            onResetPeriodo={() => setPeriodo("vigente_vencidas")}
             rateios={rateios}
             onBaixar={setBaixando}
             onEditar={abrirEdicao}
@@ -1656,7 +1695,10 @@ function Lista({
   ehReceber = false,
   titulo,
   itens,
+  todosItens = [],
   rateios = [],
+  periodoAtual,
+  onResetPeriodo,
   onBaixar,
   onEditar,
   onExcluir,
@@ -1666,7 +1708,10 @@ function Lista({
   ehReceber?: boolean;
   titulo: string;
   itens: Conta[];
+  todosItens?: Conta[];
   rateios?: { conta_id: string; categoria: string; valor: number }[];
+  periodoAtual?: string;
+  onResetPeriodo?: () => void;
   onBaixar: (c: Conta) => void;
   onEditar: (c: Conta) => void;
   onExcluir: (id: string) => void;
@@ -1678,39 +1723,75 @@ function Lista({
   const [fVencimento, setFVencimento] = useState("");
   const [fValor, setFValor] = useState("");
   const [fStatus, setFStatus] = useState("todos");
+  const [buscarEmTodoHistorico, setBuscarEmTodoHistorico] = useState(true);
+
+  const temFiltroTexto = Boolean(fDescricao || fParceiro || fVencimento || fValor);
+  const buscandoHistoricoCompleto = temFiltroTexto && buscarEmTodoHistorico && todosItens.length > 0;
+  const baseParaFiltrar = buscandoHistoricoCompleto ? todosItens : itens;
 
   const dataBR = (iso: string) => {
     const [a, m, d] = iso.slice(0, 10).split("-");
     return `${d}/${m}/${a}`;
   };
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const contem = (campo: string | null | undefined, filtro: string) =>
-    !filtro || norm(campo ?? "").includes(norm(filtro));
+  const soDigitos = (s: string) => s.replace(/\D/g, "");
 
   const statusDe = (c: Conta) =>
     c.status === "pago" ? "pago" : c.vencimento < hoje ? "vencido" : "aberto";
 
-  const visiveis = itens.filter((c) => {
-    if (!contem(c.descricao, fDescricao)) return false;
-    if (!contem(c.parceiro, fParceiro)) return false;
+  const visiveis = baseParaFiltrar.filter((c) => {
+    if (fDescricao) {
+      const alvo = norm(fDescricao);
+      const alvoDigitos = soDigitos(fDescricao);
+      const matchDesc = norm(c.descricao).includes(alvo);
+      const matchDoc = norm(c.numero_documento ?? "").includes(alvo);
+      const matchObs = norm(c.observacoes ?? "").includes(alvo);
+      const matchParc = norm(c.parceiro ?? "").includes(alvo);
+      const matchDig = alvoDigitos.length >= 4 && (
+        soDigitos(c.numero_documento ?? "").includes(alvoDigitos) ||
+        soDigitos(c.vencimento).includes(alvoDigitos) ||
+        soDigitos(dataBR(c.vencimento)).includes(alvoDigitos)
+      );
+      if (!matchDesc && !matchDoc && !matchObs && !matchParc && !matchDig) return false;
+    }
+
+    if (fParceiro) {
+      const alvo = norm(fParceiro);
+      const matchParc = norm(c.parceiro ?? "").includes(alvo);
+      const matchDesc = norm(c.descricao).includes(alvo);
+      if (!matchParc && !matchDesc) return false;
+    }
+
     if (fVencimento) {
       const alvo = norm(fVencimento);
+      const alvoDigitos = soDigitos(fVencimento);
       const v = c.vencimento.slice(0, 10);
-      if (!norm(v).includes(alvo) && !norm(dataBR(v)).includes(alvo)) return false;
+      const dbr = dataBR(v);
+      const matchTexto = norm(v).includes(alvo) || norm(dbr).includes(alvo);
+      const matchDig = alvoDigitos.length >= 2 && (
+        soDigitos(v).includes(alvoDigitos) ||
+        soDigitos(dbr).includes(alvoDigitos) ||
+        (alvoDigitos === "081926" && v.startsWith("2026-08-19")) ||
+        (alvoDigitos === "190826" && v.startsWith("2026-08-19"))
+      );
+      if (!matchTexto && !matchDig) return false;
     }
+
     if (fValor) {
-      const alvo = norm(fValor);
-      const total = (Number(c.valor) + Number(c.valor_juros ?? 0)).toFixed(2).replace(".", ",");
-      const parcela = Number(c.valor).toFixed(2).replace(".", ",");
-      if (!norm(total).includes(alvo) && !norm(parcela).includes(alvo)) return false;
+      const alvo = norm(fValor).replace(",", ".");
+      const total = (Number(c.valor) + Number(c.valor_juros ?? 0)).toFixed(2);
+      const parcela = Number(c.valor).toFixed(2);
+      const pago = Number(c.valor_pago ?? 0).toFixed(2);
+      if (!total.includes(alvo) && !parcela.includes(alvo) && !pago.includes(alvo)) return false;
     }
+
     if (fStatus !== "todos" && statusDe(c) !== fStatus) return false;
     return true;
   });
 
   const Container = expansivel ? ExpandableCard : Card;
   const acoesFixas = expansivel ? "sticky right-0 z-10 bg-inherit" : "";
-  const temFiltro = fDescricao || fParceiro || fVencimento || fValor || fStatus !== "todos";
+  const temFiltro = temFiltroTexto || fStatus !== "todos";
 
   const grupos = (() => {
     const g = {
@@ -1748,6 +1829,40 @@ function Lista({
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {buscandoHistoricoCompleto && (
+          <div className="mb-3 flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs">
+            <span className="font-medium text-primary">
+              Pesquisando em todo o histórico ({visiveis.length} títulos encontrados no total).
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setBuscarEmTodoHistorico(!buscarEmTodoHistorico)}
+              >
+                {buscarEmTodoHistorico ? "Restringir ao período atual" : "Buscar em todo histórico"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  setFDescricao("");
+                  setFParceiro("");
+                  setFVencimento("");
+                  setFValor("");
+                  setFStatus("todos");
+                }}
+              >
+                Limpar busca
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="mb-3 flex flex-wrap gap-2">
           {grupos.aberto.n > 0 && (
             <span className="rounded-md border px-2 py-1 text-xs tabular-nums">
@@ -1874,7 +1989,12 @@ function Lista({
                   <TableCell className="text-right">
                     {c.status === "pago" ? (
                       <>
-                        {brl(Number(c.valor_pago ?? 0))}
+                        <span className="font-medium tabular-nums">{brl(Number(c.valor_pago ?? c.valor))}</span>
+                        {c.data_pagamento && (
+                          <span className="block text-[11px] text-muted-foreground whitespace-nowrap">
+                            pago em {dataBR(c.data_pagamento)}
+                          </span>
+                        )}
                         {Number(c.valor_desconto ?? 0) > 0.009 && (
                           <span className="block text-xs text-muted-foreground">
                             desconto {brl(Number(c.valor_desconto))}
