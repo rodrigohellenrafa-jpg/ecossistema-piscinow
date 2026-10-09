@@ -1,11 +1,19 @@
 import { TelaPermitida } from "@/components/tela-permitida";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ExpandableCard } from "@/components/expandable-card";
 import { ExtratoImportar } from "@/components/extrato-importar";
 import { Input } from "@/components/ui/input";
@@ -27,6 +35,14 @@ export function SaldosBancarios() {
   const qc = useQueryClient();
   const [novo, setNovo] = useState({ conta: "", banco: "", saldo: "" });
   const [edits, setEdits] = useState<Record<string, { saldo: string; data_saldo: string }>>({});
+  const [alertaSaldo, setAlertaSaldo] = useState<{
+    tipo: "novo" | "editar";
+    mensagem: string;
+    detalheExistente: string;
+    saldoTentado: number;
+    contaTentada: string;
+    saldoAlvo?: Saldo;
+  } | null>(null);
 
   const { data: saldos = [] } = useQuery({
     queryKey: ["saldos-bancarios", "completo"],
@@ -174,6 +190,70 @@ export function SaldosBancarios() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const acionarCriar = () => {
+    if (!novo.conta.trim()) {
+      toast.error("Informe o nome da conta.");
+      return;
+    }
+    const valorNovo = Number(novo.saldo) || 0;
+    const contaExiste = saldos.find(
+      (s) => s.conta.trim().toLowerCase() === novo.conta.trim().toLowerCase(),
+    );
+    if (contaExiste) {
+      setAlertaSaldo({
+        tipo: "novo",
+        mensagem: `A conta "${contaExiste.conta}" já existe cadastrada no sistema.`,
+        detalheExistente: `Saldo registrado atualmente: ${brl(contaExiste.saldo)} (em ${dataBR(contaExiste.data_saldo)})`,
+        saldoTentado: valorNovo,
+        contaTentada: novo.conta.trim(),
+      });
+      return;
+    }
+
+    const saldoIdentico = saldos.find(
+      (s) => Math.abs(Number(s.saldo) - valorNovo) < 0.01 && valorNovo > 0,
+    );
+    if (saldoIdentico) {
+      setAlertaSaldo({
+        tipo: "novo",
+        mensagem: `Já existe um saldo idêntico de ${brl(valorNovo)} registrado na conta "${saldoIdentico.conta}".`,
+        detalheExistente: `Conta existente: ${saldoIdentico.conta} · Saldo: ${brl(saldoIdentico.saldo)}`,
+        saldoTentado: valorNovo,
+        contaTentada: novo.conta.trim(),
+      });
+      return;
+    }
+
+    criar.mutate();
+  };
+
+  const acionarAtualizar = (s: Saldo) => {
+    const e = edits[s.id];
+    const bruto = e?.saldo ?? s.saldo;
+    const saldo = Number(bruto);
+    if (bruto === "" || bruto === null || bruto === undefined || !Number.isFinite(saldo)) {
+      toast.error("Informe um saldo válido antes de salvar.");
+      return;
+    }
+
+    const outraComMesmoSaldo = saldos.find(
+      (item) => item.id !== s.id && Math.abs(Number(item.saldo) - saldo) < 0.01 && saldo > 0,
+    );
+    if (outraComMesmoSaldo) {
+      setAlertaSaldo({
+        tipo: "editar",
+        mensagem: `O saldo de ${brl(saldo)} é idêntico ao saldo da conta "${outraComMesmoSaldo.conta}".`,
+        detalheExistente: `Conta: ${outraComMesmoSaldo.conta} · Saldo: ${brl(outraComMesmoSaldo.saldo)}`,
+        saldoTentado: saldo,
+        contaTentada: s.conta,
+        saldoAlvo: s,
+      });
+      return;
+    }
+
+    atualizar.mutate(s);
+  };
 
   const total = saldos.reduce((s, c) => s + Number(c.saldo ?? 0), 0);
   const contasMovimentadasHoje = new Set(
@@ -327,7 +407,7 @@ export function SaldosBancarios() {
                   className="mt-3 w-full"
                   size="sm"
                   disabled={!alterado || atualizar.isPending}
-                  onClick={() => atualizar.mutate(s)}
+                  onClick={() => acionarAtualizar(s)}
                 >
                   Salvar saldo
                 </Button>
@@ -367,10 +447,69 @@ export function SaldosBancarios() {
               onChange={(e) => setNovo((n) => ({ ...n, saldo: e.target.value }))}
             />
           </div>
-          <Button onClick={() => criar.mutate()} disabled={criar.isPending}>
+          <Button onClick={acionarCriar} disabled={criar.isPending}>
             <Plus /> Adicionar conta
           </Button>
         </div>
+
+        <Dialog open={!!alertaSaldo} onOpenChange={(v) => !v && setAlertaSaldo(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
+                  <AlertTriangle className="size-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-semibold">
+                    Saldo já existente no sistema
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-muted-foreground">
+                    {alertaSaldo?.mensagem}
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-3 py-2 text-sm">
+              <div className="rounded-lg border border-amber-500/30 bg-amber-50/50 p-3 dark:bg-amber-950/20">
+                <span className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                  Tentativa de lançamento
+                </span>
+                <div className="mt-1 flex items-center justify-between font-medium">
+                  <span>{alertaSaldo?.contaTentada}</span>
+                  <span className="text-base font-bold tabular-nums">
+                    {brl(alertaSaldo?.saldoTentado ?? 0)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{alertaSaldo?.detalheExistente}</p>
+              </div>
+
+              <p className="rounded-md bg-muted/60 p-2.5 text-center text-xs text-muted-foreground">
+                Deseja <strong>incluir este saldo mesmo assim</strong> ou prefere <strong>cancelar</strong>?
+              </p>
+            </div>
+
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button type="button" variant="outline" onClick={() => setAlertaSaldo(null)}>
+                Não incluir (Cancelar)
+              </Button>
+              <Button
+                type="button"
+                className="bg-amber-600 font-medium text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-700"
+                onClick={() => {
+                  if (alertaSaldo?.tipo === "novo") {
+                    criar.mutate();
+                  } else if (alertaSaldo?.saldoAlvo) {
+                    atualizar.mutate(alertaSaldo.saldoAlvo);
+                  }
+                  setAlertaSaldo(null);
+                }}
+              >
+                Sim, incluir mesmo assim
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </ExpandableCard>
   );

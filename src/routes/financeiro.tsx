@@ -19,6 +19,12 @@ import {
 
 import { DespesasRecorrentes } from "@/components/despesas-recorrentes";
 import { SaldosBancarios } from "@/components/saldos-bancarios";
+import {
+  AlertaDuplicidadeDialog,
+  BannerAvisoDuplicidade,
+  encontrarDuplicidades,
+  type ItemLancamentoComparacao,
+} from "@/components/alerta-duplicidade-dialog";
 import { CentroCustoField, VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
@@ -182,6 +188,8 @@ function Financeiro() {
   const [fConta, setFConta] = useState("todas");
   const [fDe, setFDe] = useState("");
   const [fAte, setFAte] = useState("");
+  const [duplicidadesFinanceiro, setDuplicidadesFinanceiro] = useState<ItemLancamentoComparacao[]>([]);
+  const [dialogDuplicidadeFinanceiroAberto, setDialogDuplicidadeFinanceiroAberto] = useState(false);
 
   const { data: lancamentos = [] } = useQuery({
     queryKey: ["lancamentos_financeiros"],
@@ -378,6 +386,50 @@ function Financeiro() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const duplicidadesEmTempoReal = useMemo(() => {
+    if (!open) return [];
+    return encontrarDuplicidades(
+      {
+        id: editando?.id,
+        tipo: form.tipo_fluxo,
+        descricao: form.descricao,
+        valor: Number(form.valor) || 0,
+        data: form.data_competencia || form.vencimento || hojeISO(),
+      },
+      lancamentos as never,
+    );
+  }, [open, editando, form.tipo_fluxo, form.descricao, form.valor, form.data_competencia, form.vencimento, lancamentos]);
+
+  const acionarSalvar = () => {
+    if (!form.descricao.trim()) {
+      toast.error("Informe a descrição.");
+      return;
+    }
+    if (Number(form.valor) <= 0) {
+      toast.error("Informe um valor positivo.");
+      return;
+    }
+
+    const dupes = encontrarDuplicidades(
+      {
+        id: editando?.id,
+        tipo: form.tipo_fluxo,
+        descricao: form.descricao,
+        valor: Number(form.valor) || 0,
+        data: form.data_competencia || form.vencimento || hojeISO(),
+      },
+      lancamentos as never,
+    );
+
+    if (dupes.length > 0) {
+      setDuplicidadesFinanceiro(dupes);
+      setDialogDuplicidadeFinanceiroAberto(true);
+      return;
+    }
+
+    salvar.mutate();
+  };
 
   const reverterBaixa = useMutation({
     mutationFn: async (id: string) => {
@@ -964,12 +1016,21 @@ function Financeiro() {
                       onChange={(e) => set("observacoes")(e.target.value)}
                     />
                   </Field>
+                  <div className="sm:col-span-2">
+                    <BannerAvisoDuplicidade
+                      duplicados={duplicidadesEmTempoReal}
+                      onVerDuplicados={() => {
+                        setDuplicidadesFinanceiro(duplicidadesEmTempoReal);
+                        setDialogDuplicidadeFinanceiroAberto(true);
+                      }}
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+                  <Button onClick={acionarSalvar} disabled={salvar.isPending}>
                     {salvar.isPending
                       ? "Salvando…"
                       : editando
@@ -1368,6 +1429,24 @@ function Financeiro() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertaDuplicidadeDialog
+        aberto={dialogDuplicidadeFinanceiroAberto}
+        onCancelar={() => setDialogDuplicidadeFinanceiroAberto(false)}
+        onConfirmar={() => {
+          setDialogDuplicidadeFinanceiroAberto(false);
+          salvar.mutate();
+        }}
+        tentado={{
+          tipo: form.tipo_fluxo,
+          descricao: form.descricao,
+          valor: Number(form.valor) || 0,
+          data: form.data_competencia || form.vencimento || hojeISO(),
+          categoria: form.categoria,
+          conta_bancaria: form.conta_bancaria,
+        }}
+        duplicados={duplicidadesFinanceiro}
+      />
     </div>
   );
 }

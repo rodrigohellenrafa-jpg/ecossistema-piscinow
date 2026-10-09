@@ -1,11 +1,17 @@
 import { ExpandableCard } from "@/components/expandable-card";
 import { LancarEmLote } from "@/components/lancar-em-lote";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, CheckCircle2, ChevronsUpDown, Handshake, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  AlertaDuplicidadeDialog,
+  BannerAvisoDuplicidade,
+  encontrarDuplicidades,
+  type ItemLancamentoComparacao,
+} from "@/components/alerta-duplicidade-dialog";
 import { RenegociacaoDialog } from "@/components/renegociacao-dialog";
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
@@ -222,6 +228,8 @@ function Contas() {
   const [aba, setAba] = useState<"pagar" | "receber">(busca.tipo ?? "pagar");
   const [baixando, setBaixando] = useState<Conta | null>(null);
   const [renegociando, setRenegociando] = useState<Conta | null>(null);
+  const [duplicidadesDetectadas, setDuplicidadesDetectadas] = useState<ItemLancamentoComparacao[]>([]);
+  const [dialogDuplicidadeAberto, setDialogDuplicidadeAberto] = useState(false);
 
   const { data = [] } = useQuery({
     queryKey: ["contas"],
@@ -597,6 +605,52 @@ function Contas() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const duplicidadesEmTempoReal = useMemo(() => {
+    if (!open) return [];
+    return encontrarDuplicidades(
+      {
+        id: editando,
+        tipo: form.tipo,
+        descricao: form.descricao,
+        valor: Number(form.valor) || 0,
+        data: form.vencimento,
+        parceiro: form.parceiro,
+      },
+      data,
+    );
+  }, [open, editando, form.tipo, form.descricao, form.valor, form.vencimento, form.parceiro, data]);
+
+  const acionarSalvar = () => {
+    if (!form.descricao.trim()) {
+      toast.error("Informe a descrição do título.");
+      return;
+    }
+    if (!form.vencimento) {
+      toast.error("Informe o vencimento.");
+      return;
+    }
+
+    const dupes = encontrarDuplicidades(
+      {
+        id: editando,
+        tipo: form.tipo,
+        descricao: form.descricao,
+        valor: Number(form.valor) || 0,
+        data: form.vencimento,
+        parceiro: form.parceiro,
+      },
+      data,
+    );
+
+    if (dupes.length > 0) {
+      setDuplicidadesDetectadas(dupes);
+      setDialogDuplicidadeAberto(true);
+      return;
+    }
+
+    salvar.mutate();
+  };
 
   const reverterBaixa = useMutation({
     mutationFn: async (id: string) => {
@@ -1343,6 +1397,15 @@ function Contas() {
                   onChange={(e) => set("observacoes")(e.target.value)}
                 />
               </Field>
+              <div className="sm:col-span-2">
+                <BannerAvisoDuplicidade
+                  duplicados={duplicidadesEmTempoReal}
+                  onVerDuplicados={() => {
+                    setDuplicidadesDetectadas(duplicidadesEmTempoReal);
+                    setDialogDuplicidadeAberto(true);
+                  }}
+                />
+              </div>
             </div>
             <DialogFooter className="gap-2 sm:justify-between">
               {editando && editando.status !== "pago" && editando.status !== "renegociado" ? (
@@ -1366,7 +1429,7 @@ function Contas() {
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+                <Button onClick={acionarSalvar} disabled={salvar.isPending}>
                   {salvar.isPending
                     ? "Salvando…"
                     : editando
@@ -1522,6 +1585,25 @@ function Contas() {
         conta={renegociando}
         aberto={!!renegociando}
         onFechar={() => setRenegociando(null)}
+      />
+
+      <AlertaDuplicidadeDialog
+        aberto={dialogDuplicidadeAberto}
+        onCancelar={() => setDialogDuplicidadeAberto(false)}
+        onConfirmar={() => {
+          setDialogDuplicidadeAberto(false);
+          salvar.mutate();
+        }}
+        tentado={{
+          tipo: form.tipo,
+          descricao: form.descricao,
+          valor: (Number(form.valor) || 0) + (Number(form.valor_juros) || 0),
+          data: form.vencimento,
+          parceiro: form.parceiro,
+          categoria: form.categoria,
+          conta_bancaria: form.conta_bancaria,
+        }}
+        duplicados={duplicidadesDetectadas}
       />
     </div>
   );
