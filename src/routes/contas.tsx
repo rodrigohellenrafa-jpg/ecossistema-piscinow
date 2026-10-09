@@ -1502,7 +1502,8 @@ function Contas() {
                 </Button>
               ) : (
                 <div />
-              )}
+              );
+              })()}
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
