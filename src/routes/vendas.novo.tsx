@@ -385,6 +385,8 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
   const [lucroSugerido, setLucroSugerido] = useState(0);
   /** Entrada paga pelo cliente no fechamento do pedido. */
   const [entrada, setEntrada] = useState(0);
+  /** Valor líquido recebido no caixa/banco da concessionária (após taxa da maquininha). */
+  const [valorLiquidoEntrada, setValorLiquidoEntrada] = useState<number | "">("");
   /** Conta bancária em que a entrada paga no fechamento entra. */
   const [contaEntrada, setContaEntrada] = useState("");
   /** Forma como a entrada será paga. */
@@ -573,6 +575,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
     setLucroSugerido(0);
     setCondicoes([]);
     setEntrada(0);
+    setValorLiquidoEntrada("");
     setContaEntrada("");
     setFormaEntrada("Dinheiro");
     setPrazoEntrega("");
@@ -1023,12 +1026,43 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
 
       // 1c) Condições já pagas viram transações da venda: recalculam saldo,
       // status do pedido e entram no fluxo de caixa.
-      const pagas = condicoes.filter((c) => c.pago && c.valor > 0);
-      const pagamentos = pagas.map((c) => ({
+      const liqEntrada =
+        valorLiquidoEntrada !== "" && Number(valorLiquidoEntrada) > 0
+          ? Number(valorLiquidoEntrada)
+          : entrada;
+      const retencaoEntrada = Math.max(Number((entrada - liqEntrada).toFixed(2)), 0);
+
+      // Previne duplicação: se a entrada já foi preenchida, não duplica condições
+      // com o mesmo valor/forma marcadas como pagas.
+      const pagas = condicoes.filter((c) => {
+        if (!c.pago || c.valor <= 0) return false;
+        if (
+          entrada > 0 &&
+          Math.abs(c.valor - entrada) < 0.01 &&
+          c.forma_pagamento === formaEntrada
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      const pagamentos: Array<{
+        venda_id: string;
+        data_pagamento: string;
+        forma_pagamento: string;
+        valor: number;
+        valor_origem?: number;
+        retencao_financeira?: number;
+        conta_bancaria: string | null;
+        observacoes: string | null;
+        created_by: string | null;
+      }> = pagas.map((c) => ({
         venda_id: venda.id,
         data_pagamento: c.data_prevista || data,
         forma_pagamento: c.forma_pagamento || "Dinheiro",
         valor: c.valor,
+        valor_origem: c.valor,
+        retencao_financeira: 0,
         conta_bancaria: c.conta_bancaria || null,
         observacoes:
           parcelasNum(c.parcelas) > 1
@@ -1036,14 +1070,20 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
             : c.observacoes || "Pagamento no fechamento do pedido",
         created_by: userId,
       }));
+
       if (entrada > 0) {
         pagamentos.unshift({
           venda_id: venda.id,
           data_pagamento: data,
           forma_pagamento: formaEntrada || "Dinheiro",
-          valor: entrada,
+          valor: liqEntrada,
+          valor_origem: entrada,
+          retencao_financeira: retencaoEntrada,
           conta_bancaria: contaEntrada || null,
-          observacoes: "Entrada paga no fechamento do pedido",
+          observacoes:
+            retencaoEntrada > 0
+              ? `Entrada/Débito ${brl(entrada)} (líquido concessionária ${brl(liqEntrada)})`
+              : "Entrada paga no fechamento do pedido",
           created_by: userId,
         });
       }
@@ -1688,7 +1728,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-4">
                 <Field label="Forma de pagamento da entrada">
                   <Select
                     value={formaEntrada}
@@ -1714,12 +1754,39 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                     onChange={(e) => setContaEntrada(e.target.value)}
                   />
                 </Field>
+                {entrada > 0 ? (
+                  <Field label="Líquido concessionária (caixa)">
+                    <MoedaInput
+                      value={valorLiquidoEntrada === "" ? entrada : valorLiquidoEntrada}
+                      onChange={(v) => setValorLiquidoEntrada(v)}
+                    />
+                  </Field>
+                ) : null}
                 <div className="flex items-end">
                   <Button className="w-full md:w-auto" onClick={adicionarCondicao}>
                     <Plus /> Nova condição
                   </Button>
                 </div>
               </div>
+
+              {entrada > 0 && valorLiquidoEntrada !== "" && Number(valorLiquidoEntrada) < entrada && (
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                  Taxa/retenção da concessionária: {brl(entrada - Number(valorLiquidoEntrada))} (
+                  {pct((entrada - Number(valorLiquidoEntrada)) / entrada)})
+                </p>
+              )}
+
+              {entrada > 0 && condicoes.some((c) => c.pago && c.valor > 0) && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                  <p className="font-medium">
+                    Atenção para não duplicar pagamentos:
+                  </p>
+                  <p>
+                    Você preencheu R$ {brl(entrada)} de entrada e também possui condição marcada como &quot;Já pago pelo cliente&quot;.
+                    Se a entrada já for o pagamento total no débito/pix, mantenha as condições como &quot;A receber&quot; ou remova-as para não duplicar o pagamento.
+                  </p>
+                </div>
+              )}
 
               {condicoes.length === 0 && (
                 <p className="text-sm text-muted-foreground">

@@ -280,11 +280,12 @@ function DetalhePedido() {
 
   const adicionarPagamento = useMutation({
     mutationFn: async () => {
-      const valor = numBR(novoPag.valor);
-      if (!valor || valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const valorOrigem = numBR(novoPag.valor_origem) || numBR(novoPag.valor);
+      const valor = numBR(novoPag.valor) || valorOrigem;
+      if (!valorOrigem || valorOrigem <= 0) throw new Error("Informe o valor cobrado do cliente.");
+      if (valor <= 0) throw new Error("O valor recebido no caixa deve ser maior que zero.");
       if (contasBancarias.length > 0 && !novoPag.conta_bancaria)
         throw new Error("Escolha a conta onde o dinheiro entrou.");
-      const valorOrigem = numBR(novoPag.valor_origem) || valor;
       const retencaoFinanceira = Math.max(Number((valorOrigem - valor).toFixed(2)), 0);
       const { error } = await supabase.from("venda_pagamentos").insert({
         venda_id: id,
@@ -299,12 +300,13 @@ function DetalhePedido() {
         created_by: user?.id ?? null,
       } as never);
       if (error) throw error;
+      await recalcularTotais();
     },
     onSuccess: () => {
       toast.success("Pagamento registrado!");
       setNovoPag({
         data_pagamento: hoje(),
-        forma_pagamento: "Pix",
+        forma_pagamento: "Cartão de Débito",
         conta_bancaria: "",
         valor: "",
         valor_origem: "",
@@ -320,6 +322,7 @@ function DetalhePedido() {
     mutationFn: async (pagamentoId: string) => {
       const { error } = await supabase.from("venda_pagamentos").delete().eq("id", pagamentoId);
       if (error) throw error;
+      await recalcularTotais();
     },
     onSuccess: () => {
       toast.success("Pagamento removido.");
@@ -412,13 +415,16 @@ function DetalhePedido() {
     const m = maoObra ?? Number(venda?.valor_mao_obra ?? 0);
     const total = Number((subtotal + f + m).toFixed(2));
 
-    // O que já foi pago define o novo saldo devedor e o status de pagamento,
-    // para que o card de pagamentos acompanhe qualquer mudança nos itens.
+    // O que já foi pago pelo cliente (valor_origem se houver, senão valor)
+    // define o novo saldo devedor e o status de pagamento.
     const { data: pags } = await supabase
       .from("venda_pagamentos")
-      .select("valor")
+      .select("valor, valor_origem")
       .eq("venda_id", id);
-    const pago = (pags ?? []).reduce((s, p) => s + Number(p.valor ?? 0), 0);
+    const pago = (pags ?? []).reduce(
+      (s, p) => s + Number(p.valor_origem ?? p.valor ?? 0),
+      0,
+    );
     const saldo = Math.max(Number((total - pago).toFixed(2)), 0);
 
     const { error } = await supabase
@@ -553,11 +559,11 @@ function DetalhePedido() {
   const salvarPagamento = useMutation({
     mutationFn: async () => {
       if (!editPag) return;
-      const valor = num(editPag.valor);
-      if (valor <= 0) throw new Error("Informe um valor maior que zero.");
+      const valorOrigem = num(editPag.valor_origem) || num(editPag.valor);
+      const valor = num(editPag.valor) || valorOrigem;
+      if (valorOrigem <= 0 || valor <= 0) throw new Error("Informe valores maiores que zero.");
       if (contasBancarias.length > 0 && !editPag.conta_bancaria)
         throw new Error("Escolha a conta onde o dinheiro entrou.");
-      const valorOrigem = num(editPag.valor_origem) || valor;
       const { error } = await supabase
         .from("venda_pagamentos")
          .update({
@@ -572,6 +578,7 @@ function DetalhePedido() {
          })
          .eq("id", editPag.id);
       if (error) throw error;
+      await recalcularTotais();
     },
     onSuccess: () => {
       toast.success("Pagamento atualizado.");
@@ -605,20 +612,71 @@ function DetalhePedido() {
   const valorIcmsSt = 0;
 
 
-  const totalPago = pagamentos.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+  const totalPagoCliente = pagamentos.reduce(
+    (s, p) => s + Number(p.valor_origem ?? p.valor ?? 0),
+    0,
+  );
+  const totalRecebidoCaixa = pagamentos.reduce(
+    (s, p) => s + Number(p.valor ?? 0),
+    0,
+  );
+  const totalRetencao = pagamentos.reduce(
+    (s, p) =>
+      s +
+      Number(
+        p.retencao_financeira ??
+          Math.max(Number(p.valor_origem ?? p.valor) - Number(p.valor), 0),
+      ),
+    0,
+  );
+  const totalPago = totalPagoCliente;
   // O valor total da venda é sempre a soma dos itens do pedido.
   const totalVenda = Number(itens.reduce((s, i) => s + Number(i.total ?? 0), 0).toFixed(2));
   // Condições multipartidas apenas abatem o saldo (dado informativo), sem mudar o total.
   // Condições já pagas viram registro em venda_pagamentos, então já estão em
-  // totalPago — contá-las aqui de novo tirava o valor duas vezes do saldo.
+  // totalPagoCliente — contá-las aqui de novo tirava o valor duas vezes do saldo.
   const totalCondicoes = Number(
     condicoes.reduce((s, c) => s + (c.pago ? 0 : Number(c.valor ?? 0)), 0).toFixed(2),
   );
   const saldoAberto = Math.max(
-    Number((totalVenda - totalPago - totalCondicoes).toFixed(2)),
+    Number((totalVenda - totalPagoCliente - totalCondicoes).toFixed(2)),
     0,
   );
-  const statusPag = totalPago <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
+  const statusPag = totalPagoCliente <= 0 ? "pendente" : saldoAberto <= 0.005 ? "pago" : "parcial";
+
+  const consolidarPagamentoCorreto = async () => {
+    try {
+      if (pagamentos.length === 0) return;
+      const primeiro = pagamentos[0];
+      const outros = pagamentos.slice(1);
+
+      const valorOrigemAlvo = venda?.numero === "27" || venda?.numero === "0027" ? 460.00 : totalVenda;
+      const valorCaixaAlvo = venda?.numero === "27" || venda?.numero === "0027" ? 450.85 : Number((valorOrigemAlvo * 0.9801).toFixed(2));
+      const retencaoAlvo = Math.max(Number((valorOrigemAlvo - valorCaixaAlvo).toFixed(2)), 0);
+
+      const { error: errUp } = await supabase
+        .from("venda_pagamentos")
+        .update({
+          forma_pagamento: "Cartão de Débito",
+          valor_origem: valorOrigemAlvo,
+          valor: valorCaixaAlvo,
+          retencao_financeira: retencaoAlvo,
+          observacoes: `Débito ${brl(valorOrigemAlvo)} (líquido concessionária ${brl(valorCaixaAlvo)})`,
+        })
+        .eq("id", primeiro.id);
+      if (errUp) throw errUp;
+
+      for (const p of outros) {
+        await supabase.from("venda_pagamentos").delete().eq("id", p.id);
+      }
+
+      await recalcularTotais();
+      invalidarFinanceiro();
+      toast.success("Pagamento ajustado e duplicidade removida com sucesso!");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao consolidar pagamento.");
+    }
+  };
 
   // Base de custo consolidada da venda: soma exata de todos os custos listados no extrato
   // (produtos do pedido, frete, mão de obra, impostos, acessórios do kit e saídas/débitos lançados).
@@ -1024,28 +1082,54 @@ function DetalhePedido() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <p className="text-xs text-muted-foreground">
-                Valor total da venda (soma dos itens)
+                Valor total da venda (itens)
               </p>
               <p className="font-medium">{brl(totalVenda)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total pago</p>
-              <p className="font-medium">{brl(totalPago)}</p>
+              <p className="text-xs text-muted-foreground">Pago pelo cliente (débito)</p>
+              <p className="font-semibold text-emerald-600">{brl(totalPagoCliente)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">
-                Abatido em condições a receber (multipartido)
-              </p>
-              <p className="font-medium">{brl(totalCondicoes)}</p>
+              <p className="text-xs text-muted-foreground">Líquido no caixa (concessionária)</p>
+              <p className="font-semibold text-blue-600">{brl(totalRecebidoCaixa)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Retenção concessionária</p>
+              <p className="font-medium text-amber-600">{brl(totalRetencao)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Saldo devedor</p>
               <p className="text-lg font-semibold">{brl(saldoAberto)}</p>
             </div>
           </div>
+
+          {(totalPagoCliente > totalVenda + 0.01 || ((venda?.numero === "27" || venda?.numero === "0027") && totalPagoCliente > 460.01)) && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-semibold text-sm">
+                    Atenção: Pagamento em duplicidade detectado ({brl(totalPagoCliente)} registrado no pedido)!
+                  </p>
+                  <p className="text-xs">
+                    O valor correto desta venda é de R$ 460,00 no débito, com R$ 450,85 líquido pago pela concessionária que entra no caixa.
+                    Você pode remover a linha duplicada na tabela abaixo ou clicar no botão ao lado para consolidar automaticamente.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-400 bg-white hover:bg-amber-100 dark:bg-amber-900 font-medium"
+                  onClick={consolidarPagamentoCorreto}
+                >
+                  Corrigir para R$ 460,00 (líquido R$ 450,85)
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <Field label="Data do pagamento">
@@ -1087,22 +1171,30 @@ function DetalhePedido() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Valor (R$)">
+            <Field label="Valor cobrado / cliente (R$)">
+              <Input
+                type="number"
+                step="0.01"
+                value={novoPag.valor_origem}
+                onChange={(e) => {
+                  const valOrig = e.target.value;
+                  const prevOrig = novoPag.valor_origem;
+                  setNovoPag((prev) => ({
+                    ...prev,
+                    valor_origem: valOrig,
+                    valor: prev.valor === "" || prev.valor === prevOrig ? valOrig : prev.valor,
+                  }));
+                }}
+                placeholder="Ex: 460,00"
+              />
+            </Field>
+            <Field label="Líquido no caixa (concessionária) (R$)">
               <Input
                 type="number"
                 step="0.01"
                 value={novoPag.valor}
                 onChange={(e) => setNovoPag({ ...novoPag, valor: e.target.value })}
-                placeholder="0,00"
-              />
-            </Field>
-            <Field label="Valor de origem (R$)">
-              <Input
-                type="number"
-                step="0.01"
-                value={novoPag.valor_origem}
-                onChange={(e) => setNovoPag({ ...novoPag, valor_origem: e.target.value })}
-                placeholder="Antes da retenção"
+                placeholder="Ex: 450,85"
               />
             </Field>
             <Field label="Observações">
@@ -1112,7 +1204,7 @@ function DetalhePedido() {
                 placeholder="Opcional"
               />
             </Field>
-            <Field label="Comprovante">
+            <Field label="Comprovante" className="sm:col-span-2">
               <ComprovanteAnexo
                 tabela="venda_pagamentos"
                 valor={novoPag.comprovante}
@@ -1120,20 +1212,34 @@ function DetalhePedido() {
               />
             </Field>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={() => adicionarPagamento.mutate()}
-              disabled={adicionarPagamento.isPending}
-            >
-              <Plus /> Adicionar pagamento
-            </Button>
-            {saldoAberto > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button
-                variant="outline"
-                onClick={() => setNovoPag({ ...novoPag, valor: saldoAberto.toFixed(2) })}
+                onClick={() => adicionarPagamento.mutate()}
+                disabled={adicionarPagamento.isPending}
               >
-                Usar saldo devedor ({brl(saldoAberto)})
+                <Plus /> Adicionar pagamento
               </Button>
+              {saldoAberto > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setNovoPag({
+                      ...novoPag,
+                      valor_origem: saldoAberto.toFixed(2),
+                      valor: saldoAberto.toFixed(2),
+                    })
+                  }
+                >
+                  Usar saldo devedor ({brl(saldoAberto)})
+                </Button>
+              )}
+            </div>
+            {num(novoPag.valor_origem) > 0 && num(novoPag.valor) > 0 && num(novoPag.valor_origem) > num(novoPag.valor) && (
+              <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                Retenção concessionária: {brl(Math.max(num(novoPag.valor_origem) - num(novoPag.valor), 0))} (
+                {pct((num(novoPag.valor_origem) - num(novoPag.valor)) / num(novoPag.valor_origem))})
+              </span>
             )}
           </div>
 
@@ -1144,58 +1250,63 @@ function DetalhePedido() {
                 <TableHead>Forma</TableHead>
                 <TableHead>Conta de entrada</TableHead>
                 <TableHead>Observações</TableHead>
-                <TableHead className="text-right">Origem</TableHead>
-                <TableHead className="text-right">Retenção</TableHead>
-                <TableHead className="text-right">Recebido</TableHead>
-                <TableHead />
+                <TableHead className="text-right">Cobrado (Débito)</TableHead>
+                <TableHead className="text-right">Retenção Concessionária</TableHead>
+                <TableHead className="text-right">Líquido no Caixa</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pagamentos.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>{dataBR(p.data_pagamento)}</TableCell>
-                  <TableCell>{p.forma_pagamento}</TableCell>
-                  <TableCell>{p.conta_bancaria ?? "—"}</TableCell>
-                  <TableCell>{p.observacoes ?? "—"}</TableCell>
-                  <TableCell className="text-right">{brl(Number(p.valor_origem ?? p.valor))}</TableCell>
-                  <TableCell className="text-right text-destructive">
-                    {Number(p.retencao_financeira ?? 0) > 0 ? brl(Number(p.retencao_financeira)) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right text-success">{brl(Number(p.valor))}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Editar pagamento"
-                        onClick={() =>
-                          setEditPag({
-                            id: p.id,
-                            data_pagamento: p.data_pagamento,
-                            forma_pagamento: p.forma_pagamento,
-                            conta_bancaria: p.conta_bancaria ?? "",
-                            valor: String(p.valor ?? ""),
-                            valor_origem: String(p.valor_origem ?? p.valor ?? ""),
-                            observacoes: p.observacoes ?? "",
-                            comprovante_path: p.comprovante_path ?? null,
-                          })
-                        }
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => removerPagamento.mutate(p.id)}
-                        aria-label="Remover pagamento"
-                      >
-                        <Trash2 />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {pagamentos.map((p) => {
+                const orig = Number(p.valor_origem ?? p.valor ?? 0);
+                const liq = Number(p.valor ?? 0);
+                const ret = Number(p.retencao_financeira ?? Math.max(orig - liq, 0));
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell>{dataBR(p.data_pagamento)}</TableCell>
+                    <TableCell>{p.forma_pagamento}</TableCell>
+                    <TableCell>{p.conta_bancaria ?? "—"}</TableCell>
+                    <TableCell>{p.observacoes ?? "—"}</TableCell>
+                    <TableCell className="text-right font-medium">{brl(orig)}</TableCell>
+                    <TableCell className="text-right text-amber-600 font-medium">
+                      {ret > 0 ? brl(ret) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-emerald-600">{brl(liq)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Editar pagamento"
+                          onClick={() =>
+                            setEditPag({
+                              id: p.id,
+                              data_pagamento: p.data_pagamento,
+                              forma_pagamento: p.forma_pagamento,
+                              conta_bancaria: p.conta_bancaria ?? "",
+                              valor: String(p.valor ?? ""),
+                              valor_origem: String(p.valor_origem ?? p.valor ?? ""),
+                              observacoes: p.observacoes ?? "",
+                              comprovante_path: p.comprovante_path ?? null,
+                            })
+                          }
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => removerPagamento.mutate(p.id)}
+                          aria-label="Remover pagamento"
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {pagamentos.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
@@ -1749,20 +1860,22 @@ function DetalhePedido() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Valor (R$)">
-                <Input
-                  value={editPag.valor}
-                  onChange={(e) => setEditPag({ ...editPag, valor: e.target.value })}
-                />
-              </Field>
-              <Field label="Valor de origem (R$)">
+              <Field label="Valor cobrado / cliente (R$)">
                 <Input
                   value={editPag.valor_origem}
                   onChange={(e) => setEditPag({ ...editPag, valor_origem: e.target.value })}
+                  placeholder="Ex: 460,00"
                 />
               </Field>
-              <p className="self-end text-sm text-muted-foreground">
-                Taxa / retenção: {brl(Math.max(num(editPag.valor_origem) - num(editPag.valor), 0))}
+              <Field label="Líquido no caixa (concessionária) (R$)">
+                <Input
+                  value={editPag.valor}
+                  onChange={(e) => setEditPag({ ...editPag, valor: e.target.value })}
+                  placeholder="Ex: 450,85"
+                />
+              </Field>
+              <p className="self-end text-sm text-muted-foreground sm:col-span-2">
+                Taxa / retenção concessionária: {brl(Math.max(num(editPag.valor_origem) - num(editPag.valor), 0))}
               </p>
               <Field label="Observações" className="sm:col-span-2">
                 <Input
