@@ -3,9 +3,10 @@ import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCircle2, ChevronsUpDown, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, ChevronsUpDown, Handshake, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { RenegociacaoDialog } from "@/components/renegociacao-dialog";
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
@@ -220,6 +221,7 @@ function Contas() {
   const [periodoAte, setPeriodoAte] = useState(hojeISO());
   const [aba, setAba] = useState<"pagar" | "receber">(busca.tipo ?? "pagar");
   const [baixando, setBaixando] = useState<Conta | null>(null);
+  const [renegociando, setRenegociando] = useState<Conta | null>(null);
 
   const { data = [] } = useQuery({
     queryKey: ["contas"],
@@ -799,7 +801,7 @@ function Contas() {
   const todasReceber = data.filter((c) => c.tipo === "receber");
   const filtradas = data.filter((c) => noPeriodo(c, periodo, periodoDe, periodoAte));
   const soma = (l: typeof data) =>
-    l.filter((c) => c.status !== "pago").reduce((s, c) => s + Number(c.valor), 0);
+    l.filter((c) => c.status !== "pago" && c.status !== "renegociado").reduce((s, c) => s + Number(c.valor), 0);
   const pagar = filtradas.filter((c) => c.tipo === "pagar");
   // A receber: mantém também os recebimentos já feitos (status pago) para conferência por status.
   const receber = filtradas.filter((c) => c.tipo === "receber");
@@ -1342,17 +1344,36 @@ function Contas() {
                 />
               </Field>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
-                {salvar.isPending
-                  ? "Salvando…"
-                  : editando
-                    ? "Salvar alterações"
-                    : "Salvar lançamento"}
-              </Button>
+            <DialogFooter className="gap-2 sm:justify-between">
+              {editando && editando.status !== "pago" && editando.status !== "renegociado" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mr-auto border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                  onClick={() => {
+                    const c = editando;
+                    setOpen(false);
+                    setRenegociando(c);
+                  }}
+                >
+                  <Handshake className="size-4 mr-1.5" />
+                  Renegociar conta
+                </Button>
+              ) : (
+                <div />
+              )}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
+                  {salvar.isPending
+                    ? "Salvando…"
+                    : editando
+                      ? "Salvar alterações"
+                      : "Salvar lançamento"}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1459,6 +1480,7 @@ function Contas() {
             rateios={rateios}
             onBaixar={setBaixando}
             onEditar={abrirEdicao}
+            onRenegociar={setRenegociando}
             onExcluir={(id) => excluir.mutate(id)}
             onReverter={(c) => {
               if (window.confirm(`Reverter a baixa de "${c.descricao}"?`))
@@ -1478,6 +1500,7 @@ function Contas() {
             rateios={rateios}
             onBaixar={setBaixando}
             onEditar={abrirEdicao}
+            onRenegociar={setRenegociando}
             onExcluir={(id) => excluir.mutate(id)}
             onReverter={(c) => {
               if (window.confirm(`Reverter a baixa de "${c.descricao}"?`))
@@ -1493,6 +1516,12 @@ function Contas() {
         pendente={baixar.isPending}
         onFechar={() => setBaixando(null)}
         onConfirmar={(p) => baixar.mutate(p, { onSuccess: () => setBaixando(null) })}
+      />
+
+      <RenegociacaoDialog
+        conta={renegociando}
+        aberto={!!renegociando}
+        onFechar={() => setRenegociando(null)}
       />
     </div>
   );
@@ -1701,6 +1730,7 @@ function Lista({
   onResetPeriodo,
   onBaixar,
   onEditar,
+  onRenegociar,
   onExcluir,
   onReverter,
 }: {
@@ -1714,6 +1744,7 @@ function Lista({
   onResetPeriodo?: () => void;
   onBaixar: (c: Conta) => void;
   onEditar: (c: Conta) => void;
+  onRenegociar: (c: Conta) => void;
   onExcluir: (id: string) => void;
   onReverter: (c: Conta) => void;
 }) {
@@ -1737,7 +1768,13 @@ function Lista({
   const soDigitos = (s: string) => s.replace(/\D/g, "");
 
   const statusDe = (c: Conta) =>
-    c.status === "pago" ? "pago" : c.vencimento < hoje ? "vencido" : "aberto";
+    c.status === "pago"
+      ? "pago"
+      : c.status === "renegociado"
+        ? "renegociado"
+        : c.vencimento < hoje
+          ? "vencido"
+          : "aberto";
 
   const visiveis = baseParaFiltrar.filter((c) => {
     if (fDescricao) {
@@ -1799,6 +1836,7 @@ function Lista({
       vencido: { n: 0, total: 0 },
       parcial: { n: 0, pago: 0 },
       pago: { n: 0, pago: 0 },
+      renegociado: { n: 0, total: 0 },
     };
     for (const c of visiveis) {
       const st = (c.status ?? "").toLowerCase();
@@ -1809,6 +1847,9 @@ function Lista({
       } else if (st === "pago_parcial") {
         g.parcial.n++;
         g.parcial.pago += Number(c.valor_pago ?? 0);
+      } else if (st === "renegociado") {
+        g.renegociado.n++;
+        g.renegociado.total += totalTitulo;
       } else if (c.vencimento < hoje) {
         g.vencido.n++;
         g.vencido.total += totalTitulo;
@@ -1880,6 +1921,11 @@ function Lista({
               {brl(grupos.parcial.pago)}
             </span>
           )}
+          {grupos.renegociado.n > 0 && (
+            <span className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs tabular-nums text-amber-700 dark:text-amber-400">
+              Renegociado: {grupos.renegociado.n} · {brl(grupos.renegociado.total)}
+            </span>
+          )}
           {grupos.pago.n > 0 && (
             <span className="rounded-md border border-success/40 bg-success/10 px-2 py-1 text-xs tabular-nums text-success-foreground">
               {ehReceber ? "Recebido" : "Pago"}: {grupos.pago.n} · {brl(grupos.pago.pago)}
@@ -1897,7 +1943,7 @@ function Lista({
               <TableHead className="text-right">Total do título</TableHead>
               <TableHead className="text-right">Valor pago</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className={`w-36 text-right ${acoesFixas}`}>Ações</TableHead>
+              <TableHead className={`w-44 text-right ${acoesFixas}`}>Ações</TableHead>
             </TableRow>
             <TableRow className="hover:bg-transparent">
               <TableHead className="py-1">
@@ -1949,6 +1995,7 @@ function Lista({
                     <SelectItem value="aberto">Aberto</SelectItem>
                     <SelectItem value="vencido">Vencido</SelectItem>
                     <SelectItem value="pago">Pago</SelectItem>
+                    <SelectItem value="renegociado">Renegociado</SelectItem>
                   </SelectContent>
                 </Select>
               </TableHead>
@@ -1957,7 +2004,7 @@ function Lista({
           </TableHeader>
           <TableBody>
             {visiveis.map((c) => {
-              const vencido = c.status !== "pago" && c.vencimento < hoje;
+              const vencido = c.status !== "pago" && c.status !== "renegociado" && c.vencimento < hoje;
               return (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">
@@ -2008,10 +2055,27 @@ function Lista({
                   <TableCell>
                     <Badge
                       variant={
-                        c.status === "pago" ? "secondary" : vencido ? "destructive" : "outline"
+                        c.status === "pago"
+                          ? "secondary"
+                          : c.status === "renegociado"
+                            ? "outline"
+                            : vencido
+                              ? "destructive"
+                              : "outline"
+                      }
+                      className={
+                        c.status === "renegociado"
+                          ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium"
+                          : undefined
                       }
                     >
-                      {c.status === "pago" ? "Pago" : vencido ? "Vencido" : "Aberto"}
+                      {c.status === "pago"
+                        ? "Pago"
+                        : c.status === "renegociado"
+                          ? "Renegociado"
+                          : vencido
+                            ? "Vencido"
+                            : "Aberto"}
                     </Badge>
                   </TableCell>
                   <TableCell className={`text-right ${acoesFixas}`}>
@@ -2019,16 +2083,38 @@ function Lista({
                       {c.comprovante_path ? (
                         <ComprovanteAnexo tabela="contas" valor={c.comprovante_path} />
                       ) : null}
-                      {c.status !== "pago" ? (
+                      {c.status !== "pago" && c.status !== "renegociado" && (
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => onBaixar(c)}
+                          title="Dar baixa"
                           aria-label="Dar baixa"
                         >
                           <CheckCircle2 className="size-4" />
                         </Button>
-                      ) : (
+                      )}
+                      {c.status !== "pago" && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className={
+                            c.status === "renegociado"
+                              ? "text-amber-600/70 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400/70"
+                              : "text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400"
+                          }
+                          onClick={() => onRenegociar(c)}
+                          title={
+                            c.status === "renegociado"
+                              ? "Conta já renegociada (ver / ajustar)"
+                              : "Renegociar conta (gerar parcelamento)"
+                          }
+                          aria-label="Renegociar"
+                        >
+                          <Handshake className="size-4" />
+                        </Button>
+                      )}
+                      {c.status === "pago" && (
                         <Button
                           size="icon"
                           variant="ghost"
