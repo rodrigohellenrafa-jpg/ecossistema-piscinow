@@ -1484,13 +1484,15 @@ function Contas() {
               </div>
             </div>
             <DialogFooter className="gap-2 sm:justify-between">
-              {editando && editando.status !== "pago" && editando.status !== "renegociado" ? (
+              {(() => {
+                const contaEditando = editando ? (data as Conta[]).find((c) => c.id === editando) : null;
+                return contaEditando && contaEditando.status !== "pago" && contaEditando.status !== "renegociado" ? (
                 <Button
                   type="button"
                   variant="outline"
                   className="mr-auto border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
                   onClick={() => {
-                    const c = editando;
+                    const c = contaEditando;
                     setOpen(false);
                     setRenegociando(c);
                   }}
@@ -1500,7 +1502,8 @@ function Contas() {
                 </Button>
               ) : (
                 <div />
-              )}
+              );
+              })()}
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
@@ -1866,6 +1869,7 @@ type Conta = {
   valor_desconto?: number | null;
   vencimento: string;
   status: string;
+  data_pagamento?: string | null;
   recorrencia?: string | null;
   recorrencia_fim?: string | null;
   tipo_despesa?: string | null;

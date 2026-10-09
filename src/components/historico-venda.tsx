@@ -411,9 +411,11 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     });
   }, [filtrados]);
 
+  // Só saídas vinculadas a este pedido entram no multipartido — despesas do
+  // cliente (venda_id nula) ficam no extrato, mas não reduzem o total.
   const debitosExtrato = useMemo(
-    () => filtrados.filter((l) => l.natureza === "saida"),
-    [filtrados],
+    () => filtrados.filter((l) => l.natureza === "saida" && l.venda_id === vendaId),
+    [filtrados, vendaId],
   );
 
   const totalEntradas = extrato.reduce((s, l) => s + (l.mov > 0 ? l.mov : 0), 0);

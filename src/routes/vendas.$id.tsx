@@ -851,8 +851,10 @@ function DetalhePedido() {
     (s, a) => s + Number(a?.valor ?? 0),
     0,
   );
+  // Só saídas vinculadas a este pedido entram no custo — despesas do cliente
+  // (venda_id nula) aparecem no extrato, mas não reduzem o lucro da venda.
   const custoDebitosExtrato = historicoLancamentos
-    .filter((l) => l.natureza === "saida")
+    .filter((l) => l.natureza === "saida" && l.venda_id === id)
     .reduce((s, l) => s + Number(l.valor ?? 0), 0);
 
   const custoItens = Number(
