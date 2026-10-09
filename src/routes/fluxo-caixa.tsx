@@ -104,10 +104,24 @@ function FluxoCaixa() {
   const movimentos = useMemo<Movimento[]>(() => {
     const lista: Movimento[] = [];
 
+    // Vendas que já possuem lançamento registrado no fluxo de caixa (livro caixa)
+    const vendasEmLancamentos = new Set<string>();
+    for (const l of lancamentos as unknown as Record<string, string | number | null>[]) {
+      if (l.venda_id && l.status !== "Cancelado") {
+        vendasEmLancamentos.add(String(l.venda_id));
+      }
+    }
+
     for (const c of contas as unknown as Record<string, string | number | null>[]) {
+      // Se a conta a receber pertencer a uma venda que já está espelhada no fluxo de caixa,
+      // não duplica a entrada: o lançamento financeiro já consolida o valor líquido recebido no caixa.
+      if (c.venda_id && c.tipo === "receber" && vendasEmLancamentos.has(String(c.venda_id))) {
+        continue;
+      }
+
       const pago = c.status === "pago";
       const data = String(pago ? (c.data_pagamento ?? c.vencimento) : c.vencimento).slice(0, 10);
-      const valor = Number(c.valor ?? 0);
+      const valor = Number((pago ? c.valor_pago : null) || c.valor || 0);
       lista.push({
         id: `conta-${c.id}`,
         data,

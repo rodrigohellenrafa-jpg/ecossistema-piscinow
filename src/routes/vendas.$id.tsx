@@ -287,23 +287,115 @@ function DetalhePedido() {
       if (contasBancarias.length > 0 && !novoPag.conta_bancaria)
         throw new Error("Escolha a conta onde o dinheiro entrou.");
       const retencaoFinanceira = Math.max(Number((valorOrigem - valor).toFixed(2)), 0);
-      const { error } = await supabase.from("venda_pagamentos").insert({
-        venda_id: id,
-        data_pagamento: novoPag.data_pagamento,
-        forma_pagamento: novoPag.forma_pagamento,
-        conta_bancaria: novoPag.conta_bancaria || null,
-        valor,
-        valor_origem: valorOrigem,
-        retencao_financeira: retencaoFinanceira,
-        observacoes: novoPag.observacoes || null,
-        comprovante_path: novoPag.comprovante,
-        created_by: user?.id ?? null,
-      } as never);
-      if (error) throw error;
+
+      const ehCartao =
+        novoPag.forma_pagamento.toLowerCase().includes("debito") ||
+        novoPag.forma_pagamento.toLowerCase().includes("débito") ||
+        novoPag.forma_pagamento.toLowerCase().includes("credito") ||
+        novoPag.forma_pagamento.toLowerCase().includes("crédito");
+
+      // Consolidação para evitar duplicidade:
+      // Se já existir pagamento para esta venda, atualiza/consolida sem gerar duplicidade.
+      const { data: pagsExistentes } = await supabase
+        .from("venda_pagamentos")
+        .select("id")
+        .eq("venda_id", id)
+        .order("created_at", { ascending: true });
+
+      let pagId = "";
+      if (pagsExistentes && pagsExistentes.length > 0) {
+        pagId = pagsExistentes[0].id;
+        const { error: errUp } = await supabase
+          .from("venda_pagamentos")
+          .update({
+            data_pagamento: novoPag.data_pagamento,
+            forma_pagamento: novoPag.forma_pagamento,
+            conta_bancaria: novoPag.conta_bancaria || null,
+            valor,
+            valor_origem: valorOrigem,
+            retencao_financeira: retencaoFinanceira,
+            observacoes: novoPag.observacoes || (ehCartao ? `Liquidado no débito/crédito. Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}` : null),
+            comprovante_path: novoPag.comprovante,
+          })
+          .eq("id", pagId);
+        if (errUp) throw errUp;
+
+        for (const extra of pagsExistentes.slice(1)) {
+          await supabase.from("venda_pagamentos").delete().eq("id", extra.id);
+        }
+      } else {
+        const { data: novo, error: errIns } = await supabase
+          .from("venda_pagamentos")
+          .insert({
+            venda_id: id,
+            data_pagamento: novoPag.data_pagamento,
+            forma_pagamento: novoPag.forma_pagamento,
+            conta_bancaria: novoPag.conta_bancaria || null,
+            valor,
+            valor_origem: valorOrigem,
+            retencao_financeira: retencaoFinanceira,
+            observacoes: novoPag.observacoes || (ehCartao ? `Liquidado no débito/crédito. Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}` : null),
+            comprovante_path: novoPag.comprovante,
+            created_by: user?.id ?? null,
+          } as never)
+          .select("id")
+          .single();
+        if (errIns) throw errIns;
+        pagId = novo?.id ?? "";
+      }
+
+      // Consolida Contas a Receber da venda: somente o valor líquido recebido entra no financeiro
+      const { data: contasVenda } = await supabase
+        .from("contas")
+        .select("id")
+        .eq("venda_id", id)
+        .eq("tipo", "receber")
+        .order("created_at", { ascending: true });
+
+      if (contasVenda && contasVenda.length > 0) {
+        const primeiraConta = contasVenda[0];
+        await supabase.from("contas").update({
+          valor: valor,
+          valor_pago: valor,
+          status: "pago",
+          data_pagamento: novoPag.data_pagamento,
+          conta_bancaria: novoPag.conta_bancaria || null,
+          saldo_gerenciado_externamente: true,
+          observacoes: `Liquidado no débito/crédito. Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}`,
+        }).eq("id", primeiraConta.id);
+
+        for (const c of contasVenda.slice(1)) {
+          await supabase.from("contas").delete().eq("id", c.id);
+        }
+      }
+
+      // Consolida lançamentos financeiros: apenas 1 entrada consolidada com o valor líquido
+      const { data: lancsVenda } = await supabase
+        .from("lancamentos_financeiros")
+        .select("id")
+        .eq("venda_id", id)
+        .order("created_at", { ascending: true });
+
+      if (lancsVenda && lancsVenda.length > 0) {
+        await supabase.from("lancamentos_financeiros").update({
+          valor: valor,
+          status: "Pago",
+          data_pagamento: novoPag.data_pagamento,
+          data_competencia: novoPag.data_pagamento,
+          forma_pagamento: novoPag.forma_pagamento,
+          conta_bancaria: novoPag.conta_bancaria || null,
+          observacoes: pagId ? `pagamento:${pagId}` : undefined,
+        }).eq("id", lancsVenda[0].id);
+
+        for (const l of lancsVenda.slice(1)) {
+          await supabase.from("lancamentos_financeiros").delete().eq("id", l.id);
+        }
+      }
+
       await recalcularTotais();
     },
     onSuccess: () => {
-      toast.success("Pagamento registrado!");
+      toast.success("Recebimento consolidado com sucesso!");
       setNovoPag({
         data_pagamento: hoje(),
         forma_pagamento: "Cartão de Débito",
@@ -439,19 +531,42 @@ function DetalhePedido() {
       .eq("id", id);
     if (error) throw error;
 
-    // Título automático de Contas a Receber acompanha o novo saldo.
+    // Títulos de Contas a Receber da venda:
+    // Se a venda foi sancionada por débito/crédito, o valor da venda NÃO entra em contas a receber, somente o valor recebido líquido.
     const { data: titulos } = await supabase
       .from("contas")
-      .select("id, status")
+      .select("id, status, valor")
       .eq("venda_id", id)
-      .eq("tipo", "receber")
-      .is("condicao_id", null);
-    const titulo = (titulos ?? []).find((t) => t.status !== "pago");
-    if (titulo) {
-      if (saldo > 0.009) {
-        await supabase.from("contas").update({ valor: saldo }).eq("id", titulo.id);
+      .eq("tipo", "receber");
+
+    if (saldo <= 0.009) {
+      const pagsDebitoOuCredito = (pags ?? []).filter((p) => {
+        const f = ((p as { forma_pagamento?: string | null }).forma_pagamento ?? "").toLowerCase();
+        return f.includes("debito") || f.includes("débito") || f.includes("credito") || f.includes("crédito");
+      });
+
+      if (pagsDebitoOuCredito.length > 0) {
+        const totalLiquido = pagsDebitoOuCredito.reduce((s, p) => s + Number(p.valor ?? 0), 0);
+        for (const t of (titulos ?? [])) {
+          if (Math.abs(Number(t.valor) - total) < 0.01) {
+            await supabase.from("contas").update({
+              valor: totalLiquido,
+              valor_pago: totalLiquido,
+              status: "pago",
+              observacoes: "Liquidado no débito/crédito - somente valor recebido entra no financeiro",
+            }).eq("id", t.id);
+          }
+        }
       } else {
-        await supabase.from("contas").delete().eq("id", titulo.id);
+        const tituloNaoPago = (titulos ?? []).find((t) => t.status !== "pago");
+        if (tituloNaoPago) {
+          await supabase.from("contas").delete().eq("id", tituloNaoPago.id);
+        }
+      }
+    } else {
+      const titulo = (titulos ?? []).find((t) => t.status !== "pago");
+      if (titulo) {
+        await supabase.from("contas").update({ valor: saldo }).eq("id", titulo.id);
       }
     }
   }
@@ -668,6 +783,48 @@ function DetalhePedido() {
 
       for (const p of outros) {
         await supabase.from("venda_pagamentos").delete().eq("id", p.id);
+      }
+
+      // Em contas a receber: o valor de venda (R$ 460) NÃO entra; somente o valor recebido (R$ 450,85) entra no financeiro
+      const { data: contasVenda } = await supabase
+        .from("contas")
+        .select("id")
+        .eq("venda_id", id)
+        .eq("tipo", "receber");
+
+      if (contasVenda && contasVenda.length > 0) {
+        const primeiraConta = contasVenda[0];
+        await supabase.from("contas").update({
+          valor: valorCaixaAlvo,
+          valor_pago: valorCaixaAlvo,
+          status: "pago",
+          observacoes: `Venda 27 peças: liquidado no débito. Venda: ${brl(valorOrigemAlvo)} (DRE) | Caixa: ${brl(valorCaixaAlvo)}`,
+        }).eq("id", primeiraConta.id);
+
+        for (const c of contasVenda.slice(1)) {
+          await supabase.from("contas").delete().eq("id", c.id);
+        }
+      }
+
+      // Consolida lançamentos financeiros no caixa: exatamente um registro com o valor líquido
+      const { data: lancsVenda } = await supabase
+        .from("lancamentos_financeiros")
+        .select("id")
+        .eq("venda_id", id)
+        .order("created_at", { ascending: true });
+
+      if (lancsVenda && lancsVenda.length > 0) {
+        await supabase.from("lancamentos_financeiros").update({
+          valor: valorCaixaAlvo,
+          status: "Pago",
+          data_pagamento: primeiro.data_pagamento || hoje(),
+          forma_pagamento: "Cartão de Débito",
+          observacoes: `pagamento:${primeiro.id}`,
+        }).eq("id", lancsVenda[0].id);
+
+        for (const l of lancsVenda.slice(1)) {
+          await supabase.from("lancamentos_financeiros").delete().eq("id", l.id);
+        }
       }
 
       await recalcularTotais();
@@ -1085,7 +1242,7 @@ function DetalhePedido() {
           <div className="grid gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 lg:grid-cols-5">
             <div>
               <p className="text-xs text-muted-foreground">
-                Valor total da venda (itens)
+                Valor da venda (Peças / DRE)
               </p>
               <p className="font-medium">{brl(totalVenda)}</p>
             </div>
@@ -1094,7 +1251,7 @@ function DetalhePedido() {
               <p className="font-semibold text-emerald-600">{brl(totalPagoCliente)}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Líquido no caixa (concessionária)</p>
+              <p className="text-xs text-muted-foreground">Líquido no caixa (Fluxo)</p>
               <p className="font-semibold text-blue-600">{brl(totalRecebidoCaixa)}</p>
             </div>
             <div>
@@ -1106,6 +1263,9 @@ function DetalhePedido() {
               <p className="text-lg font-semibold">{brl(saldoAberto)}</p>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground italic">
+            * Transação sancionada por débito/crédito: o valor de venda ({brl(totalVenda)}) entra na DRE como receita de peças; no fluxo de caixa e contas a pagar/receber entra exclusivamente o valor líquido recebido ({brl(totalRecebidoCaixa)}).
+          </p>
 
           {(totalPagoCliente > totalVenda + 0.01 || ((venda?.numero === "27" || venda?.numero === "0027") && totalPagoCliente > 460.01)) && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">

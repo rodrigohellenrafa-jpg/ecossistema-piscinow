@@ -136,7 +136,20 @@ export function Movimentacoes() {
   const linhas = useMemo<Linha[]>(() => {
     const lista: Linha[] = [];
 
+    // Vendas que já possuem lançamento registrado no livro caixa / lançamentos
+    const vendasEmLancamentos = new Set<string>();
+    for (const l of lancamentos as unknown as Record<string, string | number | null>[]) {
+      if (l.venda_id && l.status !== "Cancelado") {
+        vendasEmLancamentos.add(String(l.venda_id));
+      }
+    }
+
     for (const c of contas as unknown as Record<string, string | number | null>[]) {
+      // Não duplica receitas de vendas que já têm lançamento financeiro
+      if (c.venda_id && c.tipo === "receber" && vendasEmLancamentos.has(String(c.venda_id))) {
+        continue;
+      }
+
       const pago = c.status === "pago";
       lista.push({
         id: `conta-${c.id}`,

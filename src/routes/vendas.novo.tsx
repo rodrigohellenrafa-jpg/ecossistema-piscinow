@@ -51,7 +51,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
+import { brl, ehCartaoDebitoOuCredito, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
 
 
 export const Route = createFileRoute("/vendas/novo")({
@@ -993,6 +993,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
       };
 
       // 1) Condições de pagamento do pedido (uma linha por forma usada).
+      // Vendas no débito ou crédito ficam com pago=false para gerar título a receber e não entrar automaticamente no fluxo de caixa.
       if (condicoes.length > 0) {
         const { error: erroCond } = await supabase.from("venda_condicoes").insert(
           condicoes.map((c, idx) => ({
@@ -1005,7 +1006,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
             valor_cobrado: cobradoCondicao(c),
             valor_parcela: c.valor_parcela,
             data_prevista: c.data_prevista || data,
-            pago: c.pago,
+            pago: ehCartaoDebitoOuCredito(c.forma_pagamento) ? false : c.pago,
             bandeira: c.bandeira || null,
             conta_bancaria: c.conta_bancaria || null,
             observacoes: c.observacoes || null,
@@ -1026,6 +1027,10 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
 
       // 1c) Condições já pagas viram transações da venda: recalculam saldo,
       // status do pedido e entram no fluxo de caixa.
+      // REGRA: Vendas no débito ou crédito registram o valor da venda apenas como informação no DRE.
+      // Não cria entrada automática no fluxo de caixa até que a baixa seja processada manualmente.
+      const ehCartaoEntrada = ehCartaoDebitoOuCredito(formaEntrada);
+
       const liqEntrada =
         valorLiquidoEntrada !== "" && Number(valorLiquidoEntrada) > 0
           ? Number(valorLiquidoEntrada)
@@ -1034,8 +1039,10 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
 
       // Previne duplicação: se a entrada já foi preenchida, não duplica condições
       // com o mesmo valor/forma marcadas como pagas.
+      // Débito e crédito não viram pagamento automático no caixa ao salvar o pedido.
       const pagas = condicoes.filter((c) => {
         if (!c.pago || c.valor <= 0) return false;
+        if (ehCartaoDebitoOuCredito(c.forma_pagamento)) return false;
         if (
           entrada > 0 &&
           Math.abs(c.valor - entrada) < 0.01 &&
@@ -1072,21 +1079,40 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
       }));
 
       if (entrada > 0) {
-        pagamentos.unshift({
-          venda_id: venda.id,
-          data_pagamento: data,
-          forma_pagamento: formaEntrada || "Dinheiro",
-          valor: liqEntrada,
-          valor_origem: entrada,
-          retencao_financeira: retencaoEntrada,
-          conta_bancaria: contaEntrada || null,
-          observacoes:
-            retencaoEntrada > 0
-              ? `Entrada/Débito ${brl(entrada)} (líquido concessionária ${brl(liqEntrada)})`
-              : "Entrada paga no fechamento do pedido",
-          created_by: userId,
-        });
+        if (ehCartaoEntrada) {
+          // Débito/Crédito: não cria entrada automática no fluxo de caixa!
+          // Registra título a receber em aberto aguardando baixa manual da concessionária.
+          await supabase.from("contas").insert({
+            tipo: "receber",
+            descricao: `Pedido ${numeroFinal} — ${formaEntrada || "Cartão"} (Aguardando baixa manual)`,
+            parceiro: selecaoCliente.nome,
+            cliente_id: selecaoCliente.id,
+            venda_id: venda.id,
+            categoria: "Vendas",
+            valor: entrada,
+            vencimento: data,
+            status: "aberto",
+            observacoes: "Venda no débito/crédito registrada para DRE. Aguardando baixa manual da concessionária para entrada no fluxo de caixa.",
+            created_by: userId,
+          });
+        } else {
+          pagamentos.unshift({
+            venda_id: venda.id,
+            data_pagamento: data,
+            forma_pagamento: formaEntrada || "Dinheiro",
+            valor: liqEntrada,
+            valor_origem: entrada,
+            retencao_financeira: retencaoEntrada,
+            conta_bancaria: contaEntrada || null,
+            observacoes:
+              retencaoEntrada > 0
+                ? `Entrada ${brl(entrada)} (líquido ${brl(liqEntrada)})`
+                : "Entrada paga no fechamento do pedido",
+            created_by: userId,
+          });
+        }
       }
+
       if (pagamentos.length > 0) {
         const { error: erroPag } = await supabase
           .from("venda_pagamentos")

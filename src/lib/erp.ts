@@ -152,3 +152,18 @@ export const ETIQUETAS_ORCAMENTO = [
 
 export const etiquetaInfo = (valor: string | null | undefined) =>
   ETIQUETAS_ORCAMENTO.find((e) => e.valor === valor) ?? null;
+
+/** Identifica se a forma de pagamento é cartão (débito ou crédito) para tratamento contábil/DRE vs fluxo de caixa. */
+export const ehCartaoDebitoOuCredito = (forma: string | null | undefined): boolean => {
+  if (!forma) return false;
+  const f = forma.toLowerCase();
+  return (
+    f.includes("debito") ||
+    f.includes("débito") ||
+    f.includes("credito") ||
+    f.includes("crédito") ||
+    f.includes("cartao") ||
+    f.includes("cartão")
+  );
+};
+
