@@ -294,108 +294,30 @@ function DetalhePedido() {
         novoPag.forma_pagamento.toLowerCase().includes("credito") ||
         novoPag.forma_pagamento.toLowerCase().includes("crédito");
 
-      // Consolidação para evitar duplicidade:
-      // Se já existir pagamento para esta venda, atualiza/consolida sem gerar duplicidade.
-      const { data: pagsExistentes } = await supabase
-        .from("venda_pagamentos")
-        .select("id")
-        .eq("venda_id", id)
-        .order("created_at", { ascending: true });
-
-      let pagId = "";
-      if (pagsExistentes && pagsExistentes.length > 0) {
-        pagId = pagsExistentes[0].id;
-        const { error: errUp } = await supabase
-          .from("venda_pagamentos")
-          .update({
-            data_pagamento: novoPag.data_pagamento,
-            forma_pagamento: novoPag.forma_pagamento,
-            conta_bancaria: novoPag.conta_bancaria || null,
-            valor,
-            valor_origem: valorOrigem,
-            retencao_financeira: retencaoFinanceira,
-            observacoes: novoPag.observacoes || (ehCartao ? `Liquidado no débito/crédito. Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}` : null),
-            comprovante_path: novoPag.comprovante,
-          })
-          .eq("id", pagId);
-        if (errUp) throw errUp;
-
-        for (const extra of pagsExistentes.slice(1)) {
-          await supabase.from("venda_pagamentos").delete().eq("id", extra.id);
-        }
-      } else {
-        const { data: novo, error: errIns } = await supabase
-          .from("venda_pagamentos")
-          .insert({
-            venda_id: id,
-            data_pagamento: novoPag.data_pagamento,
-            forma_pagamento: novoPag.forma_pagamento,
-            conta_bancaria: novoPag.conta_bancaria || null,
-            valor,
-            valor_origem: valorOrigem,
-            retencao_financeira: retencaoFinanceira,
-            observacoes: novoPag.observacoes || (ehCartao ? `Liquidado no débito/crédito. Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}` : null),
-            comprovante_path: novoPag.comprovante,
-            created_by: user?.id ?? null,
-          } as never)
-          .select("id")
-          .single();
-        if (errIns) throw errIns;
-        pagId = novo?.id ?? "";
-      }
-
-      // Consolida Contas a Receber da venda: somente o valor líquido recebido entra no financeiro
-      const { data: contasVenda } = await supabase
-        .from("contas")
-        .select("id")
-        .eq("venda_id", id)
-        .eq("tipo", "receber")
-        .order("created_at", { ascending: true });
-
-      if (contasVenda && contasVenda.length > 0) {
-        const primeiraConta = contasVenda[0];
-        await supabase.from("contas").update({
-          valor: valor,
-          valor_pago: valor,
-          status: "pago",
-          data_pagamento: novoPag.data_pagamento,
-          conta_bancaria: novoPag.conta_bancaria || null,
-          saldo_gerenciado_externamente: true,
-          observacoes: `Liquidado no débito/crédito. Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}`,
-        }).eq("id", primeiraConta.id);
-
-        for (const c of contasVenda.slice(1)) {
-          await supabase.from("contas").delete().eq("id", c.id);
-        }
-      }
-
-      // Consolida lançamentos financeiros: apenas 1 entrada consolidada com o valor líquido
-      const { data: lancsVenda } = await supabase
-        .from("lancamentos_financeiros")
-        .select("id")
-        .eq("venda_id", id)
-        .order("created_at", { ascending: true });
-
-      if (lancsVenda && lancsVenda.length > 0) {
-        await supabase.from("lancamentos_financeiros").update({
-          valor: valor,
-          status: "Pago",
-          data_pagamento: novoPag.data_pagamento,
-          data_competencia: novoPag.data_pagamento,
-          forma_pagamento: novoPag.forma_pagamento,
-          conta_bancaria: novoPag.conta_bancaria || null,
-          observacoes: pagId ? `pagamento:${pagId}` : undefined,
-        }).eq("id", lancsVenda[0].id);
-
-        for (const l of lancsVenda.slice(1)) {
-          await supabase.from("lancamentos_financeiros").delete().eq("id", l.id);
-        }
-      }
+      // Cada recebimento é um registro próprio; os títulos e o fluxo de caixa
+      // são atualizados pelas regras do banco, sem apagar pagamentos anteriores.
+      const { error: errIns } = await supabase.from("venda_pagamentos").insert({
+        venda_id: id,
+        data_pagamento: novoPag.data_pagamento,
+        forma_pagamento: novoPag.forma_pagamento,
+        conta_bancaria: novoPag.conta_bancaria || null,
+        valor,
+        valor_origem: valorOrigem,
+        retencao_financeira: retencaoFinanceira,
+        observacoes:
+          novoPag.observacoes ||
+          (ehCartao && retencaoFinanceira > 0
+            ? `Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}`
+            : null),
+        comprovante_path: novoPag.comprovante,
+        created_by: user?.id ?? null,
+      } as never);
+      if (errIns) throw errIns;
 
       await recalcularTotais();
     },
     onSuccess: () => {
-      toast.success("Recebimento consolidado com sucesso!");
+      toast.success("Recebimento registrado!");
       setNovoPag({
         data_pagamento: hoje(),
         forma_pagamento: "Cartão de Débito",
