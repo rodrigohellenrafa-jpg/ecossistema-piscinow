@@ -1503,10 +1503,8 @@ function Contas() {
             </div>
             <DialogFooter className="gap-2 sm:justify-between">
               {(() => {
-                const contaEditando = editando ? data.find((item) => item.id === editando) ?? null : null;
-                return contaEditando &&
-                  contaEditando.status !== "pago" &&
-                  contaEditando.status !== "renegociado" ? (
+                const contaEditando = editando ? (data as Conta[]).find((c) => c.id === editando) : null;
+                return contaEditando && contaEditando.status !== "pago" && contaEditando.status !== "renegociado" ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -1888,6 +1886,7 @@ type Conta = {
   valor_desconto?: number | null;
   vencimento: string;
   status: string;
+  data_pagamento?: string | null;
   recorrencia?: string | null;
   recorrencia_fim?: string | null;
   tipo_despesa?: string | null;
