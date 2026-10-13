@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791897630921,
+      "tag": "0000_fluxo_um_lancamento_por_pagamento",
+      "breakpoints": true
+    }
+  ]
+}
