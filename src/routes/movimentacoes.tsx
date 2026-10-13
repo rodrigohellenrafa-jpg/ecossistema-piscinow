@@ -151,16 +151,26 @@ export function Movimentacoes() {
       }
 
       const pago = c.status === "pago";
+      const valorLiquid = pago
+        ? Number(c.valor_pago) > 0
+          ? Number(c.valor_pago)
+          : Number(c.valor || 0)
+        : Number(c.valor || 0);
+      const retencao = Number(c.valor_desconto || 0);
+
       lista.push({
         id: `conta-${c.id}`,
         data: String(pago ? (c.data_pagamento ?? c.vencimento) : c.vencimento).slice(0, 10),
-        descricao: String(c.descricao ?? "—"),
+        descricao:
+          retencao > 0.009
+            ? `${String(c.descricao ?? "—")} (Líq. ${brl(valorLiquid)} | Retenção: ${brl(retencao)})`
+            : String(c.descricao ?? "—"),
         parceiro: String(c.parceiro ?? "—"),
         origem: c.tipo === "receber" ? "Conta a receber" : "Conta a pagar",
         categoria: String(c.categoria ?? "—"),
         conta: String(c.conta_bancaria ?? "—"),
         sentido: c.tipo === "receber" ? "entrada" : "saida",
-        valor: Number((pago ? c.valor_pago : null) || c.valor || 0),
+        valor: valorLiquid,
         realizado: pago,
         link: "/contas",
       });

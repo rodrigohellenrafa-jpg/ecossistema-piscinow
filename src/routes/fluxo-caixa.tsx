@@ -121,7 +121,11 @@ function FluxoCaixa() {
 
       const pago = c.status === "pago";
       const data = String(pago ? (c.data_pagamento ?? c.vencimento) : c.vencimento).slice(0, 10);
-      const valor = Number((pago ? c.valor_pago : null) || c.valor || 0);
+      const valor = pago
+        ? Number(c.valor_pago) > 0
+          ? Number(c.valor_pago)
+          : Number(c.valor || 0)
+        : Number(c.valor || 0);
       lista.push({
         id: `conta-${c.id}`,
         data,

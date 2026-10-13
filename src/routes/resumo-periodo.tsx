@@ -73,11 +73,11 @@ function ResumoPeriodo() {
       const [contas, lancs, vendas, ocs, ocPags, estoque, produtos, saldos] = await Promise.all([
         tudo(
           "contas",
-          "id,tipo,descricao,parceiro,categoria,valor,valor_pago,vencimento,data_pagamento,status,conta_bancaria",
+          "id,tipo,descricao,parceiro,categoria,valor,valor_pago,valor_desconto,vencimento,data_pagamento,status,conta_bancaria,venda_id",
         ),
         tudo(
           "lancamentos_financeiros",
-          "id,tipo_fluxo,categoria,descricao,valor,data_pagamento,vencimento,data_competencia,status,conta_bancaria,forma_pagamento",
+          "id,tipo_fluxo,categoria,descricao,valor,data_pagamento,vencimento,data_competencia,status,conta_bancaria,forma_pagamento,venda_id",
         ),
         tudo(
           "vendas",
@@ -114,8 +114,21 @@ function ResumoPeriodo() {
     const entradas: Mov[] = [];
     const saidas: Mov[] = [];
 
+    // Evita duplicações entre títulos de contas a receber e lançamentos financeiros do livro caixa
+    const vendasEmLancamentos = new Set<string>();
+    for (const l of data.lancs) {
+      if (l.venda_id && l.status !== "Cancelado") {
+        vendasEmLancamentos.add(String(l.venda_id));
+      }
+    }
+
     for (const c of data.contas) {
       if (c.status !== "pago" || !dentro(c.data_pagamento)) continue;
+      // Não duplica receitas de vendas que já têm lançamento financeiro
+      if (c.venda_id && c.tipo === "receber" && vendasEmLancamentos.has(String(c.venda_id))) {
+        continue;
+      }
+      const valorLiquid = n(c.valor_pago) > 0 ? n(c.valor_pago) : n(c.valor);
       const m = {
         data: c.data_pagamento,
         descricao: c.descricao,
@@ -123,7 +136,7 @@ function ResumoPeriodo() {
         categoria: c.categoria ?? "—",
         conta: c.conta_bancaria ?? "—",
         forma: "—",
-        valor: n(c.valor_pago) || n(c.valor),
+        valor: valorLiquid,
       };
       (c.tipo === "receber" ? entradas : saidas).push(m);
     }

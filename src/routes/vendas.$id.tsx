@@ -1,6 +1,6 @@
 import { num as numBR } from "@/lib/erp";
 import { TelaPermitida } from "@/components/tela-permitida";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -137,6 +137,46 @@ function DetalhePedido() {
     }
   }
 
+  useEffect(() => {
+    if (!id) return;
+    const atualizar = () => {
+      qc.invalidateQueries({ queryKey: ["venda", id] });
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
+      qc.invalidateQueries({ queryKey: ["venda-parcelas", id] });
+      qc.invalidateQueries({ queryKey: ["historico-venda", id] });
+      qc.invalidateQueries({ queryKey: ["historico-venda-pagamentos", id] });
+    };
+
+    const canal = supabase
+      .channel(`venda-detalhe-sync-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "vendas", filter: `id=eq.${id}` },
+        atualizar,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "venda_pagamentos", filter: `venda_id=eq.${id}` },
+        atualizar,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contas", filter: `venda_id=eq.${id}` },
+        atualizar,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "venda_historico", filter: `venda_id=eq.${id}` },
+        atualizar,
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(canal);
+    };
+  }, [id, qc]);
+
   const { data: venda } = useQuery({
     queryKey: ["venda", id],
     queryFn: async () => {
@@ -272,6 +312,8 @@ function DetalhePedido() {
     qc.invalidateQueries({ queryKey: ["venda-pagamentos", id] });
     qc.invalidateQueries({ queryKey: ["venda", id] });
     qc.invalidateQueries({ queryKey: ["vendas"] });
+    qc.invalidateQueries({ queryKey: ["historico-venda", id] });
+    qc.invalidateQueries({ queryKey: ["historico-venda-pagamentos", id] });
     qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
     qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
     qc.invalidateQueries({ queryKey: ["contas"] });
@@ -296,28 +338,72 @@ function DetalhePedido() {
 
       // Cada recebimento é um registro próprio; os títulos e o fluxo de caixa
       // são atualizados pelas regras do banco, sem apagar pagamentos anteriores.
-      const { error: errIns } = await supabase.from("venda_pagamentos").insert({
-        venda_id: id,
-        data_pagamento: novoPag.data_pagamento,
-        forma_pagamento: novoPag.forma_pagamento,
-        conta_bancaria: novoPag.conta_bancaria || null,
-        valor,
-        valor_origem: valorOrigem,
-        retencao_financeira: retencaoFinanceira,
-        observacoes:
-          novoPag.observacoes ||
-          (ehCartao && retencaoFinanceira > 0
-            ? `Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}`
-            : null),
-        comprovante_path: novoPag.comprovante,
-        created_by: user?.id ?? null,
-      } as never);
+      const { data: insPag, error: errIns } = await supabase
+        .from("venda_pagamentos")
+        .insert({
+          venda_id: id,
+          data_pagamento: novoPag.data_pagamento,
+          forma_pagamento: novoPag.forma_pagamento,
+          conta_bancaria: novoPag.conta_bancaria || null,
+          valor,
+          valor_origem: valorOrigem,
+          retencao_financeira: retencaoFinanceira,
+          observacoes:
+            novoPag.observacoes ||
+            (ehCartao && retencaoFinanceira > 0
+              ? `Venda: ${brl(valorOrigem)} (DRE) | Caixa: ${brl(valor)}`
+              : null),
+          comprovante_path: novoPag.comprovante,
+          created_by: user?.id ?? null,
+        } as never)
+        .select("id")
+        .single();
       if (errIns) throw errIns;
+
+      // Sincroniza com o extrato da obra / projeto (venda_historico)
+      const { data: ob } = await supabase
+        .from("obras")
+        .select("id")
+        .eq("venda_id", id)
+        .limit(1)
+        .maybeSingle();
+
+      const tagPag = `[pagamento_id:${insPag?.id}]`;
+
+      await supabase.from("venda_historico").insert({
+        venda_id: id,
+        cliente_id: venda?.cliente_id ?? null,
+        obra_id: ob?.id ?? null,
+        data: novoPag.data_pagamento,
+        tipo: "financeiro",
+        descricao: `Recebimento: ${novoPag.forma_pagamento} (Líquido: ${brl(valor)}${
+          retencaoFinanceira > 0 ? ` + Taxa: ${brl(retencaoFinanceira)}` : ""
+        })`,
+        natureza: "entrada",
+        valor: valor,
+        observacoes: `${novoPag.observacoes || "Recebimento registrado no pedido"} ${tagPag}`,
+        created_by: user?.id ?? null,
+      });
+
+      if (retencaoFinanceira > 0.009) {
+        await supabase.from("venda_historico").insert({
+          venda_id: id,
+          cliente_id: venda?.cliente_id ?? null,
+          obra_id: ob?.id ?? null,
+          data: novoPag.data_pagamento,
+          tipo: "financeiro",
+          descricao: `Despesa Financeira / Retenção: ${novoPag.forma_pagamento}`,
+          natureza: "saida",
+          valor: retencaoFinanceira,
+          observacoes: `Retenção financeira/taxa (${brl(retencaoFinanceira)}) ${tagPag}`,
+          created_by: user?.id ?? null,
+        });
+      }
 
       await recalcularTotais();
     },
     onSuccess: () => {
-      toast.success("Recebimento registrado!");
+      toast.success("Recebimento registrado e sincronizado com o extrato da obra!");
       setNovoPag({
         data_pagamento: hoje(),
         forma_pagamento: "Cartão de Débito",
@@ -334,12 +420,14 @@ function DetalhePedido() {
 
   const removerPagamento = useMutation({
     mutationFn: async (pagamentoId: string) => {
+      const tagPag = `[pagamento_id:${pagamentoId}]`;
+      await supabase.from("venda_historico").delete().ilike("observacoes", `%${tagPag}%`);
       const { error } = await supabase.from("venda_pagamentos").delete().eq("id", pagamentoId);
       if (error) throw error;
       await recalcularTotais();
     },
     onSuccess: () => {
-      toast.success("Pagamento removido.");
+      toast.success("Pagamento removido e extrato atualizado.");
       invalidarFinanceiro();
     },
     onError: (e: Error) => toast.error(e.message),

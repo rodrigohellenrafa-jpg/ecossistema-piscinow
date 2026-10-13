@@ -31,6 +31,10 @@ import {
 } from "@/components/alerta-duplicidade-dialog";
 import { RenegociacaoDialog } from "@/components/renegociacao-dialog";
 import { VinculoField, parseVinculo } from "@/components/centro-custo-field";
+import {
+  sincronizarBaixaContaNaVenda,
+  reverterBaixaContaNaVenda,
+} from "@/lib/venda-sincronizacao-financeira";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -672,6 +676,7 @@ function Contas() {
 
   const reverterBaixa = useMutation({
     mutationFn: async (id: string) => {
+      await reverterBaixaContaNaVenda({ contaId: id });
       const { error } = await supabase
         .from("contas")
         .update({ status: "aberto", data_pagamento: null, valor_pago: 0, valor_desconto: 0 })
@@ -681,8 +686,16 @@ function Contas() {
     onSuccess: () => {
       toast.success("Baixa revertida — o valor voltou para o saldo da conta.");
       qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      qc.invalidateQueries({ queryKey: ["venda"] });
+      qc.invalidateQueries({ queryKey: ["venda-pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["venda-parcelas"] });
+      qc.invalidateQueries({ queryKey: ["historico-venda"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
+      qc.invalidateQueries({ queryKey: ["movimentacoes"] });
+      qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+      qc.invalidateQueries({ queryKey: ["resumo-periodo-base"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -766,37 +779,18 @@ function Contas() {
           })
           .eq("id", id);
         if (error) throw error;
-
-        // Título de venda: registra apenas este recebimento como pagamento da venda.
-        // Pagamentos anteriores, lançamentos e o status da venda são preservados e
-        // recalculados pelas regras do banco a partir da soma real dos pagamentos.
-        if (conta.tipo === "receber" && conta.venda_id) {
-          const retencao = Math.max(diferenca, 0);
-          const desc = (conta.descricao ?? "").toLowerCase();
-          const forma = desc.includes("crédito") || desc.includes("credito")
-            ? "Cartão de Crédito"
-            : desc.includes("débito") || desc.includes("debito")
-              ? "Cartão de Débito"
-              : "Baixa de título";
-          const { error: errPag } = await supabase.from("venda_pagamentos").insert({
-            venda_id: conta.venda_id,
-            valor: valorPago,
-            valor_origem: total,
-            retencao_financeira: retencao,
-            forma_pagamento: forma,
-            data_pagamento: dataPagamento,
-            conta_bancaria: contaBancaria || null,
-            observacoes: `Baixa do título: ${conta.descricao ?? ""}`,
-            created_by: uidBaixa,
-          } as never);
-          if (errPag) throw errPag;
-
-          qc.invalidateQueries({ queryKey: ["venda", conta.venda_id] });
-          qc.invalidateQueries({ queryKey: ["venda-pagamentos", conta.venda_id] });
-          qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
-          qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
-        }
       }
+
+      // Sincronização bidirecional atômica com o Pedido de Venda e Extrato da Obra/Projeto
+      await sincronizarBaixaContaNaVenda({
+        contaId: id,
+        valorPago,
+        dataPagamento,
+        modo,
+        contaBancaria,
+        comprovantePath,
+        uid: uidBaixa,
+      });
 
       if (conta && conta.recorrencia && conta.recorrencia !== "nenhuma") {
         const fimRecorrencia = (conta as { recorrencia_fim?: string | null }).recorrencia_fim;
@@ -841,10 +835,18 @@ function Contas() {
       }
     },
     onSuccess: () => {
-      toast.success("Baixa registrada e saldo da conta atualizado.");
+      toast.success("Baixa registrada e sincronizada com o pedido de venda.");
       qc.invalidateQueries({ queryKey: ["contas"] });
+      qc.invalidateQueries({ queryKey: ["vendas"] });
+      qc.invalidateQueries({ queryKey: ["venda"] });
+      qc.invalidateQueries({ queryKey: ["venda-pagamentos"] });
+      qc.invalidateQueries({ queryKey: ["venda-parcelas"] });
+      qc.invalidateQueries({ queryKey: ["historico-venda"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
       qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      qc.invalidateQueries({ queryKey: ["movimentacoes"] });
+      qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
+      qc.invalidateQueries({ queryKey: ["resumo-periodo-base"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
