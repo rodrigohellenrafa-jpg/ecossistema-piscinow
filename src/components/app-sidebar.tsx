@@ -26,6 +26,7 @@ import {
   Link2,
   Gauge,
   ChevronRight,
+  Plane,
 } from "lucide-react";
 
 import {
@@ -90,6 +91,7 @@ const groups: {
     label: "Logística & Obras",
     area: "logistica",
     items: [
+      { title: "Flight Board", url: "/logistica", icon: Plane },
       { title: "Agenda da Equipe", url: "/agenda", icon: CalendarDays },
       { title: "Ordens de Serviço", url: "/ordens", icon: ClipboardCheck },
     ],
