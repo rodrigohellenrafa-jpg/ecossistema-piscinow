@@ -17,6 +17,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as ComprasRouteImport } from './routes/compras'
 import { Route as ContasRouteImport } from './routes/contas'
+import { Route as DocumentosRouteImport } from './routes/documentos'
 import { Route as DreRouteImport } from './routes/dre'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as FiscalRouteImport } from './routes/fiscal'
@@ -89,6 +90,11 @@ const ComprasRoute = ComprasRouteImport.update({
 const ContasRoute = ContasRouteImport.update({
   id: '/contas',
   path: '/contas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentosRoute = DocumentosRouteImport.update({
+  id: '/documentos',
+  path: '/documentos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DreRoute = DreRouteImport.update({
@@ -266,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
+  '/documentos': typeof DocumentosRoute
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
   '/fiscal': typeof FiscalRouteWithChildren
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
+  '/documentos': typeof DocumentosRoute
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
   '/fiscal': typeof FiscalRouteWithChildren
@@ -353,6 +361,7 @@ export interface FileRoutesById {
   '/clientes': typeof ClientesRoute
   '/compras': typeof ComprasRoute
   '/contas': typeof ContasRoute
+  '/documentos': typeof DocumentosRoute
   '/dre': typeof DreRoute
   '/financeiro': typeof FinanceiroRoute
   '/fiscal': typeof FiscalRouteWithChildren
@@ -398,6 +407,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/compras'
     | '/contas'
+    | '/documentos'
     | '/dre'
     | '/financeiro'
     | '/fiscal'
@@ -441,6 +451,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/compras'
     | '/contas'
+    | '/documentos'
     | '/dre'
     | '/financeiro'
     | '/fiscal'
@@ -484,6 +495,7 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/compras'
     | '/contas'
+    | '/documentos'
     | '/dre'
     | '/financeiro'
     | '/fiscal'
@@ -528,6 +540,7 @@ export interface RootRouteChildren {
   ClientesRoute: typeof ClientesRoute
   ComprasRoute: typeof ComprasRoute
   ContasRoute: typeof ContasRoute
+  DocumentosRoute: typeof DocumentosRoute
   DreRoute: typeof DreRoute
   FinanceiroRoute: typeof FinanceiroRoute
   FiscalRoute: typeof FiscalRouteWithChildren
@@ -618,6 +631,13 @@ declare module '@tanstack/react-router' {
       path: '/contas'
       fullPath: '/contas'
       preLoaderRoute: typeof ContasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documentos': {
+      id: '/documentos'
+      path: '/documentos'
+      fullPath: '/documentos'
+      preLoaderRoute: typeof DocumentosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dre': {
@@ -874,6 +894,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientesRoute: ClientesRoute,
   ComprasRoute: ComprasRoute,
   ContasRoute: ContasRoute,
+  DocumentosRoute: DocumentosRoute,
   DreRoute: DreRoute,
   FinanceiroRoute: FinanceiroRoute,
   FiscalRoute: FiscalRouteWithChildren,

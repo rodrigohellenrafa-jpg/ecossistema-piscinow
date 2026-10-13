@@ -129,6 +129,127 @@ export type Database = {
           },
         ]
       }
+      cargas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_solicitacao: string
+          fornecedor_id: string | null
+          fornecedor_nome: string
+          id: string
+          itens_snapshot: Json
+          motorista_contato: string | null
+          numero: string
+          observacoes: string | null
+          placa_veiculo: string | null
+          previsao_entrega: string | null
+          status: string
+          total_itens: number
+          total_valor: number
+          updated_at: string
+          volume_cubagem: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_solicitacao?: string
+          fornecedor_id?: string | null
+          fornecedor_nome: string
+          id?: string
+          itens_snapshot?: Json
+          motorista_contato?: string | null
+          numero: string
+          observacoes?: string | null
+          placa_veiculo?: string | null
+          previsao_entrega?: string | null
+          status?: string
+          total_itens?: number
+          total_valor?: number
+          updated_at?: string
+          volume_cubagem?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_solicitacao?: string
+          fornecedor_id?: string | null
+          fornecedor_nome?: string
+          id?: string
+          itens_snapshot?: Json
+          motorista_contato?: string | null
+          numero?: string
+          observacoes?: string | null
+          placa_veiculo?: string | null
+          previsao_entrega?: string | null
+          status?: string
+          total_itens?: number
+          total_valor?: number
+          updated_at?: string
+          volume_cubagem?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cargas_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cargas_itens: {
+        Row: {
+          carga_id: string
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          id: string
+          item_ordem_id: string | null
+          ordem_id: string | null
+          produto_id: string | null
+          produto_nome: string
+          quantidade: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          carga_id: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          id?: string
+          item_ordem_id?: string | null
+          ordem_id?: string | null
+          produto_id?: string | null
+          produto_nome: string
+          quantidade?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Update: {
+          carga_id?: string
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          id?: string
+          item_ordem_id?: string | null
+          ordem_id?: string | null
+          produto_id?: string | null
+          produto_nome?: string
+          quantidade?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cargas_itens_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias_financeiras: {
         Row: {
           ativo: boolean
@@ -1459,6 +1580,8 @@ export type Database = {
           unidade: string
           valor_unitario: number
           venda_id: string | null
+          carga_id: string | null
+          status_carga: string | null
         }
         Insert: {
           cliente_id?: string | null
@@ -1480,6 +1603,8 @@ export type Database = {
           unidade?: string
           valor_unitario?: number
           venda_id?: string | null
+          carga_id?: string | null
+          status_carga?: string | null
         }
         Update: {
           cliente_id?: string | null
@@ -1501,6 +1626,8 @@ export type Database = {
           unidade?: string
           valor_unitario?: number
           venda_id?: string | null
+          carga_id?: string | null
+          status_carga?: string | null
         }
         Relationships: [
           {
@@ -1641,6 +1768,10 @@ export type Database = {
           valor_pago: number
           valor_produtos: number
           valor_total: number
+          cliente_id: string | null
+          cliente_nome: string | null
+          carga_id: string | null
+          status_carga: string | null
         }
         Insert: {
           condicoes?: string | null
@@ -1667,6 +1798,10 @@ export type Database = {
           valor_pago?: number
           valor_produtos?: number
           valor_total?: number
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          carga_id?: string | null
+          status_carga?: string | null
         }
         Update: {
           condicoes?: string | null
@@ -1693,6 +1828,10 @@ export type Database = {
           valor_pago?: number
           valor_produtos?: number
           valor_total?: number
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          carga_id?: string | null
+          status_carga?: string | null
         }
         Relationships: [
           {

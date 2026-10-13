@@ -27,6 +27,7 @@ import {
   Gauge,
   ChevronRight,
   Plane,
+  FolderOpen,
 } from "lucide-react";
 
 import {
@@ -92,6 +93,7 @@ const groups: {
     area: "logistica",
     items: [
       { title: "Flight Board", url: "/logistica", icon: Plane },
+      { title: "Dossiê do Cliente", url: "/documentos", icon: FolderOpen },
       { title: "Agenda da Equipe", url: "/agenda", icon: CalendarDays },
       { title: "Ordens de Serviço", url: "/ordens", icon: ClipboardCheck },
     ],

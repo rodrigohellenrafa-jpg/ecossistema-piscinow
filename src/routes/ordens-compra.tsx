@@ -21,6 +21,7 @@ import {
   Search,
   ShoppingCart,
   Trash2,
+  Truck,
   Unlink,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -64,6 +65,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { DocumentoOrdemCompra } from "@/components/documento-ordem-compra";
 import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
+import { ModalPedirCarga } from "@/components/modal-pedir-carga";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, proximoCodigo } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
@@ -270,6 +272,8 @@ function OrdensCompra() {
   const [detalheId, setDetalheId] = useState<string | null>(null);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [novaOpen, setNovaOpen] = useState(false);
+  const [modalPedirCargaAberto, setModalPedirCargaAberto] = useState(false);
+  const [fornecedorCargaSelecionado, setFornecedorCargaSelecionado] = useState<string | null>(null);
   useAbrirModal("novo", () => setNovaOpen(true));
   const [novoItem, setNovoItem] = useState(novoItemVazio);
   const [novaOrdem, setNovaOrdem] = useState({
@@ -2178,6 +2182,16 @@ function OrdensCompra() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm flex items-center gap-1.5"
+              onClick={() => {
+                setFornecedorCargaSelecionado(null);
+                setModalPedirCargaAberto(true);
+              }}
+            >
+              <Truck className="size-4" />
+              📦 PEDIR CARGA
+            </Button>
             <Button onClick={() => setNovaOpen(true)}>
               <Plus /> Nova ordem de compra
             </Button>
@@ -2560,6 +2574,20 @@ function OrdensCompra() {
                       >
                         <ShoppingCart className="size-3.5" />
                         Comprar deste fornecedor
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setFornecedorCargaSelecionado(grupo.fornecedor.id);
+                          setModalPedirCargaAberto(true);
+                        }}
+                        className="text-xs h-8 font-semibold gap-1.5 border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+                      >
+                        <Truck className="size-3.5" />
+                        Pedir Carga
                       </Button>
 
                       <Button
@@ -4795,6 +4823,12 @@ function OrdensCompra() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ModalPedirCarga
+        open={modalPedirCargaAberto}
+        onOpenChange={setModalPedirCargaAberto}
+        fornecedorInicialId={fornecedorCargaSelecionado}
+      />
     </div>
   );
 }

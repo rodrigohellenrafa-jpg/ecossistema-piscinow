@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Truck } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader, Kpi } from "@/components/page-header";
+import { ModalPedirCarga } from "@/components/modal-pedir-carga";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ function Compras() {
   const qc = useQueryClient();
   const [selecionados, setSelecionados] = useState<Record<string, boolean>>({});
   const [qtds, setQtds] = useState<Record<string, string>>({});
+  const [modalPedirCargaAberto, setModalPedirCargaAberto] = useState(false);
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["produtos", "reposicao"],
@@ -232,12 +234,21 @@ function Compras() {
         title="Central de Reposição Inteligente"
         subtitle="Produtos com estoque igual ou abaixo do mínimo, com sugestão automática de compra."
         actions={
-          <Button
-            disabled={fornecedoresEnvolvidos === 0 && totalSelecionado === 0}
-            onClick={() => gerarOrdens.mutate()}
-          >
-            <ShoppingBag /> Gerar Ordem de Compra para os itens selecionados
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm flex items-center gap-1.5"
+              onClick={() => setModalPedirCargaAberto(true)}
+            >
+              <Truck className="size-4" />
+              📦 PEDIR CARGA
+            </Button>
+            <Button
+              disabled={fornecedoresEnvolvidos === 0 && totalSelecionado === 0}
+              onClick={() => gerarOrdens.mutate()}
+            >
+              <ShoppingBag /> Gerar Ordem de Compra para os itens selecionados
+            </Button>
+          </div>
         }
       />
 
@@ -330,6 +341,11 @@ function Compras() {
           )}
         </CardContent>
       </Card>
+
+      <ModalPedirCarga
+        open={modalPedirCargaAberto}
+        onOpenChange={setModalPedirCargaAberto}
+      />
     </div>
   );
 }
