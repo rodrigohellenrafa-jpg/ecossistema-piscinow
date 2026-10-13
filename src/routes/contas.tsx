@@ -767,75 +767,29 @@ function Contas() {
           .eq("id", id);
         if (error) throw error;
 
-        // Se o título pertencer a uma venda, consolida recebimento, venda e fluxo de caixa sem duplicidade
+        // Título de venda: registra apenas este recebimento como pagamento da venda.
+        // Pagamentos anteriores, lançamentos e o status da venda são preservados e
+        // recalculados pelas regras do banco a partir da soma real dos pagamentos.
         if (conta.tipo === "receber" && conta.venda_id) {
-          const { data: pagsExistentes } = await supabase
-            .from("venda_pagamentos")
-            .select("id")
-            .eq("venda_id", conta.venda_id)
-            .order("created_at", { ascending: true });
-
           const retencao = Math.max(diferenca, 0);
-          let pagId = "";
-
-          if (pagsExistentes && pagsExistentes.length > 0) {
-            pagId = pagsExistentes[0].id;
-            await supabase.from("venda_pagamentos").update({
-              valor: valorPago,
-              valor_origem: total,
-              retencao_financeira: retencao,
-              data_pagamento: dataPagamento,
-              conta_bancaria: contaBancaria || null,
-              observacoes: `Liquidado no débito/crédito. Venda: ${brl(total)} (DRE) | Caixa: ${brl(valorPago)}`,
-            }).eq("id", pagId);
-
-            for (const extra of pagsExistentes.slice(1)) {
-              await supabase.from("venda_pagamentos").delete().eq("id", extra.id);
-            }
-          } else {
-            const { data: novoP } = await supabase.from("venda_pagamentos").insert({
-              venda_id: conta.venda_id,
-              valor: valorPago,
-              valor_origem: total,
-              retencao_financeira: retencao,
-              forma_pagamento: conta.descricao?.toLowerCase().includes("crédito") || conta.descricao?.toLowerCase().includes("credito") ? "Cartão de Crédito" : "Cartão de Débito",
-              data_pagamento: dataPagamento,
-              conta_bancaria: contaBancaria || null,
-              observacoes: `Liquidado no débito/crédito. Venda: ${brl(total)} (DRE) | Caixa: ${brl(valorPago)}`,
-              created_by: uidBaixa,
-            } as never).select("id").single();
-            pagId = novoP?.id ?? "";
-          }
-
-          // Consolida lançamentos financeiros para não haver duplicidade
-          const { data: lancs } = await supabase
-            .from("lancamentos_financeiros")
-            .select("id")
-            .eq("venda_id", conta.venda_id)
-            .order("created_at", { ascending: true });
-
-          if (lancs && lancs.length > 0) {
-            await supabase.from("lancamentos_financeiros").update({
-              valor: valorPago,
-              status: "Pago",
-              data_pagamento: dataPagamento,
-              data_competencia: dataPagamento,
-              conta_bancaria: contaBancaria || null,
-              observacoes: pagId ? `pagamento:${pagId}` : undefined,
-            }).eq("id", lancs[0].id);
-
-            for (const l of lancs.slice(1)) {
-              await supabase.from("lancamentos_financeiros").delete().eq("id", l.id);
-            }
-          }
-
-          // Atualiza o cabeçalho da venda mantendo o valor_total da venda intacto para o DRE
-          await supabase.from("vendas").update({
-            valor_entrada: total,
-            saldo_devedor: 0,
-            status_pagamento: "pago",
-            updated_at: new Date().toISOString(),
-          }).eq("id", conta.venda_id);
+          const desc = (conta.descricao ?? "").toLowerCase();
+          const forma = desc.includes("crédito") || desc.includes("credito")
+            ? "Cartão de Crédito"
+            : desc.includes("débito") || desc.includes("debito")
+              ? "Cartão de Débito"
+              : "Baixa de título";
+          const { error: errPag } = await supabase.from("venda_pagamentos").insert({
+            venda_id: conta.venda_id,
+            valor: valorPago,
+            valor_origem: total,
+            retencao_financeira: retencao,
+            forma_pagamento: forma,
+            data_pagamento: dataPagamento,
+            conta_bancaria: contaBancaria || null,
+            observacoes: `Baixa do título: ${conta.descricao ?? ""}`,
+            created_by: uidBaixa,
+          } as never);
+          if (errPag) throw errPag;
 
           qc.invalidateQueries({ queryKey: ["venda", conta.venda_id] });
           qc.invalidateQueries({ queryKey: ["venda-pagamentos", conta.venda_id] });
