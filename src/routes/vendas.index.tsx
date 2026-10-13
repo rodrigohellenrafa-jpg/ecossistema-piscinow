@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, FileText, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
@@ -488,6 +488,7 @@ function Vendas() {
                     <TableHead>Vendedor</TableHead>
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-center w-36">Formulário</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -538,13 +539,20 @@ function Vendas() {
                           {STATUS_LABEL[v.status_pedido] ?? v.status_pedido}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-center">
+                        <BotaoVisualizarDocumento
+                          tipo="venda"
+                          id={v.id}
+                          variant="outline"
+                          size="sm"
+                          rotulo="Formulário"
+                          icone={<FileText className="size-3.5 text-primary" />}
+                          titulo={`Visualizar formulário do pedido ${v.numero ?? ""}`}
+                          className="h-8 px-2.5 text-xs font-semibold border-primary/30 hover:bg-primary/10 text-primary gap-1.5 shadow-xs"
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <BotaoVisualizarDocumento
-                            tipo="venda"
-                            id={v.id}
-                            titulo={`Visualizar pedido de venda ${v.numero ?? ""}`}
-                          />
                           <Button
                             size="icon"
                             variant="ghost"
@@ -574,7 +582,7 @@ function Vendas() {
                   ))}
                   {pedidos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                         Nenhum pedido encontrado.
                       </TableCell>
                     </TableRow>
@@ -639,6 +647,7 @@ function Vendas() {
                     <TableHead>Cliente</TableHead>
                     <TableHead>Vendedor</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-center w-36">Formulário</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -670,16 +679,20 @@ function Vendas() {
                       <TableCell>{v.cliente_nome ?? "—"}</TableCell>
                       <TableCell>{v.vendedor ?? "—"}</TableCell>
                       <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
+                      <TableCell className="text-center">
+                        <BotaoVisualizarDocumento
+                          tipo="venda"
+                          id={v.id}
+                          titulo={`Visualizar formulário da proposta ${v.numero ?? ""}`}
+                          variant="outline"
+                          size="sm"
+                          rotulo="Ver Proposta"
+                          icone={<FileText className="size-3.5 text-primary" />}
+                          className="h-8 px-2.5 text-xs font-semibold border-primary/30 hover:bg-primary/10 text-primary gap-1.5 shadow-xs"
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <BotaoVisualizarDocumento
-                            tipo="venda"
-                            id={v.id}
-                            titulo={`Visualizar orçamento ${v.numero ?? ""}`}
-                            variant="outline"
-                            size="sm"
-                            rotulo="Ver documento"
-                          />
                           <Button
                             size="sm"
                             onClick={() => atualizarStatus.mutate({ id: v.id, status: "aprovado" })}
@@ -699,7 +712,7 @@ function Vendas() {
                   ))}
                   {orcamentos.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                         Nenhum orçamento em aberto.
                       </TableCell>
                     </TableRow>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileSignature, Printer, Files, ExternalLink, Receipt, Eye } from "lucide-react";
+import { FileSignature, Printer, Files, ExternalLink, Receipt, Eye, FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -562,7 +562,7 @@ export function DocumentosVenda(props: Props) {
         onClick={() => setVisualizadorAberto(true)}
         className="gap-1.5 shadow-sm"
       >
-        <Eye className="size-4" /> Visualizar documentos
+        <FileText className="size-4" /> Formulário do Pedido
       </Button>
 
       {balcao ? (

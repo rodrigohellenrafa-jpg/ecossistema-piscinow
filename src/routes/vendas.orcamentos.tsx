@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Plus, Search, X } from "lucide-react";
+import { Check, FileText, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Kpi, PageHeader } from "@/components/page-header";
@@ -229,10 +229,12 @@ function Orcamentos() {
                       <BotaoVisualizarDocumento
                         tipo="venda"
                         id={v.id}
-                        titulo={`Visualizar orçamento ${v.numero ?? ""}`}
+                        titulo={`Visualizar formulário do orçamento ${v.numero ?? ""}`}
                         variant="outline"
                         size="sm"
-                        rotulo="Ver documento"
+                        rotulo="Ver Formulário"
+                        icone={<FileText className="size-3.5 text-primary" />}
+                        className="gap-1.5 text-xs font-semibold border-primary/30 hover:bg-primary/10 text-primary shadow-xs"
                       />
                       <EnviarOrcamento venda={v} cliente={null} />
                       <Button

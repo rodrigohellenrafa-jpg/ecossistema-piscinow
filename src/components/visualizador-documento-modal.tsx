@@ -92,11 +92,12 @@ export function VisualizadorDocumentoModal({
             setDadosCompletos(dadosIniciais);
             return;
           }
-          // Busca venda, cliente, itens e condições
-          const [resVenda, resItens, resCondicoes] = await Promise.all([
+          // Busca venda, cliente, itens, condições e pagamentos da venda
+          const [resVenda, resItens, resCondicoes, resPagamentos] = await Promise.all([
             supabase.from("vendas").select("*").eq("id", vendaId).single(),
             supabase.from("venda_itens").select("*").eq("venda_id", vendaId).order("created_at", { ascending: true }),
             supabase.from("venda_condicoes").select("*").eq("venda_id", vendaId).order("parcelas", { ascending: true }),
+            supabase.from("venda_pagamentos").select("*").eq("venda_id", vendaId).order("created_at", { ascending: true }),
           ]);
           if (resVenda.error) throw resVenda.error;
           const venda = resVenda.data;
@@ -105,11 +106,39 @@ export function VisualizadorDocumentoModal({
             const resCliente = await supabase.from("clientes").select("*").eq("id", venda.cliente_id).maybeSingle();
             cliente = resCliente.data;
           }
+
+          let condicoesFinais = (resCondicoes.data ?? []) as any[];
+          if (condicoesFinais.length === 0 && (resPagamentos.data ?? []).length > 0) {
+            condicoesFinais = (resPagamentos.data ?? []).map((p) => ({
+              id: p.id,
+              forma_pagamento: p.forma_pagamento ?? "Pix",
+              valor: Number(p.valor ?? 0),
+              parcelas: 1,
+              valor_parcela: Number(p.valor ?? 0),
+              valor_cobrado: Number(p.valor ?? 0),
+              data_prevista: p.data_pagamento ?? p.created_at ?? null,
+              pago: true,
+            }));
+          } else if (condicoesFinais.length === 0 && Number(venda.valor_total ?? 0) > 0) {
+            condicoesFinais = [
+              {
+                id: "cond-padrao",
+                forma_pagamento: venda.forma_pagamento ?? "Pix",
+                valor: Number(venda.valor_total ?? 0),
+                parcelas: Number(venda.parcelas ?? 1),
+                valor_parcela: Number(venda.valor_parcela ?? venda.valor_total ?? 0),
+                valor_cobrado: Number(venda.valor_total ?? 0),
+                data_prevista: venda.data ?? null,
+                pago: venda.status_pagamento === "pago",
+              },
+            ];
+          }
+
           setDadosCompletos({
             venda,
             cliente,
             itens: resItens.data ?? [],
-            condicoes: resCondicoes.data ?? [],
+            condicoes: condicoesFinais,
           });
         } else if (tipo === "os") {
           const osId = id || dadosIniciais?.id;
@@ -718,6 +747,7 @@ export interface BotaoVisualizarDocumentoProps {
   dados?: any;
   titulo?: string;
   rotulo?: string;
+  icone?: React.ReactNode;
   variant?: "ghost" | "outline" | "default" | "secondary";
   size?: "icon" | "sm" | "default";
   className?: string;
@@ -729,6 +759,7 @@ export function BotaoVisualizarDocumento({
   dados,
   titulo = "Visualizar formulário / documento",
   rotulo,
+  icone,
   variant = "ghost",
   size = "icon",
   className,
@@ -749,7 +780,7 @@ export function BotaoVisualizarDocumento({
           setAberto(true);
         }}
       >
-        <Eye className="size-4" />
+        {icone ?? <Eye className="size-4" />}
         {rotulo ? <span>{rotulo}</span> : null}
       </Button>
 
