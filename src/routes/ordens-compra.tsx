@@ -1,7 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Pencil, Plus, Save, Search, ShoppingCart, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Boxes,
+  Building2,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
+  Factory,
+  Filter,
+  Layers,
+  Link2,
+  Package,
+  Pencil,
+  Plus,
+  Save,
+  Search,
+  ShoppingCart,
+  Trash2,
+  Unlink,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -13,6 +34,8 @@ import { ComprovanteAnexo } from "@/components/comprovante-anexo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ExpandableCard } from "@/components/expandable-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -194,6 +217,8 @@ type Produto = {
   desconto_compra: number;
   status_compra: string;
   venda_vinculo_id: string | null;
+  estoque_atual?: number;
+  estoque_minimo?: number;
 };
 
 const STATUS_COMPRA = [
@@ -236,6 +261,10 @@ const novoItemVazio = {
 
 function OrdensCompra() {
   const qc = useQueryClient();
+  const [abaVisao, setAbaVisao] = useState<"fornecedores" | "grade" | "executadas">("fornecedores");
+  const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("todos");
+  const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("precisa_comprar");
+  const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
   const [detalheId, setDetalheId] = useState<string | null>(null);
@@ -305,7 +334,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
-        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra, venda_vinculo_id")
+        .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra, venda_vinculo_id, estoque_atual, estoque_minimo")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
@@ -813,7 +842,7 @@ function OrdensCompra() {
     if (produto.tipo === "servico") {
       return { id: SEM_CLIENTE, nome: "Splash Jardim do Trevo" } satisfies Fornecedor;
     }
-    return null;
+    return { id: "outros", nome: "Outros Fornecedores" } satisfies Fornecedor;
   };
 
   const produtosFiltrados = useMemo(() => {
@@ -908,6 +937,263 @@ function OrdensCompra() {
     setSelecionadosExecutados(
       marcado ? Object.fromEntries(linhasExecutadas.map(({ item }) => [item.id, true])) : {},
     );
+  };
+
+  type ItemVisaoFornecedor = {
+    produto: Produto;
+    fornecedor: Fornecedor;
+    demanda: { total: number; pedidos: { id: string; rotulo: string; quantidade: number }[] } | undefined;
+    estoqueAtual: number;
+    estoqueMinimo: number;
+    estoqueBaixo: boolean;
+    estoqueZerado: boolean;
+    quantidadeAComprar: number;
+    valorUnitario: number;
+    desconto: number;
+    totalItem: number;
+    vinculos: string[];
+    comVinculoCount: number;
+    semVinculoCount: number;
+    temVinculo: boolean;
+    temSemVinculo: boolean;
+    precisaComprar: boolean;
+    status: string;
+  };
+
+  type GrupoVisaoFornecedor = {
+    fornecedor: Fornecedor;
+    chave: string;
+    nome: string;
+    itens: ItemVisaoFornecedor[];
+    totalItens: number;
+    totalUnidades: number;
+    totalValor: number;
+    totalComVinculo: number;
+    totalSemVinculo: number;
+    totalDemandaPedidos: number;
+    selecionadosQtd: number;
+    todosSelecionados: boolean;
+    totalValorSelecionados: number;
+  };
+
+  const dadosItensCompra = useMemo(() => {
+    return produtosFiltrados.map((p): ItemVisaoFornecedor => {
+      const fornecedor = fornecedorDaCompra(p) ?? { id: "outros", nome: "Outros Fornecedores" };
+      const demanda = demandaPorProduto.get(p.id);
+      const totalDemanda = demanda?.total ?? 0;
+      const estoqueAtual = Number(p.estoque_atual ?? 0);
+      const estoqueMinimo = Number(p.estoque_minimo ?? 0);
+      const estoqueZerado = estoqueAtual <= 0;
+      const estoqueBaixo = estoqueAtual <= estoqueMinimo && estoqueMinimo > 0;
+      const quantidadeAComprar = quantidadeCompra(p);
+      const valorUnitario = valorCompra(p);
+      const desconto = percentualCompra(p);
+      const totalItem = totalCompra(p);
+      const vinculos = vinculosDoProduto(p);
+      const comVinculoCount = vinculos.filter((v) => v && v !== SEM_CLIENTE).length;
+      const semVinculoCount = vinculos.filter((v) => !v || v === SEM_CLIENTE).length;
+      const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
+
+      const temVinculo = comVinculoCount > 0 || totalDemanda > 0 || Boolean(p.venda_vinculo_id);
+      const temSemVinculo = semVinculoCount > 0 || (!p.venda_vinculo_id && totalDemanda === 0);
+
+      const precisaComprar =
+        totalDemanda > 0 ||
+        estoqueZerado ||
+        estoqueBaixo ||
+        (status !== "comprado" && quantidadeAComprar > 0) ||
+        Boolean(selecionadosCompra[p.id]);
+
+      return {
+        produto: p,
+        fornecedor,
+        demanda,
+        estoqueAtual,
+        estoqueMinimo,
+        estoqueBaixo,
+        estoqueZerado,
+        quantidadeAComprar,
+        valorUnitario,
+        desconto,
+        totalItem,
+        vinculos,
+        comVinculoCount,
+        semVinculoCount,
+        temVinculo,
+        temSemVinculo,
+        precisaComprar,
+        status,
+      };
+    });
+  }, [
+    produtosFiltrados,
+    fornecedores,
+    demandaPorProduto,
+    quantidadesCompra,
+    valoresCompra,
+    percentuaisCompra,
+    vinculosCompra,
+    statusCompra,
+    selecionadosCompra,
+  ]);
+
+  const contagensFiltroVinculo = useMemo(() => {
+    const base = dadosItensCompra.filter((item) =>
+      filtroNecessidade === "precisa_comprar" ? item.precisaComprar : true,
+    );
+    return {
+      todos: base.length,
+      comVinculo: base.filter((i) => i.temVinculo).length,
+      semVinculo: base.filter((i) => i.temSemVinculo).length,
+    };
+  }, [dadosItensCompra, filtroNecessidade]);
+
+  const itensVisaoFiltrados = useMemo(() => {
+    return dadosItensCompra.filter((item) => {
+      if (filtroNecessidade === "precisa_comprar" && !item.precisaComprar) {
+        return false;
+      }
+      if (filtroVinculo === "com_vinculo" && !item.temVinculo) {
+        return false;
+      }
+      if (filtroVinculo === "sem_vinculo" && !item.temSemVinculo) {
+        return false;
+      }
+      return true;
+    });
+  }, [dadosItensCompra, filtroNecessidade, filtroVinculo]);
+
+  const gruposVisaoFornecedor = useMemo(() => {
+    const mapa = new Map<string, GrupoVisaoFornecedor>();
+
+    for (const item of itensVisaoFiltrados) {
+      const chave = item.fornecedor.id || "sem-fornecedor";
+      const grupo =
+        mapa.get(chave) ??
+        {
+          fornecedor: item.fornecedor,
+          chave,
+          nome: item.fornecedor.nome,
+          itens: [],
+          totalItens: 0,
+          totalUnidades: 0,
+          totalValor: 0,
+          totalComVinculo: 0,
+          totalSemVinculo: 0,
+          totalDemandaPedidos: 0,
+          selecionadosQtd: 0,
+          todosSelecionados: false,
+          totalValorSelecionados: 0,
+        };
+
+      grupo.itens.push(item);
+      grupo.totalItens += 1;
+      grupo.totalUnidades += item.quantidadeAComprar;
+      grupo.totalValor += item.totalItem;
+      grupo.totalComVinculo += item.comVinculoCount;
+      grupo.totalSemVinculo += item.semVinculoCount;
+      grupo.totalDemandaPedidos += item.demanda?.total ?? 0;
+      if (selecionadosCompra[item.produto.id]) {
+        grupo.selecionadosQtd += 1;
+        grupo.totalValorSelecionados += item.totalItem;
+      }
+      mapa.set(chave, grupo);
+    }
+
+    const lista = Array.from(mapa.values());
+    for (const g of lista) {
+      g.todosSelecionados = g.itens.length > 0 && g.selecionadosQtd === g.itens.length;
+      g.itens.sort((a, b) => {
+        if (a.temVinculo !== b.temVinculo) return a.temVinculo ? -1 : 1;
+        if ((b.demanda?.total ?? 0) !== (a.demanda?.total ?? 0)) {
+          return (b.demanda?.total ?? 0) - (a.demanda?.total ?? 0);
+        }
+        return a.produto.nome.localeCompare(b.produto.nome);
+      });
+    }
+
+    return lista.sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [itensVisaoFiltrados, selecionadosCompra]);
+
+  const resumoGeralCompra = useMemo(() => {
+    let totalValor = 0;
+    let totalUnidades = 0;
+    let totalProdutos = 0;
+    let totalComVinculo = 0;
+    let totalSemVinculo = 0;
+    let totalFornecedoresComItens = 0;
+
+    for (const g of gruposVisaoFornecedor) {
+      if (g.itens.length > 0) totalFornecedoresComItens++;
+      totalValor += g.totalValor;
+      totalUnidades += g.totalUnidades;
+      totalProdutos += g.totalItens;
+      totalComVinculo += g.totalComVinculo;
+      totalSemVinculo += g.totalSemVinculo;
+    }
+
+    return {
+      totalValor,
+      totalUnidades,
+      totalProdutos,
+      totalComVinculo,
+      totalSemVinculo,
+      totalFornecedoresComItens,
+    };
+  }, [gruposVisaoFornecedor]);
+
+  const alternarRecolhimentoFornecedor = (chave: string) => {
+    setFornecedoresRecolhidos((atual) => ({
+      ...atual,
+      [chave]: !atual[chave],
+    }));
+  };
+
+  const recolherTodosFornecedores = (recolher: boolean) => {
+    if (recolher) {
+      const mapa: Record<string, boolean> = {};
+      for (const g of gruposVisaoFornecedor) mapa[g.chave] = true;
+      setFornecedoresRecolhidos(mapa);
+    } else {
+      setFornecedoresRecolhidos({});
+    }
+  };
+
+  const alternarSelecaoGrupoFornecedor = (grupo: GrupoVisaoFornecedor) => {
+    const marcar = !grupo.todosSelecionados;
+    setSelecionadosCompra((atual) => {
+      const proximo = { ...atual };
+      for (const item of grupo.itens) {
+        if (marcar) {
+          proximo[item.produto.id] = true;
+        } else {
+          delete proximo[item.produto.id];
+        }
+      }
+      return proximo;
+    });
+  };
+
+  const comprarItensDoFornecedor = (grupo: GrupoVisaoFornecedor) => {
+    const itensSelecionados = grupo.itens.filter((i) => selecionadosCompra[i.produto.id]);
+    const itensAlvo = itensSelecionados.length > 0 ? itensSelecionados : grupo.itens;
+
+    if (itensAlvo.length === 0) {
+      toast.error(`Nenhum produto deste fornecedor para comprar`);
+      return;
+    }
+
+    const novoMapa: Record<string, boolean> = {};
+    for (const i of itensAlvo) {
+      novoMapa[i.produto.id] = true;
+    }
+    setSelecionadosCompra(novoMapa);
+    setSelecionadosExecutados({});
+
+    toast.info(`Iniciando ordem de compra para ${grupo.nome} (${itensAlvo.length} itens)...`);
+    setTimeout(() => {
+      comprarSelecionados.mutate();
+    }, 100);
   };
 
   const comprarSelecionados = useMutation({
@@ -1899,108 +2185,745 @@ function OrdensCompra() {
         }
       />
 
-      {ordensFiltradas.length > 0 && (
-        <section className="space-y-3" aria-label="Ordens executadas e pagamentos">
-          <div>
-            <h2 className="text-base font-semibold">Ordens executadas e pagamentos</h2>
-            <p className="text-sm text-muted-foreground">
-              Cada ordem permanece aqui com o número, o valor pago e o saldo.
-            </p>
+      <Tabs
+        value={abaVisao}
+        onValueChange={(v) => setAbaVisao(v as any)}
+        className="space-y-6"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3 print:hidden">
+          <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+            <TabsTrigger value="fornecedores" className="flex items-center gap-2">
+              <Building2 className="size-4" />
+              <span>Visão por Fornecedor</span>
+              {resumoGeralCompra.totalProdutos > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="ml-1 text-[10px] px-1.5 py-0 h-4 bg-primary/15 text-primary font-bold"
+                >
+                  {resumoGeralCompra.totalProdutos}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="grade" className="flex items-center gap-2">
+              <Layers className="size-4" />
+              <span>Grade Geral</span>
+            </TabsTrigger>
+            <TabsTrigger value="executadas" className="flex items-center gap-2">
+              <CheckCircle2 className="size-4" />
+              <span>Ordens Emitidas ({ordensFiltradas.length})</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              Total a comprar:{" "}
+              <strong className="text-foreground font-semibold">
+                {brl(resumoGeralCompra.totalValor)}
+              </strong>
+            </span>
+            <span>·</span>
+            <span>
+              Selecionados:{" "}
+              <strong className="text-primary font-semibold">
+                {produtosSelecionados.length} ({brl(totalSelecionadoCompra)})
+              </strong>
+            </span>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {ordensFiltradas.map((ordem) => {
-              const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
-              const total = Number(ordem.valor_total ?? 0);
-              const saldo = total - pago;
-              const pctPago = total > 0 ? Math.min(Math.max(pago / total, 0), 1) : 0;
-              const pctLabel = Math.round(pctPago * 100);
-              const tom =
-                pctPago >= 1
-                  ? {
-                      fill: "bg-emerald-500/15",
-                      border: "border-emerald-500/30",
-                      texto: "text-emerald-400",
-                      selo: "bg-emerald-500/20 border-emerald-500/40 text-emerald-400",
-                      sombra: "shadow-emerald-500/5",
-                    }
-                  : pctPago > 0
-                    ? {
-                        fill: "bg-amber-500/15",
-                        border: "border-amber-500/20",
-                        texto: "text-amber-400",
-                        selo: "bg-amber-500/20 border-amber-500/40 text-amber-400",
-                        sombra: "shadow-amber-500/5",
-                      }
-                    : {
-                        fill: "bg-red-500/10",
-                        border: "border-red-500/20",
-                        texto: "text-red-400",
-                        selo: "bg-red-500/20 border-red-500/40 text-red-400",
-                        sombra: "shadow-red-500/5",
-                      };
+        </div>
+
+        {/* ABA 1: VISÃO GERAL POR FORNECEDOR (O QUE PRECISO COMPRAR) */}
+        <TabsContent value="fornecedores" className="space-y-6 m-0 print:hidden">
+          {/* BARRA DE CONTROLES: FILTRO DE VÍNCULO E NECESSIDADE */}
+          <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* FILTRO DE VÍNCULO */}
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <Filter className="size-3.5" />
+                  Vínculo:
+                </span>
+                <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setFiltroVinculo("todos")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                      filtroVinculo === "todos"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Todos ({contagensFiltroVinculo.todos})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroVinculo("com_vinculo")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                      filtroVinculo === "com_vinculo"
+                        ? "bg-emerald-600 text-white shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Link2 className="size-3" />
+                    Com Vínculo ({contagensFiltroVinculo.comVinculo})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroVinculo("sem_vinculo")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                      filtroVinculo === "sem_vinculo"
+                        ? "bg-amber-600 text-white shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Boxes className="size-3" />
+                    Sem Vínculo / Estoque ({contagensFiltroVinculo.semVinculo})
+                  </button>
+                </div>
+              </div>
+
+              {/* FILTRO DE NECESSIDADE */}
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Exibir:
+                </span>
+                <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setFiltroNecessidade("precisa_comprar")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                      filtroNecessidade === "precisa_comprar"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    O que precisa comprar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroNecessidade("todos")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                      filtroNecessidade === "todos"
+                        ? "bg-background text-foreground shadow-sm font-semibold"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Catálogo completo
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* AÇÕES DE EXPANSÃO E SELEÇÃO */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => recolherTodosFornecedores(false)}
+                className="text-xs h-8"
+              >
+                <ChevronDown className="size-3.5 mr-1" />
+                Expandir todos
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => recolherTodosFornecedores(true)}
+                className="text-xs h-8"
+              >
+                <ChevronUp className="size-3.5 mr-1" />
+                Recolher todos
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => marcarTodosProdutos(!todosProdutosSelecionados)}
+                className="text-xs h-8"
+              >
+                {todosProdutosSelecionados ? "Limpar seleção" : "Selecionar todos"}
+              </Button>
+            </div>
+          </div>
+
+          {/* CARDS DE RESUMO GLOBAL */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="bg-card/70 border">
+              <CardContent className="p-4 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <ShoppingCart className="size-3.5 text-primary" />
+                  Total Estimado da Demanda
+                </p>
+                <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
+                  {brl(resumoGeralCompra.totalValor)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {resumoGeralCompra.totalProdutos} produtos · {resumoGeralCompra.totalUnidades} unidades
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/70 border">
+              <CardContent className="p-4 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Factory className="size-3.5 text-blue-500" />
+                  Fornecedores Envolvidos
+                </p>
+                <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
+                  {resumoGeralCompra.totalFornecedoresComItens}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Fabricantes com compras a realizar
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/70 border border-emerald-500/20 bg-emerald-500/5">
+              <CardContent className="p-4 space-y-1">
+                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <Link2 className="size-3.5" />
+                  Demandas com Vínculo
+                </p>
+                <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
+                  {resumoGeralCompra.totalComVinculo} un.
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Vinculadas a pedidos de clientes
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/70 border border-amber-500/20 bg-amber-500/5">
+              <CardContent className="p-4 space-y-1">
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                  <Boxes className="size-3.5" />
+                  Reposição sem Vínculo
+                </p>
+                <p className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400 font-mono">
+                  {resumoGeralCompra.totalSemVinculo} un.
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Itens para estoque livre
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* BARRA DE AÇÃO FLUTUANTE / FIXA QUANDO HÁ SELEÇÃO */}
+          {produtosSelecionados.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/5 p-4 shadow-sm animate-in fade-in">
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold flex items-center gap-2 text-primary">
+                  <ShoppingCart className="size-4" />
+                  {produtosSelecionados.length} produto(s) selecionado(s) para compra
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Total selecionado: <strong>{brl(totalSelecionadoCompra)}</strong> · A pagar:{" "}
+                  <strong className="text-foreground">{brl(totalAPagarCompra)}</strong>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => salvarTodosItens.mutate()}
+                  disabled={salvarTodosItens.isPending}
+                >
+                  <Save className="size-3.5 mr-1.5" /> Salvar alterações
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => comprarSelecionados.mutate()}
+                  disabled={comprarSelecionados.isPending}
+                  className="font-semibold"
+                >
+                  <ShoppingCart className="size-4 mr-1.5" />
+                  Executar Ordem ({produtosSelecionados.length})
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* LISTA DE FORNECEDORES E PRODUTOS */}
+          {gruposVisaoFornecedor.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center text-muted-foreground space-y-3">
+                <Package className="size-10 mx-auto text-muted-foreground/60" />
+                <p className="text-base font-medium">Nenhum produto encontrado para estes filtros.</p>
+                <p className="text-xs">
+                  Tente alterar o filtro de vínculo ou necessidade para ver mais itens.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFiltroVinculo("todos");
+                    setFiltroNecessidade("todos");
+                    setBuscaFornecedor("");
+                  }}
+                >
+                  Limpar filtros
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            gruposVisaoFornecedor.map((grupo) => {
+              const recolhido = fornecedoresRecolhidos[grupo.chave] === true;
               return (
                 <Card
-                  key={ordem.id}
-                  className={`relative overflow-hidden border ${tom.border} shadow-2xl ${tom.sombra}`}
+                  key={grupo.chave}
+                  className={cn(
+                    "overflow-hidden border transition-all shadow-sm",
+                    grupo.selecionadosQtd > 0 && "border-primary/40 ring-1 ring-primary/20",
+                  )}
                 >
-                  <div
-                    aria-hidden
-                    className={`absolute inset-y-0 left-0 ${tom.fill} transition-all duration-700`}
-                    style={{ width: `${pctLabel}%` }}
-                  />
-                  <CardHeader className="relative space-y-2 pb-3">
-                    <div className="flex items-start justify-between gap-3">
+                  {/* CABEÇALHO DO FORNECEDOR */}
+                  <div className="flex flex-col gap-3 p-4 bg-muted/20 border-b sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-primary/10 p-2 text-primary mt-0.5">
+                        <Factory className="size-5" />
+                      </div>
                       <div>
-                        <CardTitle className="font-mono text-base">{ordem.numero ?? "O.C. sem número"}</CardTitle>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {ordem.fornecedor_nome ?? "Fornecedor não definido"}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-base text-foreground tracking-tight">
+                            {grupo.nome}
+                          </h3>
+                          <Badge variant="secondary" className="text-xs font-mono font-semibold">
+                            {grupo.totalItens} {grupo.totalItens === 1 ? "produto" : "produtos"} · {grupo.totalUnidades} un.
+                          </Badge>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-xs">
+                          {grupo.totalComVinculo > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-medium"
+                            >
+                              <Link2 className="size-3 mr-1" />
+                              {grupo.totalComVinculo} un. com vínculo (pedidos)
+                            </Badge>
+                          )}
+                          {grupo.totalSemVinculo > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[11px] font-medium"
+                            >
+                              <Boxes className="size-3 mr-1" />
+                              {grupo.totalSemVinculo} un. para estoque
+                            </Badge>
+                          )}
+                          {grupo.totalDemandaPedidos > 0 && (
+                            <span className="text-muted-foreground">
+                              · Demanda de pedidos: <strong>{grupo.totalDemandaPedidos} un.</strong>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0">
+                      <div className="text-right mr-1">
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
+                          Total Estimado
+                        </p>
+                        <p className="text-lg font-bold font-mono text-foreground">
+                          {brl(grupo.totalValor)}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tom.selo}`}
-                        >
-                          {pctLabel}% pago
-                        </span>
-                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => alternarSelecaoGrupoFornecedor(grupo)}
+                        className="text-xs h-8"
+                      >
+                        {grupo.todosSelecionados ? "Desmarcar itens" : "Selecionar itens"}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => comprarItensDoFornecedor(grupo)}
+                        disabled={comprarSelecionados.isPending}
+                        className="text-xs h-8 font-medium gap-1.5"
+                      >
+                        <ShoppingCart className="size-3.5" />
+                        Comprar deste fornecedor
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => alternarRecolhimentoFornecedor(grupo.chave)}
+                        className="size-8"
+                        title={recolhido ? "Expandir fornecedor" : "Recolher fornecedor"}
+                        aria-label={recolhido ? "Expandir fornecedor" : "Recolher fornecedor"}
+                      >
+                        {recolhido ? (
+                          <ChevronDown className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronUp className="size-4 text-muted-foreground" />
+                        )}
+                      </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent className="relative space-y-3">
-                    <div className="grid grid-cols-3 gap-2 text-right">
-                      <div>
-                        <p className="text-[11px] text-muted-foreground">Total</p>
-                        <p className="text-sm font-semibold">{brl(total)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] text-muted-foreground">Pago</p>
-                        <p className={`text-sm font-semibold ${tom.texto}`}>{brl(pago)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] text-muted-foreground">Saldo</p>
-                        <p className="text-sm font-semibold">{brl(saldo)}</p>
-                      </div>
+                  </div>
+
+                  {/* TABELA DE PRODUTOS DO FORNECEDOR */}
+                  {!recolhido && (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="text-xs bg-muted/10">
+                            <TableHead className="w-10">
+                              <Checkbox
+                                aria-label={`Selecionar todos os produtos de ${grupo.nome}`}
+                                checked={grupo.todosSelecionados}
+                                onCheckedChange={() => alternarSelecaoGrupoFornecedor(grupo)}
+                              />
+                            </TableHead>
+                            <TableHead className="w-24">SKU</TableHead>
+                            <TableHead className="min-w-56">Produto</TableHead>
+                            <TableHead className="w-32">Estoque</TableHead>
+                            <TableHead className="w-44">Demanda Pedidos</TableHead>
+                            <TableHead className="min-w-48">Vínculo (Cliente / Estoque)</TableHead>
+                            <TableHead className="w-20 text-right">Qtde</TableHead>
+                            <TableHead className="w-28 text-right">Vl. Unit.</TableHead>
+                            <TableHead className="w-20 text-right">% Desc.</TableHead>
+                            <TableHead className="w-28 text-right">Total</TableHead>
+                            <TableHead className="w-32">Status</TableHead>
+                            <TableHead className="w-16 text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {grupo.itens.map((item) => (
+                            <TableRow
+                              key={item.produto.id}
+                              className={cn(
+                                selecionadosCompra[item.produto.id] && "bg-primary/5",
+                                item.temVinculo && "border-l-2 border-l-emerald-500",
+                              )}
+                            >
+                              <TableCell>
+                                <Checkbox
+                                  aria-label={`Selecionar ${item.produto.nome}`}
+                                  checked={selecionadosCompra[item.produto.id] === true}
+                                  onCheckedChange={(valor) =>
+                                    setSelecionadosCompra((atual) => ({
+                                      ...atual,
+                                      [item.produto.id]: valor === true,
+                                    }))
+                                  }
+                                />
+                              </TableCell>
+
+                              <TableCell className="font-mono text-xs text-muted-foreground">
+                                {item.produto.codigo ?? "—"}
+                              </TableCell>
+
+                              <TableCell>
+                                <p className="font-medium text-sm leading-snug">{item.produto.nome}</p>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                  {item.produto.categoria && (
+                                    <Badge variant="outline" className="text-[10px] py-0 px-1 font-normal text-muted-foreground">
+                                      {item.produto.categoria}
+                                    </Badge>
+                                  )}
+                                  {item.produto.unidade && (
+                                    <span className="text-[11px] text-muted-foreground">({item.produto.unidade})</span>
+                                  )}
+                                  {(item.produto.cor_pastilha || item.produto.modelo_pastilha) && (
+                                    <span className="text-[11px] text-muted-foreground font-mono">
+                                      {[item.produto.cor_pastilha, item.produto.modelo_pastilha].filter(Boolean).join(" · ")}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+
+                              <TableCell>
+                                {item.estoqueZerado ? (
+                                  <Badge variant="destructive" className="text-[10px] py-0 px-1.5 font-semibold">
+                                    Zerado (0)
+                                  </Badge>
+                                ) : item.estoqueBaixo ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[10px] py-0 px-1.5 font-semibold"
+                                  >
+                                    Baixo ({item.estoqueAtual} / mín {item.estoqueMinimo})
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs font-mono text-muted-foreground">
+                                    {item.estoqueAtual} {item.produto.unidade}
+                                  </span>
+                                )}
+                              </TableCell>
+
+                              <TableCell>
+                                {item.demanda && item.demanda.total > 0 ? (
+                                  <div className="space-y-0.5">
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30 text-[10px] py-0 px-1.5 font-semibold"
+                                    >
+                                      {item.demanda.total} un. em {item.demanda.pedidos.length} pedido(s)
+                                    </Badge>
+                                    <p
+                                      className="text-[10px] text-muted-foreground truncate max-w-[180px]"
+                                      title={item.demanda.pedidos.map((p) => p.rotulo).join(" · ")}
+                                    >
+                                      {item.demanda.pedidos.map((p) => p.rotulo).join(" · ")}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+
+                              <TableCell>
+                                <div className="space-y-1">
+                                  {item.vinculos.map((vinculoAtual, indice) => (
+                                    <div key={`${item.produto.id}-vinculo-${indice}`} className="flex items-center gap-1.5">
+                                      {item.vinculos.length > 1 && (
+                                        <span className="w-4 shrink-0 text-[10px] font-mono text-muted-foreground">
+                                          #{indice + 1}
+                                        </span>
+                                      )}
+                                      <Select
+                                        value={vinculoAtual || SEM_CLIENTE}
+                                        onValueChange={(valor) => {
+                                          const vinculo = valor === SEM_CLIENTE ? "" : valor;
+                                          const proximos = vinculosDoProduto(item.produto);
+                                          proximos[indice] = vinculo;
+                                          setVinculosCompra((atual) => ({
+                                            ...atual,
+                                            [item.produto.id]: proximos,
+                                          }));
+                                          if (indice === 0) {
+                                            salvarAutomaticamente(
+                                              item.produto.id,
+                                              "venda_vinculo_id",
+                                              vinculo || (null as unknown as string),
+                                              true,
+                                            );
+                                          }
+                                        }}
+                                      >
+                                        <SelectTrigger
+                                          className={cn(
+                                            "h-7 text-xs w-48 font-medium",
+                                            vinculoAtual && vinculoAtual !== SEM_CLIENTE
+                                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
+                                              : "border-border bg-background text-muted-foreground",
+                                          )}
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value={SEM_CLIENTE}>
+                                            <span className="flex items-center gap-1.5 text-xs">
+                                              <Boxes className="size-3 text-amber-500" />
+                                              <span>Estoque Livre (Sem cliente)</span>
+                                            </span>
+                                          </SelectItem>
+                                          {vendasVinculo.map((venda) => (
+                                            <SelectItem key={venda.id} value={venda.id}>
+                                              <span className="flex items-center gap-1.5 text-xs">
+                                                <Link2 className="size-3 text-emerald-500" />
+                                                <span>
+                                                  {venda.numero ?? "Pedido"} — {venda.cliente_nome ?? "Cliente"}
+                                                </span>
+                                              </span>
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  ))}
+                                </div>
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  aria-label={`Quantidade de ${item.produto.nome}`}
+                                  className="ml-auto h-8 w-20 text-right font-medium"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={
+                                    quantidadesCompra[item.produto.id] ??
+                                    String(Number(item.produto.quantidade_compra ?? 1))
+                                  }
+                                  onChange={(evento) => {
+                                    const valor = evento.target.value;
+                                    setQuantidadesCompra((atual) => ({
+                                      ...atual,
+                                      [item.produto.id]: valor,
+                                    }));
+                                    salvarAutomaticamente(
+                                      item.produto.id,
+                                      "quantidade_compra",
+                                      Math.max(Number(valor) || 0, 0),
+                                    );
+                                  }}
+                                  onBlur={(evento) =>
+                                    salvarAutomaticamente(
+                                      item.produto.id,
+                                      "quantidade_compra",
+                                      Math.max(Number(evento.target.value) || 0, 0),
+                                      true,
+                                    )
+                                  }
+                                />
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  aria-label={`Valor unitário de ${item.produto.nome}`}
+                                  className="ml-auto h-8 w-24 text-right font-mono"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={
+                                    valoresCompra[item.produto.id] ??
+                                    String(Number(item.produto.preco_custo))
+                                  }
+                                  onChange={(evento) => {
+                                    const valor = evento.target.value;
+                                    setValoresCompra((atual) => ({
+                                      ...atual,
+                                      [item.produto.id]: valor,
+                                    }));
+                                    salvarAutomaticamente(
+                                      item.produto.id,
+                                      "preco_custo",
+                                      Math.max(Number(valor) || 0, 0),
+                                    );
+                                  }}
+                                  onBlur={(evento) =>
+                                    salvarAutomaticamente(
+                                      item.produto.id,
+                                      "preco_custo",
+                                      Math.max(Number(evento.target.value) || 0, 0),
+                                      true,
+                                    )
+                                  }
+                                />
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  aria-label={`Desconto percentual de ${item.produto.nome}`}
+                                  className="ml-auto h-8 w-20 text-right font-mono"
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.01"
+                                  value={
+                                    percentuaisCompra[item.produto.id] ??
+                                    String(Number(item.produto.desconto_compra ?? 0))
+                                  }
+                                  onChange={(evento) => {
+                                    const valor = evento.target.value;
+                                    setPercentuaisCompra((atual) => ({
+                                      ...atual,
+                                      [item.produto.id]: valor,
+                                    }));
+                                    salvarAutomaticamente(
+                                      item.produto.id,
+                                      "desconto_compra",
+                                      Math.min(Math.max(Number(valor) || 0, 0), 100),
+                                    );
+                                  }}
+                                  onBlur={(evento) =>
+                                    salvarAutomaticamente(
+                                      item.produto.id,
+                                      "desconto_compra",
+                                      Math.min(Math.max(Number(evento.target.value) || 0, 0), 100),
+                                      true,
+                                    )
+                                  }
+                                />
+                              </TableCell>
+
+                              <TableCell className="text-right font-semibold font-mono text-sm">
+                                {brl(item.totalItem)}
+                              </TableCell>
+
+                              <TableCell>
+                                <Select
+                                  value={statusCompra[item.produto.id] ?? item.produto.status_compra ?? "a_comprar"}
+                                  onValueChange={(valor) => {
+                                    setStatusCompra((atual) => ({ ...atual, [item.produto.id]: valor }));
+                                    salvarAutomaticamente(item.produto.id, "status_compra", valor, true);
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 w-28 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {STATUS_COMPRA.map((opcao) => (
+                                      <SelectItem key={opcao.valor} value={opcao.valor}>
+                                        {opcao.rotulo}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7"
+                                    aria-label={`Editar ${item.produto.nome}`}
+                                    title="Editar cadastro"
+                                    onClick={() => abrirEdicaoProdutoCompra(item.produto)}
+                                  >
+                                    <Pencil className="size-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7 text-destructive"
+                                    aria-label={`Excluir ${item.produto.nome}`}
+                                    title="Excluir produto"
+                                    disabled={excluirProdutoCompra.isPending}
+                                    onClick={() => excluirProdutoCompra.mutate(item.produto)}
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                    <Button
-                      type="button"
-                      className="w-full"
-                      variant="outline"
-                      onClick={() => {
-                        setModoEdicao(false);
-                        setDetalheId(ordem.id);
-                      }}
-                    >
-                      Abrir O.C. e pagamentos
-                    </Button>
-                  </CardContent>
+                  )}
                 </Card>
               );
-            })}
-          </div>
-        </section>
-      )}
+            })
+          )}
+        </TabsContent>
 
-      <ExpandableCard>
+        {/* ABA 2: GRADE GERAL DE PRODUTOS */}
+        <TabsContent value="grade" className="space-y-6 m-0 print:hidden">
+          <ExpandableCard>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div>
             <CardTitle>Ordem de compra</CardTitle>
@@ -2458,6 +3381,122 @@ function OrdensCompra() {
           </div>
         </CardContent>
       </ExpandableCard>
+    </TabsContent>
+
+    {/* ABA 3: ORDENS EMITIDAS E PAGAMENTOS */}
+    <TabsContent value="executadas" className="space-y-6 m-0 print:hidden">
+      {ordensFiltradas.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+            <CheckCircle2 className="size-8 mx-auto text-muted-foreground/60" />
+            <p className="text-base font-medium">Nenhuma ordem de compra emitida encontrada.</p>
+            <p className="text-xs">
+              Quando você executar ordens na Visão por Fornecedor ou na Grade Geral, elas aparecerão aqui.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Ordens executadas e pagamentos</h2>
+            <p className="text-sm text-muted-foreground">
+              Cada ordem permanece aqui com o número, o valor pago e o saldo.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {ordensFiltradas.map((ordem) => {
+              const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
+              const total = Number(ordem.valor_total ?? 0);
+              const saldo = total - pago;
+              const pctPago = total > 0 ? Math.min(Math.max(pago / total, 0), 1) : 0;
+              const pctLabel = Math.round(pctPago * 100);
+              const tom =
+                pctPago >= 1
+                  ? {
+                      fill: "bg-emerald-500/15",
+                      border: "border-emerald-500/30",
+                      texto: "text-emerald-400",
+                      selo: "bg-emerald-500/20 border-emerald-500/40 text-emerald-400",
+                      sombra: "shadow-emerald-500/5",
+                    }
+                  : pctPago > 0
+                    ? {
+                        fill: "bg-amber-500/15",
+                        border: "border-amber-500/20",
+                        texto: "text-amber-400",
+                        selo: "bg-amber-500/20 border-amber-500/40 text-amber-400",
+                        sombra: "shadow-amber-500/5",
+                      }
+                    : {
+                        fill: "bg-red-500/10",
+                        border: "border-red-500/20",
+                        texto: "text-red-400",
+                        selo: "bg-red-500/20 border-red-500/40 text-red-400",
+                        sombra: "shadow-red-500/5",
+                      };
+              return (
+                <Card
+                  key={ordem.id}
+                  className={`relative overflow-hidden border ${tom.border} shadow-2xl ${tom.sombra}`}
+                >
+                  <div
+                    aria-hidden
+                    className={`absolute inset-y-0 left-0 ${tom.fill} transition-all duration-700`}
+                    style={{ width: `${pctLabel}%` }}
+                  />
+                  <CardHeader className="relative space-y-2 pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="font-mono text-base">{ordem.numero ?? "O.C. sem número"}</CardTitle>
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                          {ordem.fornecedor_nome ?? "Fornecedor não definido"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tom.selo}`}
+                        >
+                          {pctLabel}% pago
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="relative space-y-3">
+                    <div className="grid grid-cols-3 gap-2 text-right">
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Total</p>
+                        <p className="text-sm font-semibold">{brl(total)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Pago</p>
+                        <p className={`text-sm font-semibold ${tom.texto}`}>{brl(pago)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-muted-foreground">Saldo</p>
+                        <p className="text-sm font-semibold">{brl(saldo)}</p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => {
+                        setModoEdicao(false);
+                        setDetalheId(ordem.id);
+                      }}
+                    >
+                      Abrir O.C. e pagamentos
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </TabsContent>
+  </Tabs>
 
       <Dialog
         open={!!detalheId}
