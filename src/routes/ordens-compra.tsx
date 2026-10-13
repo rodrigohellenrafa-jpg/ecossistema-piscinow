@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { DocumentoOrdemCompra } from "@/components/documento-ordem-compra";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, proximoCodigo } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
@@ -2284,6 +2285,11 @@ function OrdensCompra() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <BotaoVisualizarDocumento
+                          tipo="ordem_compra"
+                          id={ordem.id}
+                          titulo={`Visualizar ordem de compra ${ordem.numero ?? ""}`}
+                        />
                         <Button size="icon" variant="ghost" title="Abrir ordem" onClick={() => setDetalheId(ordem.id)}>
                           <Pencil className="size-4" />
                         </Button>
@@ -2860,6 +2866,13 @@ function OrdensCompra() {
               </div>
 
               <div className="flex flex-wrap justify-end gap-2 print:hidden">
+                <BotaoVisualizarDocumento
+                  tipo="ordem_compra"
+                  id={ordemDetalhe.id}
+                  variant="default"
+                  size="default"
+                  rotulo="Visualizar formulário completo"
+                />
                 <DocumentoOrdemCompra
                   ordem={ordemDetalhe}
                   fornecedor={

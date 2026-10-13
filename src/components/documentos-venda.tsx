@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileSignature, Printer, Files, ExternalLink, Receipt } from "lucide-react";
+import { FileSignature, Printer, Files, ExternalLink, Receipt, Eye } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { VisualizadorDocumentoModal } from "@/components/visualizador-documento-modal";
 import contratoSplash from "@/assets/contrato-splash-atualizado-2022.pdf.asset.json";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 import {
@@ -540,6 +541,7 @@ function imprimirHtml(html: string) {
 
 export function DocumentosVenda(props: Props) {
   const [contratoAberto, setContratoAberto] = useState(false);
+  const [visualizadorAberto, setVisualizadorAberto] = useState(false);
 
   const imprimirPedido = () => imprimirHtml(htmlPedido(props));
   const imprimirContrato = () => imprimirHtml(htmlContrato(props));
@@ -553,54 +555,69 @@ export function DocumentosVenda(props: Props) {
   const balcao = props.venda.tipo_atendimento === "in" && !orcamento;
   const imprimirCupom = () => imprimirHtml(htmlCupom(props));
 
-  if (balcao) {
-    return (
-      <>
-        <Button onClick={imprimirCupom}>
-          <Receipt /> Imprimir cupom
-        </Button>
-        <Button variant="outline" onClick={imprimirPedido}>
-          <Printer /> Imprimir pedido de venda (A4)
-        </Button>
-      </>
-    );
-  }
-
   return (
     <>
-      <Button variant="outline" onClick={imprimirPedido}>
-        <Printer /> {orcamento ? "Imprimir orçamento" : "Imprimir pedido de venda"}
-      </Button>
-      <Button variant="outline" onClick={imprimirContrato}>
-        <FileSignature /> Imprimir contrato preenchido
-      </Button>
-      <Button variant="outline" onClick={() => setContratoAberto(true)}>
-        <FileSignature /> Ver contrato original (PDF)
-      </Button>
-      <Button onClick={imprimirPedidoEContrato}>
-        <Files /> {orcamento ? "Imprimir orçamento + contrato" : "Imprimir pedido + contrato"}
+      <Button
+        variant="default"
+        onClick={() => setVisualizadorAberto(true)}
+        className="gap-1.5 shadow-sm"
+      >
+        <Eye className="size-4" /> Visualizar documentos
       </Button>
 
+      {balcao ? (
+        <>
+          <Button onClick={imprimirCupom}>
+            <Receipt /> Imprimir cupom
+          </Button>
+          <Button variant="outline" onClick={imprimirPedido}>
+            <Printer /> Imprimir pedido (A4)
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button variant="outline" onClick={imprimirPedido}>
+            <Printer /> {orcamento ? "Imprimir orçamento" : "Imprimir pedido"}
+          </Button>
+          <Button variant="outline" onClick={imprimirContrato}>
+            <FileSignature /> Imprimir contrato
+          </Button>
+          <Button variant="outline" onClick={() => setContratoAberto(true)}>
+            <FileSignature /> Ver PDF original
+          </Button>
+          <Button onClick={imprimirPedidoEContrato}>
+            <Files /> {orcamento ? "Orçamento + contrato" : "Pedido + contrato"}
+          </Button>
+        </>
+      )}
+
+      <VisualizadorDocumentoModal
+        open={visualizadorAberto}
+        onOpenChange={setVisualizadorAberto}
+        tipo="venda"
+        dados={{
+          venda: props.venda,
+          cliente: props.cliente,
+          itens: props.itens,
+          condicoes: props.condicoes,
+          empresa: props.empresa,
+        }}
+      />
 
       <Dialog open={contratoAberto} onOpenChange={setContratoAberto}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>Contrato de venda</DialogTitle>
-            <DialogDescription className="sr-only">Visualização do contrato original de venda.</DialogDescription>
+            <DialogTitle>Contrato de venda — Visualização</DialogTitle>
+            <DialogDescription className="sr-only">Visualização do contrato de venda.</DialogDescription>
           </DialogHeader>
-          <object
-            data={contratoSplash.url}
-            type="application/pdf"
-            className="h-[70vh] w-full rounded-md border"
-          >
-            <iframe src={contratoSplash.url} title="Contrato de venda" className="h-[70vh] w-full" />
-          </object>
+          <iframe
+            srcDoc={htmlContrato(props)}
+            title="Contrato de venda"
+            className="h-[72vh] w-full rounded-md border bg-white"
+          />
           <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => window.open(contratoSplash.url, "_blank", "noopener,noreferrer")}
-            >
-              <ExternalLink /> Abrir em nova aba
+            <Button variant="outline" onClick={imprimirContrato}>
+              <Printer /> Imprimir / Salvar PDF
             </Button>
           </div>
         </DialogContent>
@@ -608,3 +625,5 @@ export function DocumentosVenda(props: Props) {
     </>
   );
 }
+
+export { htmlPedido, htmlContrato, htmlCupom, imprimirHtml };

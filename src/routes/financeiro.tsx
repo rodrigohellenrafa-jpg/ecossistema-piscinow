@@ -31,6 +31,7 @@ import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import { ComprovanteAnexo } from "@/components/comprovante-anexo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -1314,6 +1315,12 @@ function Financeiro() {
                                 <RotateCcw className="size-4" />
                               </Button>
                             )}
+                            <BotaoVisualizarDocumento
+                              tipo="conta"
+                              id={l.id}
+                              dados={l}
+                              titulo={`Visualizar recibo / comprovante ${l.numero_documento ?? ""}`}
+                            />
                             <Button
                               variant="ghost"
                               size="icon"

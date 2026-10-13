@@ -3,8 +3,25 @@ import { LancarEmLote } from "@/components/lancar-em-lote";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCircle2, ChevronsUpDown, Handshake, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronsUpDown,
+  Handshake,
+  Pencil,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  PieChart,
+  ChevronDown,
+  ChevronUp,
+  Tag,
+  Layers,
+  FilterX,
+} from "lucide-react";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 import {
   AlertaDuplicidadeDialog,
@@ -18,6 +35,7 @@ import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import { ComprovanteAnexo } from "@/components/comprovante-anexo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -1484,23 +1502,27 @@ function Contas() {
               </div>
             </div>
             <DialogFooter className="gap-2 sm:justify-between">
-              {editando && editando.status !== "pago" && editando.status !== "renegociado" ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mr-auto border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
-                  onClick={() => {
-                    const c = editando;
-                    setOpen(false);
-                    setRenegociando(c);
-                  }}
-                >
-                  <Handshake className="size-4 mr-1.5" />
-                  Renegociar conta
-                </Button>
-              ) : (
-                <div />
-              )}
+              {(() => {
+                const contaEditando = editando ? data.find((item) => item.id === editando) ?? null : null;
+                return contaEditando &&
+                  contaEditando.status !== "pago" &&
+                  contaEditando.status !== "renegociado" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mr-auto border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                    onClick={() => {
+                      setOpen(false);
+                      setRenegociando(contaEditando);
+                    }}
+                  >
+                    <Handshake className="size-4 mr-1.5" />
+                    Renegociar conta
+                  </Button>
+                ) : (
+                  <div />
+                );
+              })()}
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => setOpen(false)}>
                   Cancelar
@@ -1908,15 +1930,139 @@ function Lista({
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
   const [fDescricao, setFDescricao] = useState("");
+  const [fCategoria, setFCategoria] = useState("todas");
   const [fParceiro, setFParceiro] = useState("");
   const [fVencimento, setFVencimento] = useState("");
   const [fValor, setFValor] = useState("");
   const [fStatus, setFStatus] = useState("todos");
   const [buscarEmTodoHistorico, setBuscarEmTodoHistorico] = useState(true);
+  const [mesFechamento, setMesFechamento] = useState<string>("vigente");
+  const [mostrarPainelFechamento, setMostrarPainelFechamento] = useState(true);
 
-  const temFiltroTexto = Boolean(fDescricao || fParceiro || fVencimento || fValor);
+  const mesVigente = hoje.slice(0, 7);
+  const mesAnterior = (() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  })();
+
+  const labelMesVigente = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const labelMesAnterior = (() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  })();
+
+  const temFiltroTexto = Boolean(fDescricao || fParceiro || fVencimento || fValor || fCategoria !== "todas");
   const buscandoHistoricoCompleto = temFiltroTexto && buscarEmTodoHistorico && todosItens.length > 0;
   const baseParaFiltrar = buscandoHistoricoCompleto ? todosItens : itens;
+
+  // Base para cálculo do fechamento do mês por categoria
+  const contasParaFechamento = useMemo(() => {
+    const base = todosItens.length > 0 ? todosItens : itens;
+    if (mesFechamento === "vigente") {
+      return base.filter((c) => c.vencimento && c.vencimento.startsWith(mesVigente));
+    }
+    if (mesFechamento === "anterior") {
+      return base.filter((c) => c.vencimento && c.vencimento.startsWith(mesAnterior));
+    }
+    return itens;
+  }, [todosItens, itens, mesFechamento, mesVigente, mesAnterior]);
+
+  // Contribuição de cada categoria no fechamento do mês
+  const fechamentoCategorias = useMemo(() => {
+    const mapa = new Map<string, {
+      categoria: string;
+      total: number;
+      pago: number;
+      aberto: number;
+      qtd: number;
+    }>();
+
+    let totalGeral = 0;
+    let pagoGeral = 0;
+    let abertoGeral = 0;
+
+    for (const c of contasParaFechamento) {
+      const totalTitulo = (Number(c.valor) || 0) + (Number(c.valor_juros) || 0);
+      const pagoTitulo = c.status === "pago" ? (Number(c.valor_pago) || totalTitulo) : 0;
+      const abertoTitulo = Math.max(0, totalTitulo - pagoTitulo);
+
+      totalGeral += totalTitulo;
+      pagoGeral += pagoTitulo;
+      abertoGeral += abertoTitulo;
+
+      const linhasRateio = rateios.filter((r) => r.conta_id === c.id);
+      if (linhasRateio.length > 0) {
+        let somaRateioItem = 0;
+        for (const r of linhasRateio) {
+          const val = Number(r.valor) || 0;
+          somaRateioItem += val;
+          const prop = totalTitulo > 0 ? val / totalTitulo : 0;
+          const pagoProp = pagoTitulo * prop;
+          const abertoProp = abertoTitulo * prop;
+
+          const catNome = r.categoria.trim() || "Sem categoria";
+          const atual = mapa.get(catNome) ?? { categoria: catNome, total: 0, pago: 0, aberto: 0, qtd: 0 };
+          atual.total += val;
+          atual.pago += pagoProp;
+          atual.aberto += abertoProp;
+          atual.qtd += 1;
+          mapa.set(catNome, atual);
+        }
+        const resto = totalTitulo - somaRateioItem;
+        if (Math.abs(resto) > 0.01) {
+          const catNome = c.categoria?.trim() || "Sem categoria";
+          const atual = mapa.get(catNome) ?? { categoria: catNome, total: 0, pago: 0, aberto: 0, qtd: 0 };
+          atual.total += resto;
+          atual.pago += pagoTitulo * (resto / totalTitulo);
+          atual.aberto += abertoTitulo * (resto / totalTitulo);
+          atual.qtd += 1;
+          mapa.set(catNome, atual);
+        }
+      } else {
+        const catNome = c.categoria?.trim() || "Sem categoria";
+        const atual = mapa.get(catNome) ?? { categoria: catNome, total: 0, pago: 0, aberto: 0, qtd: 0 };
+        atual.total += totalTitulo;
+        atual.pago += pagoTitulo;
+        atual.aberto += abertoTitulo;
+        atual.qtd += 1;
+        mapa.set(catNome, atual);
+      }
+    }
+
+    const lista = [...mapa.values()]
+      .map((item) => ({
+        ...item,
+        percentual: totalGeral > 0 ? (item.total / totalGeral) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      totalGeral,
+      pagoGeral,
+      abertoGeral,
+      qtdTitulos: contasParaFechamento.length,
+      categorias: lista,
+    };
+  }, [contasParaFechamento, rateios]);
+
+  const listaCategoriasDisponiveis = useMemo(() => {
+    const setCats = new Set<string>();
+    for (const c of baseParaFiltrar) {
+      if (c.categoria && c.categoria.trim() && c.categoria !== "Rateio") {
+        setCats.add(c.categoria.trim());
+      }
+    }
+    for (const r of rateios) {
+      if (r.categoria && r.categoria.trim()) {
+        setCats.add(r.categoria.trim());
+      }
+    }
+    return Array.from(setCats).sort((a, b) => a.localeCompare(b));
+  }, [baseParaFiltrar, rateios]);
 
   const dataBR = (iso: string) => {
     const [a, m, d] = iso.slice(0, 10).split("-");
@@ -1981,6 +2127,23 @@ function Lista({
     }
 
     if (fStatus !== "todos" && statusDe(c) !== fStatus) return false;
+
+    if (fCategoria !== "todas") {
+      if (fCategoria === "sem_categoria") {
+        const hasNoCat =
+          (!c.categoria || !c.categoria.trim() || c.categoria === "Rateio") &&
+          !rateios.some((r) => r.conta_id === c.id);
+        if (!hasNoCat) return false;
+      } else if (fCategoria === "rateio") {
+        const isRateio = c.categoria === "Rateio" || rateios.some((r) => r.conta_id === c.id);
+        if (!isRateio) return false;
+      } else {
+        const matchDireta = c.categoria === fCategoria;
+        const matchRateio = rateios.some((r) => r.conta_id === c.id && r.categoria === fCategoria);
+        if (!matchDireta && !matchRateio) return false;
+      }
+    }
+
     return true;
   });
 
@@ -2050,6 +2213,7 @@ function Lista({
                 className="h-6 px-2 text-xs"
                 onClick={() => {
                   setFDescricao("");
+                  setFCategoria("todas");
                   setFParceiro("");
                   setFVencimento("");
                   setFValor("");
@@ -2061,6 +2225,218 @@ function Lista({
             </div>
           </div>
         )}
+
+        {/* Painel de Fechamento do Mês por Tipo de Despesa / Categoria */}
+        <div className="mb-4 rounded-lg border bg-card/60 p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <PieChart className="size-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold tracking-tight flex items-center gap-2">
+                  Contribuição por Categoria · Fechamento do Mês
+                  <Badge variant="outline" className="text-[10px] font-normal uppercase tracking-wider">
+                    {mesFechamento === "vigente"
+                      ? labelMesVigente
+                      : mesFechamento === "anterior"
+                        ? labelMesAnterior
+                        : "Período da Lista"}
+                  </Badge>
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {ehReceber
+                    ? "Saiba quanto cada categoria contribui para a receita do mês."
+                    : "Saiba quanto cada tipo de despesa contribui para o fechamento do mês (total, pago e aberto)."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center rounded-md border bg-muted/40 p-0.5 text-xs">
+                <Button
+                  type="button"
+                  variant={mesFechamento === "vigente" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => setMesFechamento("vigente")}
+                >
+                  Mês vigente ({labelMesVigente.split(" ")[0]})
+                </Button>
+                <Button
+                  type="button"
+                  variant={mesFechamento === "anterior" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => setMesFechamento("anterior")}
+                >
+                  Mês anterior ({labelMesAnterior.split(" ")[0]})
+                </Button>
+                <Button
+                  type="button"
+                  variant={mesFechamento === "periodo" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => setMesFechamento("periodo")}
+                >
+                  Período da lista
+                </Button>
+              </div>
+
+              {fCategoria !== "todas" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/5"
+                  onClick={() => setFCategoria("todas")}
+                >
+                  <FilterX className="size-3" />
+                  Filtrando: <span className="font-semibold">{fCategoria}</span> (Limpar)
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setMostrarPainelFechamento(!mostrarPainelFechamento)}
+                title={mostrarPainelFechamento ? "Recolher painel" : "Expandir painel"}
+              >
+                {mostrarPainelFechamento ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                {mostrarPainelFechamento ? "Recolher" : "Ver fechamento"}
+              </Button>
+            </div>
+          </div>
+
+          {mostrarPainelFechamento && (
+            <div className="mt-3 space-y-4">
+              {/* KPIs do Fechamento */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-md border bg-background/50 p-2.5">
+                  <span className="text-[11px] text-muted-foreground uppercase font-medium">
+                    {ehReceber ? "Total a Receber no Mês" : "Total de Despesas do Mês"}
+                  </span>
+                  <div className="text-base font-bold tabular-nums">
+                    {brl(fechamentoCategorias.totalGeral)}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {fechamentoCategorias.qtdTitulos} lançamento(s) no mês
+                  </span>
+                </div>
+
+                <div className="rounded-md border bg-background/50 p-2.5">
+                  <span className="text-[11px] text-muted-foreground uppercase font-medium">
+                    {ehReceber ? "Já Recebido (Liquidado)" : "Já Pago (Liquidado)"}
+                  </span>
+                  <div className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {brl(fechamentoCategorias.pagoGeral)}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {fechamentoCategorias.totalGeral > 0
+                      ? `${((fechamentoCategorias.pagoGeral / fechamentoCategorias.totalGeral) * 100).toFixed(1)}% liquidado`
+                      : "0%"}
+                  </span>
+                </div>
+
+                <div className="rounded-md border bg-background/50 p-2.5">
+                  <span className="text-[11px] text-muted-foreground uppercase font-medium">
+                    {ehReceber ? "A Receber Pendente" : "Em Aberto / A Pagar"}
+                  </span>
+                  <div className="text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                    {brl(fechamentoCategorias.abertoGeral)}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {fechamentoCategorias.totalGeral > 0
+                      ? `${((fechamentoCategorias.abertoGeral / fechamentoCategorias.totalGeral) * 100).toFixed(1)}% a liquidar`
+                      : "0%"}
+                  </span>
+                </div>
+
+                <div className="rounded-md border bg-background/50 p-2.5">
+                  <span className="text-[11px] text-muted-foreground uppercase font-medium">
+                    Categorias Ativas
+                  </span>
+                  <div className="text-base font-bold tabular-nums">
+                    {fechamentoCategorias.categorias.length}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    tipos de despesa no fechamento
+                  </span>
+                </div>
+              </div>
+
+              {/* Lista com Progresso e % de Contribuição por Categoria */}
+              <div>
+                <div className="mb-2 flex items-center justify-between text-xs">
+                  <span className="font-medium text-muted-foreground">
+                    Participação por Categoria no Fechamento (% do mês):
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    Clique em um card para filtrar a tabela por categoria
+                  </span>
+                </div>
+
+                {fechamentoCategorias.categorias.length === 0 ? (
+                  <p className="py-4 text-center text-xs text-muted-foreground">
+                    Nenhuma despesa encontrada para o mês selecionado.
+                  </p>
+                ) : (
+                  <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                    {fechamentoCategorias.categorias.map((cat) => {
+                      const selecionada = fCategoria === cat.categoria;
+                      return (
+                        <div
+                          key={cat.categoria}
+                          onClick={() => setFCategoria(selecionada ? "todas" : cat.categoria)}
+                          className={`group cursor-pointer rounded-lg border p-3 transition-all hover:border-primary/60 hover:shadow-sm ${
+                            selecionada
+                              ? "border-primary bg-primary/10 ring-1 ring-primary"
+                              : "bg-background/80 hover:bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-semibold text-xs tracking-tight line-clamp-1 group-hover:text-primary">
+                              {cat.categoria}
+                            </span>
+                            <Badge
+                              variant={selecionada ? "default" : "secondary"}
+                              className="text-[11px] font-semibold tabular-nums shrink-0"
+                            >
+                              {cat.percentual.toFixed(1)}% do mês
+                            </Badge>
+                          </div>
+
+                          <div className="mt-1.5 flex items-baseline justify-between text-xs">
+                            <span className="font-bold text-sm tabular-nums">
+                              {brl(cat.total)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {cat.qtd} título(s)
+                            </span>
+                          </div>
+
+                          <div className="mt-2 space-y-1">
+                            <Progress value={cat.percentual} className="h-1.5" />
+                            <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
+                              <span className="text-emerald-600 dark:text-emerald-400">
+                                Pago: {brl(cat.pago)}
+                              </span>
+                              <span className="text-amber-600 dark:text-amber-400">
+                                Aberto: {brl(cat.aberto)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="mb-3 flex flex-wrap gap-2">
           {grupos.aberto.n > 0 && (
@@ -2094,6 +2470,7 @@ function Lista({
           <TableHeader>
             <TableRow>
               <TableHead>Descrição</TableHead>
+              <TableHead>Categoria</TableHead>
               <TableHead>Parceiro</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead className="text-right">Parcela</TableHead>
@@ -2112,6 +2489,26 @@ function Lista({
                   className="h-8 text-xs font-normal"
                   aria-label="Filtrar por descrição"
                 />
+              </TableHead>
+              <TableHead className="py-1">
+                <Select value={fCategoria} onValueChange={setFCategoria}>
+                  <SelectTrigger
+                    className="h-8 text-xs font-normal"
+                    aria-label="Filtrar por categoria"
+                  >
+                    <SelectValue placeholder="Categoria…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as categorias</SelectItem>
+                    <SelectItem value="sem_categoria">Sem categoria</SelectItem>
+                    <SelectItem value="rateio">Rateadas</SelectItem>
+                    {listaCategoriasDisponiveis.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </TableHead>
               <TableHead className="py-1">
                 <Input
@@ -2163,6 +2560,8 @@ function Lista({
           <TableBody>
             {visiveis.map((c) => {
               const vencido = c.status !== "pago" && c.status !== "renegociado" && c.vencimento < hoje;
+              const rateiosDaConta = rateios.filter((r) => r.conta_id === c.id);
+              const temRateio = rateiosDaConta.length > 0 || c.categoria === "Rateio";
               return (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">
@@ -2172,14 +2571,49 @@ function Lista({
                         {rotuloRecorrencia(c.recorrencia)}
                       </Badge>
                     )}
-                    {rateios.some((r) => r.conta_id === c.id) && (
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                        Rateio:{" "}
-                        {rateios
-                          .filter((r) => r.conta_id === c.id)
-                          .map((r) => `${r.categoria} ${brl(Number(r.valor))}`)
-                          .join(" · ")}
-                      </span>
+                  </TableCell>
+                  <TableCell>
+                    {temRateio ? (
+                      <div className="flex flex-col gap-0.5 items-start">
+                        <Badge
+                          variant="outline"
+                          className="cursor-pointer border-purple-500/40 bg-purple-500/10 text-purple-700 hover:bg-purple-500/20 dark:text-purple-300 text-xs font-normal"
+                          onClick={() => setFCategoria(fCategoria === "rateio" ? "todas" : "rateio")}
+                          title="Filtrar lançamentos rateados"
+                        >
+                          <Layers className="size-3 mr-1 inline" />
+                          Rateio {rateiosDaConta.length > 0 ? `(${rateiosDaConta.length})` : ""}
+                        </Badge>
+                        {rateiosDaConta.length > 0 && (
+                          <span
+                            className="text-[11px] text-muted-foreground line-clamp-1 max-w-[170px]"
+                            title={rateiosDaConta
+                              .map((r) => `${r.categoria}: ${brl(Number(r.valor))}`)
+                              .join(" · ")}
+                          >
+                            {rateiosDaConta.map((r) => r.categoria).join(", ")}
+                          </span>
+                        )}
+                      </div>
+                    ) : c.categoria ? (
+                      <div className="flex flex-col gap-0.5 items-start">
+                        <Badge
+                          variant="secondary"
+                          className="cursor-pointer text-xs font-normal hover:bg-secondary/80 transition-colors"
+                          onClick={() => setFCategoria(fCategoria === c.categoria ? "todas" : (c.categoria || "todas"))}
+                          title="Clique para filtrar por esta categoria"
+                        >
+                          <Tag className="size-3 mr-1 inline opacity-60" />
+                          {c.categoria}
+                        </Badge>
+                        {c.tipo_despesa && (
+                          <span className="text-[10px] text-muted-foreground px-0.5">
+                            {c.tipo_despesa}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Sem categoria</span>
                     )}
                   </TableCell>
                   <TableCell>{c.parceiro ?? "—"}</TableCell>
@@ -2195,9 +2629,9 @@ function Lista({
                     {c.status === "pago" ? (
                       <>
                         <span className="font-medium tabular-nums">{brl(Number(c.valor_pago ?? c.valor))}</span>
-                        {c.data_pagamento && (
+                        {(c as { data_pagamento?: string | null }).data_pagamento && (
                           <span className="block text-[11px] text-muted-foreground whitespace-nowrap">
-                            pago em {dataBR(c.data_pagamento)}
+                            pago em {dataBR((c as { data_pagamento?: string | null }).data_pagamento ?? "")}
                           </span>
                         )}
                         {Number(c.valor_desconto ?? 0) > 0.009 && (
@@ -2238,6 +2672,12 @@ function Lista({
                   </TableCell>
                   <TableCell className={`text-right ${acoesFixas}`}>
                     <div className="flex justify-end gap-1">
+                      <BotaoVisualizarDocumento
+                        tipo="conta"
+                        id={c.id}
+                        dados={c}
+                        titulo={`Visualizar recibo / comprovante ${c.numero_documento ?? ""}`}
+                      />
                       {c.comprovante_path ? (
                         <ComprovanteAnexo tabela="contas" valor={c.comprovante_path} />
                       ) : null}
@@ -2309,7 +2749,7 @@ function Lista({
             })}
             {visiveis.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                   {itens.length === 0
                     ? "Nenhum título lançado."
                     : "Nenhum título encontrado com esses filtros."}

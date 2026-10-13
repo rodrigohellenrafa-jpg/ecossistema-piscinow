@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -30,7 +30,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SenhaMestra } from "@/components/senha-mestra";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { InstallAppButton } from "@/components/install-app-button";
-import { useAuth } from "@/hooks/use-auth";
+import { encerrarSessaoCompleta, useAuth } from "@/hooks/use-auth";
 import { useRoles } from "@/hooks/use-role";
 import { AreaGuard } from "@/components/area-guard";
 
@@ -156,10 +156,12 @@ function UserBadge() {
   const { user, loading } = useAuth();
   const { roles, loading: rolesLoading, isAdmin } = useRoles();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   async function sair() {
-    await supabase.auth.signOut();
-    toast.success("Você saiu do sistema.");
+    await encerrarSessaoCompleta();
+    queryClient.clear();
+    toast.success("Sessão e ciclo de vendas encerrados. Faça login com a conta desejada.");
     void navigate({ to: "/auth" });
   }
 

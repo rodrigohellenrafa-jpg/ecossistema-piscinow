@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, RefreshCw, Search, Sparkles, Plus, Layers } from "lucide-react";
+import { CheckCircle2, RefreshCw, Search, Sparkles, Plus, Layers, Package } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,11 @@ import {
   type ItemSplashTabela,
   type ItemPorcelanaAtlas,
 } from "@/data/tabela-splash-piscinas";
+import {
+  TABELA_PECAS_ESTOQUE_2026,
+  type ItemPecaEstoque,
+} from "@/data/tabela-pecas-estoque";
+import { sincronizarPecasEstoqueNoBanco } from "@/hooks/use-sincronizar-pecas-estoque";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Produto = Tables<"produtos">;
@@ -48,7 +53,7 @@ export function ModalTabelaSplash({
   produtosExistentes?: Produto[];
 }) {
   const [open, setOpen] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState<"piscinas" | "porcelanas">("piscinas");
+  const [abaAtiva, setAbaAtiva] = useState<"piscinas" | "porcelanas" | "pecas">("piscinas");
 
   // Filtros de Piscinas
   const [busca, setBusca] = useState("");
@@ -56,6 +61,9 @@ export function ModalTabelaSplash({
 
   // Filtros de Porcelanas
   const [buscaPorcelana, setBuscaPorcelana] = useState("");
+
+  // Filtros de Peças e Estoque
+  const [buscaPeca, setBuscaPeca] = useState("");
 
   const qc = useQueryClient();
 
@@ -74,6 +82,10 @@ export function ModalTabelaSplash({
     cadastradosSet.has(item.nome.toLowerCase().trim());
 
   const estaPorcelanaCadastrada = (item: ItemPorcelanaAtlas) =>
+    cadastradosSet.has(item.codigo.toUpperCase()) ||
+    cadastradosSet.has(item.nome.toLowerCase().trim());
+
+  const estaPecaCadastrada = (item: ItemPecaEstoque) =>
     cadastradosSet.has(item.codigo.toUpperCase()) ||
     cadastradosSet.has(item.nome.toLowerCase().trim());
 
@@ -111,12 +123,28 @@ export function ModalTabelaSplash({
     });
   }, [buscaPorcelana]);
 
+  const pecasFiltradas = useMemo(() => {
+    const termo = buscaPeca.trim().toLowerCase();
+    if (!termo) return TABELA_PECAS_ESTOQUE_2026;
+    return TABELA_PECAS_ESTOQUE_2026.filter(
+      (item) =>
+        item.nome.toLowerCase().includes(termo) ||
+        item.codigo.toLowerCase().includes(termo) ||
+        item.ncm.toLowerCase().includes(termo) ||
+        String(item.linha) === termo,
+    );
+  }, [buscaPeca]);
+
   const totalCadastrados = useMemo(() => {
     return TABELA_SPLASH_PISCINAS_2026.filter((i) => estaCadastrado(i)).length;
   }, [cadastradosSet]);
 
   const totalPorcelanasCadastradas = useMemo(() => {
     return TABELA_PORCELANAS_ATLAS_2026.filter((i) => estaPorcelanaCadastrada(i)).length;
+  }, [cadastradosSet]);
+
+  const totalPecasCadastradas = useMemo(() => {
+    return TABELA_PECAS_ESTOQUE_2026.filter((i) => estaPecaCadastrada(i)).length;
   }, [cadastradosSet]);
 
   // Função auxiliar para garantir fornecedor Splash
@@ -346,12 +374,66 @@ export function ModalTabelaSplash({
     }
   };
 
+  const sincronizarPecas = useMutation({
+    mutationFn: async () => {
+      return await sincronizarPecasEstoqueNoBanco({ silencioso: false });
+    },
+    onSuccess: ({ inseridos }) => {
+      toast.success(
+        inseridos > 0
+          ? `${inseridos} peças e acessórios incluídos no estoque!`
+          : "Todas as 529 peças e acessórios já estão no estoque!",
+      );
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+      qc.invalidateQueries({ queryKey: ["fornecedores-select"] });
+    },
+    onError: (e: Error) => {
+      toast.error(e.message || "Erro ao sincronizar peças no estoque.");
+    },
+  });
+
+  const cadastrarPecaIndividual = async (item: ItemPecaEstoque) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      const fornId = await obterFornecedorSplashId(uid ?? "");
+
+      const { error } = await supabase.from("produtos").insert({
+        codigo: item.codigo,
+        nome: item.nome,
+        categoria: item.categoria,
+        tipo: item.tipo,
+        unidade: item.unidade,
+        ncm: item.ncm,
+        preco_custo: item.preco_custo,
+        preco_venda: item.preco_venda,
+        unidades_por_compra: item.unidadesPorCompra,
+        estoque_atual: 0,
+        estoque_minimo: 0,
+        sob_encomenda: false,
+        fornecedor_id: fornId,
+        descricao: item.descricao,
+        ativo: true,
+        created_by: uid,
+      } as never);
+
+      if (error) throw error;
+      toast.success(`${item.nome} incluído no estoque!`);
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+    } catch (e) {
+      toast.error((e as Error).message || "Erro ao incluir peça no estoque.");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary/5">
           <Sparkles className="size-4 text-amber-500" />
-          Tabela Splash & Pastilhas ({totalCadastrados + totalPorcelanasCadastradas}/{TABELA_SPLASH_PISCINAS_2026.length + TABELA_PORCELANAS_ATLAS_2026.length})
+          Catálogo Splash & Peças ({totalCadastrados + totalPorcelanasCadastradas + totalPecasCadastradas}/
+          {TABELA_SPLASH_PISCINAS_2026.length +
+            TABELA_PORCELANAS_ATLAS_2026.length +
+            TABELA_PECAS_ESTOQUE_2026.length})
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
@@ -360,10 +442,10 @@ export function ModalTabelaSplash({
             <div>
               <DialogTitle className="flex items-center gap-2 text-xl">
                 <Sparkles className="size-5 text-amber-500" />
-                Catálogo Oficial Splash Piscinas & Porcelanas Atlas (2026)
+                Catálogo Oficial Splash Piscinas, Porcelanas Atlas & Peças de Estoque
               </DialogTitle>
               <DialogDescription className="mt-1">
-                Tabela de preços de fábrica com 116 piscinas e 31 modelos de Porcelanas e Pastilhas Atlas.
+                Tabela oficial com 116 piscinas, 31 Porcelanas Atlas e {TABELA_PECAS_ESTOQUE_2026.length} peças e acessórios de estoque com NCM e ST.
               </DialogDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -381,7 +463,7 @@ export function ModalTabelaSplash({
                     ? "Sincronizando…"
                     : `Sincronizar Piscinas (${TABELA_SPLASH_PISCINAS_2026.length})`}
                 </Button>
-              ) : (
+              ) : abaAtiva === "porcelanas" ? (
                 <Button
                   size="sm"
                   onClick={() => sincronizarPorcelanas.mutate()}
@@ -395,6 +477,20 @@ export function ModalTabelaSplash({
                     ? "Sincronizando…"
                     : `Sincronizar 31 Porcelanas no ERP`}
                 </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => sincronizarPecas.mutate()}
+                  disabled={sincronizarPecas.isPending}
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <RefreshCw
+                    className={`size-4 ${sincronizarPecas.isPending ? "animate-spin" : ""}`}
+                  />
+                  {sincronizarPecas.isPending
+                    ? "Sincronizando…"
+                    : `Sincronizar ${TABELA_PECAS_ESTOQUE_2026.length} Peças no Estoque`}
+                </Button>
               )}
             </div>
           </div>
@@ -402,17 +498,21 @@ export function ModalTabelaSplash({
 
         <Tabs
           value={abaAtiva}
-          onValueChange={(v) => setAbaAtiva(v as "piscinas" | "porcelanas")}
+          onValueChange={(v) => setAbaAtiva(v as "piscinas" | "porcelanas" | "pecas")}
           className="w-full space-y-4"
         >
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="piscinas" className="gap-2">
               <Sparkles className="size-4 text-amber-500" />
               Piscinas Splash ({totalCadastrados}/{TABELA_SPLASH_PISCINAS_2026.length})
             </TabsTrigger>
             <TabsTrigger value="porcelanas" className="gap-2">
               <Layers className="size-4 text-indigo-500" />
-              Porcelanas & Pastilhas Atlas ({totalPorcelanasCadastradas}/{TABELA_PORCELANAS_ATLAS_2026.length})
+              Porcelanas Atlas ({totalPorcelanasCadastradas}/{TABELA_PORCELANAS_ATLAS_2026.length})
+            </TabsTrigger>
+            <TabsTrigger value="pecas" className="gap-2">
+              <Package className="size-4 text-emerald-500" />
+              Peças & Estoque ({totalPecasCadastradas}/{TABELA_PECAS_ESTOQUE_2026.length})
             </TabsTrigger>
           </TabsList>
 
@@ -693,11 +793,134 @@ export function ModalTabelaSplash({
               </Table>
             </div>
           </TabsContent>
+
+          {/* ======================================================== */}
+          {/* ABA 3: PEÇAS & ESTOQUE (529 ITENS)                       */}
+          {/* ======================================================== */}
+          <TabsContent value="pecas" className="space-y-4 mt-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Buscar peça por descrição, linha (4 a 534), código (PEC-) ou NCM..."
+                  value={buscaPeca}
+                  onChange={(e) => setBuscaPeca(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-2 rounded-md">
+                <span>Peças no Estoque:</span>
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                  {totalPecasCadastradas} cadastradas
+                </Badge>
+                <Badge variant="outline" className="bg-muted text-muted-foreground">
+                  {TABELA_PECAS_ESTOQUE_2026.length - totalPecasCadastradas} pendentes
+                </Badge>
+              </div>
+            </div>
+
+            <div className="rounded-md border overflow-hidden max-h-[55vh] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">Linha</TableHead>
+                    <TableHead className="w-28">Código</TableHead>
+                    <TableHead>Descrição da Peça / Acessório</TableHead>
+                    <TableHead className="w-28">NCM</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Preço Unit.</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Valor ST</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Preço Unit. c/ ST</TableHead>
+                    <TableHead className="text-center w-24">Status</TableHead>
+                    <TableHead className="text-right w-24">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pecasFiltradas.map((item, idx) => {
+                    const cadastrada = estaPecaCadastrada(item);
+                    return (
+                      <TableRow
+                        key={item.codigo}
+                        className={
+                          cadastrada
+                            ? idx % 2 === 0
+                              ? "bg-emerald-500/[0.04]"
+                              : "bg-emerald-500/[0.08]"
+                            : idx % 2 === 0
+                              ? "bg-muted/20"
+                              : "bg-background"
+                        }
+                      >
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          #{item.linha}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs font-semibold text-muted-foreground">
+                          {item.codigo}
+                        </TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          <div>{item.nome}</div>
+                          {item.unidadesPorCompra > 1 && (
+                            <span className="text-[11px] text-muted-foreground">
+                              Caixa com {item.unidadesPorCompra} UN
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">
+                          {item.ncm}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs whitespace-nowrap">
+                          {brl(item.precoUnit)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                          {brl(item.valorSt)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-semibold text-foreground whitespace-nowrap">
+                          {brl(item.precoUnitSt)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {cadastrada ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                              <CheckCircle2 className="size-3.5" /> No Estoque
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Pendente</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {cadastrada ? (
+                            <Button size="sm" variant="ghost" disabled className="text-xs text-muted-foreground h-8 px-2">
+                              Cadastrado
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-8 px-2 gap-1 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-600"
+                              onClick={() => cadastrarPecaIndividual(item)}
+                            >
+                              <Plus className="size-3" /> Incluir
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {pecasFiltradas.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                        Nenhuma peça encontrada para a busca "{buscaPeca}".
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
         </Tabs>
 
         <DialogFooter className="items-center justify-between border-t pt-4 sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            * Valores oficiais de Porcelanas & Pastilhas Atlas 2026. Podem ser selecionados como adicionais no pedido ou ordens de compra de fábrica.
+            * Valores oficiais de Piscinas, Porcelanas Atlas e Peças/Acessórios de Estoque (com NCM e ST).
           </p>
           <Button variant="outline" onClick={() => setOpen(false)}>
             Fechar

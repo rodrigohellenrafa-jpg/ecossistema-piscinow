@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,8 +115,25 @@ function DetalheObra() {
                   <ArrowLeft /> Voltar às Ordens de Serviço
                 </Link>
               </Button>
-              <Button onClick={() => window.print()}>
-                <Printer /> Imprimir OS
+              <BotaoVisualizarDocumento
+                tipo="os"
+                id={(obra as any).board_os_id || null}
+                dados={{
+                  ordem: {
+                    numero: obra.numero,
+                    cliente_nome: obra.cliente_nome,
+                    responsavel: obra.responsavel,
+                    tipo_servico: obra.tipo_servico,
+                    descricao: obra.observacoes,
+                    venda_id: obra.venda_id,
+                  },
+                }}
+                variant="default"
+                size="default"
+                rotulo="Visualizar formulário OS"
+              />
+              <Button variant="outline" onClick={() => window.print()}>
+                <Printer /> Imprimir tela
               </Button>
             </div>
           }

@@ -1,6 +1,7 @@
+import { useState, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight, Layers, PieChart, Tag } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -14,6 +15,8 @@ import {
 
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -71,7 +74,7 @@ function RelatorioContas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contas")
-        .select("id,descricao,parceiro,tipo,valor,valor_juros,categoria,vencimento,status")
+        .select("id,descricao,parceiro,tipo,valor,valor_juros,valor_pago,categoria,vencimento,status")
         .order("vencimento", { ascending: true });
       if (error) throw error;
       return data;
@@ -179,28 +182,100 @@ function RelatorioContas() {
     { titulo: "Saldo previsto", valor: saldo, to: "/fluxo-caixa" },
   ];
 
-  // Despesas por categoria, respeitando o rateio de cada título
-  const mapaCat = new Map<string, number>();
-  for (const c of contas) {
-    if (c.tipo !== "pagar") continue;
-    const totalTitulo = (Number(c.valor) || 0) + (Number(c.valor_juros) || 0);
-    const linhasRateio = rateios.filter((r) => r.conta_id === c.id);
-    if (linhasRateio.length > 0) {
-      for (const l of linhasRateio)
-        mapaCat.set(l.categoria, (mapaCat.get(l.categoria) ?? 0) + (Number(l.valor) || 0));
-      const resto = totalTitulo - linhasRateio.reduce((s, l) => s + (Number(l.valor) || 0), 0);
-      if (Math.abs(resto) > 0.005) {
-        const k = c.categoria ?? "Sem categoria";
-        mapaCat.set(k, (mapaCat.get(k) ?? 0) + resto);
+  const [mesFiltroCat, setMesFiltroCat] = useState<string>("vigente");
+
+  const mesVigente = hoje.slice(0, 7);
+  const mesAnterior = (() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  })();
+
+  const labelMesVigente = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const labelMesAnterior = (() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  })();
+
+  // Despesas por categoria e contribuição no fechamento do mês
+  const contasParaCat = useMemo(() => {
+    return contas.filter((c) => {
+      if (c.tipo !== "pagar") return false;
+      if (mesFiltroCat === "vigente") return c.vencimento.startsWith(mesVigente);
+      if (mesFiltroCat === "anterior") return c.vencimento.startsWith(mesAnterior);
+      return true;
+    });
+  }, [contas, mesFiltroCat, mesVigente, mesAnterior]);
+
+  const { categoriasDespesa, totalDespesasFechamento, totalPagoFechamento, totalAbertoFechamento } = useMemo(() => {
+    const mapaCat = new Map<string, { categoria: string; total: number; pago: number; aberto: number; qtd: number }>();
+    let totalDespesasFechamento = 0;
+    let totalPagoFechamento = 0;
+    let totalAbertoFechamento = 0;
+
+    for (const c of contasParaCat) {
+      const totalTitulo = (Number(c.valor) || 0) + (Number(c.valor_juros) || 0);
+      const pagoTitulo = c.status === "pago" ? (Number((c as any).valor_pago) || totalTitulo) : 0;
+      const abertoTitulo = Math.max(0, totalTitulo - pagoTitulo);
+
+      totalDespesasFechamento += totalTitulo;
+      totalPagoFechamento += pagoTitulo;
+      totalAbertoFechamento += abertoTitulo;
+
+      const linhasRateio = rateios.filter((r) => r.conta_id === c.id);
+      if (linhasRateio.length > 0) {
+        let somaRateio = 0;
+        for (const l of linhasRateio) {
+          const val = Number(l.valor) || 0;
+          somaRateio += val;
+          const prop = totalTitulo > 0 ? val / totalTitulo : 0;
+          const k = l.categoria?.trim() || "Sem categoria";
+          const cur = mapaCat.get(k) ?? { categoria: k, total: 0, pago: 0, aberto: 0, qtd: 0 };
+          cur.total += val;
+          cur.pago += pagoTitulo * prop;
+          cur.aberto += abertoTitulo * prop;
+          cur.qtd += 1;
+          mapaCat.set(k, cur);
+        }
+        const resto = totalTitulo - somaRateio;
+        if (Math.abs(resto) > 0.005) {
+          const k = c.categoria?.trim() || "Sem categoria";
+          const prop = totalTitulo > 0 ? resto / totalTitulo : 0;
+          const cur = mapaCat.get(k) ?? { categoria: k, total: 0, pago: 0, aberto: 0, qtd: 0 };
+          cur.total += resto;
+          cur.pago += pagoTitulo * prop;
+          cur.aberto += abertoTitulo * prop;
+          cur.qtd += 1;
+          mapaCat.set(k, cur);
+        }
+      } else {
+        const k = c.categoria?.trim() || "Sem categoria";
+        const cur = mapaCat.get(k) ?? { categoria: k, total: 0, pago: 0, aberto: 0, qtd: 0 };
+        cur.total += totalTitulo;
+        cur.pago += pagoTitulo;
+        cur.aberto += abertoTitulo;
+        cur.qtd += 1;
+        mapaCat.set(k, cur);
       }
-    } else {
-      const k = c.categoria ?? "Sem categoria";
-      mapaCat.set(k, (mapaCat.get(k) ?? 0) + totalTitulo);
     }
-  }
-  const categoriasDespesa = [...mapaCat.entries()]
-    .map(([categoria, valor]) => ({ categoria, valor }))
-    .sort((a, b) => b.valor - a.valor);
+
+    const lista = [...mapaCat.values()]
+      .map((item) => ({
+        ...item,
+        percentual: totalDespesasFechamento > 0 ? (item.total / totalDespesasFechamento) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      categoriasDespesa: lista,
+      totalDespesasFechamento,
+      totalPagoFechamento,
+      totalAbertoFechamento,
+    };
+  }, [contasParaCat, rateios]);
 
   // Alertas de vencimento
   const abertas = contas.filter((c) => c.status !== "pago");
@@ -273,21 +348,134 @@ function RelatorioContas() {
         ))}
       </div>
 
-      {categoriasDespesa.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Despesas por categoria (com rateio)</CardTitle>
-          </CardHeader>
-          <CardContent className="divide-y divide-border">
-            {categoriasDespesa.map((c) => (
-              <div key={c.categoria} className="flex items-center justify-between py-2.5">
-                <span className="text-sm text-muted-foreground">{c.categoria}</span>
-                <span className="text-sm tabular-nums">{brl(c.valor)}</span>
+      <Card>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <PieChart className="size-4 text-primary" />
+              Contribuição por Tipo de Despesa · Fechamento do Mês
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Participação percentual de cada categoria no total de despesas e fechamento mensal.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-md border bg-muted/40 p-0.5 text-xs">
+              <Button
+                type="button"
+                variant={mesFiltroCat === "vigente" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setMesFiltroCat("vigente")}
+              >
+                Mês vigente ({labelMesVigente.split(" ")[0]})
+              </Button>
+              <Button
+                type="button"
+                variant={mesFiltroCat === "anterior" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setMesFiltroCat("anterior")}
+              >
+                Mês anterior ({labelMesAnterior.split(" ")[0]})
+              </Button>
+              <Button
+                type="button"
+                variant={mesFiltroCat === "todos" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setMesFiltroCat("todos")}
+              >
+                Todo o histórico
+              </Button>
+            </div>
+            <Button asChild variant="outline" size="sm" className="h-7 text-xs gap-1">
+              <Link to="/contas" search={{ periodo: undefined, tipo: undefined }}>
+                Ver Contas <ArrowRight className="size-3" />
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border bg-background/50 p-3">
+              <span className="text-xs text-muted-foreground uppercase font-medium">
+                Total de Despesas
+              </span>
+              <div className="text-xl font-bold tabular-nums">
+                {brl(totalDespesasFechamento)}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+              <span className="text-[11px] text-muted-foreground">
+                {contasParaCat.length} lançamento(s) no fechamento
+              </span>
+            </div>
+            <div className="rounded-lg border bg-background/50 p-3">
+              <span className="text-xs text-muted-foreground uppercase font-medium">
+                Total Já Liquidado
+              </span>
+              <div className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {brl(totalPagoFechamento)}
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                {totalDespesasFechamento > 0
+                  ? `${((totalPagoFechamento / totalDespesasFechamento) * 100).toFixed(1)}% liquidado`
+                  : "0%"}
+              </span>
+            </div>
+            <div className="rounded-lg border bg-background/50 p-3">
+              <span className="text-xs text-muted-foreground uppercase font-medium">
+                Pendente / Em Aberto
+              </span>
+              <div className="text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                {brl(totalAbertoFechamento)}
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                {totalDespesasFechamento > 0
+                  ? `${((totalAbertoFechamento / totalDespesasFechamento) * 100).toFixed(1)}% a liquidar`
+                  : "0%"}
+              </span>
+            </div>
+          </div>
+
+          {categoriasDespesa.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma despesa encontrada para o período selecionado.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {categoriasDespesa.map((c) => (
+                <div key={c.categoria} className="rounded-lg border bg-card/50 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-semibold tracking-tight line-clamp-1">
+                      {c.categoria}
+                    </span>
+                    <Badge variant="secondary" className="text-[11px] font-semibold tabular-nums shrink-0">
+                      {c.percentual.toFixed(1)}% do mês
+                    </Badge>
+                  </div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-base font-bold tabular-nums">
+                      {brl(c.total)}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {c.qtd} conta(s)
+                    </span>
+                  </div>
+                  <Progress value={c.percentual} className="h-1.5" />
+                  <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      Pago: {brl(c.pago)}
+                    </span>
+                    <span className="text-amber-600 dark:text-amber-400">
+                      Aberto: {brl(c.aberto)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className={alertas.some((c) => c.dias <= 7) ? "border-destructive/50" : undefined}>
         <CardHeader>

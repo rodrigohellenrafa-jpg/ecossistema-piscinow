@@ -19,6 +19,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/estoque/relatorio")({
   staticData: { sitemap: false },
@@ -74,6 +75,7 @@ function inicioDoMes() {
 }
 
 function RelatorioEstoque() {
+  useSincronizarPecasEstoque();
   const [de, setDe] = useState(inicioDoMes());
   const [ate, setAte] = useState(hoje());
   const [busca, setBusca] = useState("");

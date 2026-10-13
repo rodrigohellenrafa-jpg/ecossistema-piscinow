@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { encerrarSessaoCompleta } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 
@@ -42,8 +43,8 @@ function AuthPage() {
   const [esqueci, setEsqueci] = useState(false);
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) void navigate({ to: "/agenda" });
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) void navigate({ to: "/agenda" });
     });
     return () => data.subscription.unsubscribe();
   }, [navigate]);
@@ -51,11 +52,21 @@ function AuthPage() {
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Bem-vindo de volta!");
-    navigate({ to: "/agenda" });
+    try {
+      await encerrarSessaoCompleta();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: senha,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Bem-vindo de volta!");
+      navigate({ to: "/agenda" });
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function cadastrar(e: React.FormEvent) {

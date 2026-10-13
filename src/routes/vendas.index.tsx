@@ -7,6 +7,8 @@ import { toast } from "sonner";
 
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
+import { BotaoVisualizarFormulariosEmitidos } from "@/components/modal-formularios-emitidos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -343,6 +345,12 @@ function Vendas() {
                 </Button>
               </>
             )}
+            <BotaoVisualizarFormulariosEmitidos
+              variant="outline"
+              size="default"
+              rotulo="Visualizar formulários emitidos"
+              tipoInicial="todos"
+            />
             <Button asChild>
               <Link to="/vendas/novo">
                 <Plus /> Novo pedido
@@ -532,6 +540,11 @@ function Vendas() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <BotaoVisualizarDocumento
+                            tipo="venda"
+                            id={v.id}
+                            titulo={`Visualizar pedido de venda ${v.numero ?? ""}`}
+                          />
                           <Button
                             size="icon"
                             variant="ghost"
@@ -659,6 +672,14 @@ function Vendas() {
                       <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <BotaoVisualizarDocumento
+                            tipo="venda"
+                            id={v.id}
+                            titulo={`Visualizar orçamento ${v.numero ?? ""}`}
+                            variant="outline"
+                            size="sm"
+                            rotulo="Ver documento"
+                          />
                           <Button
                             size="sm"
                             onClick={() => atualizarStatus.mutate({ id: v.id, status: "aprovado" })}

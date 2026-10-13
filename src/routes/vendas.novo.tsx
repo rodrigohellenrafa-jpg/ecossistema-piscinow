@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Check, KeyRound, Lock, LogOut, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ClienteRapidoDialog } from "@/components/cliente-rapido-dialog";
@@ -49,9 +49,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/hooks/use-auth";
+import { encerrarSessaoCompleta, useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, ehCartaoDebitoOuCredito, FORMAS_PAGAMENTO, hojeISO, margem, num, pct, proximoCodigo } from "@/lib/erp";
+import {
+  LINHAS_CUSTO_VENDA_PISCINAS,
+  NOTA_PORCELANA_POR_LINHA,
+  TABELA_CUSTO_VENDA_PISCINAS,
+} from "@/data/tabela-custo-venda-piscinas";
 
 
 export const Route = createFileRoute("/vendas/novo")({
@@ -310,7 +315,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
     },
   });
 
-  const { data: tabelaFabricante = [] } = useQuery({
+  const { data: tabelaFabricanteDb = [] } = useQuery({
     queryKey: ["tabela-fabricante"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -324,6 +329,44 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
       return data;
     },
   });
+
+  const tabelaFabricante = useMemo(() => {
+    const porModeloDb = new Map(
+      tabelaFabricanteDb.map((item) => [item.modelo.trim().toLowerCase(), item]),
+    );
+    const combinada = TABELA_CUSTO_VENDA_PISCINAS.map((padrao) => {
+      const db = porModeloDb.get(padrao.modelo.trim().toLowerCase());
+      if (!db) return padrao;
+      porModeloDb.delete(padrao.modelo.trim().toLowerCase());
+      return {
+        ...padrao,
+        id: db.id,
+        linha: (db.linha as typeof padrao.linha) || padrao.linha,
+        custo_casco: num(db.custo_casco) || padrao.custo_casco,
+        custo_filtro: num(db.custo_filtro) || padrao.custo_filtro,
+        frete: num(db.frete) || padrao.frete,
+        instalacao: num(db.instalacao) || padrao.instalacao,
+        imposto: num(db.imposto) || padrao.imposto,
+        lucro: num(db.lucro) || padrao.lucro,
+        preco_venda: num(db.preco_venda) || padrao.preco_venda,
+      };
+    });
+    for (const extra of porModeloDb.values()) {
+      combinada.push({
+        id: extra.id,
+        modelo: extra.modelo,
+        linha: (extra.linha as (typeof TABELA_CUSTO_VENDA_PISCINAS)[number]["linha"]) || "Italiana",
+        custo_casco: num(extra.custo_casco),
+        custo_filtro: num(extra.custo_filtro),
+        frete: num(extra.frete),
+        instalacao: num(extra.instalacao),
+        imposto: num(extra.imposto),
+        lucro: num(extra.lucro),
+        preco_venda: num(extra.preco_venda),
+      });
+    }
+    return combinada;
+  }, [tabelaFabricanteDb]);
 
 
   const { data: numerosExistentes = [] } = useQuery({
@@ -354,15 +397,77 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
   const [tipoAtendimento, setTipoAtendimento] = useState<"in" | "out">("in");
   const [clienteId, setClienteId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
+  const [trocarVendedorAberto, setTrocarVendedorAberto] = useState(false);
+  const [loginVendedorEmail, setLoginVendedorEmail] = useState("");
+  const [loginVendedorSenha, setLoginVendedorSenha] = useState("");
+  const [autenticandoVendedor, setAutenticandoVendedor] = useState(false);
 
-  // Pré-seleciona o usuário logado como vendedor do pedido (por id ou e-mail).
+  const vendedorLogado = useMemo(() => {
+    if (!user) return null;
+    const porId = vendedores.find((v) => v.id === user.id);
+    if (porId) return porId;
+    if (user.email) {
+      const porEmail = vendedores.find(
+        (v) => v.email?.trim().toLowerCase() === user.email?.trim().toLowerCase(),
+      );
+      if (porEmail) return porEmail;
+    }
+    return {
+      id: user.id,
+      nome:
+        (user.user_metadata?.nome as string | undefined)?.trim() ||
+        user.email?.split("@")[0] ||
+        "Vendedor autenticado",
+      email: user.email ?? null,
+    };
+  }, [user, vendedores]);
+
+  // Trava sempre o usuário logado como vendedor do pedido (por id ou e-mail).
   useEffect(() => {
-    if (vendedorId || !user?.id) return;
-    const atual =
-      vendedores.find((v) => v.id === user.id) ??
-      vendedores.find((v) => v.email?.toLowerCase() === user.email?.toLowerCase());
-    if (atual) setVendedorId(atual.id);
-  }, [user, vendedores, vendedorId]);
+    if (vendedorLogado) {
+      setVendedorId(vendedorLogado.id);
+    }
+  }, [vendedorLogado]);
+
+  async function autenticarOutroVendedor(e?: React.FormEvent) {
+    e?.preventDefault();
+    const emailTrim = loginVendedorEmail.trim();
+    if (!emailTrim || !loginVendedorSenha) {
+      toast.error("Informe o login (e-mail) e a senha do vendedor.");
+      return;
+    }
+    setAutenticandoVendedor(true);
+    try {
+      await encerrarSessaoCompleta({ manterRascunho: true });
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: emailTrim,
+        password: loginVendedorSenha,
+      });
+      if (error || !authData.user) {
+        toast.error("Login ou senha incorretos. Faça login novamente.");
+        return;
+      }
+      setLoginVendedorSenha("");
+      setTrocarVendedorAberto(false);
+      queryClient.clear();
+      await queryClient.invalidateQueries({ queryKey: ["vendedores-select"] });
+      toast.success(
+        `Vendedor autenticado: ${(authData.user.user_metadata?.nome as string | undefined) ?? authData.user.email}`,
+      );
+    } finally {
+      setAutenticandoVendedor(false);
+    }
+  }
+
+  async function encerrarCicloLogout() {
+    finalizadoRef.current = true;
+    setTrocarVendedorAberto(false);
+    await encerrarSessaoCompleta();
+    queryClient.clear();
+    limparCampos();
+    toast.success("Ciclo de vendas e sessão encerrados. Faça login com a conta desejada.");
+    void navigate({ to: "/auth" });
+  }
   const [observacoes, setObservacoes] = useState("");
 
 
@@ -383,6 +488,9 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
   const [custoCasco, setCustoCasco] = useState(0);
   const [custoFiltro, setCustoFiltro] = useState(0);
   const [lucroSugerido, setLucroSugerido] = useState(0);
+  const [linhaFiltroTabela, setLinhaFiltroTabela] = useState<string>("todas");
+  const [buscaModeloTabela, setBuscaModeloTabela] = useState<string>("");
+  const [exibirTabelaCompleta, setExibirTabelaCompleta] = useState<boolean>(true);
   /** Entrada paga pelo cliente no fechamento do pedido. */
   const [entrada, setEntrada] = useState(0);
   /** Valor líquido recebido no caixa/banco da concessionária (após taxa da maquininha). */
@@ -442,7 +550,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
         if (d.tipoAtendimento === "in" || d.tipoAtendimento === "out")
           setTipoAtendimento(d.tipoAtendimento);
         if (typeof d.clienteId === "string") setClienteId(d.clienteId);
-        if (typeof d.vendedorId === "string") setVendedorId(d.vendedorId);
+        // O vendedor permanece sempre travado no login autenticado atual (não restaura do rascunho).
         if (typeof d.observacoes === "string") setObservacoes(d.observacoes);
         if (Array.isArray(d.itens)) setItens(d.itens as ItemLinha[]);
         if (d.descontoInputs && typeof d.descontoInputs === "object")
@@ -678,6 +786,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
           data,
           cliente_id: selecaoCliente.id,
           cliente_nome: selecaoCliente.nome,
+          vendedor: vendedorLogado?.nome ?? null,
           forma_pagamento: formaPagamento,
           status_pagamento: "pendente",
           status_pedido: "orcamento",
@@ -751,6 +860,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
     tipoAtendimento,
     valorTotal,
     precoVendaKit,
+    vendedorLogado,
   ]);
 
 
@@ -869,7 +979,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
       if (!clienteId) throw new Error("Selecione o cliente.");
       salvarPendenteRef.current = true;
       if (itens.length === 0) throw new Error("Adicione ao menos um produto antes de salvar.");
-      if (contasBancarias.length > 0) {
+      if (modo === "venda" && contasBancarias.length > 0) {
         const norm = (s: string) => s.trim().toLowerCase();
         const validas = new Set(contasBancarias.map(norm));
         const checar = (conta: string, rotulo: string) => {
@@ -881,16 +991,11 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
       }
 
       const cliente = { id: selecaoCliente.id, nome: selecaoCliente.nome };
+      // O nome do vendedor é estritamente travado pelo usuário autenticado (login e senha).
       const vendedor =
-        vendedores.find((v) => v.id === vendedorId) ??
+        vendedorLogado ??
         vendedores.find((v) => v.id === user?.id) ??
-        (user?.email
-          ? {
-              id: user.id,
-              nome: (user.user_metadata?.nome as string | undefined) ?? user.email.split("@")[0],
-              email: user.email,
-            }
-          : undefined);
+        vendedores.find((v) => v.id === vendedorId);
       const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id ?? null;
 
       // O rascunho salvo como orçamento não concluído dá lugar ao pedido final.
@@ -924,7 +1029,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
           status_pagamento: "pendente",
           status_pedido: modo === "venda" ? "aprovado" : "orcamento",
           tipo_atendimento: tipoAtendimento,
-
+          etiqueta: null,
           observacoes: observacoes || null,
           prazo_entrega: prazoEntrega || null,
           endereco_instalacao: enderecoInstalacao || null,
@@ -969,7 +1074,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
         if (error) throw error;
       }
 
-      if (cascoId || filtroId || acessorios.length > 0) {
+      if (cascoId || filtroId || acessorios.length > 0 || modeloTabela || precoVendaKit > 0) {
         const { error } = await supabase.from("venda_kit").insert({
           venda_id: venda.id,
           casco_id: cascoId || null,
@@ -980,20 +1085,14 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
           impostos: impostosKit,
           custo_total_kit: custoTotalKit,
           preco_venda_kit: precoVendaKit,
+          comparativo: { custoCasco, custoFiltro, modeloTabela, lucroSugerido },
         });
         if (error) throw error;
       }
 
-      const ctx = {
-        numero: numeroFinal,
-        data,
-        clienteId: selecaoCliente.id,
-        clienteNome: cliente?.nome ?? null,
-        userId,
-      };
-
       // 1) Condições de pagamento do pedido (uma linha por forma usada).
-      // Vendas no débito ou crédito ficam com pago=false para gerar título a receber e não entrar automaticamente no fluxo de caixa.
+      // Se for apenas Orçamento (modo === "pedido"), salva as condições apenas como proposta (pago=false)
+      // e não gera lançamentos em Contas a Receber nem no Fluxo de Caixa.
       if (condicoes.length > 0) {
         const { error: erroCond } = await supabase.from("venda_condicoes").insert(
           condicoes.map((c, idx) => ({
@@ -1006,7 +1105,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
             valor_cobrado: cobradoCondicao(c),
             valor_parcela: c.valor_parcela,
             data_prevista: c.data_prevista || data,
-            pago: ehCartaoDebitoOuCredito(c.forma_pagamento) ? false : c.pago,
+            pago: modo === "venda" && !ehCartaoDebitoOuCredito(c.forma_pagamento) ? c.pago : false,
             bandeira: c.bandeira || null,
             conta_bancaria: c.conta_bancaria || null,
             observacoes: c.observacoes || null,
@@ -1016,121 +1115,107 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
         if (erroCond) throw erroCond;
       }
 
-      // 1b) Contas a Receber é gerado automaticamente pelo banco a partir de
-      // cada condição de pagamento (valor abatido, sem juros), vinculado ao
-      // pedido. Editar ou excluir a condição atualiza/remove o título sozinho.
-
-      // 1b-2) Os juros/acréscimo da maquininha NÃO viram receita: ficam apenas
-      // registrados na condição de pagamento (venda_condicoes.acrescimo) como
-      // informação, sem alimentar o financeiro nem o DRE.
-
-
-      // 1c) Condições já pagas viram transações da venda: recalculam saldo,
-      // status do pedido e entram no fluxo de caixa.
-      // REGRA: Vendas no débito ou crédito registram o valor da venda apenas como informação no DRE.
-      // Não cria entrada automática no fluxo de caixa até que a baixa seja processada manualmente.
-      const ehCartaoEntrada = ehCartaoDebitoOuCredito(formaEntrada);
-
-      const liqEntrada =
-        valorLiquidoEntrada !== "" && Number(valorLiquidoEntrada) > 0
-          ? Number(valorLiquidoEntrada)
-          : entrada;
-      const retencaoEntrada = Math.max(Number((entrada - liqEntrada).toFixed(2)), 0);
-
-      // Previne duplicação: se a entrada já foi preenchida, não duplica condições
-      // com o mesmo valor/forma marcadas como pagas.
-      // Débito e crédito não viram pagamento automático no caixa ao salvar o pedido.
-      const pagas = condicoes.filter((c) => {
-        if (!c.pago || c.valor <= 0) return false;
-        if (ehCartaoDebitoOuCredito(c.forma_pagamento)) return false;
-        if (
-          entrada > 0 &&
-          Math.abs(c.valor - entrada) < 0.01 &&
-          c.forma_pagamento === formaEntrada
-        ) {
-          return false;
-        }
-        return true;
-      });
-
-      const pagamentos: Array<{
-        venda_id: string;
-        data_pagamento: string;
-        forma_pagamento: string;
-        valor: number;
-        valor_origem?: number;
-        retencao_financeira?: number;
-        conta_bancaria: string | null;
-        observacoes: string | null;
-        created_by: string | null;
-      }> = pagas.map((c) => ({
-        venda_id: venda.id,
-        data_pagamento: c.data_prevista || data,
-        forma_pagamento: c.forma_pagamento || "Dinheiro",
-        valor: c.valor,
-        valor_origem: c.valor,
-        retencao_financeira: 0,
-        conta_bancaria: c.conta_bancaria || null,
-        observacoes:
-          parcelasNum(c.parcelas) > 1
-            ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
-            : c.observacoes || "Pagamento no fechamento do pedido",
-        created_by: userId,
-      }));
-
-      if (entrada > 0) {
-        if (ehCartaoEntrada) {
-          // Débito/Crédito: não cria entrada automática no fluxo de caixa!
-          // Registra título a receber em aberto aguardando baixa manual da concessionária.
-          await supabase.from("contas").insert({
-            tipo: "receber",
-            descricao: `Pedido ${numeroFinal} — ${formaEntrada || "Cartão"} (Aguardando baixa manual)`,
-            parceiro: selecaoCliente.nome,
-            cliente_id: selecaoCliente.id,
-            venda_id: venda.id,
-            categoria: "Vendas",
-            valor: entrada,
-            vencimento: data,
-            status: "aberto",
-            observacoes: "Venda no débito/crédito registrada para DRE. Aguardando baixa manual da concessionária para entrada no fluxo de caixa.",
-            created_by: userId,
-          });
-        } else {
-          pagamentos.unshift({
-            venda_id: venda.id,
-            data_pagamento: data,
-            forma_pagamento: formaEntrada || "Dinheiro",
-            valor: liqEntrada,
-            valor_origem: entrada,
-            retencao_financeira: retencaoEntrada,
-            conta_bancaria: contaEntrada || null,
-            observacoes:
-              retencaoEntrada > 0
-                ? `Entrada ${brl(entrada)} (líquido ${brl(liqEntrada)})`
-                : "Entrada paga no fechamento do pedido",
-            created_by: userId,
-          });
-        }
-      }
-
-      if (pagamentos.length > 0) {
-        const { error: erroPag } = await supabase
-          .from("venda_pagamentos")
-          .insert(pagamentos as never);
-        if (erroPag) throw erroPag;
-
-        queryClient.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-      }
-
-      // Orçamentos não baixam estoque nem criam compras.
       let roteamento: { baixados: number; encomendados: number; ordensCriadas: string[] } = {
         baixados: 0, encomendados: 0, ordensCriadas: [],
       };
       let aviso: string | null = null;
-      if (modo === "venda") {
+      let contaReceber = 0;
+
+      if (modo === "pedido") {
+        // Garante que o orçamento não deixe títulos pendentes em Contas a Receber
+        await supabase.from("contas").delete().eq("venda_id", venda.id);
+      } else {
+        // modo === "venda": processa recebimentos, contas a receber, estoque e ordens de compra
+        const ehCartaoEntrada = ehCartaoDebitoOuCredito(formaEntrada);
+
+        const liqEntrada =
+          valorLiquidoEntrada !== "" && Number(valorLiquidoEntrada) > 0
+            ? Number(valorLiquidoEntrada)
+            : entrada;
+        const retencaoEntrada = Math.max(Number((entrada - liqEntrada).toFixed(2)), 0);
+
+        const pagas = condicoes.filter((c) => {
+          if (!c.pago || c.valor <= 0) return false;
+          if (ehCartaoDebitoOuCredito(c.forma_pagamento)) return false;
+          if (
+            entrada > 0 &&
+            Math.abs(c.valor - entrada) < 0.01 &&
+            c.forma_pagamento === formaEntrada
+          ) {
+            return false;
+          }
+          return true;
+        });
+
+        const pagamentos: Array<{
+          venda_id: string;
+          data_pagamento: string;
+          forma_pagamento: string;
+          valor: number;
+          valor_origem?: number;
+          retencao_financeira?: number;
+          conta_bancaria: string | null;
+          observacoes: string | null;
+          created_by: string | null;
+        }> = pagas.map((c) => ({
+          venda_id: venda.id,
+          data_pagamento: c.data_prevista || data,
+          forma_pagamento: c.forma_pagamento || "Dinheiro",
+          valor: c.valor,
+          valor_origem: c.valor,
+          retencao_financeira: 0,
+          conta_bancaria: c.conta_bancaria || null,
+          observacoes:
+            parcelasNum(c.parcelas) > 1
+              ? `${parcelasNum(c.parcelas)}x de ${brl(c.valor_parcela)} (cobrado ${brl(cobradoCondicao(c))})`
+              : c.observacoes || "Pagamento no fechamento do pedido",
+          created_by: userId,
+        }));
+
+        if (entrada > 0) {
+          if (ehCartaoEntrada) {
+            await supabase.from("contas").insert({
+              tipo: "receber",
+              descricao: `Pedido ${numeroFinal} — ${formaEntrada || "Cartão"} (Aguardando baixa manual)`,
+              parceiro: selecaoCliente.nome,
+              cliente_id: selecaoCliente.id,
+              venda_id: venda.id,
+              categoria: "Vendas",
+              valor: entrada,
+              vencimento: data,
+              status: "aberto",
+              observacoes: "Venda no débito/crédito registrada para DRE. Aguardando baixa manual da concessionária para entrada no fluxo de caixa.",
+              created_by: userId,
+            });
+          } else {
+            pagamentos.unshift({
+              venda_id: venda.id,
+              data_pagamento: data,
+              forma_pagamento: formaEntrada || "Dinheiro",
+              valor: liqEntrada,
+              valor_origem: entrada,
+              retencao_financeira: retencaoEntrada,
+              conta_bancaria: contaEntrada || null,
+              observacoes:
+                retencaoEntrada > 0
+                  ? `Entrada ${brl(entrada)} (líquido ${brl(liqEntrada)})`
+                  : "Entrada paga no fechamento do pedido",
+              created_by: userId,
+            });
+          }
+        }
+
+        if (pagamentos.length > 0) {
+          const { error: erroPag } = await supabase
+            .from("venda_pagamentos")
+            .insert(pagamentos as never);
+          if (erroPag) throw erroPag;
+
+          queryClient.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+        }
+
         const { data: resultado, error } = await supabase.rpc("processar_compra_estoque_venda", { p_venda_id: venda.id });
         if (error) {
-          // Mantém o pedido disponível para corrigir fornecedor e confirmar novamente.
           await supabase.from("vendas").update({ status_pedido: "orcamento" }).eq("id", venda.id);
           aviso = `Pedido salvo como orçamento: ${error.message}`;
         } else {
@@ -1139,15 +1224,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
           queryClient.invalidateQueries({ queryKey: ["ordens_compra"] });
           queryClient.invalidateQueries({ queryKey: ["produtos-select"] });
         }
-      }
 
-      // 2b) Pagamento parcial: o que faltou virar dinheiro entra como título em
-      // Contas a Receber, qualquer que seja o serviço, a categoria ou a forma de
-      // pagamento. As condições de pagamento em aberto já geram os próprios
-      // títulos (trigger), então aqui entra só o que ficou sem cobertura.
-      let contaReceber = 0;
-      const houvePagamento = entrada > 0 || pagas.length > 0;
-      if (modo === "venda" || houvePagamento) {
         const semCobertura = Number((valorTotal - entrada - totalAplicado).toFixed(2));
         if (semCobertura > 0.01) {
           const { error: erroConta } = await supabase.from("contas").insert({
@@ -1173,6 +1250,8 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
 
       // Obras e O.S. são criadas somente pela seleção no Flight Board.
       const obraCriada = false;
+      queryClient.invalidateQueries({ queryKey: ["vendas"] });
+      queryClient.invalidateQueries({ queryKey: ["vendas", "orcamentos"] });
       queryClient.invalidateQueries({ queryKey: ["vendas-out"] });
 
       return { id: venda.id as string, roteamento, aviso, contaReceber, modo, obraCriada };
@@ -1181,12 +1260,10 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
 
       toast.success(
         aviso?.startsWith("Pedido salvo como orçamento:")
-          ? "Pedido salvo; confira o aviso antes de confirmar a venda."
+          ? "Pedido salvo como orçamento; confira o aviso antes de confirmar a venda."
           : modo === "venda"
-          ? "Venda confirmada e financeiro lançado!"
-          : tipoAtendimento === "in"
-            ? "Pedido de balcão registrado e financeiro lançado!"
-            : "Pedido registrado e financeiro lançado!",
+            ? "Venda gerada, confirmada e financeiro lançado!"
+            : "Orçamento gerado e salvo com sucesso!",
       );
       if (obraCriada) {
         toast.success("Serviço externo enviado para o Flight Board.");
@@ -1207,7 +1284,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
       }
       if (aviso) toast.warning(aviso);
 
-      // Venda concluída: impede o autosave de regravar e limpa a tela.
+      // Concluído: impede o autosave de regravar e limpa a tela.
       finalizadoRef.current = true;
       setRascunhoVendaId(null);
       limparCampos();
@@ -1274,10 +1351,18 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
     <div className="min-w-0 space-y-6 [&_[data-slot=select-trigger]]:w-full [&_[data-slot=select-trigger]]:min-w-0 [&_[data-slot=select-value]]:truncate">
       {!comparativoId && <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader title="Novo Pedido (PDV)" subtitle={`Pedido ${numero}`} />
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Rascunho salvo automaticamente</span>
           <Button variant="outline" size="sm" onClick={descartarRascunho}>
             Descartar rascunho
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void encerrarCicloLogout()}
+            title="Encerra o ciclo de vendas atual e finaliza a sessão para trocar de usuário"
+          >
+            <LogOut className="size-3.5" /> Encerrar ciclo / Trocar usuário
           </Button>
         </div>
       </div>}
@@ -1315,19 +1400,98 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
               <Field label="Data">
                 <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
               </Field>
-              <Field label="Vendedor">
-                <Select value={vendedorId} onValueChange={setVendedorId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendedores.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Field label="Vendedor (travado pelo login)">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <Lock className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={vendedorLogado?.nome ?? "Carregando vendedor..."}
+                        disabled
+                        readOnly
+                        title={
+                          vendedorLogado?.email
+                            ? `Vinculado ao login: ${vendedorLogado.email}`
+                            : "Vinculado ao login autenticado"
+                        }
+                        className="bg-muted/60 pl-8 font-medium text-foreground opacity-100"
+                      />
+                    </div>
+                    <Dialog
+                      open={trocarVendedorAberto}
+                      onOpenChange={(aberto) => {
+                        setTrocarVendedorAberto(aberto);
+                        if (!aberto) setLoginVendedorSenha("");
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          title="Trocar vendedor mediante login e senha"
+                          aria-label="Trocar vendedor mediante login e senha"
+                        >
+                          <KeyRound className="size-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Lock className="size-4 text-primary" />
+                            Autenticar Vendedor
+                          </DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={autenticarOutroVendedor} className="space-y-3">
+                          <p className="text-xs text-muted-foreground">
+                            O nome do vendedor é travado pela conta autenticada. Para registrar a
+                            venda em nome de outro vendedor, informe o{" "}
+                            <strong>login (e-mail) e senha</strong> dele:
+                          </p>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="login-vendedor-email">Login (E-mail)</Label>
+                            <Input
+                              id="login-vendedor-email"
+                              type="email"
+                              required
+                              autoComplete="username"
+                              placeholder="vendedor@splashpiscinas.com"
+                              value={loginVendedorEmail}
+                              onChange={(e) => setLoginVendedorEmail(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="login-vendedor-senha">Senha</Label>
+                            <Input
+                              id="login-vendedor-senha"
+                              type="password"
+                              required
+                              autoComplete="current-password"
+                              placeholder="••••••••"
+                              value={loginVendedorSenha}
+                              onChange={(e) => setLoginVendedorSenha(e.target.value)}
+                            />
+                          </div>
+                          <DialogFooter className="pt-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setTrocarVendedorAberto(false)}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button type="submit" disabled={autenticandoVendedor}>
+                              {autenticandoVendedor ? "Autenticando..." : "Autenticar e vincular"}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Travado pelo seu login{vendedorLogado?.email ? ` (${vendedorLogado.email})` : ""}
+                  </p>
+                </div>
               </Field>
               <Field label="Cliente" className="sm:col-span-3">
                 <div className="flex items-center gap-2">
@@ -1600,10 +1764,24 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
           </ExpandableCard>
 
           </>}
-          {comparativoId && (
           <ExpandableCard>
             <CardHeader className="pr-12">
-              <CardTitle>Composição da Piscina (Multipartido)</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle>Composição da Piscina (Multipartido)</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tabela de custo da piscina em comparação à venda — clique em qualquer modelo na tabela abaixo ou selecione no campo para preencher automaticamente.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExibirTabelaCompleta((v) => !v)}
+                >
+                  {exibirTabelaCompleta ? "Ocultar tabela completa" : "Ver tabela de custos × venda"}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1687,30 +1865,176 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                 ))}
               </div>
 
-              <div className="rounded-lg border border-border bg-muted/30 p-3">
-                <Field label="Tabela de custos do fabricante">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                <Field label="Tabela de custos do fabricante (Custo × Venda)">
                   <Select value={modeloTabela} onValueChange={aplicarTabela}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o modelo da tabela" />
                     </SelectTrigger>
                     <SelectContent>
-                      {tabelaFabricante.map((t) => (
-                        <SelectItem key={t.id} value={t.modelo}>
-                          {t.modelo} — {brl(num(t.preco_venda))}
-                        </SelectItem>
-                      ))}
+                      {LINHAS_CUSTO_VENDA_PISCINAS.map((linha) => {
+                        const modelosDaLinha = tabelaFabricante.filter((t) => t.linha === linha);
+                        if (modelosDaLinha.length === 0) return null;
+                        return (
+                          <SelectGroup key={linha}>
+                            <SelectLabel className="font-bold text-primary">
+                              {linha === "Navagio / Porcelana" ? "Modelo / Porcelana (Navagio)" : `Linha ${linha}`}
+                            </SelectLabel>
+                            {modelosDaLinha.map((t) => (
+                              <SelectItem key={t.id} value={t.modelo}>
+                                {t.modelo} — Custo: {brl(num(t.custo_casco) + num(t.custo_filtro) + num(t.frete) + num(t.instalacao) + num(t.imposto))} | Lucro: {brl(num(t.lucro))} | Venda: {brl(num(t.preco_venda))}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </Field>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Ao escolher o modelo, os custos de casco, filtro, frete, mão de obra e imposto são
-                  preenchidos automaticamente, junto com o preço de venda sugerido. Você pode
+                <p className="text-xs text-muted-foreground">
+                  Ao escolher o modelo, os custos de casco (10%), filtro, frete, instalação (mão de obra) e imposto são
+                  preenchidos automaticamente, junto com o lucro projetado e o preço de venda sugerido. Você pode
                   ajustar qualquer valor depois.
                 </p>
+
+                {exibirTabelaCompleta && (
+                  <div className="space-y-3 border-t border-border pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={linhaFiltroTabela === "todas" ? "default" : "outline"}
+                          className="h-7 px-2.5 text-xs"
+                          onClick={() => setLinhaFiltroTabela("todas")}
+                        >
+                          Todas ({tabelaFabricante.length})
+                        </Button>
+                        {LINHAS_CUSTO_VENDA_PISCINAS.map((linha) => (
+                          <Button
+                            key={linha}
+                            type="button"
+                            size="sm"
+                            variant={linhaFiltroTabela === linha ? "default" : "outline"}
+                            className="h-7 px-2.5 text-xs"
+                            onClick={() => setLinhaFiltroTabela(linha)}
+                          >
+                            {linha}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="relative w-full sm:w-56">
+                        <Search className="pointer-events-none absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
+                        <Input
+                          value={buscaModeloTabela}
+                          onChange={(e) => setBuscaModeloTabela(e.target.value)}
+                          placeholder="Buscar modelo..."
+                          className="h-7 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-[420px] space-y-4 overflow-y-auto rounded-md border border-border bg-background p-2">
+                      {LINHAS_CUSTO_VENDA_PISCINAS.filter(
+                        (linha) => linhaFiltroTabela === "todas" || linhaFiltroTabela === linha,
+                      ).map((linha) => {
+                        const termo = buscaModeloTabela.trim().toLowerCase();
+                        const itensLinha = tabelaFabricante.filter(
+                          (t) =>
+                            t.linha === linha &&
+                            (!termo || t.modelo.toLowerCase().includes(termo)),
+                        );
+                        if (itensLinha.length === 0) return null;
+                        const notaPorcelana = NOTA_PORCELANA_POR_LINHA[linha];
+                        return (
+                          <div key={linha} className="space-y-1">
+                            <div className="overflow-x-auto rounded border border-border">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-muted/60">
+                                    <TableHead className="h-8 px-2.5 text-xs font-bold text-foreground">
+                                      {linha === "Navagio / Porcelana" ? "Modelo / Porcelana" : `Modelo (${linha})`}
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 text-right text-xs font-bold text-foreground">
+                                      Casco 10%
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 text-right text-xs font-bold text-foreground">
+                                      Filtro
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 text-right text-xs font-bold text-foreground">
+                                      Frete
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 text-right text-xs font-bold text-foreground">
+                                      Instalação
+                                    </TableHead>
+                                    <TableHead className="h-8 px-2 text-right text-xs font-bold text-foreground">
+                                      Imposto
+                                    </TableHead>
+                                    <TableHead className="h-8 bg-emerald-100/80 px-2 text-right text-xs font-bold text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                      Lucro
+                                    </TableHead>
+                                    <TableHead className="h-8 bg-zinc-700 px-2.5 text-right text-xs font-bold text-white">
+                                      Venda
+                                    </TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {itensLinha.map((t) => {
+                                    const selecionado = modeloTabela === t.modelo;
+                                    return (
+                                      <TableRow
+                                        key={t.id}
+                                        onClick={() => aplicarTabela(t.modelo)}
+                                        className={`cursor-pointer text-xs transition-colors hover:bg-primary/10 ${
+                                          selecionado ? "bg-primary/15 font-semibold ring-1 ring-inset ring-primary" : ""
+                                        }`}
+                                        title="Clique para aplicar este modelo na composição da piscina"
+                                      >
+                                        <TableCell className="py-1.5 px-2.5 font-semibold text-foreground">
+                                          {t.modelo}
+                                        </TableCell>
+                                        <TableCell className="py-1.5 px-2 text-right tabular-nums">
+                                          {brl(num(t.custo_casco))}
+                                        </TableCell>
+                                        <TableCell className="py-1.5 px-2 text-right tabular-nums">
+                                          {brl(num(t.custo_filtro))}
+                                        </TableCell>
+                                        <TableCell className="py-1.5 px-2 text-right tabular-nums">
+                                          {brl(num(t.frete))}
+                                        </TableCell>
+                                        <TableCell className="py-1.5 px-2 text-right tabular-nums">
+                                          {brl(num(t.instalacao))}
+                                        </TableCell>
+                                        <TableCell className="py-1.5 px-2 text-right tabular-nums">
+                                          {brl(num(t.imposto))}
+                                        </TableCell>
+                                        <TableCell className="bg-emerald-50/70 py-1.5 px-2 text-right font-semibold text-emerald-700 tabular-nums dark:bg-emerald-950/30 dark:text-emerald-400">
+                                          {brl(num(t.lucro))}
+                                        </TableCell>
+                                        <TableCell className="bg-muted/80 py-1.5 px-2.5 text-right font-bold text-foreground tabular-nums">
+                                          {brl(num(t.preco_venda))}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                            {notaPorcelana && (
+                              <p className="px-1 text-[11px] italic text-muted-foreground">
+                                {notaPorcelana}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field label="Custo do casco">
+                <Field label="Custo do casco (Casco 10%)">
                   <MoedaInput value={custoCascoFinal} onChange={setCustoCasco} />
                 </Field>
                 <Field label="Custo do filtro">
@@ -1719,7 +2043,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                 <Field label="Custo de frete">
                   <MoedaInput value={custoFrete} onChange={setCustoFrete} />
                 </Field>
-                <Field label="Custo de mão de obra">
+                <Field label="Custo de mão de obra (Instalação)">
                   <MoedaInput value={custoMaoObra} onChange={setCustoMaoObra} />
                 </Field>
                 <Field label="Impostos">
@@ -1729,9 +2053,47 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
                   <MoedaInput value={precoVendaKit} onChange={setPrecoVendaKit} />
                 </Field>
               </div>
+
+              {(custoTotalKit > 0 || precoVendaKit > 0 || modeloTabela) && (
+                <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Custo Total (s/ margem)
+                    </p>
+                    <p className="text-base font-bold text-foreground">{brl(custoTotalKit)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Lucro Tabelado
+                    </p>
+                    <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">
+                      {brl(lucroSugerido)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Lucro na Composição
+                    </p>
+                    <p
+                      className={`text-base font-bold ${
+                        precoVendaKit - custoTotalKit >= lucroSugerido
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-amber-600 dark:text-amber-400"
+                      }`}
+                    >
+                      {brl(precoVendaKit - custoTotalKit)} ({pct(margemKit)})
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      Venda do Kit
+                    </p>
+                    <p className="text-base font-bold text-primary">{brl(precoVendaKit)}</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </ExpandableCard>
-          )}
 
 
           {!comparativoId && <>
@@ -2150,16 +2512,23 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
               variant="outline"
               onClick={() => salvar.mutate("pedido")}
               disabled={salvar.isPending}
+              title="Apenas salva o registro como Orçamento (sem movimentar estoque ou financeiro)"
             >
-              Salvar pedido
+              Salvar Pedido
             </Button>
-            <Button size="lg" onClick={() => salvar.mutate("venda")} disabled={salvar.isPending}>
+            <Button
+              size="lg"
+              onClick={() => salvar.mutate("venda")}
+              disabled={salvar.isPending}
+              title="Efetiva a Venda, baixando estoque e lançando no financeiro"
+            >
               Vender
             </Button>
           </div>
           <p className="text-right text-xs text-muted-foreground">
-            "Vender" confirma a venda; se o total não for quitado, o saldo vira título em Contas a
-            Receber automaticamente.
+            <strong>"Salvar Pedido"</strong> salva apenas o registro do <strong>Orçamento</strong>;{" "}
+            <strong>"Vender"</strong> efetiva a <strong>Venda</strong>, movimenta o estoque e lança
+            os títulos no financeiro.
           </p>
           </>}
           {comparativoId && <div className="flex justify-end"><Button onClick={() => salvarComparativo.mutate()} disabled={salvarComparativo.isPending}>Salvar comparativo</Button></div>}

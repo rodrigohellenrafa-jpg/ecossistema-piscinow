@@ -27,6 +27,7 @@ import { Route as HoleriteRouteImport } from './routes/holerite'
 import { Route as ImportacaoRouteImport } from './routes/importacao'
 import { Route as IndicadoresRouteImport } from './routes/indicadores'
 import { Route as LogisticaRouteImport } from './routes/logistica'
+import { Route as MapaSistemaRouteImport } from './routes/mapa-sistema'
 import { Route as MovimentacoesRouteImport } from './routes/movimentacoes'
 import { Route as NotasCompraRouteImport } from './routes/notas-compra'
 import { Route as OrdensRouteImport } from './routes/ordens'
@@ -138,6 +139,11 @@ const IndicadoresRoute = IndicadoresRouteImport.update({
 const LogisticaRoute = LogisticaRouteImport.update({
   id: '/logistica',
   path: '/logistica',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapaSistemaRoute = MapaSistemaRouteImport.update({
+  id: '/mapa-sistema',
+  path: '/mapa-sistema',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MovimentacoesRoute = MovimentacoesRouteImport.update({
@@ -270,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/importacao': typeof ImportacaoRoute
   '/indicadores': typeof IndicadoresRoute
   '/logistica': typeof LogisticaRoute
+  '/mapa-sistema': typeof MapaSistemaRoute
   '/movimentacoes': typeof MovimentacoesRoute
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
@@ -312,6 +319,7 @@ export interface FileRoutesByTo {
   '/importacao': typeof ImportacaoRoute
   '/indicadores': typeof IndicadoresRoute
   '/logistica': typeof LogisticaRoute
+  '/mapa-sistema': typeof MapaSistemaRoute
   '/movimentacoes': typeof MovimentacoesRoute
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
@@ -355,6 +363,7 @@ export interface FileRoutesById {
   '/importacao': typeof ImportacaoRoute
   '/indicadores': typeof IndicadoresRoute
   '/logistica': typeof LogisticaRoute
+  '/mapa-sistema': typeof MapaSistemaRoute
   '/movimentacoes': typeof MovimentacoesRoute
   '/notas-compra': typeof NotasCompraRoute
   '/ordens': typeof OrdensRoute
@@ -399,6 +408,7 @@ export interface FileRouteTypes {
     | '/importacao'
     | '/indicadores'
     | '/logistica'
+    | '/mapa-sistema'
     | '/movimentacoes'
     | '/notas-compra'
     | '/ordens'
@@ -441,6 +451,7 @@ export interface FileRouteTypes {
     | '/importacao'
     | '/indicadores'
     | '/logistica'
+    | '/mapa-sistema'
     | '/movimentacoes'
     | '/notas-compra'
     | '/ordens'
@@ -483,6 +494,7 @@ export interface FileRouteTypes {
     | '/importacao'
     | '/indicadores'
     | '/logistica'
+    | '/mapa-sistema'
     | '/movimentacoes'
     | '/notas-compra'
     | '/ordens'
@@ -526,6 +538,7 @@ export interface RootRouteChildren {
   ImportacaoRoute: typeof ImportacaoRoute
   IndicadoresRoute: typeof IndicadoresRoute
   LogisticaRoute: typeof LogisticaRoute
+  MapaSistemaRoute: typeof MapaSistemaRoute
   MovimentacoesRoute: typeof MovimentacoesRoute
   NotasCompraRoute: typeof NotasCompraRoute
   OrdensRoute: typeof OrdensRoute
@@ -675,6 +688,13 @@ declare module '@tanstack/react-router' {
       path: '/logistica'
       fullPath: '/logistica'
       preLoaderRoute: typeof LogisticaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mapa-sistema': {
+      id: '/mapa-sistema'
+      path: '/mapa-sistema'
+      fullPath: '/mapa-sistema'
+      preLoaderRoute: typeof MapaSistemaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/movimentacoes': {
@@ -864,6 +884,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportacaoRoute: ImportacaoRoute,
   IndicadoresRoute: IndicadoresRoute,
   LogisticaRoute: LogisticaRoute,
+  MapaSistemaRoute: MapaSistemaRoute,
   MovimentacoesRoute: MovimentacoesRoute,
   NotasCompraRoute: NotasCompraRoute,
   OrdensRoute: OrdensRoute,

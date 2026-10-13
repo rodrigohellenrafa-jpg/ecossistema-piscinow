@@ -6,6 +6,7 @@ import { Copy, Download, FileText, Link2, Mail, MessageCircle, Send, Share2 } fr
 import { toast } from "sonner";
 
 import { baixarBlob, gerarOrcamentoPdf } from "@/lib/orcamento-pdf";
+import { VisualizadorDocumentoModal } from "@/components/visualizador-documento-modal";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -180,6 +181,7 @@ export function EnviarOrcamento({
   };
 
   const [gerando, setGerando] = useState(false);
+  const [visualizadorPdfAberto, setVisualizadorPdfAberto] = useState(false);
 
   const criarPdf = async () => {
     setGerando(true);
@@ -205,16 +207,8 @@ export function EnviarOrcamento({
     }
   };
 
-  const abrirPdf = async () => {
-    try {
-      const { blob } = await criarPdf();
-      const url = URL.createObjectURL(blob);
-      const janela = window.open(url, "_blank", "noopener");
-      if (!janela) toast.info("Libere os pop-ups para visualizar o PDF nesta aba.");
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      toast.error("Não foi possível abrir o PDF.");
-    }
+  const abrirPdf = () => {
+    setVisualizadorPdfAberto(true);
   };
 
   const compartilharPdf = async () => {
@@ -237,6 +231,7 @@ export function EnviarOrcamento({
   };
 
   return (
+    <>
     <Dialog open={aberto} onOpenChange={setAberto}>
       <DialogTrigger asChild>
         <Button variant="outline">
@@ -285,7 +280,7 @@ export function EnviarOrcamento({
             >
               <Copy /> Copiar
             </Button>
-            <Button variant="outline" disabled={gerando} onClick={() => void abrirPdf()}>
+            <Button variant="outline" disabled={gerando} onClick={abrirPdf}>
               <FileText /> Ver PDF
             </Button>
             <Button variant="outline" disabled={gerando} onClick={() => void baixarPdf()}>
@@ -307,5 +302,13 @@ export function EnviarOrcamento({
         </div>
       </DialogContent>
     </Dialog>
+    <VisualizadorDocumentoModal
+      open={visualizadorPdfAberto}
+      onOpenChange={setVisualizadorPdfAberto}
+      tipo="venda"
+      id={venda.id}
+      dados={{ venda, cliente: clienteFinal, itens: itensFinal }}
+    />
+    </>
   );
 }

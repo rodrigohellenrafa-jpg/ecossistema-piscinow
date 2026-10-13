@@ -50,6 +50,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { brl, CATEGORIAS_PRODUTO, margem, pct } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
 import { useAbrirModal } from "@/hooks/use-abrir-modal";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/produtos")({
   staticData: { sitemap: false },
@@ -125,6 +126,7 @@ const ORIGENS_MERCADORIA = [
 
 function Produtos() {
   const qc = useQueryClient();
+  useSincronizarPecasEstoque();
   const [q, setQ] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState<string>(TODAS_CATEGORIAS);
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");

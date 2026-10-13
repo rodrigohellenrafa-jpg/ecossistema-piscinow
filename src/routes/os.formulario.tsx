@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RequireAuth } from "@/components/require-auth";
+import { BotaoVisualizarFormulariosEmitidos } from "@/components/modal-formularios-emitidos";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { supabase } from "@/integrations/supabase/client";
 import plantaPiscina from "@/assets/planta-piscina-limpa.png";
@@ -127,6 +129,18 @@ function FormularioOS() {
   const [descricaoServico, setDescricaoServico] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [linhasApoio, setLinhasApoio] = useState<string[]>(LINHAS_APOIO_VAZIAS);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      const osParam = sp.get("os");
+      const obraParam = sp.get("obra");
+      const vendaParam = sp.get("venda");
+      if (osParam) setSelecao(`os:${osParam}`);
+      else if (obraParam) setSelecao(`obra:${obraParam}`);
+      else if (vendaParam) setSelecao(`venda:${vendaParam}`);
+    }
+  }, []);
 
   const { data: obras = [] } = useQuery({
     queryKey: ["obras-formulario"],
@@ -375,6 +389,25 @@ function FormularioOS() {
               ))}
             </SelectContent>
           </Select>
+
+          <BotaoVisualizarFormulariosEmitidos
+            variant="outline"
+            size="default"
+            rotulo="Visualizar formulários emitidos"
+            tipoInicial="os"
+            onSelecionar={(item) => setSelecao(`${item.tipo}:${item.id}`)}
+          />
+
+          {selecao && (
+            <BotaoVisualizarDocumento
+              tipo={selecao.startsWith("venda:") ? "venda" : "os"}
+              id={selecao.split(":")[1] || null}
+              variant="secondary"
+              size="default"
+              rotulo="Visualizar formulário atual"
+              titulo={`Visualizar formulário ${numeroOS || ""}`.trim()}
+            />
+          )}
 
           <Button variant="outline" asChild>
             <Link to="/ordens">

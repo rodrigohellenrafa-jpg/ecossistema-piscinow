@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ExternalLink, Maximize2 } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
+import { BotaoVisualizarFormulariosEmitidos } from "@/components/modal-formularios-emitidos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RequireAuth } from "@/components/require-auth";
 
@@ -75,6 +76,7 @@ const grupos: { grupo: string; itens: Atalho[] }[] = [
       { titulo: "Fluxo de caixa", to: "/fluxo-caixa" },
       { titulo: "Relatório de contas", to: "/relatorio-contas" },
       { titulo: "DRE", to: "/dre" },
+      { titulo: "Mapa Vetorizado do Sistema", to: "/mapa-sistema", nota: "Diálogo interativo dos vetores e simulação" },
     ],
   },
   {
@@ -100,6 +102,14 @@ function AtalhosPage() {
       <PageHeader
         title="Atalhos de formulários"
         subtitle="Links diretos para abrir cada janela do sistema sem precisar procurar o botão."
+        actions={
+          <BotaoVisualizarFormulariosEmitidos
+            variant="default"
+            size="default"
+            rotulo="Visualizar formulários emitidos"
+            tipoInicial="todos"
+          />
+        }
       />
 
       <Card>

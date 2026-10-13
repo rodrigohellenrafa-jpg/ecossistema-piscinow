@@ -5,6 +5,8 @@ import { Hammer, Plus, FileText, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
+import { BotaoVisualizarFormulariosEmitidos } from "@/components/modal-formularios-emitidos";
 import { Field } from "@/components/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RequireAuth } from "@/components/require-auth";
@@ -322,6 +324,12 @@ function Ordens() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <BotaoVisualizarFormulariosEmitidos
+            variant="outline"
+            size="default"
+            rotulo="Visualizar formulários emitidos"
+            tipoInicial="os"
+          />
           <Button variant="outline" asChild>
             <Link to="/os/formulario">
               <FileText /> Formulário de OS
@@ -544,6 +552,15 @@ function Ordens() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
+                      <BotaoVisualizarDocumento
+                        tipo="os"
+                        id={o.id}
+                        dados={o}
+                        titulo={`Visualizar formulário da OS ${o.numero ?? ""}`}
+                        variant="outline"
+                        size="sm"
+                        rotulo="Ver formulário"
+                      />
                       <Button
                         variant="outline"
                         size="sm"

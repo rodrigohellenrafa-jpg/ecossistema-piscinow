@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
+import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -225,6 +226,14 @@ function Orcamentos() {
                   <TableCell className="text-right font-medium">{brl(v.valor_total)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <BotaoVisualizarDocumento
+                        tipo="venda"
+                        id={v.id}
+                        titulo={`Visualizar orçamento ${v.numero ?? ""}`}
+                        variant="outline"
+                        size="sm"
+                        rotulo="Ver documento"
+                      />
                       <EnviarOrcamento venda={v} cliente={null} />
                       <Button
                         size="sm"

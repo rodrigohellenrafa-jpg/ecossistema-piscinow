@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { dataBR } from "@/lib/erp";
 import { useAbrirModal } from "@/hooks/use-abrir-modal";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/estoque/entradas")({
   staticData: { sitemap: false },
@@ -97,6 +98,7 @@ const formVazio = {
 
 function EstoqueEntradas() {
   const qc = useQueryClient();
+  useSincronizarPecasEstoque();
   const [tipo, setTipo] = useState<"entrada" | "saida">("entrada");
   const [form, setForm] = useState(formVazio);
   const [importarOpen, setImportarOpen] = useState(false);

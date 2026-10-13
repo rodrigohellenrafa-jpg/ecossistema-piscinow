@@ -145,7 +145,7 @@ export async function sincronizarRecorrenciasContas(
       .select("id, tipo, descricao, parceiro, vencimento, recorrencia, recorrencia_fim, recorrencia_id, competencia_recorrencia, status");
 
     const mapaContas = new Set<string>();
-    for (const c of contasExistentes) {
+    for (const c of contasExistentes ?? []) {
       if (c.recorrencia_id && c.competencia_recorrencia) {
         mapaContas.add(`rec:${c.recorrencia_id}:${String(c.competencia_recorrencia).slice(0, 7)}`);
       }

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, Plus, Printer, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, KeyRound, Lock, Pencil, Plus, Printer, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { AssinaturaDialog } from "@/components/assinatura-dialog";
@@ -462,6 +462,46 @@ function DetalhePedido() {
     valor_entrada: string;
     observacoes: string;
   }>(null);
+  const [authVendedorAberto, setAuthVendedorAberto] = useState(false);
+  const [authVendedorEmail, setAuthVendedorEmail] = useState("");
+  const [authVendedorSenha, setAuthVendedorSenha] = useState("");
+  const [autenticandoVendedor, setAutenticandoVendedor] = useState(false);
+
+  async function autenticarVendedorEdicao(e?: React.FormEvent) {
+    e?.preventDefault();
+    const emailTrim = authVendedorEmail.trim();
+    if (!emailTrim || !authVendedorSenha) {
+      toast.error("Informe o login (e-mail) e a senha do vendedor.");
+      return;
+    }
+    setAutenticandoVendedor(true);
+    try {
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: emailTrim,
+        password: authVendedorSenha,
+      });
+      if (error || !authData.user) {
+        toast.error("Login ou senha incorretos. O vendedor não foi alterado.");
+        return;
+      }
+      const emailLower = (authData.user.email ?? emailTrim).toLowerCase();
+      const [colab, importados] = await Promise.all([
+        supabase.from("funcionarios").select("nome, email").ilike("email", emailLower).maybeSingle(),
+        supabase.from("usuarios_importados").select("nome, email").ilike("email", emailLower).maybeSingle(),
+      ]);
+      const nomeAutenticado =
+        colab.data?.nome ||
+        importados.data?.nome ||
+        (authData.user.user_metadata?.nome as string | undefined)?.trim() ||
+        emailLower.split("@")[0];
+      setEditPedido((prev) => (prev ? { ...prev, vendedor: nomeAutenticado } : prev));
+      setAuthVendedorSenha("");
+      setAuthVendedorAberto(false);
+      toast.success(`Vendedor autenticado e vinculado: ${nomeAutenticado}`);
+    } finally {
+      setAutenticandoVendedor(false);
+    }
+  }
   const [editItem, setEditItem] = useState<null | {
     id: string;
     descricao: string;
@@ -1747,11 +1787,65 @@ function DetalhePedido() {
                   onChange={(e) => setEditPedido({ ...editPedido, cliente_nome: e.target.value })}
                 />
               </Field>
-              <Field label="Vendedor">
-                <Input
-                  value={editPedido.vendedor}
-                  onChange={(e) => setEditPedido({ ...editPedido, vendedor: e.target.value })}
-                />
+              <Field label="Vendedor (travado pelo login)">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <Lock className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={editPedido.vendedor || "—"}
+                        disabled
+                        readOnly
+                        className="bg-muted/60 pl-8 font-medium text-foreground opacity-100"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Alterar vendedor com login e senha"
+                      aria-label="Alterar vendedor com login e senha"
+                      onClick={() => setAuthVendedorAberto((v) => !v)}
+                    >
+                      <KeyRound className="size-4" />
+                    </Button>
+                  </div>
+                  {authVendedorAberto && (
+                    <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5">
+                      <p className="text-[11px] text-muted-foreground">
+                        Informe o <strong>login (e-mail) e senha</strong> do vendedor para alterar:
+                      </p>
+                      <Input
+                        type="email"
+                        placeholder="Login (e-mail) do vendedor"
+                        value={authVendedorEmail}
+                        onChange={(e) => setAuthVendedorEmail(e.target.value)}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="password"
+                          placeholder="Senha do vendedor"
+                          value={authVendedorSenha}
+                          onChange={(e) => setAuthVendedorSenha(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void autenticarVendedorEdicao();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={autenticandoVendedor}
+                          onClick={() => void autenticarVendedorEdicao()}
+                        >
+                          {autenticandoVendedor ? "Validando..." : "Autenticar"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Field>
               <Field label="Tipo de atendimento">
                 <Select

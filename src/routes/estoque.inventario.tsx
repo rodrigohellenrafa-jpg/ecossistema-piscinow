@@ -27,6 +27,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/estoque/inventario")({
   staticData: { sitemap: false },
@@ -67,6 +68,7 @@ type Produto = {
 
 function EstoqueInventario() {
   const qc = useQueryClient();
+  useSincronizarPecasEstoque();
   const [contagens, setContagens] = useState<Record<string, string>>({});
   const [categoria, setCategoria] = useState("todas");
   const [localizacao, setLocalizacao] = useState("todas");
