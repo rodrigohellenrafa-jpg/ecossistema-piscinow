@@ -951,40 +951,132 @@ function OrdensCompra() {
 
       let quantidadeOrdens = 0;
       const ordensCriadas: Ordem[] = [];
+      const mapaNumeroPorCliente = new Map<string, string>();
+
       for (const { fornecedor, itens } of grupos.values()) {
-        const numero = proximoCodigo("OC", numeros);
-        numeros.push(numero);
-        const valorProdutos = itens.reduce((total, produto) => total + totalCompra(produto), 0);
-        const creditoOrdem =
-          creditoAplicado !== 0 && totalSelecionadoCompra > 0
-            ? (valorProdutos / totalSelecionadoCompra) * creditoAplicado
-            : 0;
-        const { data: ordem, error: erroOrdem } = await supabase
-          .from("ordens_compra")
-          .insert({
-            numero,
-            fornecedor_id: fornecedor.id === SEM_CLIENTE ? null : fornecedor.id,
-            fornecedor_nome: fornecedor.nome,
-            data_pedido: hojeISO(),
-            valor_produtos: valorProdutos,
-            desconto: creditoOrdem,
-            icms_base: valorProdutos,
-            icms_valor: valorProdutos * 0.18,
-            icms_st_base: 0,
-            icms_st_valor: 0,
-            valor_total: valorProdutos - creditoOrdem,
-            status: "pendente",
-            observacoes:
-              creditoOrdem > 0
-                ? `Compra selecionada na grade de produtos | Crédito fabricante abatido: ${brl(creditoOrdem)}`
-                : creditoOrdem < 0
-                  ? `Compra selecionada na grade de produtos | Crédito fabricante negativo cobrado: ${brl(Math.abs(creditoOrdem))}`
-                  : "Compra selecionada na grade de produtos",
-            created_by: auth.user?.id ?? null,
-          })
-          .select("*")
-          .single();
-        if (erroOrdem) throw erroOrdem;
+        const fornecedorIdAlvo = fornecedor.id === SEM_CLIENTE ? null : fornecedor.id;
+
+        // Identifica clientes e pedidos vinculados aos itens desta compra
+        const clientesDosItens = Array.from(
+          new Set(
+            itens
+              .flatMap((produto) =>
+                vinculosDoProduto(produto).map((vid) => (vid ? vendaPorId.get(vid)?.cliente_id : null)),
+              )
+              .filter(Boolean) as string[],
+          ),
+        );
+        const vendasDosItens = Array.from(
+          new Set(itens.flatMap((produto) => vinculosDoProduto(produto)).filter(Boolean)),
+        );
+        const nomesDosItens = Array.from(
+          new Set(
+            itens
+              .flatMap((produto) =>
+                vinculosDoProduto(produto).map((vid) => (vid ? vendaPorId.get(vid)?.cliente_nome : null)),
+              )
+              .filter(Boolean) as string[],
+          ),
+        );
+
+        // Verifica se já existe ordem ativa deste fornecedor para o mesmo cliente/venda
+        const ordemExistente = ordens.find((o) => {
+          if (o.status === "cancelada") return false;
+          if (o.fornecedor_id !== fornecedorIdAlvo) return false;
+          const itensDestaOrdem = itensTodos.filter((it) => it.ordem_id === o.id);
+          return itensDestaOrdem.some(
+            (it) =>
+              (it.cliente_id && clientesDosItens.includes(it.cliente_id)) ||
+              (it.venda_id && vendasDosItens.includes(it.venda_id)) ||
+              (it.cliente_nome && nomesDosItens.includes(it.cliente_nome)),
+          );
+        });
+
+        let ordemFinalId: string;
+        let ordemFinalObj: Ordem;
+
+        if (ordemExistente) {
+          ordemFinalId = ordemExistente.id;
+          ordemFinalObj = ordemExistente;
+        } else {
+          // Busca número de ordem já existente para este cliente em qualquer fornecedor
+          let numeroCliente: string | null = null;
+          for (const cid of clientesDosItens) {
+            if (mapaNumeroPorCliente.has(cid)) {
+              numeroCliente = mapaNumeroPorCliente.get(cid)!;
+              break;
+            }
+            const itemComNum = itensTodos.find((it) => it.cliente_id === cid);
+            if (itemComNum) {
+              const o = ordens.find((ord) => ord.id === itemComNum.ordem_id && ord.numero);
+              if (o?.numero) {
+                numeroCliente = o.numero;
+                break;
+              }
+            }
+          }
+          if (!numeroCliente) {
+            for (const vid of vendasDosItens) {
+              if (mapaNumeroPorCliente.has(vid)) {
+                numeroCliente = mapaNumeroPorCliente.get(vid)!;
+                break;
+              }
+              const itemComNum = itensTodos.find((it) => it.venda_id === vid);
+              if (itemComNum) {
+                const o = ordens.find((ord) => ord.id === itemComNum.ordem_id && ord.numero);
+                if (o?.numero) {
+                  numeroCliente = o.numero;
+                  break;
+                }
+              }
+            }
+          }
+
+          const numero = numeroCliente ?? proximoCodigo("OC", numeros);
+          if (!numeroCliente) {
+            numeros.push(numero);
+            for (const cid of clientesDosItens) mapaNumeroPorCliente.set(cid, numero);
+            for (const vid of vendasDosItens) mapaNumeroPorCliente.set(vid, numero);
+          } else {
+            for (const cid of clientesDosItens) mapaNumeroPorCliente.set(cid, numeroCliente);
+            for (const vid of vendasDosItens) mapaNumeroPorCliente.set(vid, numeroCliente);
+          }
+
+          const valorProdutos = itens.reduce((total, produto) => total + totalCompra(produto), 0);
+          const creditoOrdem =
+            creditoAplicado !== 0 && totalSelecionadoCompra > 0
+              ? (valorProdutos / totalSelecionadoCompra) * creditoAplicado
+              : 0;
+          const { data: ordem, error: erroOrdem } = await supabase
+            .from("ordens_compra")
+            .insert({
+              numero,
+              fornecedor_id: fornecedorIdAlvo,
+              fornecedor_nome: fornecedor.nome,
+              data_pedido: hojeISO(),
+              valor_produtos: valorProdutos,
+              desconto: creditoOrdem,
+              icms_base: valorProdutos,
+              icms_valor: valorProdutos * 0.18,
+              icms_st_base: 0,
+              icms_st_valor: 0,
+              valor_total: valorProdutos - creditoOrdem,
+              status: "pendente",
+              observacoes:
+                creditoOrdem > 0
+                  ? `Compra selecionada na grade de produtos | Crédito fabricante abatido: ${brl(creditoOrdem)}`
+                  : creditoOrdem < 0
+                    ? `Compra selecionada na grade de produtos | Crédito fabricante negativo cobrado: ${brl(Math.abs(creditoOrdem))}`
+                    : "Compra selecionada na grade de produtos",
+              created_by: auth.user?.id ?? null,
+            })
+            .select("*")
+            .single();
+          if (erroOrdem) throw erroOrdem;
+
+          ordemFinalId = ordem.id;
+          ordemFinalObj = ordem as Ordem;
+        }
 
         const payload = itens.flatMap((produto) => {
           const valorUnitario = valorCompra(produto);
@@ -992,7 +1084,7 @@ function OrdensCompra() {
           return vinculosDoProduto(produto).map((vendaId) => {
             const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
             return {
-              ordem_id: ordem.id,
+              ordem_id: ordemFinalId,
               produto_id: produto.id,
               codigo: produto.codigo,
               descricao: produto.nome,
@@ -1005,16 +1097,35 @@ function OrdensCompra() {
               total: valorUnitario - descontoUnitario,
               cliente_id: venda?.cliente_id ?? null,
               cliente_nome: venda?.cliente_nome ?? null,
-               venda_id: vendaId || null,
-               cor: produto.cor_pastilha ?? null,
-               pastilha: produto.modelo_pastilha ?? null,
-             };
+              venda_id: vendaId || null,
+              cor: produto.cor_pastilha ?? null,
+              pastilha: produto.modelo_pastilha ?? null,
+            };
           });
         });
         const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
         if (erroItens) throw erroItens;
+
+        // Se complementou ordem existente, recalcula o total
+        if (ordemExistente) {
+          const { data: todosItens } = await supabase
+            .from("ordem_compra_itens")
+            .select("total")
+            .eq("ordem_id", ordemFinalId);
+          const novoTotal = (todosItens ?? []).reduce((s, it) => s + Number(it.total || 0), 0);
+          await supabase
+            .from("ordens_compra")
+            .update({
+              valor_produtos: novoTotal,
+              valor_total: Math.max(novoTotal - Number(ordemExistente.desconto || 0), 0),
+              icms_base: novoTotal,
+              icms_valor: novoTotal * 0.18,
+            })
+            .eq("id", ordemFinalId);
+        }
+
         quantidadeOrdens += 1;
-        ordensCriadas.push(ordem as Ordem);
+        ordensCriadas.push(ordemFinalObj);
       }
       return { quantidadeOrdens, ordensCriadas };
     },
@@ -1680,7 +1791,22 @@ function OrdensCompra() {
       const icmsValor = icmsBase * 0.18;
       const { data: auth } = await supabase.auth.getUser();
       const { data: existentes } = await supabase.from("ordens_compra").select("numero");
-      const numero = proximoCodigo("OC", (existentes ?? []).map((o) => o.numero));
+
+      let numeroCliente: string | null = null;
+      for (const i of itensNovaOrdem) {
+        if (i.cliente_id && i.cliente_id !== SEM_CLIENTE) {
+          const itemComNum = itensTodos.find((it) => it.cliente_id === i.cliente_id);
+          if (itemComNum) {
+            const o = ordens.find((ord) => ord.id === itemComNum.ordem_id && ord.numero);
+            if (o?.numero) {
+              numeroCliente = o.numero;
+              break;
+            }
+          }
+        }
+      }
+
+      const numero = numeroCliente ?? proximoCodigo("OC", (existentes ?? []).map((o) => o.numero));
 
       const { data: ordem, error: erroOrdem } = await supabase
         .from("ordens_compra")

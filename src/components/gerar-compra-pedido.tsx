@@ -158,31 +158,95 @@ export function GerarCompraPedido({
         grupos.set(f, [...(grupos.get(f) ?? []), l]);
       }
       const criadas: string[] = [];
+
+      // Verifica se o cliente já possui um número de ordem de compra emitido no sistema
+      let numeroCliente: string | null = null;
+      if (clienteId || clienteNome || vendaId) {
+        let q = supabase
+          .from("ordem_compra_itens")
+          .select("ordem_id, ordens_compra(id, numero, status)")
+          .limit(20);
+        if (clienteId) {
+          q = q.eq("cliente_id", clienteId);
+        } else if (clienteNome) {
+          q = q.eq("cliente_nome", clienteNome);
+        } else {
+          q = q.eq("venda_id", vendaId);
+        }
+        const { data: itensDoCliente } = await q;
+        const encontrada = (itensDoCliente ?? []).find(
+          (it: any) => it.ordens_compra?.numero && it.ordens_compra?.status !== "cancelada"
+        );
+        if (encontrada) {
+          numeroCliente = (encontrada as any).ordens_compra.numero;
+        }
+      }
+
       for (const [fornecedorId, itens] of grupos) {
-        const numero = proximoCodigo("OC", numeros);
-        numeros.push(numero);
-        const valor = itens.reduce((s, l) => s + num(ed[l.chave].qtd) * num(ed[l.chave].custo), 0);
-        const { data: ordem, error } = await supabase
-          .from("ordens_compra")
-          .insert({
-            numero,
-            fornecedor_id: fornecedorId,
-            fornecedor_nome: nomeFornecedor.get(fornecedorId) ?? "Fornecedor",
-            data_pedido: hojeISO(),
-            valor_produtos: valor,
-            desconto: 0,
-            icms_base: valor,
-            icms_valor: valor * 0.18,
-            icms_st_base: 0,
-            icms_st_valor: 0,
-            valor_total: valor,
-            status: "pendente",
-            observacoes: `Gerada a partir do pedido ${vendaNumero ?? ""}`.trim(),
-            created_by: auth.user?.id ?? null,
-          })
-          .select("id")
-          .single();
-        if (error) throw error;
+        // Verifica se já existe uma ordem de compra ativa para este cliente e fornecedor
+        let ordemIdExistente: string | null = null;
+        let numeroOrdem: string | null = null;
+
+        if (clienteId || clienteNome || vendaId) {
+          let qForn = supabase
+            .from("ordem_compra_itens")
+            .select("ordem_id, ordens_compra!inner(id, numero, fornecedor_id, status)")
+            .eq("ordens_compra.fornecedor_id", fornecedorId)
+            .neq("ordens_compra.status", "cancelada")
+            .limit(1);
+
+          if (clienteId) {
+            qForn = qForn.eq("cliente_id", clienteId);
+          } else if (clienteNome) {
+            qForn = qForn.eq("cliente_nome", clienteNome);
+          } else {
+            qForn = qForn.eq("venda_id", vendaId);
+          }
+          const { data: existenteForn } = await qForn;
+          if (existenteForn && existenteForn.length > 0) {
+            const oc = (existenteForn[0] as any).ordens_compra;
+            if (oc?.id) {
+              ordemIdExistente = oc.id;
+              numeroOrdem = oc.numero;
+            }
+          }
+        }
+
+        let idOrdemFinal = ordemIdExistente;
+
+        if (!idOrdemFinal) {
+          const numero = numeroCliente ?? proximoCodigo("OC", numeros);
+          if (!numeroCliente) {
+            numeroCliente = numero;
+            numeros.push(numero);
+          }
+          numeroOrdem = numero;
+
+          const valor = itens.reduce((s, l) => s + num(ed[l.chave].qtd) * num(ed[l.chave].custo), 0);
+          const { data: ordem, error } = await supabase
+            .from("ordens_compra")
+            .insert({
+              numero,
+              fornecedor_id: fornecedorId,
+              fornecedor_nome: nomeFornecedor.get(fornecedorId) ?? "Fornecedor",
+              data_pedido: hojeISO(),
+              valor_produtos: valor,
+              desconto: 0,
+              icms_base: valor,
+              icms_valor: valor * 0.18,
+              icms_st_base: 0,
+              icms_st_valor: 0,
+              valor_total: valor,
+              status: "pendente",
+              observacoes: `Gerada a partir do pedido ${vendaNumero ?? ""}`.trim(),
+              created_by: auth.user?.id ?? null,
+            })
+            .select("id")
+            .single();
+          if (error) throw error;
+          idOrdemFinal = ordem.id;
+        }
+
         // Uma linha por unidade, igual à grade de Ordens de compra (cada unidade com seu vínculo).
         const payload = itens.flatMap((l) => {
           const e = ed[l.chave];
@@ -190,7 +254,7 @@ export function GerarCompraPedido({
           const custo = num(e.custo);
           const paraPedido = e.destino === "pedido";
           return Array.from({ length: qtd }, () => ({
-            ordem_id: ordem.id,
+            ordem_id: idOrdemFinal!,
             produto_id: l.produto_id,
             codigo: l.codigo,
             descricao: l.nome,
@@ -210,7 +274,28 @@ export function GerarCompraPedido({
         });
         const { error: eI } = await supabase.from("ordem_compra_itens").insert(payload);
         if (eI) throw eI;
-        criadas.push(numero);
+
+        // Se adicionou a uma ordem existente, recalcula o total
+        if (ordemIdExistente) {
+          const { data: todosItens } = await supabase
+            .from("ordem_compra_itens")
+            .select("total")
+            .eq("ordem_id", ordemIdExistente);
+          const novoTotal = (todosItens ?? []).reduce((s, it) => s + Number(it.total || 0), 0);
+          await supabase
+            .from("ordens_compra")
+            .update({
+              valor_produtos: novoTotal,
+              valor_total: novoTotal,
+              icms_base: novoTotal,
+              icms_valor: novoTotal * 0.18,
+            })
+            .eq("id", ordemIdExistente);
+        }
+
+        if (numeroOrdem && !criadas.includes(numeroOrdem)) {
+          criadas.push(numeroOrdem);
+        }
       }
       return criadas;
     },
