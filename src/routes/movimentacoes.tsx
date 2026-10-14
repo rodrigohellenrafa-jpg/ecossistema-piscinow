@@ -198,7 +198,7 @@ export function Movimentacoes() {
       });
     }
 
-    return lista.sort((a, b) => (a.data < b.data ? 1 : -1));
+    return lista.sort((a, b) => (b.data || "").localeCompare(a.data || "") || (b.id || "").localeCompare(a.id || ""));
   }, [contas, lancamentos]);
 
   // Agrupamento de possíveis duplicidades
@@ -251,7 +251,7 @@ export function Movimentacoes() {
       )
         return false;
       return true;
-    });
+    }).sort((a, b) => (b.data || "").localeCompare(a.data || "") || (b.id || "").localeCompare(a.id || ""));
   }, [linhasComFlag, busca, sentido, situacao, origem, conta, de, ate]);
 
   const soma = (fn: (l: Linha) => boolean) =>

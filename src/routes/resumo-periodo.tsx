@@ -158,7 +158,7 @@ function ResumoPeriodo() {
       };
       (ehEntrada ? entradas : saidas).push(m);
     }
-    const ord = (a: Mov, b: Mov) => (a.data < b.data ? -1 : 1);
+    const ord = (a: Mov, b: Mov) => (b.data || "").localeCompare(a.data || "");
     entradas.sort(ord);
     saidas.sort(ord);
     const totE = entradas.reduce((s, m) => s + m.valor, 0);
@@ -180,14 +180,20 @@ function ResumoPeriodo() {
 
     const vendas = data.vendas
       .filter((v) => dentro(v.data))
-      .sort((a, b) => (a.data < b.data ? -1 : 1));
-    const ocs = data.ocs.filter((o) => dentro(o.data_pedido));
+      .sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+    const ocs = data.ocs
+      .filter((o) => dentro(o.data_pedido))
+      .sort((a, b) => (b.data_pedido || "").localeCompare(a.data_pedido || ""));
     const ocNum = new Map(
       data.ocs.map((o) => [o.id, `${o.numero ?? "—"} ${o.fornecedor_nome ?? ""}`]),
     );
-    const ocPags = data.ocPags.filter((p) => dentro(p.data_pagamento));
+    const ocPags = data.ocPags
+      .filter((p) => dentro(p.data_pagamento))
+      .sort((a, b) => (b.data_pagamento || "").localeCompare(a.data_pagamento || ""));
     const prod = new Map(data.produtos.map((p) => [p.id, p.nome]));
-    const estoque = data.estoque.filter((m) => dentro(m.created_at));
+    const estoque = data.estoque
+      .filter((m) => dentro(m.created_at))
+      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     const abertos = data.contas.filter((c) => c.status !== "pago" && c.status !== "cancelado");
 
     const secoes: Secao[] = [
@@ -297,7 +303,7 @@ function ResumoPeriodo() {
         titulo: "Contas em aberto (hoje)",
         colunas: ["Vencimento", "Tipo", "Descrição", "Parceiro", "Em aberto"],
         linhas: abertos
-          .sort((a, b) => (a.vencimento < b.vencimento ? -1 : 1))
+          .sort((a, b) => (b.vencimento || "").localeCompare(a.vencimento || ""))
           .map((c) => [
             dataBR(c.vencimento),
             c.tipo === "receber" ? "A receber" : "A pagar",

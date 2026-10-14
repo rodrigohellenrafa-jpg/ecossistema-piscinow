@@ -67,7 +67,8 @@ function Orcamentos() {
         .from("vendas")
         .select("*")
         .eq("status_pedido", "orcamento")
-        .order("data", { ascending: false });
+        .order("data", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },

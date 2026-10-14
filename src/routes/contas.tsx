@@ -271,7 +271,8 @@ function Contas() {
       const { data, error } = await supabase
         .from("contas")
         .select("*")
-        .order("vencimento", { ascending: true });
+        .order("vencimento", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -916,9 +917,20 @@ function Contas() {
 
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const todasPagar = data.filter((c) => c.tipo === "pagar");
-  const todasReceber = data.filter((c) => c.tipo === "receber");
-  const filtradas = data.filter((c) => noPeriodo(c, periodo, periodoDe, periodoAte));
+  const ordenarPorDataDesc = (a: (typeof data)[number], b: (typeof data)[number]) => {
+    const dataB = b.data_pagamento || b.vencimento || b.created_at || "";
+    const dataA = a.data_pagamento || a.vencimento || a.created_at || "";
+    const cmp = dataB.localeCompare(dataA);
+    if (cmp !== 0) return cmp;
+    return (b.created_at || "").localeCompare(a.created_at || "");
+  };
+
+  const todasPagar = data.filter((c) => c.tipo === "pagar").slice().sort(ordenarPorDataDesc);
+  const todasReceber = data.filter((c) => c.tipo === "receber").slice().sort(ordenarPorDataDesc);
+  const filtradas = data
+    .filter((c) => noPeriodo(c, periodo, periodoDe, periodoAte))
+    .slice()
+    .sort(ordenarPorDataDesc);
   const soma = (l: typeof data) =>
     l.filter((c) => c.status !== "pago" && c.status !== "renegociado").reduce((s, c) => s + Number(c.valor), 0);
   const pagar = filtradas.filter((c) => c.tipo === "pagar");

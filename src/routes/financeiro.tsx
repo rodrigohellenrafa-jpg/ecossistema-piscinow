@@ -120,6 +120,7 @@ type Lancamento = {
   comprovante_path?: string | null;
   obra_id?: string | null;
   cliente_id?: string | null;
+  created_at?: string | null;
 };
 
 const RECORRENCIAS = [
@@ -205,7 +206,8 @@ function Financeiro() {
       const { data, error } = await supabase
         .from("lancamentos_financeiros")
         .select("*")
-        .order("data_competencia", { ascending: false });
+        .order("data_competencia", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Lancamento[];
     },
@@ -611,15 +613,25 @@ function Financeiro() {
     [lancamentos],
   );
 
-  const filtrados = lancamentos.filter((l) => {
-    if (fTipo !== "todos" && l.tipo_fluxo !== fTipo) return false;
-    if (fCategoria !== "todas" && l.categoria !== fCategoria) return false;
-    if (fStatus !== "todos" && l.status !== fStatus) return false;
-    if (fConta !== "todas" && l.conta_bancaria !== fConta) return false;
-    if (fDe && l.data_competencia < fDe) return false;
-    if (fAte && l.data_competencia > fAte) return false;
-    return true;
-  });
+  const filtrados = useMemo(() => {
+    return lancamentos
+      .filter((l) => {
+        if (fTipo !== "todos" && l.tipo_fluxo !== fTipo) return false;
+        if (fCategoria !== "todas" && l.categoria !== fCategoria) return false;
+        if (fStatus !== "todos" && l.status !== fStatus) return false;
+        if (fConta !== "todas" && l.conta_bancaria !== fConta) return false;
+        if (fDe && l.data_competencia < fDe) return false;
+        if (fAte && l.data_competencia > fAte) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const dataB = b.data_pagamento || b.vencimento || b.data_competencia || b.created_at || "";
+        const dataA = a.data_pagamento || a.vencimento || a.data_competencia || a.created_at || "";
+        const cmp = dataB.localeCompare(dataA);
+        if (cmp !== 0) return cmp;
+        return (b.created_at || "").localeCompare(a.created_at || "");
+      });
+  }, [lancamentos, fTipo, fCategoria, fStatus, fConta, fDe, fAte]);
 
   const hoje = new Date();
   const mesAtual = hoje.toISOString().slice(0, 7);

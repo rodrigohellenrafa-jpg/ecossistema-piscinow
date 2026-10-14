@@ -166,7 +166,9 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
         : null;
       let q = supabase.from("venda_historico").select("*");
       q = filtro ? q.or(filtro) : q.eq("venda_id", vendaId);
-      const { data, error } = await q.order("data").order("created_at");
+      const { data, error } = await q
+        .order("data", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -400,15 +402,25 @@ export function HistoricoVenda({ vendaId, clienteId, clienteNome, itens }: Props
     [lancamentos, filtroObra],
   );
 
-  /** Extrato com saldo acumulado (entradas somam, saídas subtraem). */
+  /** Extrato com saldo acumulado (entradas somam, saídas subtraem), exibido do mais novo para o mais velho. */
   const extrato = useMemo(() => {
+    const crono = [...filtrados].sort(
+      (a, b) =>
+        (a.data || "").localeCompare(b.data || "") ||
+        (a.created_at || "").localeCompare(b.created_at || ""),
+    );
     let saldo = 0;
-    return filtrados.map((l) => {
+    const comSaldo = crono.map((l) => {
       const v = Number(l.valor ?? 0);
       const mov = l.natureza === "entrada" ? v : l.natureza === "saida" ? -v : 0;
       saldo += mov;
       return { ...l, mov, saldo };
     });
+    return comSaldo.sort(
+      (a, b) =>
+        (b.data || "").localeCompare(a.data || "") ||
+        (b.created_at || "").localeCompare(a.created_at || ""),
+    );
   }, [filtrados]);
 
   // Só saídas vinculadas a este pedido entram no multipartido — despesas do

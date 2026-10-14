@@ -315,7 +315,8 @@ function OrdensCompra() {
       const { data, error } = await supabase
         .from("ordens_compra")
         .select("*")
-        .order("data_pedido", { ascending: false });
+        .order("data_pedido", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Ordem[];
     },
@@ -416,7 +417,8 @@ function OrdensCompra() {
         .from("ordem_compra_pagamentos")
         .select("*")
         .eq("ordem_id", detalheId!)
-        .order("data_pagamento");
+        .order("data_pagamento", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -431,7 +433,7 @@ function OrdensCompra() {
         .from("ordem_compra_notas")
         .select("*")
         .eq("ordem_id", detalheId!)
-        .order("created_at");
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data as NotaOrdem[];
     },

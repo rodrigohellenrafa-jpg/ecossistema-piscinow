@@ -249,7 +249,8 @@ function DetalhePedido() {
         .select("*")
         .eq("venda_id", id)
         .eq("tipo", "receber")
-        .order("vencimento");
+        .order("vencimento", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -262,7 +263,8 @@ function DetalhePedido() {
         .from("venda_pagamentos")
         .select("*")
         .eq("venda_id", id)
-        .order("data_pagamento");
+        .order("data_pagamento", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -289,7 +291,9 @@ function DetalhePedido() {
         : null;
       let q = supabase.from("venda_historico").select("*");
       q = filtro ? q.or(filtro) : q.eq("venda_id", id);
-      const { data, error } = await q.order("data").order("created_at");
+      const { data, error } = await q
+        .order("data", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },

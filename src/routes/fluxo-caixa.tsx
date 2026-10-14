@@ -162,7 +162,7 @@ function FluxoCaixa() {
 
     return lista
       .filter((m) => m.data && m.data !== "null")
-      .sort((a, b) => a.data.localeCompare(b.data));
+      .sort((a, b) => b.data.localeCompare(a.data));
   }, [contas, lancamentos]);
 
   const hoje = hojeISO();
