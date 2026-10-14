@@ -166,6 +166,8 @@ type Ordem = {
   obs_pagamento: string | null;
   enviada_em?: string | null;
   faturada_em?: string | null;
+  carga_id?: string | null;
+  status_carga?: string | null;
 };
 
 type Item = {
@@ -187,6 +189,8 @@ type Item = {
   numero_nf: string | null;
   cor: string | null;
   pastilha: string | null;
+  carga_id?: string | null;
+  status_carga?: string | null;
 };
 
 type NotaOrdem = {
@@ -270,7 +274,7 @@ function OrdensCompra() {
   const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("todos");
   const [filtroExibicaoCatalogo, setFiltroExibicaoCatalogo] = useState<
     "apenas_vinculados_selecionados" | "catalogo_completo"
-  >("catalogo_completo");
+  >("apenas_vinculados_selecionados");
   const [ocultarJaComprados, setOcultarJaComprados] = useState(true);
   const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
   const [filtroFornecedor, setFiltroFornecedor] = useState<string>("todos");
@@ -281,6 +285,7 @@ function OrdensCompra() {
   const [novaOpen, setNovaOpen] = useState(false);
   const [modalPedirCargaAberto, setModalPedirCargaAberto] = useState(false);
   const [fornecedorCargaSelecionado, setFornecedorCargaSelecionado] = useState<string | null>(null);
+  const [itensCargaIniciais, setItensCargaIniciais] = useState<string[]>([]);
   useAbrirModal("novo", () => setNovaOpen(true));
   const [novoItem, setNovoItem] = useState(novoItemVazio);
   const [novaOrdem, setNovaOrdem] = useState({
@@ -665,7 +670,7 @@ function OrdensCompra() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendas")
-        .select("id, numero, cliente_id, cliente_nome")
+        .select("id, numero, cliente_id, cliente_nome, status_pedido")
         .order("numero");
       if (error) throw error;
       return data as {
@@ -673,6 +678,7 @@ function OrdensCompra() {
         numero: string | null;
         cliente_id: string | null;
         cliente_nome: string | null;
+        status_pedido: string | null;
       }[];
     },
   });
@@ -692,13 +698,18 @@ function OrdensCompra() {
   const vendaPorId = useMemo(() => {
     const m = new Map<
       string,
-      { numero: string | null; cliente_id: string | null; cliente_nome: string | null }
+      {
+        numero: string | null;
+        cliente_id: string | null;
+        cliente_nome: string | null;
+        status_pedido: string | null;
+      }
     >();
     for (const v of vendasVinculo) m.set(v.id, v);
     return m;
   }, [vendasVinculo]);
 
-  /** Informações consolidadas sobre itens e vínculos que já tiveram Ordem de Compra gerada ou foram faturados/comprados. */
+  /** Informações consolidadas sobre itens e vínculos que já tiveram Ordem de Compra gerada, foram faturados/comprados ou estão em lotes anteriores. */
   const itensCompradosInfo = useMemo(() => {
     const mapaOrdens = new Map<string, Ordem>();
     for (const o of ordens) mapaOrdens.set(o.id, o);
@@ -711,6 +722,8 @@ function OrdensCompra() {
     const produtosComOrdemGerada = new Set<string>();
     // Conjunto de IDs de produtos faturados ou concluídos
     const produtosFaturadosOuConcluidos = new Set<string>();
+    // Conjunto de IDs de produtos comprados ou consolidados em lotes/cargas anteriores
+    const produtosEmCargasAnteriores = new Set<string>();
 
     for (const it of itensTodos) {
       if (!it.produto_id) continue;
@@ -721,11 +734,23 @@ function OrdensCompra() {
       const qtd = Number(it.quantidade ?? 1);
       produtosComOrdemGerada.add(it.produto_id);
 
+      // Itens já consolidados em carga/lote anterior
+      if (
+        it.carga_id ||
+        it.status_carga === "em_carga" ||
+        it.status_carga === "entregue" ||
+        (ordem as any)?.carga_id
+      ) {
+        produtosEmCargasAnteriores.add(it.produto_id);
+      }
+
       if (
         it.numero_nf ||
         (ordem &&
           (ordem.status === "faturada" ||
             ordem.status === "entregue" ||
+            ordem.status === "concluida" ||
+            ordem.status === "recebida" ||
             ordem.status === "comprado" ||
             Boolean(ordem.faturada_em)))
       ) {
@@ -747,10 +772,11 @@ function OrdensCompra() {
       qtdTotalCompradaPorProduto,
       produtosComOrdemGerada,
       produtosFaturadosOuConcluidos,
+      produtosEmCargasAnteriores,
     };
   }, [itensTodos, ordens]);
 
-  /** Demanda consolidada PENDENTE: apenas pedidos de venda que ainda NÃO tiveram ordem de compra gerada. */
+  /** Demanda consolidada PENDENTE: apenas pedidos de venda ativos que ainda NÃO tiveram ordem de compra gerada e que não foram entregues/instalados/concluídos. */
   const demandaPorProduto = useMemo(() => {
     const mapa = new Map<
       string,
@@ -761,6 +787,22 @@ function OrdensCompra() {
       const quantidadeTotal = Number(item.quantidade ?? 0);
       if (quantidadeTotal <= 0) continue;
 
+      const venda = vendaPorId.get(item.venda_id);
+      // Oculta automaticamente itens de pedidos já entregues, instalados, concluídos, cancelados ou orçamento
+      const statusVenda = (venda?.status_pedido || "").toLowerCase().trim();
+      if (
+        statusVenda === "entregue" ||
+        statusVenda === "instalado" ||
+        statusVenda === "instalada" ||
+        statusVenda === "concluido" ||
+        statusVenda === "concluida" ||
+        statusVenda === "cancelado" ||
+        statusVenda === "cancelada" ||
+        statusVenda === "orcamento"
+      ) {
+        continue;
+      }
+
       // Abate o que já teve Ordem de Compra gerada para esta venda específica
       const chave = `${item.produto_id}::${item.venda_id}`;
       const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
@@ -770,7 +812,6 @@ function OrdensCompra() {
       if (quantidadePendente <= 0) continue;
 
       const atual = mapa.get(item.produto_id) ?? { total: 0, pedidos: [] };
-      const venda = vendaPorId.get(item.venda_id);
       const rotulo = `${venda?.numero ?? "Pedido"} — ${venda?.cliente_nome ?? "Cliente"}`;
       const existente = atual.pedidos.find((p) => p.id === item.venda_id);
       if (existente) existente.quantidade += quantidadePendente;
@@ -932,13 +973,29 @@ function OrdensCompra() {
     [fornecedores],
   );
 
-  /** Identifica se o produto já teve ordem de compra gerada ou já foi faturado/comprado. */
+  /** Identifica se o produto já teve ordem de compra gerada ou já foi faturado/comprado ou está em lote anterior. */
   const ehProdutoJaCompradoOuFaturado = useCallback(
     (p: Produto) => {
       const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
-      if (status === "comprado") return true;
+      if (
+        status === "comprado" ||
+        status === "faturada" ||
+        status === "concluida" ||
+        status === "recebida"
+      ) {
+        return true;
+      }
 
-      if (itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id)) return true;
+      if (itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id)) {
+        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
+        if (pendente === 0) return true;
+      }
+
+      // Se já está consolidado em lote/carga anterior e não possui demanda pendente
+      if (itensCompradosInfo.produtosEmCargasAnteriores.has(p.id)) {
+        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
+        if (pendente === 0) return true;
+      }
 
       // Se possui vínculo direto com venda e esse vínculo já teve OC gerada e não há mais demanda pendente
       if (p.venda_vinculo_id) {
@@ -971,30 +1028,41 @@ function OrdensCompra() {
       const jaComprado = ehProdutoJaCompradoOuFaturado(produto);
       const estaSelecionado = Boolean(selecionadosCompra[produto.id]);
 
-      // 1. Ocultar automaticamente itens já comprados ou com ordem gerada
+      // 1. Ocultar automaticamente itens já comprados, faturados ou em lotes anteriores
       if (ocultarJaComprados && jaComprado && !estaSelecionado) {
-        const casaBuscaExataProduto =
-          termoBusca &&
-          (normalizar(produto.nome).includes(termoBusca) ||
-            normalizar(produto.codigo ?? "").includes(termoBusca));
-        if (!casaBuscaExataProduto) {
-          return false;
-        }
+        return false;
       }
 
       // 2. Se o usuário ativamente marcou/selecionou este item, sempre exibe
       if (estaSelecionado) return true;
 
-      // 3. Verifica vínculo explícito ou demanda pendente de pedidos de venda
+      // 3. Verifica vínculo explícito ou demanda pendente de pedidos de venda ativos
       const temDemandaPendente = (demandaPorProduto.get(produto.id)?.total ?? 0) > 0;
       const temVinculoManual = Boolean(
         vinculosCompra[produto.id]?.some((v) => v && v !== SEM_CLIENTE),
       );
-      const temVinculoProduto = Boolean(produto.venda_vinculo_id && !jaComprado);
+      let temVinculoProduto = false;
+      if (produto.venda_vinculo_id && !jaComprado) {
+        const v = vendaPorId.get(produto.venda_vinculo_id);
+        const st = (v?.status_pedido || "").toLowerCase().trim();
+        if (
+          st !== "entregue" &&
+          st !== "instalado" &&
+          st !== "instalada" &&
+          st !== "concluido" &&
+          st !== "concluida" &&
+          st !== "cancelado" &&
+          st !== "cancelada" &&
+          st !== "orcamento"
+        ) {
+          temVinculoProduto = true;
+        }
+      }
+
       const estaExplicitamenteVinculado =
         temDemandaPendente || temVinculoManual || temVinculoProduto;
 
-      // 4. Se o usuário ativou o modo "Catálogo completo" (padrão para exibir todo o cadastro do fornecedor)
+      // 4. Se o usuário ativou o modo "Catálogo completo"
       if (filtroExibicaoCatalogo === "catalogo_completo") {
         if (termoBusca) {
           const casaFornecedor = normalizar(forn?.nome ?? "").includes(termoBusca);
@@ -1017,7 +1085,7 @@ function OrdensCompra() {
         return true;
       }
 
-      // 5. Modo "Apenas Vinculados / Demanda": exibe apenas itens vinculados ou buscados
+      // 5. Padrão: "Apenas Vinculados / Demanda": nunca exibe o catálogo completo automaticamente
       if (termoBusca) {
         const casaProduto =
           normalizar(produto.nome).includes(termoBusca) ||
@@ -1032,13 +1100,8 @@ function OrdensCompra() {
             normalizar(vendaVinculo.cliente_nome ?? "").includes(termoBusca));
         const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
         const casaDemanda = pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
-        const casaFornecedor = normalizar(forn?.nome ?? "").includes(termoBusca);
 
         if (casaProduto || casaVinculo || casaDemanda) {
-          return true;
-        }
-
-        if (casaFornecedor && estaExplicitamenteVinculado) {
           return true;
         }
 
@@ -1457,6 +1520,7 @@ function OrdensCompra() {
 
       let quantidadeOrdens = 0;
       const ordensCriadas: Ordem[] = [];
+      const todosItensCriadosIds: string[] = [];
       const mapaNumeroPorCliente = new Map<string, string>();
 
       for (const { fornecedor, itens } of grupos.values()) {
@@ -1568,6 +1632,7 @@ function OrdensCompra() {
               icms_st_valor: 0,
               valor_total: valorProdutos - creditoOrdem,
               status: "pendente",
+              status_carga: "pendente_carga",
               observacoes:
                 creditoOrdem > 0
                   ? `Compra selecionada na grade de produtos | Crédito fabricante abatido: ${brl(creditoOrdem)}`
@@ -1606,11 +1671,20 @@ function OrdensCompra() {
               venda_id: vendaId || null,
               cor: produto.cor_pastilha ?? null,
               pastilha: produto.modelo_pastilha ?? null,
+              status_carga: "pendente_carga",
             };
           });
         });
-        const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
+        const { data: itensInseridos, error: erroItens } = await supabase
+          .from("ordem_compra_itens")
+          .insert(payload)
+          .select("id");
         if (erroItens) throw erroItens;
+        if (itensInseridos) {
+          for (const it of itensInseridos) {
+            todosItensCriadosIds.push(it.id);
+          }
+        }
 
         // Se complementou ordem existente, recalcula o total
         if (ordemExistente) {
@@ -1633,7 +1707,7 @@ function OrdensCompra() {
         quantidadeOrdens += 1;
         ordensCriadas.push(ordemFinalObj);
       }
-      return { quantidadeOrdens, ordensCriadas };
+      return { quantidadeOrdens, ordensCriadas, itemIds: todosItensCriadosIds };
     },
     onSuccess: async ({ quantidadeOrdens: quantidade, ordensCriadas }) => {
       toast.success(
@@ -1668,6 +1742,43 @@ function OrdensCompra() {
     },
     onError: (erro: Error) => toast.error(erro.message),
   });
+
+  const pedirCarga = async (fornecedorIdAlvo?: string | null) => {
+    // 1. Se o usuário marcou itens já existentes na aba executadas (ordem_compra_itens)
+    const idsExecutados = Object.keys(selecionadosExecutados).filter(
+      (id) => selecionadosExecutados[id] === true,
+    );
+    if (idsExecutados.length > 0) {
+      const primeiroItem = itensTodos.find((it) => it.id === idsExecutados[0]);
+      const ordemDoItem = ordens.find((o) => o.id === primeiroItem?.ordem_id);
+      const fornId = fornecedorIdAlvo || ordemDoItem?.fornecedor_id || null;
+      setFornecedorCargaSelecionado(fornId);
+      setItensCargaIniciais(idsExecutados);
+      setModalPedirCargaAberto(true);
+      return;
+    }
+
+    // 2. Se o usuário marcou produtos na tela para compra (selecionadosCompra)
+    if (produtosSelecionados.length > 0) {
+      try {
+        const resultado = await comprarSelecionados.mutateAsync();
+        const fornId =
+          fornecedorIdAlvo ||
+          (produtosSelecionados[0] ? fornecedorDaCompra(produtosSelecionados[0])?.id : null);
+        setFornecedorCargaSelecionado(fornId || null);
+        setItensCargaIniciais(resultado.itemIds ?? []);
+        setModalPedirCargaAberto(true);
+      } catch {
+        // Erro já disparado por comprarSelecionados.onError
+      }
+      return;
+    }
+
+    // 3. Sem itens marcados: abre o modal de carga diretamente
+    setFornecedorCargaSelecionado(fornecedorIdAlvo || null);
+    setItensCargaIniciais([]);
+    setModalPedirCargaAberto(true);
+  };
 
   const abrirEdicaoProdutoCompra = (produto: Produto) => {
     setProdutoCompraEditando(produto);
@@ -2590,8 +2701,7 @@ function OrdensCompra() {
             <Button
               className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm flex items-center gap-1.5"
               onClick={() => {
-                setFornecedorCargaSelecionado(null);
-                setModalPedirCargaAberto(true);
+                pedirCarga(filtroFornecedor !== "todos" ? filtroFornecedor : null);
               }}
             >
               <Truck className="size-4" />
@@ -2906,6 +3016,16 @@ function OrdensCompra() {
                 <Button
                   type="button"
                   size="sm"
+                  onClick={() => pedirCarga(produtosSelecionados[0] ? fornecedorDaCompra(produtosSelecionados[0])?.id : null)}
+                  disabled={comprarSelecionados.isPending}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold flex items-center gap-1.5 shadow-sm"
+                >
+                  <Truck className="size-4" />
+                  Pedir Carga ({produtosSelecionados.length})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
                   onClick={() => comprarSelecionados.mutate()}
                   disabled={comprarSelecionados.isPending}
                   className="font-semibold"
@@ -3067,8 +3187,7 @@ function OrdensCompra() {
                         size="sm"
                         variant="secondary"
                         onClick={() => {
-                          setFornecedorCargaSelecionado(grupo.fornecedor.id);
-                          setModalPedirCargaAberto(true);
+                          pedirCarga(grupo.fornecedor.id);
                         }}
                         className="text-xs h-8 font-semibold gap-1.5 border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
                       >
@@ -3964,6 +4083,19 @@ function OrdensCompra() {
               disabled={produtos.length === 0 || salvarTodosItens.isPending}
             >
               <Save /> Salvar itens
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white font-semibold flex items-center gap-1.5"
+              onClick={() =>
+                pedirCarga(
+                  produtosSelecionados[0]
+                    ? fornecedorDaCompra(produtosSelecionados[0])?.id
+                    : null,
+                )
+              }
+              disabled={produtosSelecionados.length === 0 || comprarSelecionados.isPending}
+            >
+              <Truck className="size-4" /> Pedir Carga ({produtosSelecionados.length})
             </Button>
             <Button
               onClick={() => comprarSelecionados.mutate()}
@@ -5426,8 +5558,14 @@ function OrdensCompra() {
 
       <ModalPedirCarga
         open={modalPedirCargaAberto}
-        onOpenChange={setModalPedirCargaAberto}
+        onOpenChange={(aberto) => {
+          setModalPedirCargaAberto(aberto);
+          if (!aberto) {
+            setItensCargaIniciais([]);
+          }
+        }}
         fornecedorInicialId={fornecedorCargaSelecionado}
+        itensIniciaisIds={itensCargaIniciais}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Truck,
@@ -73,14 +73,40 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fornecedorInicialId?: string | null;
+  itensIniciaisIds?: string[];
 }
 
-export function ModalPedirCarga({ open, onOpenChange, fornecedorInicialId }: Props) {
+export function ModalPedirCarga({
+  open,
+  onOpenChange,
+  fornecedorInicialId,
+  itensIniciaisIds,
+}: Props) {
   const qc = useQueryClient();
   const [passo, setPasso] = useState<1 | 2 | 3 | 4>(1);
   const [fornecedorId, setFornecedorId] = useState<string>(fornecedorInicialId || "");
   const [itensSelecionados, setItensSelecionados] = useState<Record<string, boolean>>({});
+  const [valoresUnitarios, setValoresUnitarios] = useState<Record<string, number>>({});
   const [busca, setBusca] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      if (fornecedorInicialId) {
+        setFornecedorId(fornecedorInicialId);
+        setPasso(2); // Migra diretamente para a aba OCs Pendentes do Fornecedor
+      } else {
+        setPasso(1);
+      }
+      if (itensIniciaisIds && itensIniciaisIds.length > 0) {
+        setItensSelecionados(
+          Object.fromEntries(itensIniciaisIds.map((id) => [id, true])),
+        );
+      } else {
+        setItensSelecionados({});
+      }
+      setValoresUnitarios({});
+    }
+  }, [open, fornecedorInicialId, itensIniciaisIds]);
 
   // Dados do formulário de fechamento (Passo 4)
   const [previsaoEntrega, setPrevisaoEntrega] = useState("");
@@ -214,8 +240,37 @@ export function ModalPedirCarga({ open, onOpenChange, fornecedorInicialId }: Pro
     return itensDoFornecedor.filter((item) => itensSelecionados[item.id] === true);
   }, [itensDoFornecedor, itensSelecionados]);
 
+  const getValorUnitario = (item: ItemPendente) => {
+    if (valoresUnitarios[item.id] !== undefined) {
+      return valoresUnitarios[item.id];
+    }
+    return item.valor_unitario;
+  };
+
+  const getTotalItem = (item: ItemPendente) => {
+    const unit = getValorUnitario(item);
+    return unit * item.quantidade;
+  };
+
+  const atualizarValorUnitarioItem = async (item: ItemPendente, novoValor: number) => {
+    const novoTotal = novoValor * item.quantidade;
+    try {
+      await supabase
+        .from("ordem_compra_itens")
+        .update({
+          valor_unitario: novoValor,
+          total: novoTotal,
+        })
+        .eq("id", item.id);
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+    } catch (err) {
+      console.error("Erro ao atualizar valor unitário:", err);
+    }
+  };
+
   const totalItensMarcados = itensMarcados.reduce((sum, item) => sum + item.quantidade, 0);
-  const totalValorMarcado = itensMarcados.reduce((sum, item) => sum + item.valor_total, 0);
+  const totalValorMarcado = itensMarcados.reduce((sum, item) => sum + getTotalItem(item), 0);
   const clientesAtendidos = Array.from(new Set(itensMarcados.map((i) => i.cliente_nome)));
 
   const todosFiltradosMarcados =
@@ -250,14 +305,14 @@ export function ModalPedirCarga({ open, onOpenChange, fornecedorInicialId }: Pro
       const numeros = (cargasExistentes ?? []).map((c: any) => c.numero);
       const numeroCarga = proximoCodigo("CRG", numeros);
 
-      // Snapshot dos itens
+      // Snapshot dos itens com valores atualizados
       const itensSnapshot: ItemCargaManifesto[] = itensMarcados.map((item) => ({
         ordem_numero: item.ordem_numero,
         cliente_nome: item.cliente_nome,
         produto_nome: item.produto_nome,
         quantidade: item.quantidade,
-        valor_unitario: item.valor_unitario,
-        valor_total: item.valor_total,
+        valor_unitario: getValorUnitario(item),
+        valor_total: getTotalItem(item),
       }));
 
       // 1. Cria a carga
@@ -286,7 +341,7 @@ export function ModalPedirCarga({ open, onOpenChange, fornecedorInicialId }: Pro
 
       const cargaId = novaCarga.id;
 
-      // 2. Insere itens na tabela cargas_itens
+      // 2. Insere itens na tabela cargas_itens com valores atualizados
       const payloadItens = itensMarcados.map((item) => ({
         carga_id: cargaId,
         ordem_id: item.ordem_id,
@@ -296,8 +351,8 @@ export function ModalPedirCarga({ open, onOpenChange, fornecedorInicialId }: Pro
         produto_id: item.produto_id,
         produto_nome: item.produto_nome,
         quantidade: item.quantidade,
-        valor_unitario: item.valor_unitario,
-        valor_total: item.valor_total,
+        valor_unitario: getValorUnitario(item),
+        valor_total: getTotalItem(item),
       }));
 
       const { error: erroItens } = await (supabase as any)
@@ -305,16 +360,21 @@ export function ModalPedirCarga({ open, onOpenChange, fornecedorInicialId }: Pro
         .insert(payloadItens);
       if (erroItens) throw erroItens;
 
-      // 3. Atualiza ordem_compra_itens para em_carga
-      const idsItens = itensMarcados.map((i) => i.id);
-      const { error: erroUpItens } = await supabase
-        .from("ordem_compra_itens")
-        .update({
-          carga_id: cargaId,
-          status_carga: "em_carga",
-        } as any)
-        .in("id", idsItens);
-      if (erroUpItens) throw erroUpItens;
+      // 3. Atualiza ordem_compra_itens para em_carga e sincroniza valor_unitario e total editados
+      for (const item of itensMarcados) {
+        const vlUnit = getValorUnitario(item);
+        const vlTotal = getTotalItem(item);
+        const { error: erroUpItens } = await supabase
+          .from("ordem_compra_itens")
+          .update({
+            carga_id: cargaId,
+            status_carga: "em_carga",
+            valor_unitario: vlUnit,
+            total: vlTotal,
+          } as any)
+          .eq("id", item.id);
+        if (erroUpItens) throw erroUpItens;
+      }
 
       // 4. Atualiza ordens_compra relacionadas
       const idsOrdens = Array.from(new Set(itensMarcados.map((i) => i.ordem_id)));
@@ -608,11 +668,32 @@ export function ModalPedirCarga({ open, onOpenChange, fornecedorInicialId }: Pro
                               <TableCell className="text-right font-bold">
                                 {item.quantidade} un.
                               </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {brl(item.valor_unitario)}
+                              <TableCell className="text-right font-mono" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="h-7 w-24 text-right font-mono text-xs ml-auto font-medium"
+                                  value={
+                                    valoresUnitarios[item.id] !== undefined
+                                      ? valoresUnitarios[item.id]
+                                      : item.valor_unitario
+                                  }
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setValoresUnitarios((prev) => ({
+                                      ...prev,
+                                      [item.id]: val,
+                                    }));
+                                  }}
+                                  onBlur={(e) => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    atualizarValorUnitarioItem(item, val);
+                                  }}
+                                />
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold text-foreground">
-                                {brl(item.valor_total)}
+                                {brl(getTotalItem(item))}
                               </TableCell>
                             </TableRow>
                           );
