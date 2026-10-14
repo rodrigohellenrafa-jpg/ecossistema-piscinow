@@ -35,6 +35,7 @@ import {
   sincronizarBaixaContaNaVenda,
   reverterBaixaContaNaVenda,
 } from "@/lib/venda-sincronizacao-financeira";
+import { excluirMovimentacaoPermanente } from "@/lib/exclusao-movimentacao";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -853,10 +854,18 @@ function Contas() {
 
   const excluir = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("contas").delete().eq("id", id);
-      if (error) throw error;
+      await excluirMovimentacaoPermanente(
+        {
+          id,
+          tipo: "conta",
+        },
+        qc,
+      );
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["contas"] }),
+    onSuccess: () => {
+      toast.success("Título excluído permanentemente e saldo atualizado.");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const abrirEdicao = (c: Conta) => {

@@ -1,13 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownCircle, ArrowUpCircle, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CheckCircle2,
+  Loader2,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -27,6 +44,12 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR } from "@/lib/erp";
+import {
+  agruparDuplicidadesMovimentacoes,
+  excluirDuplicidadesEmLote,
+  excluirMovimentacaoPermanente,
+  type LinhaMovimentacao,
+} from "@/lib/exclusao-movimentacao";
 
 export const Route = createFileRoute("/movimentacoes")({
   staticData: { sitemap: false },
@@ -54,19 +77,7 @@ export const Route = createFileRoute("/movimentacoes")({
   ),
 });
 
-type Linha = {
-  id: string;
-  data: string;
-  descricao: string;
-  parceiro: string;
-  origem: string;
-  categoria: string;
-  conta: string;
-  sentido: "entrada" | "saida";
-  valor: number;
-  realizado: boolean;
-  link?: string;
-};
+export type Linha = LinhaMovimentacao;
 
 export function Movimentacoes() {
   const qc = useQueryClient();
@@ -77,6 +88,11 @@ export function Movimentacoes() {
   const [conta, setConta] = useState("todas");
   const [de, setDe] = useState("");
   const [ate, setAte] = useState("");
+
+  const [itemParaExcluir, setItemParaExcluir] = useState<Linha | null>(null);
+  const [modalDuplicidadesAberto, setModalDuplicidadesAberto] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [excluindoLote, setExcluindoLote] = useState(false);
 
   useEffect(() => {
     const atualizar = () => {
@@ -145,7 +161,7 @@ export function Movimentacoes() {
     }
 
     for (const c of contas as unknown as Record<string, string | number | null>[]) {
-      // Não duplica receitas de vendas que já têm lançamento financeiro
+      // Não duplica receitas de vendas que já têm lançamento financeiro no fluxo
       if (c.venda_id && c.tipo === "receber" && vendasEmLancamentos.has(String(c.venda_id))) {
         continue;
       }
@@ -160,6 +176,8 @@ export function Movimentacoes() {
 
       lista.push({
         id: `conta-${c.id}`,
+        rawId: String(c.id),
+        tipoRegistro: "conta",
         data: String(pago ? (c.data_pagamento ?? c.vencimento) : c.vencimento).slice(0, 10),
         descricao:
           retencao > 0.009
@@ -173,6 +191,7 @@ export function Movimentacoes() {
         valor: valorLiquid,
         realizado: pago,
         link: "/contas",
+        vendaId: c.venda_id ? String(c.venda_id) : null,
       });
     }
 
@@ -182,6 +201,8 @@ export function Movimentacoes() {
       const receita = l.tipo_fluxo === "receita" || l.tipo_fluxo === "entrada";
       lista.push({
         id: `lanc-${l.id}`,
+        rawId: String(l.id),
+        tipoRegistro: "lancamento",
         data: String((pago ? l.data_pagamento : null) ?? l.vencimento ?? l.data_competencia).slice(
           0,
           10,
@@ -195,21 +216,48 @@ export function Movimentacoes() {
         valor: Number(l.valor ?? 0),
         realizado: pago,
         link: "/financeiro",
+        vendaId: l.venda_id ? String(l.venda_id) : null,
       });
     }
 
     return lista.sort((a, b) => (a.data < b.data ? 1 : -1));
   }, [contas, lancamentos]);
 
-  const origens = useMemo(() => Array.from(new Set(linhas.map((l) => l.origem))).sort(), [linhas]);
+  // Agrupamento de possíveis duplicidades
+  const gruposDuplicados = useMemo(() => {
+    return agruparDuplicidadesMovimentacoes(linhas);
+  }, [linhas]);
+
+  const todosItensDuplicados = useMemo(() => {
+    return gruposDuplicados.flatMap((g) => g.duplicados);
+  }, [gruposDuplicados]);
+
+  const idsDuplicados = useMemo(() => {
+    return new Set(todosItensDuplicados.map((d) => d.id));
+  }, [todosItensDuplicados]);
+
+  const linhasComFlag = useMemo(() => {
+    return linhas.map((l) => ({
+      ...l,
+      ehDuplicado: idsDuplicados.has(l.id),
+    }));
+  }, [linhas, idsDuplicados]);
+
+  const origens = useMemo(
+    () => Array.from(new Set(linhasComFlag.map((l) => l.origem))).sort(),
+    [linhasComFlag],
+  );
   const contasLista = useMemo(
-    () => Array.from(new Set(linhas.map((l) => l.conta).filter((c) => c && c !== "—"))).sort(),
-    [linhas],
+    () =>
+      Array.from(
+        new Set(linhasComFlag.map((l) => l.conta).filter((c) => c && c !== "—")),
+      ).sort(),
+    [linhasComFlag],
   );
 
   const filtradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    return linhas.filter((l) => {
+    return linhasComFlag.filter((l) => {
       if (sentido !== "todos" && l.sentido !== sentido) return false;
       if (situacao === "realizado" && !l.realizado) return false;
       if (situacao === "previsto" && l.realizado) return false;
@@ -226,7 +274,7 @@ export function Movimentacoes() {
         return false;
       return true;
     });
-  }, [linhas, busca, sentido, situacao, origem, conta, de, ate]);
+  }, [linhasComFlag, busca, sentido, situacao, origem, conta, de, ate]);
 
   const soma = (fn: (l: Linha) => boolean) =>
     filtradas.filter(fn).reduce((acc, l) => acc + l.valor, 0);
@@ -257,17 +305,95 @@ export function Movimentacoes() {
     setAte("");
   };
 
+  const handleConfirmarExclusaoUnica = async () => {
+    if (!itemParaExcluir) return;
+    try {
+      setExcluindo(true);
+      await excluirMovimentacaoPermanente(
+        {
+          id: itemParaExcluir.rawId,
+          tipo: itemParaExcluir.tipoRegistro,
+          descricao: itemParaExcluir.descricao,
+          valor: itemParaExcluir.valor,
+          contaBancaria: itemParaExcluir.conta,
+          sentido: itemParaExcluir.sentido,
+          realizado: itemParaExcluir.realizado,
+          vendaId: itemParaExcluir.vendaId,
+        },
+        qc,
+      );
+      toast.success("Registro removido permanentemente e saldo atualizado imediatamente!");
+      setItemParaExcluir(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir registro.");
+    } finally {
+      setExcluindo(false);
+    }
+  };
+
+  const handleExcluirTodosDuplicados = async () => {
+    if (todosItensDuplicados.length === 0) return;
+    try {
+      setExcluindoLote(true);
+      const res = await excluirDuplicidadesEmLote(todosItensDuplicados, qc);
+      toast.success(
+        `${res.removidos} lançamento(s) duplicado(s) removido(s) com sucesso! Saldo recalculado.`,
+      );
+      setModalDuplicidadesAberto(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir duplicados em lote.");
+    } finally {
+      setExcluindoLote(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Movimentações"
         subtitle="Tudo que entra e sai do sistema — já realizado ou ainda previsto."
         actions={
-          <Button variant="outline" asChild>
-            <Link to="/fluxo-caixa">Fluxo de caixa</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {idsDuplicados.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-1.5 shadow-sm"
+                onClick={() => setModalDuplicidadesAberto(true)}
+              >
+                <Trash2 className="size-4" />
+                Limpar Duplicados ({idsDuplicados.size})
+              </Button>
+            )}
+            <Button variant="outline" asChild>
+              <Link to="/fluxo-caixa">Fluxo de caixa</Link>
+            </Button>
+          </div>
         }
       />
+
+      {/* Alerta de Lançamentos Duplicados Detectados */}
+      {idsDuplicados.size > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3.5 text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div>
+              <span className="font-semibold">Lançamentos duplicados identificados:</span> Existem{" "}
+              {idsDuplicados.size} registros concorrentes que podem distorcer o saldo bancário e o
+              faturamento.
+            </div>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setModalDuplicidadesAberto(true)}
+            className="shrink-0 gap-1.5 shadow-sm"
+          >
+            <Trash2 className="size-4" />
+            Revisar e Excluir Duplicados ({idsDuplicados.size})
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Kpi
@@ -288,7 +414,7 @@ export function Movimentacoes() {
           label="Saldo em conta"
           value={brl(saldoBancos)}
           tone={saldoBancos >= 0 ? "positive" : "negative"}
-          hint="só muda quando é pago/recebido"
+          hint="atualizado em tempo real"
         />
       </div>
 
@@ -370,7 +496,7 @@ export function Movimentacoes() {
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <Table className="min-w-[1000px]">
+          <Table className="min-w-[1050px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
@@ -382,20 +508,26 @@ export function Movimentacoes() {
                 <TableHead>Situação</TableHead>
                 <TableHead className="text-right">Entrada</TableHead>
                 <TableHead className="text-right">Saída</TableHead>
+                <TableHead className="w-[90px] text-center">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtradas.map((l) => (
-                <TableRow key={l.id}>
+                <TableRow
+                  key={l.id}
+                  className={l.ehDuplicado ? "bg-amber-50/40 dark:bg-amber-950/20" : undefined}
+                >
                   <TableCell className="whitespace-nowrap">{dataBR(l.data)}</TableCell>
                   <TableCell className="max-w-[280px]">
-                    {l.link ? (
-                      <Link to={l.link} className="hover:underline">
-                        {l.descricao}
-                      </Link>
-                    ) : (
-                      l.descricao
-                    )}
+                    <div className="flex flex-col gap-0.5">
+                      {l.link ? (
+                        <Link to={l.link} className="hover:underline">
+                          {l.descricao}
+                        </Link>
+                      ) : (
+                        l.descricao
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{l.parceiro}</TableCell>
                   <TableCell className="whitespace-nowrap">
@@ -421,11 +553,33 @@ export function Movimentacoes() {
                   <TableCell className="text-right text-destructive">
                     {l.sentido === "saida" ? brl(l.valor) : "—"}
                   </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {l.ehDuplicado && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/50 bg-amber-500/15 text-[10px] text-amber-700 dark:text-amber-300"
+                          title="Lançamento com duplicidade detectada"
+                        >
+                          Duplicado
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                        title="Excluir lançamento permanentemente"
+                        onClick={() => setItemParaExcluir(l)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
               {filtradas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                     Nenhuma movimentação com esses filtros.
                   </TableCell>
                 </TableRow>
@@ -439,6 +593,7 @@ export function Movimentacoes() {
                   </TableCell>
                   <TableCell className="text-right text-success">{brl(totalEntradas)}</TableCell>
                   <TableCell className="text-right text-destructive">{brl(totalSaidas)}</TableCell>
+                  <TableCell />
                 </TableRow>
                 <TableRow className="bg-muted/50 font-semibold">
                   <TableCell colSpan={8} className="whitespace-nowrap">
@@ -449,12 +604,260 @@ export function Movimentacoes() {
                   >
                     {brl(saldoPeriodo)}
                   </TableCell>
+                  <TableCell />
                 </TableRow>
               </TableFooter>
             )}
           </Table>
         </CardContent>
       </Card>
+
+      {/* Modal de Confirmação de Exclusão Individual */}
+      <Dialog
+        open={Boolean(itemParaExcluir)}
+        onOpenChange={(aberto) => !aberto && !excluindo && setItemParaExcluir(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="size-5" /> Excluir permanentemente?
+            </DialogTitle>
+            <DialogDescription>
+              Esta operação removerá definitivamente este registro do banco de dados e atualizará o
+              saldo da conta bancária imediatamente.
+            </DialogDescription>
+          </DialogHeader>
+
+          {itemParaExcluir && (
+            <div className="space-y-2.5 rounded-lg border bg-muted/40 p-4 text-xs sm:text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Descrição:</span>
+                <span className="font-semibold text-foreground text-right">
+                  {itemParaExcluir.descricao}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Valor:</span>
+                <span className="text-base font-bold text-foreground tabular-nums">
+                  {brl(itemParaExcluir.valor)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Data:</span>
+                <span>{dataBR(itemParaExcluir.data)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Conta Bancária:</span>
+                <span className="font-medium">{itemParaExcluir.conta}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Origem do Registro:</span>
+                <span>{itemParaExcluir.origem}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Situação:</span>
+                <Badge variant={itemParaExcluir.realizado ? "default" : "outline"}>
+                  {itemParaExcluir.realizado ? "Realizado (estorna saldo bancário)" : "Previsto"}
+                </Badge>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={excluindo}
+              onClick={() => setItemParaExcluir(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={excluindo}
+              onClick={handleConfirmarExclusaoUnica}
+              className="gap-2"
+            >
+              {excluindo ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Excluindo...
+                </>
+              ) : (
+                "Sim, excluir permanentemente"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Gestão e Exclusão em Lote de Lançamentos Duplicados */}
+      <Dialog
+        open={modalDuplicidadesAberto}
+        onOpenChange={(aberto) => !aberto && !excluindoLote && setModalDuplicidadesAberto(false)}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="size-5" /> Lançamentos Duplicados Detectados (
+              {idsDuplicados.size})
+            </DialogTitle>
+            <DialogDescription>
+              Abaixo estão os grupos de lançamentos que possuem a mesma data, valor, pedido de venda
+              ou conta. Você pode excluir os registros duplicados mantendo o lançamento original.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {gruposDuplicados.map((grupo, gIdx) => (
+              <div
+                key={grupo.id}
+                className="rounded-lg border border-border bg-card p-4 space-y-3 shadow-sm"
+              >
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Grupo {gIdx + 1}: {grupo.criterio}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    Excedente: {brl(grupo.totalDuplicado)}
+                  </Badge>
+                </div>
+
+                {/* Registro Principal (Mantido) */}
+                <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs sm:text-sm">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 font-semibold text-emerald-800 dark:text-emerald-300">
+                      <CheckCircle2 className="size-4" /> Lançamento Original (Será mantido)
+                    </span>
+                    <Badge variant="outline" className="text-emerald-700 dark:text-emerald-300">
+                      {grupo.principal.origem}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-muted-foreground">
+                    <div>
+                      <span className="text-[11px] block">Data:</span>
+                      <strong className="text-foreground">{dataBR(grupo.principal.data)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[11px] block">Valor:</span>
+                      <strong className="text-foreground tabular-nums">
+                        {brl(grupo.principal.valor)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[11px] block">Conta:</span>
+                      <strong className="text-foreground">{grupo.principal.conta}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[11px] block">Situação:</span>
+                      <strong className="text-foreground">
+                        {grupo.principal.realizado ? "Realizado" : "Previsto"}
+                      </strong>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-foreground/80 truncate">
+                    {grupo.principal.descricao}
+                  </p>
+                </div>
+
+                {/* Registros Duplicados (Marcados para exclusão) */}
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-destructive">
+                    Registros duplicados que devem ser excluídos permanentemente:
+                  </span>
+                  {grupo.duplicados.map((dup) => (
+                    <div
+                      key={dup.id}
+                      className="flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs sm:text-sm"
+                    >
+                      <div className="space-y-0.5 max-w-[75%]">
+                        <div className="flex items-center gap-2">
+                          <strong className="text-foreground">{brl(dup.valor)}</strong>
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">{dataBR(dup.data)}</span>
+                          <span className="text-muted-foreground">·</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {dup.origem}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{dup.descricao}</p>
+                      </div>
+
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={excluindoLote}
+                        onClick={async () => {
+                          try {
+                            await excluirMovimentacaoPermanente(
+                              {
+                                id: dup.rawId,
+                                tipo: dup.tipoRegistro,
+                                descricao: dup.descricao,
+                                valor: dup.valor,
+                                contaBancaria: dup.conta,
+                                sentido: dup.sentido,
+                                realizado: dup.realizado,
+                                vendaId: dup.vendaId,
+                              },
+                              qc,
+                            );
+                            toast.success("Duplicado excluído e saldo atualizado!");
+                          } catch (e) {
+                            toast.error(
+                              e instanceof Error ? e.message : "Erro ao excluir duplicado.",
+                            );
+                          }
+                        }}
+                        className="gap-1 h-8 px-2.5 text-xs"
+                      >
+                        <Trash2 className="size-3.5" /> Excluir Este
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {gruposDuplicados.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Nenhum lançamento duplicado encontrado no momento.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={excluindoLote}
+              onClick={() => setModalDuplicidadesAberto(false)}
+            >
+              Fechar
+            </Button>
+            {todosItensDuplicados.length > 0 && (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={excluindoLote}
+                onClick={handleExcluirTodosDuplicados}
+                className="gap-2"
+              >
+                {excluindoLote ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> Excluindo todos...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="size-4" /> Excluir Todos os Duplicados (
+                    {todosItensDuplicados.length})
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -26,6 +26,7 @@ import {
   type ItemLancamentoComparacao,
 } from "@/components/alerta-duplicidade-dialog";
 import { CentroCustoField, VinculoField, parseVinculo } from "@/components/centro-custo-field";
+import { excluirMovimentacaoPermanente } from "@/lib/exclusao-movimentacao";
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -530,19 +531,16 @@ function Financeiro() {
 
   const excluir = useMutation({
     mutationFn: async (id: string) => {
-      const { data: orig } = await supabase
-        .from("lancamentos_financeiros")
-        .select("tipo_fluxo, valor, status, conta_bancaria")
-        .eq("id", id)
-        .maybeSingle();
-
-      const { error } = await supabase.from("lancamentos_financeiros").delete().eq("id", id);
-      if (error) throw error;
+      await excluirMovimentacaoPermanente(
+        {
+          id,
+          tipo: "lancamento",
+        },
+        qc,
+      );
     },
     onSuccess: () => {
-      toast.success("Lançamento excluído.");
-      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      toast.success("Lançamento excluído permanentemente e saldo atualizado.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
