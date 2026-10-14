@@ -36,6 +36,11 @@ import {
   reverterBaixaContaNaVenda,
 } from "@/lib/venda-sincronizacao-financeira";
 import { excluirMovimentacaoPermanente } from "@/lib/exclusao-movimentacao";
+import {
+  useFinancialRealtimeSync,
+  broadcastFinancialMutation,
+  sincronizarConsultasFinanceiras,
+} from "@/lib/financial-realtime-sync";
 import { Field } from "@/components/field";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -240,6 +245,7 @@ function noPeriodo(
 
 function Contas() {
   const qc = useQueryClient();
+  const { isConnected } = useFinancialRealtimeSync({ canalNome: "tela-contas-sync" });
   const [open, setOpen] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
   useAbrirModal("novo", () => setOpen(true));
@@ -623,8 +629,12 @@ function Contas() {
         { categoria: "", valor: "" },
       ]);
       setOpen(false);
-      qc.invalidateQueries({ queryKey: ["contas"] });
-      qc.invalidateQueries({ queryKey: ["conta-rateios"] });
+      broadcastFinancialMutation({
+        origem: "contas",
+        tipo: editando ? "update" : "insert",
+        tabela: "contas",
+      });
+      void sincronizarConsultasFinanceiras(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -686,17 +696,12 @@ function Contas() {
     },
     onSuccess: () => {
       toast.success("Baixa revertida — o valor voltou para o saldo da conta.");
-      qc.invalidateQueries({ queryKey: ["contas"] });
-      qc.invalidateQueries({ queryKey: ["vendas"] });
-      qc.invalidateQueries({ queryKey: ["venda"] });
-      qc.invalidateQueries({ queryKey: ["venda-pagamentos"] });
-      qc.invalidateQueries({ queryKey: ["venda-parcelas"] });
-      qc.invalidateQueries({ queryKey: ["historico-venda"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
-      qc.invalidateQueries({ queryKey: ["movimentacoes"] });
-      qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
-      qc.invalidateQueries({ queryKey: ["resumo-periodo-base"] });
+      broadcastFinancialMutation({
+        origem: "contas",
+        tipo: "estorno",
+        tabela: "contas",
+      });
+      void sincronizarConsultasFinanceiras(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -837,17 +842,12 @@ function Contas() {
     },
     onSuccess: () => {
       toast.success("Baixa registrada e sincronizada com o pedido de venda.");
-      qc.invalidateQueries({ queryKey: ["contas"] });
-      qc.invalidateQueries({ queryKey: ["vendas"] });
-      qc.invalidateQueries({ queryKey: ["venda"] });
-      qc.invalidateQueries({ queryKey: ["venda-pagamentos"] });
-      qc.invalidateQueries({ queryKey: ["venda-parcelas"] });
-      qc.invalidateQueries({ queryKey: ["historico-venda"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-      qc.invalidateQueries({ queryKey: ["movimentacoes"] });
-      qc.invalidateQueries({ queryKey: ["fluxo-caixa"] });
-      qc.invalidateQueries({ queryKey: ["resumo-periodo-base"] });
+      broadcastFinancialMutation({
+        origem: "contas",
+        tipo: "baixa",
+        tabela: "contas",
+      });
+      void sincronizarConsultasFinanceiras(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -864,6 +864,12 @@ function Contas() {
     },
     onSuccess: () => {
       toast.success("Título excluído permanentemente e saldo atualizado.");
+      broadcastFinancialMutation({
+        origem: "contas",
+        tipo: "delete",
+        tabela: "contas",
+      });
+      void sincronizarConsultasFinanceiras(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -927,6 +933,16 @@ function Contas() {
           <p className="text-sm text-muted-foreground">Títulos com vencimento e baixa manual.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 px-2.5 py-1.5 rounded-full border">
+            <span
+              className={`size-2 rounded-full ${
+                isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+              }`}
+            />
+            <span className="font-medium text-[11px]">
+              {isConnected ? "Sincronização em tempo real ativa" : "Conectando..."}
+            </span>
+          </div>
           <Button
             type="button"
             variant="outline"

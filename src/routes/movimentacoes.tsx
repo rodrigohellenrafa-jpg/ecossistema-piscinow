@@ -50,6 +50,7 @@ import {
   excluirMovimentacaoPermanente,
   type LinhaMovimentacao,
 } from "@/lib/exclusao-movimentacao";
+import { useFinancialRealtimeSync } from "@/lib/financial-realtime-sync";
 
 export const Route = createFileRoute("/movimentacoes")({
   staticData: { sitemap: false },
@@ -94,30 +95,7 @@ export function Movimentacoes() {
   const [excluindo, setExcluindo] = useState(false);
   const [excluindoLote, setExcluindoLote] = useState(false);
 
-  useEffect(() => {
-    const atualizar = () => {
-      qc.invalidateQueries({ queryKey: ["contas"] });
-      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-    };
-    const canal = supabase
-      .channel("movimentacoes-financeiras")
-      .on("postgres_changes", { event: "*", schema: "public", table: "contas" }, atualizar)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "lancamentos_financeiros" },
-        atualizar,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "saldos_bancarios" },
-        atualizar,
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(canal);
-    };
-  }, [qc]);
+  const { isConnected } = useFinancialRealtimeSync({ canalNome: "tela-movimentacoes-sync" });
 
   const { data: contas = [] } = useQuery({
     queryKey: ["contas"],
@@ -354,6 +332,16 @@ export function Movimentacoes() {
         subtitle="Tudo que entra e sai do sistema — já realizado ou ainda previsto."
         actions={
           <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 px-2.5 py-1.5 rounded-full border">
+              <span
+                className={`size-2 rounded-full ${
+                  isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                }`}
+              />
+              <span className="font-medium text-[11px]">
+                {isConnected ? "Sincronização em tempo real ativa" : "Conectando..."}
+              </span>
+            </div>
             {idsDuplicados.size > 0 && (
               <Button
                 variant="destructive"

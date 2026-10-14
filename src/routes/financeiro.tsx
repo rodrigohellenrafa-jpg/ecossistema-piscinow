@@ -27,6 +27,11 @@ import {
 } from "@/components/alerta-duplicidade-dialog";
 import { CentroCustoField, VinculoField, parseVinculo } from "@/components/centro-custo-field";
 import { excluirMovimentacaoPermanente } from "@/lib/exclusao-movimentacao";
+import {
+  useFinancialRealtimeSync,
+  broadcastFinancialMutation,
+  sincronizarConsultasFinanceiras,
+} from "@/lib/financial-realtime-sync";
 import { Field } from "@/components/field";
 import { Kpi, PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -171,6 +176,7 @@ const vazio = {
 
 function Financeiro() {
   const qc = useQueryClient();
+  const { isConnected } = useFinancialRealtimeSync({ canalNome: "tela-financeiro-lancamentos" });
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Lancamento | null>(null);
@@ -382,9 +388,12 @@ function Financeiro() {
         { categoria: "", valor: "" },
       ]);
       setOpen(false);
-      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
-      qc.invalidateQueries({ queryKey: ["lancamento-rateios"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
+      broadcastFinancialMutation({
+        origem: "financeiro",
+        tipo: editando ? "update" : "insert",
+        tabela: "lancamentos_financeiros",
+      });
+      void sincronizarConsultasFinanceiras(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -443,9 +452,12 @@ function Financeiro() {
     },
     onSuccess: () => {
       toast.success("Baixa revertida — o valor voltou para o saldo da conta.");
-      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
+      broadcastFinancialMutation({
+        origem: "financeiro",
+        tipo: "estorno",
+        tabela: "lancamentos_financeiros",
+      });
+      void sincronizarConsultasFinanceiras(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -511,9 +523,12 @@ function Financeiro() {
     onSuccess: () => {
       toast.success("Lançamento pago e saldo da conta atualizado.");
       setBaixa(null);
-      qc.invalidateQueries({ queryKey: ["lancamentos_financeiros"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios"] });
-      qc.invalidateQueries({ queryKey: ["saldos-bancarios-select"] });
+      broadcastFinancialMutation({
+        origem: "financeiro",
+        tipo: "baixa",
+        tabela: "lancamentos_financeiros",
+      });
+      void sincronizarConsultasFinanceiras(qc);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -647,6 +662,16 @@ function Financeiro() {
         subtitle="Lançamentos financeiros, evolução mensal e conciliação bancária."
         actions={
           <>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 px-2.5 py-1.5 rounded-full border">
+              <span
+                className={`size-2 rounded-full ${
+                  isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                }`}
+              />
+              <span className="font-medium text-[11px]">
+                {isConnected ? "Sincronização em tempo real ativa" : "Conectando..."}
+              </span>
+            </div>
             <LancarEmLote destino="financeiro" />
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger

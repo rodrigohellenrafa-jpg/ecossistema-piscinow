@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, mesLabel, pct } from "@/lib/erp";
+import { useFinancialRealtimeSync } from "@/lib/financial-realtime-sync";
 
 export const Route = createFileRoute("/dre")({
   staticData: { sitemap: false },
@@ -58,6 +59,7 @@ const meses = [
 ];
 
 function Dre() {
+  useFinancialRealtimeSync({ canalNome: "tela-dre-sync" });
   const [visao, setVisao] = useState<"mensal" | "anual" | "trimestral" | "personalizado">("mensal");
   const [trimestre, setTrimestre] = useState("1");
   const [inicio, setInicio] = useState(`${anoAtual}-01-01`);

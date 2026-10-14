@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR } from "@/lib/erp";
+import { useFinancialRealtimeSync } from "@/lib/financial-realtime-sync";
 
 export const Route = createFileRoute("/resumo-periodo")({
   staticData: { sitemap: false },
@@ -66,6 +67,7 @@ type Secao = {
 function ResumoPeriodo() {
   const [de, setDe] = useState(inicioMes());
   const [ate, setAte] = useState(hoje());
+  useFinancialRealtimeSync({ canalNome: "tela-resumo-periodo-sync" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["resumo-periodo-base"],

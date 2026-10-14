@@ -42,6 +42,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, mesLabel } from "@/lib/erp";
+import { useFinancialRealtimeSync } from "@/lib/financial-realtime-sync";
 
 export const Route = createFileRoute("/fluxo-caixa")({
   staticData: { sitemap: false },
@@ -82,6 +83,7 @@ type Movimento = {
 
 function FluxoCaixa() {
   const [horizonte, setHorizonte] = useState("90");
+  const { isConnected } = useFinancialRealtimeSync({ canalNome: "tela-fluxo-caixa-sync" });
 
   const { data: contas = [] } = useQuery({
     queryKey: ["contas"],
@@ -231,6 +233,16 @@ function FluxoCaixa() {
         subtitle="Entradas e saídas consolidadas de contas a pagar, contas a receber e lançamentos financeiros."
         actions={
           <>
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 px-2.5 py-1.5 rounded-full border">
+              <span
+                className={`size-2 rounded-full ${
+                  isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                }`}
+              />
+              <span className="font-medium text-[11px]">
+                {isConnected ? "Sincronização em tempo real ativa" : "Conectando..."}
+              </span>
+            </div>
             <Select value={horizonte} onValueChange={setHorizonte}>
               <SelectTrigger className="w-44">
                 <SelectValue />
