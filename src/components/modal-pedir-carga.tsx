@@ -382,16 +382,28 @@ export function ModalPedirCarga({
         if (erroUpItens) throw erroUpItens;
       }
 
-      // 4. Atualiza ordens_compra relacionadas
+      // 4. Atualiza ordens_compra relacionadas como Comprado / Em Trânsito
       const idsOrdens = Array.from(new Set(itensMarcados.map((i) => i.ordem_id)));
       for (const ordemId of idsOrdens) {
         await supabase
           .from("ordens_compra")
           .update({
             carga_id: cargaId,
-            status_carga: "em_carga",
+            status: "comprado",
+            status_carga: "em_transito",
           } as any)
           .eq("id", ordemId);
+      }
+
+      // 5. Atualiza status dos produtos marcados
+      const idsProdutos = Array.from(
+        new Set(itensMarcados.map((i) => i.produto_id).filter(Boolean)),
+      ) as string[];
+      if (idsProdutos.length > 0) {
+        await supabase
+          .from("produtos")
+          .update({ status_compra: "comprado" })
+          .in("id", idsProdutos);
       }
 
       return {
@@ -411,10 +423,14 @@ export function ModalPedirCarga({
       } as CargaManifestoDados;
     },
     onSuccess: (dados) => {
-      toast.success(`Carga #${dados.numero} criada e solicitada com sucesso!`);
+      toast.success(
+        `Ordem executada e Carga #${dados.numero} gerada com sucesso! Itens marcados como Comprado / Em Trânsito.`,
+      );
       qc.invalidateQueries({ queryKey: ["cargas"] });
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+      qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] });
 
       setCargaCriada(dados);
       setManifestoAberto(true);
@@ -951,8 +967,8 @@ export function ModalPedirCarga({
                   disabled={criarCargaMutation.isPending || itensMarcados.length === 0}
                   className="gap-1.5 text-xs font-bold bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
                 >
-                  <CheckCircle2 className="size-4" />
-                  Confirmar e Enviar Pedido de Carga
+                  <ShoppingCart className="size-4" />
+                  Executar Ordem / Fechar Carga
                 </Button>
               )}
             </div>

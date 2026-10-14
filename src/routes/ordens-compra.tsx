@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Ban,
   Boxes,
   Building2,
   Check,
@@ -16,17 +17,21 @@ import {
   Filter,
   Layers,
   Link2,
+  Mail,
   Maximize2,
+  MessageSquare,
   Minimize2,
   Package,
   Pencil,
   Plus,
+  Printer,
   Save,
   Search,
   ShoppingCart,
   Trash2,
   Truck,
   Unlink,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -67,7 +72,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { DocumentoOrdemCompra } from "@/components/documento-ordem-compra";
+import { DocumentoOrdemCompra, gerarPdfOrdemCompra } from "@/components/documento-ordem-compra";
 import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import { ModalPedirCarga } from "@/components/modal-pedir-carga";
 import { supabase } from "@/integrations/supabase/client";
@@ -272,12 +277,14 @@ const novoItemVazio = {
 function OrdensCompra() {
   const qc = useQueryClient();
   const [abaVisao, setAbaVisao] = useState<"fornecedores" | "grade" | "executadas">("fornecedores");
-  const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("todos");
-  const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("todos");
+  const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("com_vinculo");
+  const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("precisa_comprar");
   const [filtroExibicaoCatalogo, setFiltroExibicaoCatalogo] = useState<
     "apenas_vinculados_selecionados" | "catalogo_completo"
   >("apenas_vinculados_selecionados");
   const [ocultarJaComprados, setOcultarJaComprados] = useState(true);
+  const [linhasExpandidas, setLinhasExpandidas] = useState<Record<string, boolean>>({});
+  const [ordensExpandidas, setOrdensExpandidas] = useState<Record<string, boolean>>({});
   const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
   const [filtroFornecedor, setFiltroFornecedor] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
@@ -348,6 +355,22 @@ function OrdensCompra() {
       return data as Fornecedor[];
     },
   });
+
+  /** Garante que Analândia e Progeu estejam sempre presentes na lista de fornecedores */
+  const fornecedoresCompletos = useMemo(() => {
+    const lista = [...fornecedores];
+    const temAnalandia = lista.some(
+      (f) => normalizar(f.nome).includes("analandia") || normalizar(f.nome).includes("analândia"),
+    );
+    if (!temAnalandia) {
+      lista.unshift({ id: "analandia", nome: "Analândia" });
+    }
+    const temProgeu = lista.some((f) => normalizar(f.nome).includes("progeu"));
+    if (!temProgeu) {
+      lista.push({ id: "progeu", nome: "Progeu" });
+    }
+    return lista;
+  }, [fornecedores]);
 
   const { data: produtos = [] } = useQuery({
     queryKey: ["produtos", "lista-simples"],
@@ -698,6 +721,24 @@ function OrdensCompra() {
     },
   });
 
+  /** Kits e combos de vendas para desmembramento automático de cascos e acessórios na fila. */
+  const { data: kitsVendas = [] } = useQuery({
+    queryKey: ["venda_kit", "consumo-compras"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("venda_kit")
+        .select("id, venda_id, casco_id, filtro_id, acessorios");
+      if (error) throw error;
+      return (data ?? []) as {
+        id: string;
+        venda_id: string;
+        casco_id: string | null;
+        filtro_id: string | null;
+        acessorios: { produto_id?: string; nome?: string; valor?: number }[] | null;
+      }[];
+    },
+  });
+
   const vendaPorId = useMemo(() => {
     const m = new Map<
       string,
@@ -741,6 +782,7 @@ function OrdensCompra() {
       if (
         it.carga_id ||
         it.status_carga === "em_carga" ||
+        it.status_carga === "em_transito" ||
         it.status_carga === "entregue" ||
         (ordem as any)?.carga_id
       ) {
@@ -779,16 +821,21 @@ function OrdensCompra() {
     };
   }, [itensTodos, ordens]);
 
-  /** Demanda consolidada PENDENTE: apenas pedidos de venda ativos que ainda NÃO tiveram ordem de compra gerada e que não foram entregues/instalados/concluídos. */
+  /** Demanda consolidada PENDENTE: apenas pedidos de venda ativos que ainda NÃO tiveram ordem de compra gerada e que não foram entregues/instalados/concluídos. Desmembra combos de venda_kit automaticamente. */
   const demandaPorProduto = useMemo(() => {
     const mapa = new Map<
       string,
       { total: number; pedidos: { id: string; rotulo: string; quantidade: number }[] }
     >();
+
+    const paresProcessados = new Set<string>();
+
     for (const item of consumoItens) {
       if (!item.produto_id) continue;
       const quantidadeTotal = Number(item.quantidade ?? 0);
       if (quantidadeTotal <= 0) continue;
+
+      paresProcessados.add(`${item.produto_id}::${item.venda_id}`);
 
       const venda = vendaPorId.get(item.venda_id);
       // Oculta automaticamente itens de pedidos já entregues, instalados, concluídos, cancelados ou orçamento
@@ -822,8 +869,54 @@ function OrdensCompra() {
       atual.total += quantidadePendente;
       mapa.set(item.produto_id, atual);
     }
+
+    // Desmembramento automático de kits/combos gravados em venda_kit
+    for (const kit of kitsVendas) {
+      const venda = vendaPorId.get(kit.venda_id);
+      const statusVenda = (venda?.status_pedido || "").toLowerCase().trim();
+      if (
+        statusVenda === "entregue" ||
+        statusVenda === "instalado" ||
+        statusVenda === "instalada" ||
+        statusVenda === "concluido" ||
+        statusVenda === "concluida" ||
+        statusVenda === "cancelado" ||
+        statusVenda === "cancelada" ||
+        statusVenda === "orcamento"
+      ) {
+        continue;
+      }
+
+      const itensKit: string[] = [];
+      if (kit.casco_id) itensKit.push(kit.casco_id);
+      if (kit.filtro_id) itensKit.push(kit.filtro_id);
+      if (kit.acessorios && Array.isArray(kit.acessorios)) {
+        for (const ac of kit.acessorios) {
+          if (ac && ac.produto_id) itensKit.push(ac.produto_id);
+        }
+      }
+
+      for (const prodId of itensKit) {
+        const chave = `${prodId}::${kit.venda_id}`;
+        if (paresProcessados.has(chave)) continue;
+        paresProcessados.add(chave);
+
+        const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+        const quantidadePendente = Math.max(0, 1 - jaComprado);
+        if (quantidadePendente <= 0) continue;
+
+        const atual = mapa.get(prodId) ?? { total: 0, pedidos: [] };
+        const rotulo = `${venda?.numero ?? "Pedido"} — ${venda?.cliente_nome ?? "Cliente"}`;
+        const existente = atual.pedidos.find((p) => p.id === kit.venda_id);
+        if (existente) existente.quantidade += quantidadePendente;
+        else atual.pedidos.push({ id: kit.venda_id, rotulo, quantidade: quantidadePendente });
+        atual.total += quantidadePendente;
+        mapa.set(prodId, atual);
+      }
+    }
+
     return mapa;
-  }, [consumoItens, vendaPorId, itensCompradosInfo]);
+  }, [consumoItens, kitsVendas, vendaPorId, itensCompradosInfo]);
 
 
   const termoBusca = useMemo(() => normalizar(buscaFornecedor.trim()), [buscaFornecedor]);
@@ -952,28 +1045,31 @@ function OrdensCompra() {
     (produto: Produto) => {
       // 1. Prioridade: fornecedor direto cadastrado no produto
       if (produto.fornecedor_id) {
-        const fDireto = fornecedores.find((f) => f.id === produto.fornecedor_id);
+        const fDireto = fornecedoresCompletos.find((f) => f.id === produto.fornecedor_id);
         if (fDireto) return fDireto;
       }
       // 2. Serviço interno Splash
       if (produto.tipo === "servico") {
-        const fSplash = fornecedores.find((f) =>
+        const fSplash = fornecedoresCompletos.find((f) =>
           normalizar(f.nome).includes("splash jardim do trevo"),
         );
         return fSplash ?? ({ id: SEM_CLIENTE, nome: "Splash Jardim do Trevo" } satisfies Fornecedor);
       }
-      // 3. Fallback inteligente por categoria ou nome
+      // 3. Fallback inteligente: Casco/Piscina -> Analândia, Demais -> Progeu
       const categoria = normalizar(produto.categoria ?? "");
       const nome = normalizar(produto.nome);
-      const alvo =
-        categoria.includes("piscina") || nome.includes("piscina")
-          ? "analandia"
-          : "progeu";
-      const encontrado = fornecedores.find((f) => normalizar(f.nome).includes(alvo));
+      const ehPiscina =
+        categoria.includes("piscina") ||
+        nome.includes("piscina") ||
+        normalizar(produto.tipo).includes("casco");
+      const alvo = ehPiscina ? "analandia" : "progeu";
+      const encontrado = fornecedoresCompletos.find((f) => normalizar(f.nome).includes(alvo));
       if (encontrado) return encontrado;
-      return { id: "outros", nome: "Outros Fornecedores" } satisfies Fornecedor;
+      return ehPiscina
+        ? ({ id: "analandia", nome: "Analândia" } satisfies Fornecedor)
+        : ({ id: "progeu", nome: "Progeu" } satisfies Fornecedor);
     },
-    [fornecedores],
+    [fornecedoresCompletos],
   );
 
   /** Identifica se o produto já teve ordem de compra gerada ou já foi faturado/comprado ou está em lote anterior. */
@@ -2448,7 +2544,7 @@ function OrdensCompra() {
 
   /** Salva automaticamente quantidade, valor, desconto e status de compra do produto. */
   const atualizarCompra = useMutation({
-    mutationFn: async ({ id, campo, valor }: { id: string; campo: string; valor: number | string }) => {
+    mutationFn: async ({ id, campo, valor }: { id: string; campo: string; valor: number | string | null }) => {
       const { error } = await supabase
         .from("produtos")
         .update({ [campo]: valor } as any)
@@ -2468,7 +2564,7 @@ function OrdensCompra() {
   const salvarAutomaticamente = (
     id: string,
     campo: string,
-    valor: number | string,
+    valor: number | string | null,
     imediato = false,
   ) => {
     const chave = `${id}:${campo}`;
@@ -2536,6 +2632,170 @@ function OrdensCompra() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const cancelarOrdem = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ordens_compra")
+        .update({ status: "cancelada", status_carga: null } as any)
+        .eq("id", id);
+      if (error) throw error;
+      await supabase
+        .from("ordem_compra_itens")
+        .update({ status_carga: null } as any)
+        .eq("ordem_id", id);
+    },
+    onSuccess: () => {
+      toast.success("Ordem de Compra cancelada com sucesso! Os itens retornaram para a fila de espera.");
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] });
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const dispararWhatsAppOrdem = async (ordem: Ordem) => {
+    try {
+      const itensDestaOrdem = itensTodos.filter((it) => it.ordem_id === ordem.id);
+      const fornecedor = fornecedoresCompletos.find((f) => f.id === ordem.fornecedor_id);
+
+      // Gera e baixa o PDF oficial
+      try {
+        const doc = await gerarPdfOrdemCompra({
+          ordem: {
+            numero: ordem.numero,
+            data_pedido: ordem.data_pedido,
+            previsao_entrega: ordem.previsao_entrega,
+            condicoes: ordem.condicoes,
+            observacoes: ordem.observacoes,
+            valor_produtos: ordem.valor_produtos,
+            desconto: ordem.desconto,
+            valor_total: ordem.valor_total,
+            valor_nota: ordem.valor_nota,
+            valor_pago: ordem.valor_pago,
+            obs_pagamento: ordem.obs_pagamento,
+          },
+          fornecedor: fornecedor ? { nome: fornecedor.nome, telefone: fornecedor.telefone, email: fornecedor.email, documento: fornecedor.cnpj } : null,
+          itens: itensDestaOrdem.map((it) => ({
+            id: it.id,
+            codigo: it.codigo,
+            descricao: it.descricao,
+            unidade: it.unidade,
+            quantidade: it.quantidade,
+            valor_unitario: it.valor_unitario,
+            desconto: it.desconto,
+            total: it.total,
+            cliente_nome: it.cliente_nome,
+            cor: it.cor,
+            pastilha: it.pastilha,
+          })),
+        });
+        const nomePdf = `Ordem-de-Compra-${(ordem.numero ?? "s-num").replace(/[^\w-]/g, "")}.pdf`;
+        doc.save(nomePdf);
+        toast.success("PDF oficial baixado.");
+      } catch (errPdf) {
+        console.warn("PDF não pôde ser gerado para download:", errPdf);
+      }
+
+      const resumoItens = itensDestaOrdem
+        .map((i) => `• ${i.quantidade}x ${i.descricao} (${i.cliente_nome ?? "Estoque"}) - ${brl(Number(i.total))}`)
+        .join("\n");
+
+      const texto = [
+        `*ORDEM DE COMPRA: ${ordem.numero ?? ""}*`,
+        `*Fornecedor:* ${ordem.fornecedor_nome ?? fornecedor?.nome ?? "—"}`,
+        `*Data do Pedido:* ${dataBR(ordem.data_pedido)}`,
+        ordem.previsao_entrega ? `*Previsão de Entrega:* ${dataBR(ordem.previsao_entrega)}` : "",
+        `*Valor Total:* ${brl(Number(ordem.valor_total))}`,
+        "",
+        `*Itens da Carga:*`,
+        resumoItens || "• Conforme espelho de pedido anexo",
+        "",
+        `*Faturamento / Entrega:*`,
+        `Splash Jardim do Trevo · CNPJ 26.108.962/0001-52`,
+        `Comércio e Instalação de Piscinas`,
+        "",
+        `_O PDF oficial foi gerado e baixado no seu dispositivo. Favor anexá-lo nesta conversa._`,
+      ].filter(Boolean).join("\n");
+
+      const fone = (fornecedor?.telefone ?? "").replace(/\D/g, "");
+      const foneFinal = fone.length >= 10 ? (fone.startsWith("55") ? fone : `55${fone}`) : "";
+      const urlWa = foneFinal
+        ? `https://wa.me/${foneFinal}?text=${encodeURIComponent(texto)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+      window.open(urlWa, "_blank", "noopener");
+    } catch (e: any) {
+      toast.error("Erro ao preparar WhatsApp: " + e.message);
+    }
+  };
+
+  const dispararEmailOrdem = async (ordem: Ordem) => {
+    try {
+      const itensDestaOrdem = itensTodos.filter((it) => it.ordem_id === ordem.id);
+      const fornecedor = fornecedoresCompletos.find((f) => f.id === ordem.fornecedor_id);
+
+      try {
+        const doc = await gerarPdfOrdemCompra({
+          ordem: {
+            numero: ordem.numero,
+            data_pedido: ordem.data_pedido,
+            previsao_entrega: ordem.previsao_entrega,
+            condicoes: ordem.condicoes,
+            observacoes: ordem.observacoes,
+            valor_produtos: ordem.valor_produtos,
+            desconto: ordem.desconto,
+            valor_total: ordem.valor_total,
+            valor_nota: ordem.valor_nota,
+            valor_pago: ordem.valor_pago,
+            obs_pagamento: ordem.obs_pagamento,
+          },
+          fornecedor: fornecedor ? { nome: fornecedor.nome, telefone: fornecedor.telefone, email: fornecedor.email, documento: fornecedor.cnpj } : null,
+          itens: itensDestaOrdem.map((it) => ({
+            id: it.id,
+            codigo: it.codigo,
+            descricao: it.descricao,
+            unidade: it.unidade,
+            quantidade: it.quantidade,
+            valor_unitario: it.valor_unitario,
+            desconto: it.desconto,
+            total: it.total,
+            cliente_nome: it.cliente_nome,
+            cor: it.cor,
+            pastilha: it.pastilha,
+          })),
+        });
+        const nomePdf = `Ordem-de-Compra-${(ordem.numero ?? "s-num").replace(/[^\w-]/g, "")}.pdf`;
+        doc.save(nomePdf);
+        toast.success("PDF oficial baixado para anexação.");
+      } catch (errPdf) {
+        console.warn("PDF não pôde ser gerado para download:", errPdf);
+      }
+
+      const resumoItens = itensDestaOrdem
+        .map((i) => `• ${i.quantidade}x ${i.descricao} (${i.cliente_nome ?? "Estoque"}) - ${brl(Number(i.total))}`)
+        .join("\n");
+      const assunto = `Ordem de Compra ${ordem.numero ?? ""} - Splash Jardim do Trevo`;
+      const corpo = [
+        `Olá,`,
+        ``,
+        `Segue nossa Ordem de Compra ${ordem.numero ?? ""} emitida em ${dataBR(ordem.data_pedido)}.`,
+        `Valor total: ${brl(Number(ordem.valor_total))}`,
+        ``,
+        `Itens solicitados:`,
+        resumoItens,
+        ``,
+        `Favor confirmar recebimento e previsão de entrega.`,
+        ``,
+        `Splash Jardim do Trevo`,
+      ].join("\n");
+
+      const mailto = `mailto:${fornecedor?.email ?? ""}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+      window.location.href = mailto;
+    } catch (e: any) {
+      toast.error("Erro ao preparar e-mail: " + e.message);
+    }
+  };
 
   /** Remove em lote os itens de ordens já executadas que foram marcados na grade. */
   const excluirItensSelecionados = useMutation({
@@ -3283,8 +3543,9 @@ function OrdensCompra() {
                         </TableHeader>
                         <TableBody>
                           {grupo.itens.map((item) => (
-                            <TableRow
-                              key={item.produto.id}
+                            <Fragment key={item.produto.id}>
+                              <TableRow
+                                key={item.produto.id}
                               className={cn(
                                 selecionadosCompra[item.produto.id] && "bg-primary/5",
                                 item.temVinculo && "border-l-2 border-l-emerald-500",
@@ -3574,14 +3835,34 @@ function OrdensCompra() {
                               </TableCell>
 
                               <TableCell className="text-right">
-                                <div className="flex justify-end gap-1">
+                                <div className="flex justify-end items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7 text-muted-foreground hover:text-foreground"
+                                    aria-label={`Expandir detalhes de ${item.produto.nome}`}
+                                    title={linhasExpandidas[item.produto.id] ? "Recolher detalhes" : "Expandir detalhes"}
+                                    onClick={() =>
+                                      setLinhasExpandidas((prev) => ({
+                                        ...prev,
+                                        [item.produto.id]: !prev[item.produto.id],
+                                      }))
+                                    }
+                                  >
+                                    {linhasExpandidas[item.produto.id] ? (
+                                      <ChevronUp className="size-3.5" />
+                                    ) : (
+                                      <ChevronDown className="size-3.5" />
+                                    )}
+                                  </Button>
                                   <Button
                                     type="button"
                                     size="icon"
                                     variant="ghost"
                                     className="size-7"
                                     aria-label={`Editar ${item.produto.nome}`}
-                                    title="Editar cadastro"
+                                    title="Editar produto"
                                     onClick={() => abrirEdicaoProdutoCompra(item.produto)}
                                   >
                                     <Pencil className="size-3.5" />
@@ -3590,18 +3871,112 @@ function OrdensCompra() {
                                     type="button"
                                     size="icon"
                                     variant="ghost"
-                                    className="size-7 text-destructive"
+                                    className="size-7 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
+                                    aria-label={`Desvincular ${item.produto.nome}`}
+                                    title="Desvincular de pedidos (enviar para estoque livre)"
+                                    onClick={() => {
+                                      salvarAutomaticamente(item.produto.id, "venda_vinculo_id", null, true);
+                                      setVinculosCompra((prev) => ({
+                                        ...prev,
+                                        [item.produto.id]: [SEM_CLIENTE],
+                                      }));
+                                      toast.success(`Vínculo de "${item.produto.nome}" desfeito.`);
+                                    }}
+                                  >
+                                    <Unlink className="size-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7 text-destructive hover:bg-destructive/10"
                                     aria-label={`Excluir ${item.produto.nome}`}
                                     title="Excluir produto"
                                     disabled={excluirProdutoCompra.isPending}
-                                    onClick={() => excluirProdutoCompra.mutate(item.produto)}
+                                    onClick={() => {
+                                      if (window.confirm(`Excluir ${item.produto.nome}?`)) {
+                                        excluirProdutoCompra.mutate(item.produto);
+                                      }
+                                    }}
                                   >
                                     <Trash2 className="size-3.5" />
                                   </Button>
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))}
+                            {linhasExpandidas[item.produto.id] && (
+                              <TableRow className="bg-muted/15 border-b-2">
+                                <TableCell colSpan={12} className="p-3">
+                                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
+                                      <p className="font-semibold text-muted-foreground flex items-center gap-1 text-[11px] uppercase">
+                                        <Link2 className="size-3 text-emerald-500" />
+                                        Pedidos Vinculados
+                                      </p>
+                                      {item.demanda && item.demanda.pedidos.length > 0 ? (
+                                        <div className="space-y-1 pt-0.5">
+                                          {item.demanda.pedidos.map((p) => (
+                                            <div key={p.id} className="flex items-center justify-between font-medium">
+                                              <span className="truncate max-w-[160px]">{p.rotulo}</span>
+                                              <Badge variant="secondary" className="font-mono text-[10px] py-0 px-1">
+                                                {p.quantidade} un.
+                                              </Badge>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : item.produto.venda_vinculo_id ? (
+                                        <p className="text-foreground">
+                                          {vendaPorId.get(item.produto.venda_vinculo_id)?.numero ?? "Pedido"} —{" "}
+                                          {vendaPorId.get(item.produto.venda_vinculo_id)?.cliente_nome ?? "Cliente"}
+                                        </p>
+                                      ) : (
+                                        <p className="text-muted-foreground italic">Reposição para estoque (sem pedidos diretos)</p>
+                                      )}
+                                    </div>
+
+                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
+                                      <p className="font-semibold text-muted-foreground flex items-center gap-1 text-[11px] uppercase">
+                                        <Boxes className="size-3 text-blue-500" />
+                                        Situação do Estoque
+                                      </p>
+                                      <p className="text-foreground">
+                                        Estoque atual: <strong>{item.estoqueAtual} {item.produto.unidade}</strong>
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        Estoque mínimo: {item.estoqueMinimo} {item.produto.unidade}
+                                      </p>
+                                    </div>
+
+                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
+                                      <p className="font-semibold text-muted-foreground text-[11px] uppercase">
+                                        Dados Fiscais / Unidade
+                                      </p>
+                                      <p className="text-foreground">
+                                        NCM: <span className="font-mono">{item.produto.ncm ?? "—"}</span> · CST: <span className="font-mono">{item.produto.cst ?? "—"}</span>
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        Unidade: {item.produto.unidade} · Tipo: {item.produto.tipo}
+                                      </p>
+                                    </div>
+
+                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
+                                      <p className="font-semibold text-muted-foreground text-[11px] uppercase">
+                                        Especificações do Modelo
+                                      </p>
+                                      <p className="text-foreground truncate">
+                                        {item.produto.cor_pastilha ? `Cor: ${item.produto.cor_pastilha}` : "Cor padrão"}
+                                        {item.produto.modelo_pastilha ? ` · Pastilha: ${item.produto.modelo_pastilha}` : ""}
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        Custo unitário base: {brl(Number(item.produto.preco_custo))}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        ))}
                         </TableBody>
                       </Table>
                     </div>
@@ -3752,7 +4127,8 @@ function OrdensCompra() {
                 {produtosFiltrados.map((produto) => {
                   const fornecedor = fornecedorDaCompra(produto);
                   return (
-                    <TableRow key={produto.id}>
+                    <Fragment key={produto.id}>
+                      <TableRow key={produto.id}>
                       <TableCell>
                         <Checkbox
                           aria-label={`Selecionar ${produto.nome}`}
@@ -3971,33 +4347,139 @@ function OrdensCompra() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">Após faturar</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end items-center gap-1">
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
+                            className="size-7 text-muted-foreground hover:text-foreground"
+                            aria-label={`Expandir detalhes de ${produto.nome}`}
+                            title={linhasExpandidas[produto.id] ? "Recolher detalhes" : "Expandir detalhes"}
+                            onClick={() =>
+                              setLinhasExpandidas((prev) => ({
+                                ...prev,
+                                [produto.id]: !prev[produto.id],
+                              }))
+                            }
+                          >
+                            {linhasExpandidas[produto.id] ? (
+                              <ChevronUp className="size-3.5" />
+                            ) : (
+                              <ChevronDown className="size-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
                             aria-label={`Editar ${produto.nome}`}
                             title="Editar produto"
                             onClick={() => abrirEdicaoProdutoCompra(produto)}
                           >
-                            <Pencil className="size-4" />
+                            <Pencil className="size-3.5" />
                           </Button>
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
+                            className="size-7 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
+                            aria-label={`Desvincular ${produto.nome}`}
+                            title="Desvincular de pedidos (enviar para estoque livre)"
+                            onClick={() => {
+                              salvarAutomaticamente(produto.id, "venda_vinculo_id", null, true);
+                              setVinculosCompra((prev) => ({
+                                ...prev,
+                                [produto.id]: [SEM_CLIENTE],
+                              }));
+                              toast.success(`Vínculo de "${produto.nome}" desfeito.`);
+                            }}
+                          >
+                            <Unlink className="size-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-7 text-destructive hover:bg-destructive/10"
                             aria-label={`Excluir ${produto.nome}`}
                             title="Excluir produto"
                             disabled={excluirProdutoCompra.isPending}
-                            onClick={() => excluirProdutoCompra.mutate(produto)}
+                            onClick={() => {
+                              if (window.confirm(`Excluir permanentemente o produto "${produto.nome}"?`)) {
+                                excluirProdutoCompra.mutate(produto);
+                              }
+                            }}
                           >
-                            <Trash2 className="size-4 text-destructive" />
+                            <Trash2 className="size-3.5" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
+                    {linhasExpandidas[produto.id] && (
+                      <TableRow className="bg-muted/15 border-b-2">
+                        <TableCell colSpan={15} className="p-3">
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+                            <div className="p-2.5 rounded-md border bg-card space-y-1">
+                              <p className="font-semibold text-muted-foreground flex items-center gap-1 text-[11px] uppercase">
+                                <Link2 className="size-3 text-emerald-500" />
+                                Pedidos Vinculados
+                              </p>
+                              {(() => {
+                                const demanda = demandaPorProduto.get(produto.id);
+                                if (!demanda || demanda.pedidos.length === 0) {
+                                  return <p className="text-muted-foreground">Destinado ao estoque livre (sem vínculo)</p>;
+                                }
+                                return (
+                                  <div className="space-y-1 pt-0.5">
+                                    {demanda.pedidos.map((p) => (
+                                      <div key={p.id} className="flex items-center justify-between font-medium">
+                                        <span className="truncate max-w-[160px]">{p.rotulo}</span>
+                                        <Badge variant="secondary" className="font-mono text-[10px] py-0 px-1">
+                                          {p.quantidade} un.
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                            <div className="p-2.5 rounded-md border bg-card space-y-1">
+                              <p className="font-semibold text-muted-foreground text-[11px] uppercase">
+                                Especificações
+                              </p>
+                              <div className="space-y-0.5 text-muted-foreground">
+                                <p><span className="text-foreground font-medium">Categoria:</span> {produto.categoria || "—"}</p>
+                                <p><span className="text-foreground font-medium">Tipo:</span> {produto.tipo || "—"}</p>
+                                <p><span className="text-foreground font-medium">Unidade:</span> {produto.unidade || "UN"}</p>
+                              </div>
+                            </div>
+                            <div className="p-2.5 rounded-md border bg-card space-y-1">
+                              <p className="font-semibold text-muted-foreground text-[11px] uppercase">
+                                Acabamento & Modelo
+                              </p>
+                              <div className="space-y-0.5 text-muted-foreground">
+                                <p><span className="text-foreground font-medium">Cor:</span> {coresCompra[produto.id] ?? produto.cor_pastilha ?? "—"}</p>
+                                <p><span className="text-foreground font-medium">Modelo Pastilha:</span> {modelosCompra[produto.id] ?? produto.modelo_pastilha ?? "—"}</p>
+                              </div>
+                            </div>
+                            <div className="p-2.5 rounded-md border bg-card space-y-1">
+                              <p className="font-semibold text-muted-foreground text-[11px] uppercase">
+                                Dados Fiscais & Estoque
+                              </p>
+                              <div className="space-y-0.5 text-muted-foreground">
+                                <p><span className="text-foreground font-medium">NCM:</span> {produto.ncm || "—"}</p>
+                                <p><span className="text-foreground font-medium">CST:</span> {produto.cst || "—"}</p>
+                                <p><span className="text-foreground font-medium">Estoque Atual:</span> {produto.estoque_atual ?? 0} un.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
                 {linhasExecutadas.map(({ item, ordem, produto, venda }) => (
                   <TableRow key={`executada-${item.id}`}>
                     <TableCell>
@@ -4201,6 +4683,7 @@ function OrdensCompra() {
                 const saldo = total - pago;
                 const pctPago = total > 0 ? Math.min(Math.max(pago / total, 0), 1) : 0;
                 const pctLabel = Math.round(pctPago * 100);
+                const itensDestaOrdem = itensTodos.filter((it) => it.ordem_id === ordem.id);
                 const tom =
                   pctPago >= 1
                     ? {
@@ -4242,6 +4725,9 @@ function OrdensCompra() {
                           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                             {ordem.fornecedor_nome ?? "Fornecedor não definido"}
                           </p>
+                          <p className="mt-0.5 text-[11px] font-mono text-muted-foreground">
+                            {itensDestaOrdem.length} {itensDestaOrdem.length === 1 ? "item" : "itens"}
+                          </p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
@@ -4268,52 +4754,205 @@ function OrdensCompra() {
                           <p className="text-sm font-semibold">{brl(saldo)}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <Button
-                          type="button"
-                          className="flex-1 text-xs h-8"
-                          variant="outline"
-                          onClick={() => {
-                            setModoEdicao(false);
-                            setDetalheId(ordem.id);
-                          }}
-                        >
-                          Abrir O.C.
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="size-8"
-                          title="Editar ordem de compra"
-                          onClick={() => {
-                            setModoEdicao(true);
-                            setDetalheId(ordem.id);
-                          }}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <BotaoVisualizarDocumento
-                          tipo="ordem_compra"
-                          id={ordem.id}
-                          titulo={`Visualizar O.C. ${ordem.numero ?? ""}`}
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="size-8 text-destructive hover:bg-destructive/10"
-                          title="Excluir ordem de compra"
-                          disabled={excluirOrdem.isPending}
-                          onClick={() => {
-                            if (window.confirm(`Excluir permanentemente a Ordem de Compra ${ordem.numero ?? ""}?`)) {
-                              excluirOrdem.mutate(ordem.id);
+                      <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-border/40">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            className="text-xs h-8 px-2.5"
+                            variant="outline"
+                            onClick={() => {
+                              setModoEdicao(false);
+                              setDetalheId(ordem.id);
+                            }}
+                          >
+                            Abrir O.C.
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={ordensExpandidas[ordem.id] ? "secondary" : "ghost"}
+                            className="h-8 px-2 text-xs flex items-center gap-1"
+                            title={ordensExpandidas[ordem.id] ? "Recolher detalhes da O.C." : "Expandir detalhes da O.C."}
+                            onClick={() =>
+                              setOrdensExpandidas((prev) => ({ ...prev, [ordem.id]: !prev[ordem.id] }))
                             }
-                          }}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
+                          >
+                            {ordensExpandidas[ordem.id] ? (
+                              <>
+                                <ChevronUp className="size-3.5" /> Recolher
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="size-3.5" /> Detalhes
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                            title="Editar ordem de compra"
+                            onClick={() => {
+                              setModoEdicao(true);
+                              setDetalheId(ordem.id);
+                            }}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <BotaoVisualizarDocumento
+                            tipo="ordem_compra"
+                            id={ordem.id}
+                            titulo={`Visualizar e Imprimir O.C. ${ordem.numero ?? ""}`}
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                            title="Gerar PDF e Enviar por WhatsApp"
+                            onClick={() => dispararWhatsAppOrdem(ordem)}
+                          >
+                            <MessageSquare className="size-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-8 text-sky-600 hover:text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                            title="Gerar PDF e Enviar por E-mail"
+                            onClick={() => dispararEmailOrdem(ordem)}
+                          >
+                            <Mail className="size-3.5" />
+                          </Button>
+                          {ordem.status !== "cancelada" && (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="size-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                              title="Cancelar O.C. (libera itens de volta para a fila)"
+                              disabled={cancelarOrdem.isPending}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Cancelar a Ordem de Compra ${ordem.numero ?? ""}? Os itens voltarão para a fila de espera.`,
+                                  )
+                                ) {
+                                  cancelarOrdem.mutate(ordem.id);
+                                }
+                              }}
+                            >
+                              <Ban className="size-3.5" />
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-8 text-destructive hover:bg-destructive/10"
+                            title="Excluir ordem de compra permanentemente"
+                            disabled={excluirOrdem.isPending}
+                            onClick={() => {
+                              if (window.confirm(`Excluir permanentemente a Ordem de Compra ${ordem.numero ?? ""}?`)) {
+                                excluirOrdem.mutate(ordem.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
                       </div>
+
+                      {ordensExpandidas[ordem.id] && (
+                        <div className="mt-3 pt-3 border-t space-y-2 bg-muted/20 -mx-6 -mb-6 p-4 rounded-b-lg">
+                          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            <span>Itens da Ordem ({itensDestaOrdem.length})</span>
+                            <span className="text-[11px] font-normal normal-case">Vl. Unitário é editável</span>
+                          </div>
+                          {itensDestaOrdem.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">Nenhum item vinculado a esta ordem.</p>
+                          ) : (
+                            <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                              {itensDestaOrdem.map((it) => {
+                                const venda = it.venda_id ? vendaPorId.get(it.venda_id) : undefined;
+                                const clienteVinculado = it.cliente_nome ?? venda?.cliente_nome ?? "Estoque Livre";
+                                return (
+                                  <div
+                                    key={it.id}
+                                    className="flex items-center justify-between gap-2 p-2 rounded bg-card border text-xs"
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-medium truncate">{it.descricao}</p>
+                                      <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
+                                        <Badge variant="outline" className="text-[10px] py-0 px-1 font-mono">
+                                          {it.quantidade} {it.unidade}
+                                        </Badge>
+                                        <span>·</span>
+                                        <span className="truncate text-foreground/80 font-medium">{clienteVinculado}</span>
+                                        {it.cor && <span>· Cor: {it.cor}</span>}
+                                        {it.pastilha && <span>· Pastilha: {it.pastilha}</span>}
+                                        {it.numero_nf && (
+                                          <Badge variant="secondary" className="text-[10px] py-0 px-1 font-mono">
+                                            NF: {it.numero_nf}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <div className="text-right">
+                                        <Input
+                                          type="number"
+                                          min={0}
+                                          step="0.01"
+                                          aria-label={`Valor unitário de ${it.descricao}`}
+                                          className="h-7 w-24 text-right font-mono text-xs"
+                                          defaultValue={Number(it.valor_unitario) || 0}
+                                          key={`exec-card-vlr-${it.id}-${it.valor_unitario}`}
+                                          onBlur={(evento) => {
+                                            const novoValor = Math.max(Number(evento.target.value) || 0, 0);
+                                            if (novoValor !== Number(it.valor_unitario)) {
+                                              atualizarValorUnitarioItem.mutate({
+                                                itemId: it.id,
+                                                ordemId: ordem.id,
+                                                valorUnitario: novoValor,
+                                              });
+                                            }
+                                          }}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                                          Total: {brl(Number(it.total))}
+                                        </p>
+                                      </div>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="size-7 text-destructive hover:bg-destructive/10"
+                                        title="Excluir item desta ordem"
+                                        disabled={excluirItemOrdem.isPending}
+                                        onClick={() => {
+                                          if (window.confirm(`Excluir o item "${it.descricao}" desta ordem?`)) {
+                                            excluirItemOrdem.mutate({ itemId: it.id, ordemId: ordem.id });
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {ordem.observacoes && (
+                            <p className="text-[11px] text-muted-foreground bg-card/60 p-1.5 rounded border border-dashed">
+                              <span className="font-semibold text-foreground">Obs:</span> {ordem.observacoes}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -4368,16 +5007,62 @@ function OrdensCompra() {
                     >
                       {modalDetalheMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                     </Button>
+                    <BotaoVisualizarDocumento
+                      tipo="ordem_compra"
+                      id={ordemDetalhe.id}
+                      titulo={`Visualizar e Imprimir O.C. ${ordemDetalhe.numero ?? ""}`}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                      title="Gerar PDF e Enviar por WhatsApp"
+                      onClick={() => dispararWhatsAppOrdem(ordemDetalhe)}
+                    >
+                      <MessageSquare className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-8 text-sky-600 hover:text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                      title="Gerar PDF e Enviar por E-mail"
+                      onClick={() => dispararEmailOrdem(ordemDetalhe)}
+                    >
+                      <Mail className="size-4" />
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-8"
+                      className="size-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                       title="Editar ordem"
                       onClick={() => setModoEdicao(true)}
                     >
                       <Pencil className="size-4" />
                     </Button>
+                    {ordemDetalhe.status !== "cancelada" && (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                        title="Cancelar O.C. (libera itens de volta para a fila)"
+                        disabled={cancelarOrdem.isPending}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Cancelar a Ordem de Compra ${ordemDetalhe.numero ?? ""}? Os itens voltarão para a fila de espera.`,
+                            )
+                          ) {
+                            cancelarOrdem.mutate(ordemDetalhe.id);
+                          }
+                        }}
+                      >
+                        <Ban className="size-4" />
+                      </Button>
+                    )}
                     <Button
                       type="button"
                       size="icon"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileDown, Mail, Printer } from "lucide-react";
+import { FileDown, Mail, MessageSquare, Printer } from "lucide-react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { brl, dataBR } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 
-type Ordem = {
+export type OrdemDocumento = {
   numero: string | null;
   data_pedido: string;
   previsao_entrega: string | null;
@@ -24,14 +24,14 @@ type Ordem = {
   obs_pagamento?: string | null;
 };
 
-type Fornecedor = {
+export type FornecedorDocumento = {
   nome?: string | null;
   documento?: string | null;
   telefone?: string | null;
   email?: string | null;
 } | null;
 
-type Item = {
+export type ItemDocumento = {
   id: string;
   codigo: string | null;
   descricao: string;
@@ -45,22 +45,140 @@ type Item = {
   pastilha?: string | null;
 };
 
-interface Props {
-  ordem: Ordem;
-  fornecedor: Fornecedor;
-  itens: Item[];
+export interface PropsDocumentoOrdemCompra {
+  ordem: OrdemDocumento;
+  fornecedor: FornecedorDocumento;
+  itens: ItemDocumento[];
   empresa?: { nome: string; documento?: string; endereco?: string; contato?: string };
 }
 
-const EMPRESA_PADRAO = {
+export const EMPRESA_PADRAO = {
   nome: "Splash Jardim do Trevo",
   documento: "CNPJ 26.108.962/0001-52",
   endereco: "Comércio e Instalação de Piscinas",
   contato: "",
 };
 
+/** Gera o PDF oficial da Ordem de Compra. */
+export async function gerarPdfOrdemCompra({
+  ordem,
+  fornecedor,
+  itens,
+  empresa,
+}: {
+  ordem: OrdemDocumento;
+  fornecedor?: FornecedorDocumento;
+  itens: ItemDocumento[];
+  empresa?: { nome: string; documento?: string; endereco?: string; contato?: string };
+}) {
+  const emp = { ...EMPRESA_PADRAO, ...(empresa ?? {}) };
+  const valorNota = Number(ordem.valor_nota ?? 0);
+  const valorPago = Number(ordem.valor_pago ?? 0);
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const m = 14;
+  let y = m;
 
-export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Props) {
+  try {
+    const resp = await fetch(logoSplash.url);
+    const blob = await resp.blob();
+    const dataUrl: string = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(String(fr.result));
+      fr.onerror = rej;
+      fr.readAsDataURL(blob);
+    });
+    doc.addImage(dataUrl, "PNG", m, y, 34, 20);
+  } catch {
+    /* segue sem logo */
+  }
+
+  doc.setFontSize(14).setFont("helvetica", "bold");
+  doc.text("ORDEM DE COMPRA", 196, y + 6, { align: "right" });
+  doc.setFontSize(9).setFont("helvetica", "normal");
+  doc.text(`Nº ${ordem.numero ?? "—"}`, 196, y + 12, { align: "right" });
+  doc.text(`Emissão: ${dataBR(ordem.data_pedido)}`, 196, y + 17, { align: "right" });
+  doc.text(`Previsão: ${dataBR(ordem.previsao_entrega)}`, 196, y + 22, { align: "right" });
+
+  y += 24;
+  doc.setFont("helvetica", "bold").setFontSize(11);
+  doc.text(emp.nome, m, y);
+  doc.setFont("helvetica", "normal").setFontSize(9);
+  doc.text(`${emp.endereco} — ${emp.documento}`, m, y + 5);
+
+  y += 12;
+  doc.setDrawColor(153, 27, 27).line(m, y, 196, y);
+  y += 6;
+
+  doc.setFont("helvetica", "bold").setFontSize(10);
+  doc.text("DADOS DO FORNECEDOR", m, y);
+  doc.setFont("helvetica", "normal").setFontSize(9);
+  y += 5;
+  doc.text(`Fornecedor: ${fornecedor?.nome ?? "—"}`, m, y);
+  doc.text(`CNPJ/CPF: ${fornecedor?.documento ?? "—"}`, 110, y);
+  y += 5;
+  doc.text(`Telefone: ${fornecedor?.telefone ?? "—"}`, m, y);
+  doc.text(`E-mail: ${fornecedor?.email ?? "—"}`, 110, y);
+  y += 5;
+  doc.text(`Condições de pagamento: ${ordem.condicoes ?? "—"}`, m, y);
+
+  autoTable(doc, {
+    startY: y + 6,
+    margin: { left: m, right: 14 },
+    head: [["Código", "Descrição do produto", "Cor", "Pastilha", "Cliente / destino", "Un.", "Qtd", "Valor unit.", "Total"]],
+    body: itens.map((i) => [
+      i.codigo ?? "—",
+      i.descricao,
+      i.cor ?? "—",
+      i.pastilha ?? "—",
+      i.cliente_nome ?? "Estoque",
+      i.unidade,
+      String(i.quantidade),
+      brl(Number(i.valor_unitario)),
+      brl(Number(i.total)),
+    ]),
+    styles: { fontSize: 8, textColor: [69, 10, 10], lineColor: [153, 27, 27], lineWidth: 0.2 },
+    headStyles: { fillColor: [254, 202, 202], textColor: [69, 10, 10], fontStyle: "bold" },
+    alternateRowStyles: { fillColor: [254, 242, 242] },
+    columnStyles: {
+      5: { halign: "center" },
+      6: { halign: "center" },
+      7: { halign: "right" },
+      8: { halign: "right" },
+    },
+  });
+
+  let ty = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  doc.setFont("helvetica", "bold").setFontSize(10);
+  doc.text("TOTALIZAÇÃO", m, ty);
+  doc.setFont("helvetica", "normal").setFontSize(9);
+  ty += 5;
+  doc.text(`Valor dos produtos: ${brl(Number(ordem.valor_produtos))}`, m, ty);
+  doc.text(`Desconto: ${brl(Number(ordem.desconto))}`, 110, ty);
+  ty += 5;
+  doc.text(`Valor faturado na nota: ${brl(valorNota)}`, m, ty);
+  doc.text(`Valor pago ao fornecedor: ${brl(valorPago)}`, 110, ty);
+  ty += 5;
+  doc.setFont("helvetica", "bold");
+  doc.text(`Valor total da compra: ${brl(Number(ordem.valor_total))}`, m, ty);
+  doc.setFont("helvetica", "normal");
+
+  if (ordem.obs_pagamento) {
+    ty += 5;
+    doc.text(doc.splitTextToSize(`Observação de pagamento: ${ordem.obs_pagamento}`, 182), m, ty);
+    ty += 4;
+  }
+  if (ordem.observacoes) {
+    ty += 6;
+    doc.setFont("helvetica", "bold").text("OBSERVAÇÕES", m, ty);
+    doc.setFont("helvetica", "normal");
+    ty += 5;
+    doc.text(doc.splitTextToSize(String(ordem.observacoes), 182), m, ty);
+  }
+
+  return doc;
+}
+
+export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: PropsDocumentoOrdemCompra) {
   const emp = { ...EMPRESA_PADRAO, ...(empresa ?? {}) };
   const [imprimindo, setImprimindo] = useState(false);
 
@@ -102,110 +220,7 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
   const nomeArquivo = `Ordem-de-Compra-${(ordem.numero ?? "s-numero").replace(/[^\w-]/g, "")}.pdf`;
 
   /** Gera o PDF da ordem com todos os itens e devolve o documento. */
-  const gerarPdf = async () => {
-    const doc = new jsPDF({ unit: "mm", format: "a4" });
-    const m = 14;
-    let y = m;
-
-    try {
-      const resp = await fetch(logoSplash.url);
-      const blob = await resp.blob();
-      const dataUrl: string = await new Promise((res, rej) => {
-        const fr = new FileReader();
-        fr.onload = () => res(String(fr.result));
-        fr.onerror = rej;
-        fr.readAsDataURL(blob);
-      });
-      doc.addImage(dataUrl, "PNG", m, y, 34, 20);
-    } catch {
-      /* segue sem logo */
-    }
-
-    doc.setFontSize(14).setFont("helvetica", "bold");
-    doc.text("ORDEM DE COMPRA", 196, y + 6, { align: "right" });
-    doc.setFontSize(9).setFont("helvetica", "normal");
-    doc.text(`Nº ${ordem.numero ?? "—"}`, 196, y + 12, { align: "right" });
-    doc.text(`Emissão: ${dataBR(ordem.data_pedido)}`, 196, y + 17, { align: "right" });
-    doc.text(`Previsão: ${dataBR(ordem.previsao_entrega)}`, 196, y + 22, { align: "right" });
-
-    y += 24;
-    doc.setFont("helvetica", "bold").setFontSize(11);
-    doc.text(emp.nome, m, y);
-    doc.setFont("helvetica", "normal").setFontSize(9);
-    doc.text(`${emp.endereco} — ${emp.documento}`, m, y + 5);
-
-    y += 12;
-    doc.setDrawColor(153, 27, 27).line(m, y, 196, y);
-    y += 6;
-
-    doc.setFont("helvetica", "bold").setFontSize(10);
-    doc.text("DADOS DO FORNECEDOR", m, y);
-    doc.setFont("helvetica", "normal").setFontSize(9);
-    y += 5;
-    doc.text(`Fornecedor: ${fornecedor?.nome ?? "—"}`, m, y);
-    doc.text(`CNPJ/CPF: ${fornecedor?.documento ?? "—"}`, 110, y);
-    y += 5;
-    doc.text(`Telefone: ${fornecedor?.telefone ?? "—"}`, m, y);
-    doc.text(`E-mail: ${fornecedor?.email ?? "—"}`, 110, y);
-    y += 5;
-    doc.text(`Condições de pagamento: ${ordem.condicoes ?? "—"}`, m, y);
-
-    autoTable(doc, {
-      startY: y + 6,
-      margin: { left: m, right: 14 },
-      head: [["Código", "Descrição do produto", "Cor", "Pastilha", "Cliente / destino", "Un.", "Qtd", "Valor unit.", "Total"]],
-      body: itens.map((i) => [
-        i.codigo ?? "—",
-        i.descricao,
-        i.cor ?? "—",
-        i.pastilha ?? "—",
-        i.cliente_nome ?? "Estoque",
-        i.unidade,
-        String(i.quantidade),
-        brl(Number(i.valor_unitario)),
-        brl(Number(i.total)),
-      ]),
-      styles: { fontSize: 8, textColor: [69, 10, 10], lineColor: [153, 27, 27], lineWidth: 0.2 },
-      headStyles: { fillColor: [254, 202, 202], textColor: [69, 10, 10], fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [254, 242, 242] },
-      columnStyles: {
-        5: { halign: "center" },
-        6: { halign: "center" },
-        7: { halign: "right" },
-        8: { halign: "right" },
-      },
-    });
-
-    let ty = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-    doc.setFont("helvetica", "bold").setFontSize(10);
-    doc.text("TOTALIZAÇÃO", m, ty);
-    doc.setFont("helvetica", "normal").setFontSize(9);
-    ty += 5;
-    doc.text(`Valor dos produtos: ${brl(Number(ordem.valor_produtos))}`, m, ty);
-    doc.text(`Desconto: ${brl(Number(ordem.desconto))}`, 110, ty);
-    ty += 5;
-    doc.text(`Valor faturado na nota: ${brl(valorNota)}`, m, ty);
-    doc.text(`Valor pago ao fornecedor: ${brl(valorPago)}`, 110, ty);
-    ty += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text(`Valor total da compra: ${brl(Number(ordem.valor_total))}`, m, ty);
-    doc.setFont("helvetica", "normal");
-
-    if (ordem.obs_pagamento) {
-      ty += 5;
-      doc.text(doc.splitTextToSize(`Observação de pagamento: ${ordem.obs_pagamento}`, 182), m, ty);
-      ty += 4;
-    }
-    if (ordem.observacoes) {
-      ty += 6;
-      doc.setFont("helvetica", "bold").text("OBSERVAÇÕES", m, ty);
-      doc.setFont("helvetica", "normal");
-      ty += 5;
-      doc.text(doc.splitTextToSize(String(ordem.observacoes), 182), m, ty);
-    }
-
-    return doc;
-  };
+  const gerarPdf = () => gerarPdfOrdemCompra({ ordem, fornecedor, itens, empresa: emp });
 
   const baixarPdf = async () => {
     try {
@@ -244,6 +259,52 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
     window.setTimeout(() => {
       window.location.href = mailto;
     }, 800);
+  };
+
+  /** Gera o PDF oficial, baixa para anexar e abre o WhatsApp com resumo da carga. */
+  const enviarPorWhatsApp = async () => {
+    try {
+      const doc = await gerarPdf();
+      doc.save(nomeArquivo);
+      toast.success("PDF da Ordem de Compra baixado com sucesso!");
+
+      const resumoItens = itens
+        .map(
+          (i) =>
+            `• ${i.quantidade}x ${i.descricao} (${i.cliente_nome ?? "Estoque"}) - ${brl(Number(i.total))}`,
+        )
+        .join("\n");
+
+      const textoWhatsApp = [
+        `*ORDEM DE COMPRA: ${ordem.numero ?? ""}*`,
+        `*Fornecedor:* ${fornecedor?.nome ?? "—"}`,
+        `*Data do Pedido:* ${dataBR(ordem.data_pedido)}`,
+        ordem.previsao_entrega ? `*Previsão de Entrega:* ${dataBR(ordem.previsao_entrega)}` : "",
+        `*Valor Total:* ${brl(Number(ordem.valor_total))}`,
+        "",
+        `*Itens da Carga / Pedido:*`,
+        resumoItens,
+        "",
+        `*Dados de Faturamento e Entrega:*`,
+        `${emp.nome} — ${emp.documento}`,
+        `${emp.endereco}`,
+        "",
+        `_O PDF oficial (${nomeArquivo}) foi gerado e baixado no seu dispositivo. Favor anexá-lo nesta conversa._`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const fone = (fornecedor?.telefone ?? "").replace(/\D/g, "");
+      const foneFinal = fone.length >= 10 ? (fone.startsWith("55") ? fone : `55${fone}`) : "";
+      const urlWa = foneFinal
+        ? `https://wa.me/${foneFinal}?text=${encodeURIComponent(textoWhatsApp)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(textoWhatsApp)}`;
+
+      window.open(urlWa, "_blank", "noopener");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao gerar PDF e abrir WhatsApp.");
+    }
   };
 
 
@@ -385,6 +446,13 @@ export function DocumentoOrdemCompra({ ordem, fornecedor, itens, empresa }: Prop
       </Button>
       <Button variant="outline" onClick={baixarPdf}>
         <FileDown /> Baixar PDF do pedido
+      </Button>
+      <Button
+        variant="outline"
+        onClick={enviarPorWhatsApp}
+        className="text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-700"
+      >
+        <MessageSquare className="size-4 mr-1 text-emerald-600" /> WhatsApp
       </Button>
       <Button onClick={enviarPorEmail}>
         <Mail /> Gerar PDF e enviar por e-mail
