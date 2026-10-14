@@ -16,6 +16,8 @@ import {
   Filter,
   Layers,
   Link2,
+  Maximize2,
+  Minimize2,
   Package,
   Pencil,
   Plus,
@@ -282,6 +284,7 @@ function OrdensCompra() {
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
   const [detalheId, setDetalheId] = useState<string | null>(null);
   const [modoEdicao, setModoEdicao] = useState(false);
+  const [modalDetalheMaximized, setModalDetalheMaximized] = useState(false);
   const [novaOpen, setNovaOpen] = useState(false);
   const [modalPedirCargaAberto, setModalPedirCargaAberto] = useState(false);
   const [fornecedorCargaSelecionado, setFornecedorCargaSelecionado] = useState<string | null>(null);
@@ -2549,6 +2552,35 @@ function OrdensCompra() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Exclui um item específico de uma ordem de compra e atualiza o total da ordem */
+  const excluirItemOrdem = useMutation({
+    mutationFn: async ({ itemId, ordemId }: { itemId: string; ordemId: string }) => {
+      const { error } = await supabase.from("ordem_compra_itens").delete().eq("id", itemId);
+      if (error) throw error;
+      const { data: itensRestantes } = await supabase
+        .from("ordem_compra_itens")
+        .select("total")
+        .eq("ordem_id", ordemId);
+      const novoTotal = (itensRestantes ?? []).reduce((s, it) => s + Number(it.total || 0), 0);
+      await supabase
+        .from("ordens_compra")
+        .update({
+          valor_produtos: novoTotal,
+          valor_total: novoTotal,
+          icms_base: novoTotal,
+          icms_valor: novoTotal * 0.18,
+        })
+        .eq("id", ordemId);
+    },
+    onSuccess: () => {
+      toast.success("Item removido da ordem");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const recalcularTotal = (o: Ordem) =>
     Number(o.valor_produtos) - Number(o.desconto) + Number(o.icms_st_valor);
 
@@ -2762,15 +2794,25 @@ function OrdensCompra() {
 
         {/* ABA 1: VISÃO GERAL POR FORNECEDOR (O QUE PRECISO COMPRAR) */}
         <TabsContent value="fornecedores" className="space-y-6 m-0 print:hidden">
-          {/* BARRA DE CONTROLES: FILTRO DE VÍNCULO E NECESSIDADE */}
-          <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-4">
-              {/* FILTRO DE VÍNCULO */}
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  <Filter className="size-3.5" />
-                  Vínculo:
-                </span>
+          <ExpandableCard>
+            <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
+              <div>
+                <CardTitle>Visão por Fornecedor · Compras Pendentes</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Demandas vinculadas a clientes e reposição de estoque agrupadas por fabricante.
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* BARRA DE CONTROLES: FILTRO DE VÍNCULO E NECESSIDADE */}
+              <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* FILTRO DE VÍNCULO */}
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                      <Filter className="size-3.5" />
+                      Vínculo:
+                    </span>
                 <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
                   <button
                     type="button"
@@ -3064,7 +3106,7 @@ function OrdensCompra() {
             gruposVisaoFornecedor.map((grupo) => {
               const recolhido = fornecedoresRecolhidos[grupo.chave] === true;
               return (
-                <Card
+                <ExpandableCard
                   key={grupo.chave}
                   className={cn(
                     "overflow-hidden border transition-all shadow-sm",
@@ -3072,7 +3114,7 @@ function OrdensCompra() {
                   )}
                 >
                   {/* CABEÇALHO DO FORNECEDOR */}
-                  <div className="flex flex-col gap-3 p-4 bg-muted/20 border-b sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-3 p-4 pr-12 bg-muted/20 border-b sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-start gap-3">
                       <div className="rounded-lg bg-primary/10 p-2 text-primary mt-0.5">
                         <Factory className="size-5" />
@@ -3564,10 +3606,12 @@ function OrdensCompra() {
                       </Table>
                     </div>
                   )}
-                </Card>
+                </ExpandableCard>
               );
             })
           )}
+            </CardContent>
+          </ExpandableCard>
         </TabsContent>
 
         {/* ABA 2: GRADE GERAL DE PRODUTOS */}
@@ -4051,11 +4095,30 @@ function OrdensCompra() {
                           id={ordem.id}
                           titulo={`Visualizar ordem de compra ${ordem.numero ?? ""}`}
                         />
-                        <Button size="icon" variant="ghost" title="Abrir ordem" onClick={() => setDetalheId(ordem.id)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={`Editar/abrir ordem ${ordem.numero ?? ""}`}
+                          onClick={() => {
+                            setModoEdicao(false);
+                            setDetalheId(ordem.id);
+                          }}
+                        >
                           <Pencil className="size-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" title="Excluir ordem" onClick={() => excluirOrdem.mutate(ordem.id)}>
-                          <Trash2 className="size-4 text-destructive" />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={`Excluir o item "${item.descricao}" desta ordem`}
+                          className="text-destructive hover:bg-destructive/10"
+                          disabled={excluirItemOrdem.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Excluir o item "${item.descricao}" da ordem ${ordem.numero ?? ""}?`)) {
+                              excluirItemOrdem.mutate({ itemId: item.id, ordemId: ordem.id });
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -4110,116 +4173,155 @@ function OrdensCompra() {
 
     {/* ABA 3: ORDENS EMITIDAS E PAGAMENTOS */}
     <TabsContent value="executadas" className="space-y-6 m-0 print:hidden">
-      {ordensFiltradas.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-muted-foreground space-y-2">
-            <CheckCircle2 className="size-8 mx-auto text-muted-foreground/60" />
-            <p className="text-base font-medium">Nenhuma ordem de compra emitida encontrada.</p>
-            <p className="text-xs">
-              Quando você executar ordens na Visão por Fornecedor ou na Grade Geral, elas aparecerão aqui.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
+      <ExpandableCard>
+        <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
           <div>
-            <h2 className="text-base font-semibold">Ordens executadas e pagamentos</h2>
-            <p className="text-sm text-muted-foreground">
+            <CardTitle>Ordens Executadas e Pagamentos</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
               Cada ordem permanece aqui com o número, o valor pago e o saldo.
             </p>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {ordensFiltradas.map((ordem) => {
-              const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
-              const total = Number(ordem.valor_total ?? 0);
-              const saldo = total - pago;
-              const pctPago = total > 0 ? Math.min(Math.max(pago / total, 0), 1) : 0;
-              const pctLabel = Math.round(pctPago * 100);
-              const tom =
-                pctPago >= 1
-                  ? {
-                      fill: "bg-emerald-500/15",
-                      border: "border-emerald-500/30",
-                      texto: "text-emerald-400",
-                      selo: "bg-emerald-500/20 border-emerald-500/40 text-emerald-400",
-                      sombra: "shadow-emerald-500/5",
-                    }
-                  : pctPago > 0
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {ordensFiltradas.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center text-muted-foreground space-y-2">
+                <CheckCircle2 className="size-8 mx-auto text-muted-foreground/60" />
+                <p className="text-base font-medium">Nenhuma ordem de compra emitida encontrada.</p>
+                <p className="text-xs">
+                  Quando você executar ordens na Visão por Fornecedor ou na Grade Geral, elas aparecerão aqui.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {ordensFiltradas.map((ordem) => {
+                const pago = totaisPagosPorOrdem.get(ordem.id) ?? Number(ordem.valor_pago ?? 0);
+                const total = Number(ordem.valor_total ?? 0);
+                const saldo = total - pago;
+                const pctPago = total > 0 ? Math.min(Math.max(pago / total, 0), 1) : 0;
+                const pctLabel = Math.round(pctPago * 100);
+                const tom =
+                  pctPago >= 1
                     ? {
-                        fill: "bg-amber-500/15",
-                        border: "border-amber-500/20",
-                        texto: "text-amber-400",
-                        selo: "bg-amber-500/20 border-amber-500/40 text-amber-400",
-                        sombra: "shadow-amber-500/5",
+                        fill: "bg-emerald-500/15",
+                        border: "border-emerald-500/30",
+                        texto: "text-emerald-400",
+                        selo: "bg-emerald-500/20 border-emerald-500/40 text-emerald-400",
+                        sombra: "shadow-emerald-500/5",
                       }
-                    : {
-                        fill: "bg-red-500/10",
-                        border: "border-red-500/20",
-                        texto: "text-red-400",
-                        selo: "bg-red-500/20 border-red-500/40 text-red-400",
-                        sombra: "shadow-red-500/5",
-                      };
-              return (
-                <Card
-                  key={ordem.id}
-                  className={`relative overflow-hidden border ${tom.border} shadow-2xl ${tom.sombra}`}
-                >
-                  <div
-                    aria-hidden
-                    className={`absolute inset-y-0 left-0 ${tom.fill} transition-all duration-700`}
-                    style={{ width: `${pctLabel}%` }}
-                  />
-                  <CardHeader className="relative space-y-2 pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <CardTitle className="font-mono text-base">{ordem.numero ?? "O.C. sem número"}</CardTitle>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {ordem.fornecedor_nome ?? "Fornecedor não definido"}
-                        </p>
+                    : pctPago > 0
+                      ? {
+                          fill: "bg-amber-500/15",
+                          border: "border-amber-500/20",
+                          texto: "text-amber-400",
+                          selo: "bg-amber-500/20 border-amber-500/40 text-amber-400",
+                          sombra: "shadow-amber-500/5",
+                        }
+                      : {
+                          fill: "bg-red-500/10",
+                          border: "border-red-500/20",
+                          texto: "text-red-400",
+                          selo: "bg-red-500/20 border-red-500/40 text-red-400",
+                          sombra: "shadow-red-500/5",
+                        };
+                return (
+                  <Card
+                    key={ordem.id}
+                    className={`relative overflow-hidden border ${tom.border} shadow-2xl ${tom.sombra}`}
+                  >
+                    <div
+                      aria-hidden
+                      className={`absolute inset-y-0 left-0 ${tom.fill} transition-all duration-700`}
+                      style={{ width: `${pctLabel}%` }}
+                    />
+                    <CardHeader className="relative space-y-2 pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <CardTitle className="font-mono text-base">{ordem.numero ?? "O.C. sem número"}</CardTitle>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {ordem.fornecedor_nome ?? "Fornecedor não definido"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tom.selo}`}
+                          >
+                            {pctLabel}% pago
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge variant={statusVariant(ordem.status)}>{statusLabel[ordem.status] ?? ordem.status}</Badge>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${tom.selo}`}
+                    </CardHeader>
+                    <CardContent className="relative space-y-3">
+                      <div className="grid grid-cols-3 gap-2 text-right">
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Total</p>
+                          <p className="text-sm font-semibold">{brl(total)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Pago</p>
+                          <p className={`text-sm font-semibold ${tom.texto}`}>{brl(pago)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Saldo</p>
+                          <p className="text-sm font-semibold">{brl(saldo)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button
+                          type="button"
+                          className="flex-1 text-xs h-8"
+                          variant="outline"
+                          onClick={() => {
+                            setModoEdicao(false);
+                            setDetalheId(ordem.id);
+                          }}
                         >
-                          {pctLabel}% pago
-                        </span>
+                          Abrir O.C.
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-8"
+                          title="Editar ordem de compra"
+                          onClick={() => {
+                            setModoEdicao(true);
+                            setDetalheId(ordem.id);
+                          }}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        <BotaoVisualizarDocumento
+                          tipo="ordem_compra"
+                          id={ordem.id}
+                          titulo={`Visualizar O.C. ${ordem.numero ?? ""}`}
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-8 text-destructive hover:bg-destructive/10"
+                          title="Excluir ordem de compra"
+                          disabled={excluirOrdem.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Excluir permanentemente a Ordem de Compra ${ordem.numero ?? ""}?`)) {
+                              excluirOrdem.mutate(ordem.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="relative space-y-3">
-                    <div className="grid grid-cols-3 gap-2 text-right">
-                      <div>
-                        <p className="text-[11px] text-muted-foreground">Total</p>
-                        <p className="text-sm font-semibold">{brl(total)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] text-muted-foreground">Pago</p>
-                        <p className={`text-sm font-semibold ${tom.texto}`}>{brl(pago)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] text-muted-foreground">Saldo</p>
-                        <p className="text-sm font-semibold">{brl(saldo)}</p>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      className="w-full"
-                      variant="outline"
-                      onClick={() => {
-                        setModoEdicao(false);
-                        setDetalheId(ordem.id);
-                      }}
-                    >
-                      Abrir O.C. e pagamentos
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </ExpandableCard>
     </TabsContent>
   </Tabs>
 
@@ -4232,14 +4334,68 @@ function OrdensCompra() {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl print:max-h-none print:overflow-visible">
+        <DialogContent
+          className={cn(
+            "overflow-y-auto transition-all duration-200 print:max-h-none print:overflow-visible",
+            modalDetalheMaximized
+              ? "fixed inset-2 md:inset-4 max-w-none w-[calc(100vw-1rem)] md:w-[calc(100vw-2rem)] h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] max-h-none z-50 flex flex-col"
+              : "max-h-[90vh] sm:max-w-4xl",
+          )}
+        >
           {ordemDetalhe && !modoEdicao && (
             <div className="space-y-6">
               <DialogHeader className="print:hidden">
-                <DialogTitle>Ordem de compra {ordemDetalhe.numero}</DialogTitle>
-                <DialogDescription>
-                  Detalhe completo da ordem, itens e tributos.
-                </DialogDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <DialogTitle className="flex items-center gap-2">
+                      <span>Ordem de compra {ordemDetalhe.numero}</span>
+                      <Badge variant={statusVariant(ordemDetalhe.status)}>
+                        {statusLabel[ordemDetalhe.status] ?? ordemDetalhe.status}
+                      </Badge>
+                    </DialogTitle>
+                    <DialogDescription>
+                      Detalhe completo da ordem, itens, tributos e pagamentos.
+                    </DialogDescription>
+                  </div>
+                  <div className="flex items-center gap-1.5 mr-6">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 text-muted-foreground hover:text-primary"
+                      title={modalDetalheMaximized ? "Reduzir tela (Esc)" : "Expandir para tela cheia"}
+                      onClick={() => setModalDetalheMaximized((v) => !v)}
+                    >
+                      {modalDetalheMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      title="Editar ordem"
+                      onClick={() => setModoEdicao(true)}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="size-8 text-destructive hover:bg-destructive/10"
+                      title="Excluir ordem"
+                      disabled={excluirOrdem.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Excluir permanentemente a ordem de compra ${ordemDetalhe.numero ?? ""}?`)) {
+                          excluirOrdem.mutate(ordemDetalhe.id);
+                          setDetalheId(null);
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </div>
               </DialogHeader>
 
               <div className="hidden print:block">
@@ -4315,30 +4471,49 @@ function OrdensCompra() {
                       <TableCell>{i.cst ?? "—"}</TableCell>
                       <TableCell>{i.unidade}</TableCell>
                       <TableCell className="print:hidden">
-                        {(() => {
-                          const produto = i.produto_id
-                            ? produtos.find((p) => p.id === i.produto_id)
-                            : undefined;
-                          return (
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              aria-label={`Editar produto ${i.descricao}`}
-                              title={
-                                produto
-                                  ? "Editar cadastro do produto"
-                                  : "Item sem cadastro de produto"
+                        <div className="flex items-center gap-1">
+                          {(() => {
+                            const produto = i.produto_id
+                              ? produtos.find((p) => p.id === i.produto_id)
+                              : undefined;
+                            return (
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="size-7"
+                                aria-label={`Editar produto ${i.descricao}`}
+                                title={
+                                  produto
+                                    ? "Editar cadastro do produto"
+                                    : "Item sem cadastro de produto"
+                                }
+                                disabled={!produto}
+                                onClick={() => {
+                                  if (produto) abrirEdicaoProdutoCompra(produto);
+                                }}
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
+                            );
+                          })()}
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-7 text-destructive hover:bg-destructive/10"
+                            aria-label={`Excluir ${i.descricao} da ordem`}
+                            title="Excluir item da ordem"
+                            disabled={excluirItemOrdem.isPending}
+                            onClick={() => {
+                              if (window.confirm(`Excluir o item "${i.descricao}" desta ordem de compra?`)) {
+                                excluirItemOrdem.mutate({ itemId: i.id, ordemId: ordemDetalhe.id });
                               }
-                              disabled={!produto}
-                              onClick={() => {
-                                if (produto) abrirEdicaoProdutoCompra(produto);
-                              }}
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                          );
-                        })()}
+                            }}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <Input

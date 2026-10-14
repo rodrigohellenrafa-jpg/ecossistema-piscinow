@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Folder,
   FolderOpen,
@@ -20,8 +20,14 @@ import {
   MapPin,
   Phone,
   Factory,
+  Pencil,
+  Trash2,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { ExpandableCard } from "@/components/expandable-card";
 import { PageHeader } from "@/components/page-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
@@ -104,10 +110,35 @@ interface OrdemCompraItem {
 }
 
 function DocumentosClientes() {
+  const qc = useQueryClient();
   const [clienteSelecionadoId, setClienteSelecionadoId] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [abaDossie, setAbaDossie] = useState<"os" | "oc">("os");
   const [modalPedirCargaAberto, setModalPedirCargaAberto] = useState(false);
+
+  const excluirOS = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ordens_servico").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Ordem de Serviço excluída com sucesso");
+      qc.invalidateQueries({ queryKey: ["ordens_servico"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const excluirItemOC = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("ordem_compra_itens").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Item de compra excluído com sucesso");
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   // 1. Carrega todos os clientes
   const { data: clientes = [] } = useQuery({
@@ -430,7 +461,7 @@ function DocumentosClientes() {
         /* ======================================================== */
         /* CASO 2: DENTRO DA PASTA DO CLIENTE (DOSSIÊ COMPLETO)     */
         /* ======================================================== */
-        <div className="space-y-6">
+        <ExpandableCard className="space-y-6 p-6">
           {/* CARTÃO DE CABEÇALHO DO CLIENTE */}
           <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -563,10 +594,24 @@ function DocumentosClientes() {
                                 id={os.id}
                                 titulo={`Visualizar OS ${os.numero ?? ""}`}
                               />
-                              <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
+                              <Button asChild size="icon" variant="ghost" className="size-7" title="Editar OS no Módulo de Ordens">
                                 <Link to="/ordens">
-                                  <ExternalLink className="size-3.5" />
+                                  <Pencil className="size-3.5" />
                                 </Link>
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="size-7 text-destructive hover:bg-destructive/10"
+                                title="Excluir OS"
+                                disabled={excluirOS.isPending}
+                                onClick={() => {
+                                  if (window.confirm(`Excluir permanentemente a Ordem de Serviço ${os.numero ?? ""}?`)) {
+                                    excluirOS.mutate(os.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="size-3.5" />
                               </Button>
                             </div>
                           </TableCell>
@@ -598,9 +643,9 @@ function DocumentosClientes() {
               ) : (
                 <div className="space-y-4">
                   {ocsAgrupadasPorFornecedor.map((grupo) => (
-                    <Card key={grupo.fornecedorNome} className="overflow-hidden border">
+                    <ExpandableCard key={grupo.fornecedorNome} className="overflow-hidden border">
                       {/* CABEÇALHO DO FORNECEDOR DENTRO DA PASTA DO CLIENTE */}
-                      <div className="flex flex-col gap-2 p-3.5 bg-muted/20 border-b sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-col gap-2 p-3.5 pr-12 bg-muted/20 border-b sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2.5">
                           <div className="rounded-lg bg-primary/10 p-2 text-primary">
                             <Factory className="size-4" />
@@ -649,7 +694,7 @@ function DocumentosClientes() {
                             <TableHead className="w-28 text-right">Valor Unit.</TableHead>
                             <TableHead className="w-28 text-right">Total</TableHead>
                             <TableHead className="w-32">Status da Carga</TableHead>
-                            <TableHead className="w-28 text-right">Documento</TableHead>
+                            <TableHead className="w-32 text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -690,23 +735,44 @@ function DocumentosClientes() {
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
-                                <BotaoVisualizarDocumento
-                                  tipo="ordem_compra"
-                                  id={item.ordem_id}
-                                  titulo={`O.C. ${item.ordem_numero ?? ""}`}
-                                />
+                                <div className="flex items-center justify-end gap-1">
+                                  <BotaoVisualizarDocumento
+                                    tipo="ordem_compra"
+                                    id={item.ordem_id}
+                                    titulo={`O.C. ${item.ordem_numero ?? ""}`}
+                                  />
+                                  <Button asChild size="icon" variant="ghost" className="size-7" title="Abrir e editar O.C.">
+                                    <Link to="/ordens-compra">
+                                      <Pencil className="size-3.5" />
+                                    </Link>
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7 text-destructive hover:bg-destructive/10"
+                                    title="Excluir item desta ordem"
+                                    disabled={excluirItemOC.isPending}
+                                    onClick={() => {
+                                      if (window.confirm(`Excluir o item "${item.descricao}" da ordem ${item.ordem_numero ?? ""}?`)) {
+                                        excluirItemOC.mutate(item.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
-                    </Card>
+                    </ExpandableCard>
                   ))}
                 </div>
               )}
             </TabsContent>
           </Tabs>
-        </div>
+        </ExpandableCard>
       )}
 
       {/* MODAL GLOBAL PARA PEDIR CARGA */}

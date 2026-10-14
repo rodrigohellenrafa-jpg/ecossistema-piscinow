@@ -13,9 +13,14 @@ import {
   Search,
   ShoppingCart,
   Boxes,
+  Maximize2,
+  Minimize2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,6 +93,7 @@ export function ModalPedirCarga({
   const [itensSelecionados, setItensSelecionados] = useState<Record<string, boolean>>({});
   const [valoresUnitarios, setValoresUnitarios] = useState<Record<string, number>>({});
   const [busca, setBusca] = useState("");
+  const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -461,7 +467,14 @@ export function ModalPedirCarga({
           onOpenChange(v);
         }}
       >
-        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
+        <DialogContent
+          className={cn(
+            "overflow-y-auto transition-all duration-200",
+            isMaximized
+              ? "fixed inset-2 md:inset-4 max-w-none w-[calc(100vw-1rem)] md:w-[calc(100vw-2rem)] h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] max-h-none z-50 flex flex-col"
+              : "max-h-[92vh] sm:max-w-4xl",
+          )}
+        >
           <DialogHeader>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
@@ -476,6 +489,19 @@ export function ModalPedirCarga({
                     Consolide Ordens de Compra por fornecedor em um manifesto único de transporte.
                   </DialogDescription>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 mr-6">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground hover:text-primary"
+                  title={isMaximized ? "Reduzir tela (Esc)" : "Expandir para tela cheia"}
+                  onClick={() => setIsMaximized((v) => !v)}
+                >
+                  {isMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                </Button>
               </div>
             </div>
 
@@ -622,12 +648,13 @@ export function ModalPedirCarga({
                         <TableHead className="w-20 text-right">Qtd</TableHead>
                         <TableHead className="w-28 text-right">Valor Unit.</TableHead>
                         <TableHead className="w-28 text-right">Total</TableHead>
+                        <TableHead className="w-20 text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {itensFiltrados.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-xs">
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-xs">
                             Nenhum item pendente de carga encontrado para este fornecedor.
                           </TableCell>
                         </TableRow>
@@ -694,6 +721,46 @@ export function ModalPedirCarga({
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold text-foreground">
                                 {brl(getTotalItem(item))}
+                              </TableCell>
+                              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7"
+                                    title="Editar valor unitário"
+                                    onClick={() => {
+                                      const input = window.prompt(
+                                        `Novo valor unitário para "${item.produto_nome}":`,
+                                        String(
+                                          valoresUnitarios[item.id] !== undefined
+                                            ? valoresUnitarios[item.id]
+                                            : item.valor_unitario,
+                                        ),
+                                      );
+                                      if (input !== null) {
+                                        const val = parseFloat(input) || 0;
+                                        setValoresUnitarios((prev) => ({ ...prev, [item.id]: val }));
+                                        atualizarValorUnitarioItem(item, val);
+                                      }
+                                    }}
+                                  >
+                                    <Pencil className="size-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7 text-destructive hover:bg-destructive/10"
+                                    title="Remover/desmarcar da carga"
+                                    onClick={() => {
+                                      setItensSelecionados((prev) => ({ ...prev, [item.id]: false }));
+                                    }}
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
