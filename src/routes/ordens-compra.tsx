@@ -267,10 +267,10 @@ function OrdensCompra() {
   const qc = useQueryClient();
   const [abaVisao, setAbaVisao] = useState<"fornecedores" | "grade" | "executadas">("fornecedores");
   const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("todos");
-  const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("precisa_comprar");
+  const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("todos");
   const [filtroExibicaoCatalogo, setFiltroExibicaoCatalogo] = useState<
     "apenas_vinculados_selecionados" | "catalogo_completo"
-  >("apenas_vinculados_selecionados");
+  >("catalogo_completo");
   const [ocultarJaComprados, setOcultarJaComprados] = useState(true);
   const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
   const [filtroFornecedor, setFiltroFornecedor] = useState<string>("todos");
@@ -994,7 +994,7 @@ function OrdensCompra() {
       const estaExplicitamenteVinculado =
         temDemandaPendente || temVinculoManual || temVinculoProduto;
 
-      // 4. Se o usuário ativou explicitamente o modo "Catálogo completo"
+      // 4. Se o usuário ativou o modo "Catálogo completo" (padrão para exibir todo o cadastro do fornecedor)
       if (filtroExibicaoCatalogo === "catalogo_completo") {
         if (termoBusca) {
           const casaFornecedor = normalizar(forn?.nome ?? "").includes(termoBusca);
@@ -1002,13 +1002,22 @@ function OrdensCompra() {
             normalizar(produto.nome).includes(termoBusca) ||
             normalizar(produto.codigo ?? "").includes(termoBusca) ||
             normalizar(produto.categoria ?? "").includes(termoBusca);
-          return casaFornecedor || casaProduto;
+          const vendaVinculo = produto.venda_vinculo_id
+            ? vendaPorId.get(produto.venda_vinculo_id)
+            : undefined;
+          const casaVinculo =
+            vendaVinculo &&
+            (normalizar(vendaVinculo.numero ?? "").includes(termoBusca) ||
+              normalizar(vendaVinculo.cliente_nome ?? "").includes(termoBusca));
+          const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
+          const casaDemanda = pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
+
+          return casaFornecedor || casaProduto || casaVinculo || casaDemanda;
         }
         return true;
       }
 
-      // 5. REGRA CRÍTICA: Não exibir automaticamente todo o catálogo de produtos do fornecedor selecionado.
-      // Mostre apenas os itens explicitamente vinculados à ordem de compra ou buscados/selecionados pelo usuário.
+      // 5. Modo "Apenas Vinculados / Demanda": exibe apenas itens vinculados ou buscados
       if (termoBusca) {
         const casaProduto =
           normalizar(produto.nome).includes(termoBusca) ||
@@ -1025,13 +1034,10 @@ function OrdensCompra() {
         const casaDemanda = pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
         const casaFornecedor = normalizar(forn?.nome ?? "").includes(termoBusca);
 
-        // Se o usuário buscou diretamente o produto, código, pedido ou cliente:
         if (casaProduto || casaVinculo || casaDemanda) {
           return true;
         }
 
-        // Se o usuário buscou pelo nome do fornecedor:
-        // NÃO exibe todo o catálogo do fornecedor! Exibe apenas os itens com demanda ou vínculo daquele fornecedor.
         if (casaFornecedor && estaExplicitamenteVinculado) {
           return true;
         }
@@ -1039,7 +1045,6 @@ function OrdensCompra() {
         return false;
       }
 
-      // Sem busca textual e sem seleção: apenas itens com demanda pendente ou vínculo explícito
       return estaExplicitamenteVinculado;
     });
   }, [
@@ -1811,33 +1816,84 @@ function OrdensCompra() {
         .eq("id", ordemDetalhe.id);
       if (erroOrdem) throw erroOrdem;
 
-      const { error: erroExcluirItens } = await supabase
+      // Mantém itens existentes para preservar integridade de cargas geradas
+      const { data: itensExistentes } = await supabase
         .from("ordem_compra_itens")
-        .delete()
+        .select("id")
         .eq("ordem_id", ordemDetalhe.id);
-      if (erroExcluirItens) throw erroExcluirItens;
 
-      const payload = formEdicao.itens.map((i) => ({
-        ordem_id: ordemDetalhe.id,
-        produto_id: i.produto_id || null,
-        codigo: i.codigo,
-        descricao: i.descricao,
-        ncm: i.ncm,
-        cst: i.cst,
-        unidade: i.unidade,
-        quantidade: i.quantidade,
-        valor_unitario: i.valor_unitario,
-        desconto: i.desconto,
-        total: i.quantidade * i.valor_unitario - i.desconto,
-        cliente_id: i.cliente_id,
-        cliente_nome: i.cliente_nome,
-        venda_id: i.venda_id ?? null,
-        numero_nf: i.numero_nf ?? null,
-        cor: i.cor?.trim() || null,
-        pastilha: i.pastilha?.trim() || null,
-      }));
-      const { error: erroItens } = await supabase.from("ordem_compra_itens").insert(payload);
-      if (erroItens) throw erroItens;
+      const idsMantidos = new Set(formEdicao.itens.map((i) => i.id).filter(Boolean));
+      const idsParaExcluir = (itensExistentes ?? [])
+        .map((it) => it.id)
+        .filter((id) => !idsMantidos.has(id));
+
+      if (idsParaExcluir.length > 0) {
+        try {
+          await (supabase as any)
+            .from("cargas_itens")
+            .delete()
+            .in("item_ordem_id", idsParaExcluir);
+        } catch (_) {}
+        await supabase
+          .from("ordem_compra_itens")
+          .delete()
+          .in("id", idsParaExcluir);
+      }
+
+      for (const i of formEdicao.itens) {
+        const itemPayload = {
+          ordem_id: ordemDetalhe.id,
+          produto_id: i.produto_id || null,
+          codigo: i.codigo,
+          descricao: i.descricao,
+          ncm: i.ncm,
+          cst: i.cst,
+          unidade: i.unidade,
+          quantidade: Number(i.quantidade) || 0,
+          valor_unitario: Number(i.valor_unitario) || 0,
+          desconto: Number(i.desconto) || 0,
+          total: (Number(i.quantidade) || 0) * (Number(i.valor_unitario) || 0) - (Number(i.desconto) || 0),
+          cliente_id: i.cliente_id,
+          cliente_nome: i.cliente_nome,
+          venda_id: i.venda_id ?? null,
+          numero_nf: i.numero_nf ?? null,
+          cor: i.cor?.trim() || null,
+          pastilha: i.pastilha?.trim() || null,
+        };
+
+        if (i.id) {
+          await supabase.from("ordem_compra_itens").update(itemPayload).eq("id", i.id);
+          try {
+            await (supabase as any)
+              .from("cargas_itens")
+              .update({
+                valor_unitario: Number(i.valor_unitario) || 0,
+                valor_total: (Number(i.quantidade) || 0) * (Number(i.valor_unitario) || 0),
+              })
+              .eq("item_ordem_id", i.id);
+          } catch (_) {}
+        } else {
+          await supabase.from("ordem_compra_itens").insert(itemPayload);
+        }
+      }
+
+      // Recalcula total da carga se existir
+      try {
+        const { data: cargaItens } = await (supabase as any)
+          .from("cargas_itens")
+          .select("carga_id")
+          .eq("ordem_id", ordemDetalhe.id);
+
+        const cargasIds = Array.from(new Set((cargaItens ?? []).map((ci: any) => ci.carga_id)));
+        for (const cId of cargasIds) {
+          const { data: itensC } = await (supabase as any)
+            .from("cargas_itens")
+            .select("valor_total")
+            .eq("carga_id", cId);
+          const totalC = (itensC ?? []).reduce((acc: number, c: any) => acc + Number(c.valor_total ?? 0), 0);
+          await (supabase as any).from("cargas").update({ total_valor: totalC }).eq("id", cId);
+        }
+      } catch (_) {}
     },
     onSuccess: () => {
       toast.success("Ordem de compra atualizada");
@@ -2072,6 +2128,126 @@ function OrdensCompra() {
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
     },
     onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  /** Permite editar valores unitários de itens/piscinas mesmo após a geração da carga, sincronizando ordem e carga. */
+  const atualizarValorUnitarioItem = useMutation({
+    mutationFn: async ({
+      itemId,
+      ordemId,
+      valorUnitario,
+    }: {
+      itemId: string;
+      ordemId: string;
+      valorUnitario: number;
+    }) => {
+      // 1. Busca o item para recalcular quantidade e desconto
+      const { data: itemAtual, error: erroItem } = await supabase
+        .from("ordem_compra_itens")
+        .select("id, quantidade, desconto, produto_id, descricao")
+        .eq("id", itemId)
+        .single();
+      if (erroItem || !itemAtual) throw erroItem || new Error("Item não encontrado");
+
+      const qtd = Number(itemAtual.quantidade ?? 1);
+      const desc = Number(itemAtual.desconto ?? 0);
+      const novoTotalItem = Math.max(0, qtd * valorUnitario - desc);
+
+      // 2. Atualiza ordem_compra_itens
+      const { error: erroUpdateItem } = await supabase
+        .from("ordem_compra_itens")
+        .update({
+          valor_unitario: valorUnitario,
+          total: novoTotalItem,
+        })
+        .eq("id", itemId);
+      if (erroUpdateItem) throw erroUpdateItem;
+
+      // 3. Atualiza também em cargas_itens caso já tenha carga gerada
+      try {
+        await (supabase as any)
+          .from("cargas_itens")
+          .update({
+            valor_unitario: valorUnitario,
+            valor_total: qtd * valorUnitario,
+          })
+          .eq("item_ordem_id", itemId);
+
+        // Recalcula o valor total da carga se existir
+        const { data: cargaItem } = await (supabase as any)
+          .from("cargas_itens")
+          .select("carga_id")
+          .eq("item_ordem_id", itemId)
+          .maybeSingle();
+
+        if (cargaItem?.carga_id) {
+          const { data: todosItensCarga } = await (supabase as any)
+            .from("cargas_itens")
+            .select("valor_total")
+            .eq("carga_id", cargaItem.carga_id);
+
+          const novoTotalCarga = (todosItensCarga ?? []).reduce(
+            (acc: number, cur: any) => acc + Number(cur.valor_total ?? 0),
+            0,
+          );
+
+          await (supabase as any)
+            .from("cargas")
+            .update({ total_valor: novoTotalCarga })
+            .eq("id", cargaItem.carga_id);
+        }
+      } catch (e) {
+        console.warn("Aviso ao sincronizar carga:", e);
+      }
+
+      // 4. Recalcula os totais da ordem de compra
+      const { data: todosItensOrdem } = await supabase
+        .from("ordem_compra_itens")
+        .select("total")
+        .eq("ordem_id", ordemId);
+
+      const novoValorProdutos = (todosItensOrdem ?? []).reduce(
+        (acc, cur) => acc + Number(cur.total ?? 0),
+        0,
+      );
+
+      const { data: ordemAtual } = await supabase
+        .from("ordens_compra")
+        .select("desconto, icms_st_valor")
+        .eq("id", ordemId)
+        .single();
+
+      const descOrdem = Number(ordemAtual?.desconto ?? 0);
+      const icmsStOrdem = Number(ordemAtual?.icms_st_valor ?? 0);
+      const novoValorTotal = novoValorProdutos - descOrdem + icmsStOrdem;
+
+      await supabase
+        .from("ordens_compra")
+        .update({
+          valor_produtos: novoValorProdutos,
+          icms_base: novoValorProdutos,
+          icms_valor: novoValorProdutos * 0.18,
+          valor_total: novoValorTotal,
+        })
+        .eq("id", ordemId);
+
+      // 5. Se tiver produto_id, também atualiza preco_custo no catálogo do produto
+      if (itemAtual.produto_id) {
+        await supabase
+          .from("produtos")
+          .update({ preco_custo: valorUnitario })
+          .eq("id", itemAtual.produto_id);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Valor unitário atualizado com sucesso!");
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["cargas"] });
+      qc.invalidateQueries({ queryKey: ["cargas_itens"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+    },
+    onError: (erro: Error) => toast.error(`Erro ao atualizar valor: ${erro.message}`),
   });
 
   /** Recalcula o valor faturado na nota (soma das NFs lançadas) e grava na ordem. */
@@ -3679,8 +3855,27 @@ function OrdensCompra() {
                     <TableCell>{item.descricao}</TableCell>
                     <TableCell>{produto?.cor_pastilha ?? "—"}</TableCell>
                     <TableCell>{produto?.modelo_pastilha ?? "—"}</TableCell>
-                    <TableCell className="text-right">{Number(item.quantidade)}</TableCell>
-                    <TableCell className="text-right">{brl(Number(item.valor_unitario))}</TableCell>
+                    <TableCell className="text-right">
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        aria-label={`Valor unitário de ${item.descricao}`}
+                        className="h-8 w-28 text-right font-mono ml-auto"
+                        defaultValue={Number(item.valor_unitario) || 0}
+                        key={`exec-vlr-${item.id}-${item.valor_unitario}`}
+                        onBlur={(evento) => {
+                          const novoValor = Math.max(Number(evento.target.value) || 0, 0);
+                          if (novoValor !== Number(item.valor_unitario)) {
+                            atualizarValorUnitarioItem.mutate({
+                              itemId: item.id,
+                              ordemId: ordem.id,
+                              valorUnitario: novoValor,
+                            });
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell className="text-right">
                       {Number(item.quantidade) * Number(item.valor_unitario) > 0
                         ? `${((Number(item.desconto) / (Number(item.quantidade) * Number(item.valor_unitario))) * 100).toFixed(2)}%`
@@ -4013,8 +4208,27 @@ function OrdensCompra() {
                           );
                         })()}
                       </TableCell>
-                      <TableCell className="text-right">{i.quantidade}</TableCell>
-                      <TableCell className="text-right">{brl(Number(i.valor_unitario))}</TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          aria-label={`Valor unitário de ${i.descricao}`}
+                          className="h-8 w-28 text-right font-mono ml-auto"
+                          defaultValue={Number(i.valor_unitario) || 0}
+                          key={`det-vlr-${i.id}-${i.valor_unitario}`}
+                          onBlur={(evento) => {
+                            const novoValor = Math.max(Number(evento.target.value) || 0, 0);
+                            if (novoValor !== Number(i.valor_unitario)) {
+                              atualizarValorUnitarioItem.mutate({
+                                itemId: i.id,
+                                ordemId: ordemDetalhe.id,
+                                valorUnitario: novoValor,
+                              });
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="text-right">{brl(Number(i.desconto))}</TableCell>
                       <TableCell>
                         {etapaAtual(ordemDetalhe.status) >= 2 ? (
