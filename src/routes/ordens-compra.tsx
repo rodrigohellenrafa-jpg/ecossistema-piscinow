@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -273,6 +273,7 @@ function OrdensCompra() {
   >("apenas_vinculados_selecionados");
   const [ocultarJaComprados, setOcultarJaComprados] = useState(true);
   const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
+  const [filtroFornecedor, setFiltroFornecedor] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
   const [detalheId, setDetalheId] = useState<string | null>(null);
@@ -786,7 +787,11 @@ function OrdensCompra() {
   const ordensFiltradas = useMemo(() => {
     const casaStatus = (ordem: Ordem) =>
       filtroStatus === "todas" || ordem.status === filtroStatus;
-    if (!termoBusca) return ordens.filter(casaStatus);
+    const casaFornecedor = (ordem: Ordem) =>
+      filtroFornecedor === "todos" || ordem.fornecedor_id === filtroFornecedor;
+
+    const ordensBase = ordens.filter((o) => casaStatus(o) && casaFornecedor(o));
+    if (!termoBusca) return ordensBase;
 
     const itensPorOrdem = new Map<string, Item[]>();
     for (const it of itensTodos) {
@@ -794,8 +799,7 @@ function OrdensCompra() {
       lista.push(it);
       itensPorOrdem.set(it.ordem_id, lista);
     }
-    return ordens.filter((ordem) => {
-      if (!casaStatus(ordem)) return false;
+    return ordensBase.filter((ordem) => {
       if (normalizar(ordem.fornecedor_nome ?? "").includes(termoBusca)) return true;
       if (normalizar(ordem.numero ?? "").includes(termoBusca)) return true;
       return (itensPorOrdem.get(ordem.id) ?? []).some((it) => {
@@ -808,7 +812,7 @@ function OrdensCompra() {
         );
       });
     });
-  }, [ordens, filtroStatus, termoBusca, itensTodos, vendaPorId]);
+  }, [ordens, filtroStatus, filtroFornecedor, termoBusca, itensTodos, vendaPorId]);
 
   /** Produto comprado, com a ordem e o pedido de venda vinculados. */
   type LinhaProduto = {
@@ -900,57 +904,112 @@ function OrdensCompra() {
       : Number(ordemDetalhe?.valor_nota ?? 0);
 
 
-  const fornecedorDaCompra = (produto: Produto) => {
-    const categoria = normalizar(produto.categoria ?? "");
-    const nome = normalizar(produto.nome);
-    const alvo =
-      produto.tipo === "servico"
-        ? "splash jardim do trevo"
-        : categoria.includes("piscina") || nome.includes("piscina")
+  const fornecedorDaCompra = useCallback(
+    (produto: Produto) => {
+      // 1. Prioridade: fornecedor direto cadastrado no produto
+      if (produto.fornecedor_id) {
+        const fDireto = fornecedores.find((f) => f.id === produto.fornecedor_id);
+        if (fDireto) return fDireto;
+      }
+      // 2. Serviço interno Splash
+      if (produto.tipo === "servico") {
+        const fSplash = fornecedores.find((f) =>
+          normalizar(f.nome).includes("splash jardim do trevo"),
+        );
+        return fSplash ?? ({ id: SEM_CLIENTE, nome: "Splash Jardim do Trevo" } satisfies Fornecedor);
+      }
+      // 3. Fallback inteligente por categoria ou nome
+      const categoria = normalizar(produto.categoria ?? "");
+      const nome = normalizar(produto.nome);
+      const alvo =
+        categoria.includes("piscina") || nome.includes("piscina")
           ? "analandia"
           : "progeu";
-    const encontrado =
-      fornecedores.find((f) => normalizar(f.nome).includes(alvo)) ??
-      fornecedores.find((f) => f.id === produto.fornecedor_id);
-    if (encontrado) return encontrado;
-    if (produto.tipo === "servico") {
-      return { id: SEM_CLIENTE, nome: "Splash Jardim do Trevo" } satisfies Fornecedor;
-    }
-    return { id: "outros", nome: "Outros Fornecedores" } satisfies Fornecedor;
-  };
+      const encontrado = fornecedores.find((f) => normalizar(f.nome).includes(alvo));
+      if (encontrado) return encontrado;
+      return { id: "outros", nome: "Outros Fornecedores" } satisfies Fornecedor;
+    },
+    [fornecedores],
+  );
 
   /** Identifica se o produto já teve ordem de compra gerada ou já foi faturado/comprado. */
-  const ehProdutoJaCompradoOuFaturado = (p: Produto) => {
-    const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
-    if (status === "comprado") return true;
+  const ehProdutoJaCompradoOuFaturado = useCallback(
+    (p: Produto) => {
+      const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
+      if (status === "comprado") return true;
 
-    if (itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id)) return true;
+      if (itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id)) return true;
 
-    // Se possui vínculo direto com venda e esse vínculo já teve OC gerada e não há mais demanda pendente
-    if (p.venda_vinculo_id) {
-      const chave = `${p.id}::${p.venda_vinculo_id}`;
-      const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
-      const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
-      if (jaComprado > 0 && pendente === 0) return true;
-    }
+      // Se possui vínculo direto com venda e esse vínculo já teve OC gerada e não há mais demanda pendente
+      if (p.venda_vinculo_id) {
+        const chave = `${p.id}::${p.venda_vinculo_id}`;
+        const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
+        if (jaComprado > 0 && pendente === 0) return true;
+      }
 
-    // Se já teve ordem de compra gerada em ordem ativa e não possui demanda pendente
-    if (itensCompradosInfo.produtosComOrdemGerada.has(p.id)) {
-      const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
-      if (pendente === 0) return true;
-    }
+      // Se já teve ordem de compra gerada em ordem ativa e não possui demanda pendente
+      if (itensCompradosInfo.produtosComOrdemGerada.has(p.id)) {
+        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
+        if (pendente === 0) return true;
+      }
 
-    return false;
-  };
+      return false;
+    },
+    [statusCompra, itensCompradosInfo, demandaPorProduto],
+  );
 
   const produtosFiltrados = useMemo(() => {
     return produtos.filter((produto) => {
+      const forn = fornecedorDaCompra(produto);
+
+      // 0. Filtro por fornecedor selecionado no seletor principal
+      if (filtroFornecedor !== "todos" && forn?.id !== filtroFornecedor) {
+        return false;
+      }
+
       const jaComprado = ehProdutoJaCompradoOuFaturado(produto);
       const estaSelecionado = Boolean(selecionadosCompra[produto.id]);
 
-      // 1. Se há termo de busca ativo, busca em todo o catálogo do fornecedor ou produtos
+      // 1. Ocultar automaticamente itens já comprados ou com ordem gerada
+      if (ocultarJaComprados && jaComprado && !estaSelecionado) {
+        const casaBuscaExataProduto =
+          termoBusca &&
+          (normalizar(produto.nome).includes(termoBusca) ||
+            normalizar(produto.codigo ?? "").includes(termoBusca));
+        if (!casaBuscaExataProduto) {
+          return false;
+        }
+      }
+
+      // 2. Se o usuário ativamente marcou/selecionou este item, sempre exibe
+      if (estaSelecionado) return true;
+
+      // 3. Verifica vínculo explícito ou demanda pendente de pedidos de venda
+      const temDemandaPendente = (demandaPorProduto.get(produto.id)?.total ?? 0) > 0;
+      const temVinculoManual = Boolean(
+        vinculosCompra[produto.id]?.some((v) => v && v !== SEM_CLIENTE),
+      );
+      const temVinculoProduto = Boolean(produto.venda_vinculo_id && !jaComprado);
+      const estaExplicitamenteVinculado =
+        temDemandaPendente || temVinculoManual || temVinculoProduto;
+
+      // 4. Se o usuário ativou explicitamente o modo "Catálogo completo"
+      if (filtroExibicaoCatalogo === "catalogo_completo") {
+        if (termoBusca) {
+          const casaFornecedor = normalizar(forn?.nome ?? "").includes(termoBusca);
+          const casaProduto =
+            normalizar(produto.nome).includes(termoBusca) ||
+            normalizar(produto.codigo ?? "").includes(termoBusca) ||
+            normalizar(produto.categoria ?? "").includes(termoBusca);
+          return casaFornecedor || casaProduto;
+        }
+        return true;
+      }
+
+      // 5. REGRA CRÍTICA: Não exibir automaticamente todo o catálogo de produtos do fornecedor selecionado.
+      // Mostre apenas os itens explicitamente vinculados à ordem de compra ou buscados/selecionados pelo usuário.
       if (termoBusca) {
-        const casaFornecedor = normalizar(fornecedorDaCompra(produto)?.nome ?? "").includes(termoBusca);
         const casaProduto =
           normalizar(produto.nome).includes(termoBusca) ||
           normalizar(produto.codigo ?? "").includes(termoBusca) ||
@@ -964,51 +1023,29 @@ function OrdensCompra() {
             normalizar(vendaVinculo.cliente_nome ?? "").includes(termoBusca));
         const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
         const casaDemanda = pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
+        const casaFornecedor = normalizar(forn?.nome ?? "").includes(termoBusca);
 
-        if (!casaFornecedor && !casaProduto && !casaVinculo && !casaDemanda) {
-          return false;
+        // Se o usuário buscou diretamente o produto, código, pedido ou cliente:
+        if (casaProduto || casaVinculo || casaDemanda) {
+          return true;
         }
 
-        // Se estiver buscando e a opção de ocultar já comprados estiver ativa:
-        // Oculta itens já comprados a menos que a busca corresponda diretamente ao produto
-        if (ocultarJaComprados && jaComprado && !estaSelecionado) {
-          if (!casaProduto) return false;
+        // Se o usuário buscou pelo nome do fornecedor:
+        // NÃO exibe todo o catálogo do fornecedor! Exibe apenas os itens com demanda ou vínculo daquele fornecedor.
+        if (casaFornecedor && estaExplicitamenteVinculado) {
+          return true;
         }
 
-        return true;
-      }
-
-      // 2. REGRA CRÍTICA: Ocultar automaticamente itens já comprados ou com ordem gerada
-      if (ocultarJaComprados && jaComprado && !estaSelecionado) {
         return false;
       }
 
-      // 3. Itens ativamente selecionados pelo usuário sempre aparecem
-      if (estaSelecionado) return true;
-
-      // 4. REGRA CRÍTICA: Não exibir automaticamente todo o catálogo de produtos do fornecedor.
-      // Exibir apenas se foi explicitamente vinculado à ordem de compra ou se houver demanda pendente:
-      const temDemandaPendente = (demandaPorProduto.get(produto.id)?.total ?? 0) > 0;
-      const temVinculoManual = Boolean(
-        vinculosCompra[produto.id]?.some((v) => v && v !== SEM_CLIENTE),
-      );
-      const temVinculoProduto = Boolean(produto.venda_vinculo_id && !jaComprado);
-
-      const estaExplicitamenteVinculado =
-        temDemandaPendente || temVinculoManual || temVinculoProduto;
-
-      if (estaExplicitamenteVinculado) return true;
-
-      // Se o usuário optou por visualizar o catálogo completo
-      if (filtroExibicaoCatalogo === "catalogo_completo") {
-        return true;
-      }
-
-      return false;
+      // Sem busca textual e sem seleção: apenas itens com demanda pendente ou vínculo explícito
+      return estaExplicitamenteVinculado;
     });
   }, [
     produtos,
-    fornecedores,
+    filtroFornecedor,
+    fornecedorDaCompra,
     termoBusca,
     vendaPorId,
     demandaPorProduto,
@@ -1016,8 +1053,7 @@ function OrdensCompra() {
     vinculosCompra,
     ocultarJaComprados,
     filtroExibicaoCatalogo,
-    itensCompradosInfo,
-    statusCompra,
+    ehProdutoJaCompradoOuFaturado,
   ]);
 
   const quantidadeCompra = (produto: Produto) => {
@@ -1206,12 +1242,15 @@ function OrdensCompra() {
   const totalJaCompradosOcultos = useMemo(() => {
     let count = 0;
     for (const p of produtos) {
+      if (filtroFornecedor !== "todos" && fornecedorDaCompra(p)?.id !== filtroFornecedor) {
+        continue;
+      }
       if (ehProdutoJaCompradoOuFaturado(p) && !selecionadosCompra[p.id]) {
         count++;
       }
     }
     return count;
-  }, [produtos, ehProdutoJaCompradoOuFaturado, selecionadosCompra]);
+  }, [produtos, filtroFornecedor, fornecedorDaCompra, ehProdutoJaCompradoOuFaturado, selecionadosCompra]);
 
   const contagensFiltroVinculo = useMemo(() => {
     const base = dadosItensCompra.filter((item) =>
@@ -2358,6 +2397,20 @@ function OrdensCompra() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={filtroFornecedor} onValueChange={setFiltroFornecedor}>
+              <SelectTrigger className="w-48">
+                <Building2 className="size-3.5 mr-1 text-muted-foreground" />
+                <SelectValue placeholder="Fornecedor: Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os fornecedores</SelectItem>
+                {fornecedores.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               className="bg-amber-600 hover:bg-amber-700 text-white font-semibold shadow-sm flex items-center gap-1.5"
               onClick={() => {
@@ -2781,7 +2834,9 @@ function OrdensCompra() {
                           (p) => fornecedorDaCompra(p)?.id === grupo.fornecedor.id,
                         );
                         const produtosDisponiveis = produtosDesteFornecedor.filter(
-                          (p) => !grupo.itens.some((it) => it.produto.id === p.id),
+                          (p) =>
+                            !grupo.itens.some((it) => it.produto.id === p.id) &&
+                            (!ocultarJaComprados || !ehProdutoJaCompradoOuFaturado(p)),
                         );
                         if (produtosDisponiveis.length === 0) return null;
                         return (
@@ -4500,12 +4555,20 @@ function OrdensCompra() {
                       <SelectValue placeholder="Produto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {produtos.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.codigo ? `${p.codigo} — ` : ""}
-                          {p.nome}
-                        </SelectItem>
-                      ))}
+                      {produtos
+                        .filter((p) => {
+                          const fId = formEdicao.fornecedor_id || ordemDetalhe?.fornecedor_id;
+                          if (fId) {
+                            return fornecedorDaCompra(p)?.id === fId;
+                          }
+                          return true;
+                        })
+                        .map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.codigo ? `${p.codigo} — ` : ""}
+                            {p.nome}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <Select
@@ -5029,12 +5092,20 @@ function OrdensCompra() {
                   <SelectValue placeholder="Produto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {produtos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.codigo ? `${p.codigo} — ` : ""}
-                      {p.nome}
-                    </SelectItem>
-                  ))}
+                  {produtos
+                    .filter((p) => {
+                      if (novaOrdem.fornecedor_id) {
+                        return fornecedorDaCompra(p)?.id === novaOrdem.fornecedor_id;
+                      }
+                      return true;
+                    })
+                    .filter((p) => (!ocultarJaComprados ? true : !ehProdutoJaCompradoOuFaturado(p)))
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.codigo ? `${p.codigo} — ` : ""}
+                        {p.nome}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <Select
