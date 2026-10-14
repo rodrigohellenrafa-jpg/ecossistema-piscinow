@@ -10,6 +10,8 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  Eye,
+  EyeOff,
   Factory,
   Filter,
   Layers,
@@ -266,6 +268,10 @@ function OrdensCompra() {
   const [abaVisao, setAbaVisao] = useState<"fornecedores" | "grade" | "executadas">("fornecedores");
   const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("todos");
   const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("precisa_comprar");
+  const [filtroExibicaoCatalogo, setFiltroExibicaoCatalogo] = useState<
+    "apenas_vinculados_selecionados" | "catalogo_completo"
+  >("apenas_vinculados_selecionados");
+  const [ocultarJaComprados, setOcultarJaComprados] = useState(true);
   const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
@@ -691,7 +697,59 @@ function OrdensCompra() {
     return m;
   }, [vendasVinculo]);
 
-  /** Demanda consolidada: quais pedidos consomem cada produto e em que quantidade. */
+  /** Informações consolidadas sobre itens e vínculos que já tiveram Ordem de Compra gerada ou foram faturados/comprados. */
+  const itensCompradosInfo = useMemo(() => {
+    const mapaOrdens = new Map<string, Ordem>();
+    for (const o of ordens) mapaOrdens.set(o.id, o);
+
+    // Quantidade já comprada por par (produto_id, venda_id)
+    const qtdCompradaPorProdutoVenda = new Map<string, number>();
+    // Quantidade total já comprada por produto_id
+    const qtdTotalCompradaPorProduto = new Map<string, number>();
+    // Conjunto de IDs de produtos com ordem gerada em ordens ativas (não-canceladas)
+    const produtosComOrdemGerada = new Set<string>();
+    // Conjunto de IDs de produtos faturados ou concluídos
+    const produtosFaturadosOuConcluidos = new Set<string>();
+
+    for (const it of itensTodos) {
+      if (!it.produto_id) continue;
+      const ordem = mapaOrdens.get(it.ordem_id);
+      // Desconsidera ordens canceladas no histórico
+      if (ordem && ordem.status === "cancelada") continue;
+
+      const qtd = Number(it.quantidade ?? 1);
+      produtosComOrdemGerada.add(it.produto_id);
+
+      if (
+        it.numero_nf ||
+        (ordem &&
+          (ordem.status === "faturada" ||
+            ordem.status === "entregue" ||
+            ordem.status === "comprado" ||
+            Boolean(ordem.faturada_em)))
+      ) {
+        produtosFaturadosOuConcluidos.add(it.produto_id);
+      }
+
+      const totalAnt = qtdTotalCompradaPorProduto.get(it.produto_id) ?? 0;
+      qtdTotalCompradaPorProduto.set(it.produto_id, totalAnt + qtd);
+
+      if (it.venda_id) {
+        const chave = `${it.produto_id}::${it.venda_id}`;
+        const ant = qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+        qtdCompradaPorProdutoVenda.set(chave, ant + qtd);
+      }
+    }
+
+    return {
+      qtdCompradaPorProdutoVenda,
+      qtdTotalCompradaPorProduto,
+      produtosComOrdemGerada,
+      produtosFaturadosOuConcluidos,
+    };
+  }, [itensTodos, ordens]);
+
+  /** Demanda consolidada PENDENTE: apenas pedidos de venda que ainda NÃO tiveram ordem de compra gerada. */
   const demandaPorProduto = useMemo(() => {
     const mapa = new Map<
       string,
@@ -699,18 +757,28 @@ function OrdensCompra() {
     >();
     for (const item of consumoItens) {
       if (!item.produto_id) continue;
+      const quantidadeTotal = Number(item.quantidade ?? 0);
+      if (quantidadeTotal <= 0) continue;
+
+      // Abate o que já teve Ordem de Compra gerada para esta venda específica
+      const chave = `${item.produto_id}::${item.venda_id}`;
+      const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+      const quantidadePendente = Math.max(0, quantidadeTotal - jaComprado);
+
+      // Se já foi totalmente pedido/comprado, não há demanda pendente para esta venda
+      if (quantidadePendente <= 0) continue;
+
       const atual = mapa.get(item.produto_id) ?? { total: 0, pedidos: [] };
-      const quantidade = Number(item.quantidade ?? 0);
       const venda = vendaPorId.get(item.venda_id);
       const rotulo = `${venda?.numero ?? "Pedido"} — ${venda?.cliente_nome ?? "Cliente"}`;
       const existente = atual.pedidos.find((p) => p.id === item.venda_id);
-      if (existente) existente.quantidade += quantidade;
-      else atual.pedidos.push({ id: item.venda_id, rotulo, quantidade });
-      atual.total += quantidade;
+      if (existente) existente.quantidade += quantidadePendente;
+      else atual.pedidos.push({ id: item.venda_id, rotulo, quantidade: quantidadePendente });
+      atual.total += quantidadePendente;
       mapa.set(item.produto_id, atual);
     }
     return mapa;
-  }, [consumoItens, vendaPorId]);
+  }, [consumoItens, vendaPorId, itensCompradosInfo]);
 
 
   const termoBusca = useMemo(() => normalizar(buscaFornecedor.trim()), [buscaFornecedor]);
@@ -851,34 +919,113 @@ function OrdensCompra() {
     return { id: "outros", nome: "Outros Fornecedores" } satisfies Fornecedor;
   };
 
+  /** Identifica se o produto já teve ordem de compra gerada ou já foi faturado/comprado. */
+  const ehProdutoJaCompradoOuFaturado = (p: Produto) => {
+    const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
+    if (status === "comprado") return true;
+
+    if (itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id)) return true;
+
+    // Se possui vínculo direto com venda e esse vínculo já teve OC gerada e não há mais demanda pendente
+    if (p.venda_vinculo_id) {
+      const chave = `${p.id}::${p.venda_vinculo_id}`;
+      const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+      const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
+      if (jaComprado > 0 && pendente === 0) return true;
+    }
+
+    // Se já teve ordem de compra gerada em ordem ativa e não possui demanda pendente
+    if (itensCompradosInfo.produtosComOrdemGerada.has(p.id)) {
+      const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
+      if (pendente === 0) return true;
+    }
+
+    return false;
+  };
+
   const produtosFiltrados = useMemo(() => {
-    if (!termoBusca) return produtos;
     return produtos.filter((produto) => {
-      if (normalizar(fornecedorDaCompra(produto)?.nome ?? "").includes(termoBusca)) return true;
-      if (
-        normalizar(produto.nome).includes(termoBusca) ||
-        normalizar(produto.codigo ?? "").includes(termoBusca)
-      )
+      const jaComprado = ehProdutoJaCompradoOuFaturado(produto);
+      const estaSelecionado = Boolean(selecionadosCompra[produto.id]);
+
+      // 1. Se há termo de busca ativo, busca em todo o catálogo do fornecedor ou produtos
+      if (termoBusca) {
+        const casaFornecedor = normalizar(fornecedorDaCompra(produto)?.nome ?? "").includes(termoBusca);
+        const casaProduto =
+          normalizar(produto.nome).includes(termoBusca) ||
+          normalizar(produto.codigo ?? "").includes(termoBusca) ||
+          normalizar(produto.categoria ?? "").includes(termoBusca);
+        const vendaVinculo = produto.venda_vinculo_id
+          ? vendaPorId.get(produto.venda_vinculo_id)
+          : undefined;
+        const casaVinculo =
+          vendaVinculo &&
+          (normalizar(vendaVinculo.numero ?? "").includes(termoBusca) ||
+            normalizar(vendaVinculo.cliente_nome ?? "").includes(termoBusca));
+        const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
+        const casaDemanda = pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
+
+        if (!casaFornecedor && !casaProduto && !casaVinculo && !casaDemanda) {
+          return false;
+        }
+
+        // Se estiver buscando e a opção de ocultar já comprados estiver ativa:
+        // Oculta itens já comprados a menos que a busca corresponda diretamente ao produto
+        if (ocultarJaComprados && jaComprado && !estaSelecionado) {
+          if (!casaProduto) return false;
+        }
+
         return true;
-      const vendaVinculo = produto.venda_vinculo_id
-        ? vendaPorId.get(produto.venda_vinculo_id)
-        : undefined;
-      if (
-        vendaVinculo &&
-        (normalizar(vendaVinculo.numero ?? "").includes(termoBusca) ||
-          normalizar(vendaVinculo.cliente_nome ?? "").includes(termoBusca))
-      )
+      }
+
+      // 2. REGRA CRÍTICA: Ocultar automaticamente itens já comprados ou com ordem gerada
+      if (ocultarJaComprados && jaComprado && !estaSelecionado) {
+        return false;
+      }
+
+      // 3. Itens ativamente selecionados pelo usuário sempre aparecem
+      if (estaSelecionado) return true;
+
+      // 4. REGRA CRÍTICA: Não exibir automaticamente todo o catálogo de produtos do fornecedor.
+      // Exibir apenas se foi explicitamente vinculado à ordem de compra ou se houver demanda pendente:
+      const temDemandaPendente = (demandaPorProduto.get(produto.id)?.total ?? 0) > 0;
+      const temVinculoManual = Boolean(
+        vinculosCompra[produto.id]?.some((v) => v && v !== SEM_CLIENTE),
+      );
+      const temVinculoProduto = Boolean(produto.venda_vinculo_id && !jaComprado);
+
+      const estaExplicitamenteVinculado =
+        temDemandaPendente || temVinculoManual || temVinculoProduto;
+
+      if (estaExplicitamenteVinculado) return true;
+
+      // Se o usuário optou por visualizar o catálogo completo
+      if (filtroExibicaoCatalogo === "catalogo_completo") {
         return true;
-      const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
-      return pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
+      }
+
+      return false;
     });
-  }, [produtos, fornecedores, termoBusca, vendaPorId, demandaPorProduto]);
+  }, [
+    produtos,
+    fornecedores,
+    termoBusca,
+    vendaPorId,
+    demandaPorProduto,
+    selecionadosCompra,
+    vinculosCompra,
+    ocultarJaComprados,
+    filtroExibicaoCatalogo,
+    itensCompradosInfo,
+    statusCompra,
+  ]);
 
   const quantidadeCompra = (produto: Produto) => {
     const valor = quantidadesCompra[produto.id];
-    return valor === undefined
-      ? Number(produto.quantidade_compra ?? 1)
-      : Math.max(Number(valor) || 0, 0);
+    if (valor !== undefined) return Math.max(Number(valor) || 0, 0);
+    const pendente = demandaPorProduto.get(produto.id)?.total;
+    if (pendente !== undefined && pendente > 0) return pendente;
+    return Number(produto.quantidade_compra ?? 1);
   };
 
   const vinculosDoProduto = (produto: Produto) => {
@@ -964,6 +1111,8 @@ function OrdensCompra() {
     temSemVinculo: boolean;
     precisaComprar: boolean;
     status: string;
+    jaComprado?: boolean;
+    jaFaturado?: boolean;
   };
 
   type GrupoVisaoFornecedor = {
@@ -1000,15 +1149,23 @@ function OrdensCompra() {
       const semVinculoCount = vinculos.filter((v) => !v || v === SEM_CLIENTE).length;
       const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
 
-      const temVinculo = comVinculoCount > 0 || totalDemanda > 0 || Boolean(p.venda_vinculo_id);
-      const temSemVinculo = semVinculoCount > 0 || (!p.venda_vinculo_id && totalDemanda === 0);
+      const jaComprado = ehProdutoJaCompradoOuFaturado(p);
+      const jaFaturado = itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id);
+
+      const temVinculo =
+        comVinculoCount > 0 ||
+        totalDemanda > 0 ||
+        Boolean(p.venda_vinculo_id && !jaComprado);
+      const temSemVinculo =
+        semVinculoCount > 0 || (!p.venda_vinculo_id && totalDemanda === 0);
 
       const precisaComprar =
         totalDemanda > 0 ||
-        estoqueZerado ||
-        estoqueBaixo ||
-        (status !== "comprado" && quantidadeAComprar > 0) ||
-        Boolean(selecionadosCompra[p.id]);
+        (Boolean(p.venda_vinculo_id) && !jaComprado) ||
+        Boolean(selecionadosCompra[p.id]) ||
+        Boolean(vinculosCompra[p.id]?.some((v) => v && v !== SEM_CLIENTE)) ||
+        (estoqueZerado && !jaComprado) ||
+        (estoqueBaixo && !jaComprado);
 
       return {
         produto: p,
@@ -1029,6 +1186,8 @@ function OrdensCompra() {
         temSemVinculo,
         precisaComprar,
         status,
+        jaComprado,
+        jaFaturado,
       };
     });
   }, [
@@ -1041,7 +1200,18 @@ function OrdensCompra() {
     vinculosCompra,
     statusCompra,
     selecionadosCompra,
+    itensCompradosInfo,
   ]);
+
+  const totalJaCompradosOcultos = useMemo(() => {
+    let count = 0;
+    for (const p of produtos) {
+      if (ehProdutoJaCompradoOuFaturado(p) && !selecionadosCompra[p.id]) {
+        count++;
+      }
+    }
+    return count;
+  }, [produtos, ehProdutoJaCompradoOuFaturado, selecionadosCompra]);
 
   const contagensFiltroVinculo = useMemo(() => {
     const base = dadosItensCompra.filter((item) =>
@@ -1442,7 +1612,9 @@ function OrdensCompra() {
       ]);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["ordens_compra"] }),
-        qc.invalidateQueries({ queryKey: ["ordem_compra_itens", "todos"] }),
+        qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] }),
+        qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] }),
+        qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] }),
       ]);
       const primeiraOrdem = ordensCriadas[0];
       if (primeiraOrdem) {
@@ -2030,6 +2202,8 @@ function OrdensCompra() {
       toast.success("Ordem removida");
       setDetalheId(null);
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -2300,38 +2474,83 @@ function OrdensCompra() {
                 </div>
               </div>
 
-              {/* FILTRO DE NECESSIDADE */}
+              {/* FILTRO DE NECESSIDADE E CATÁLOGO */}
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Exibir:
+                  Catálogo:
                 </span>
                 <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
                   <button
                     type="button"
-                    onClick={() => setFiltroNecessidade("precisa_comprar")}
+                    onClick={() => {
+                      setFiltroExibicaoCatalogo("apenas_vinculados_selecionados");
+                      setFiltroNecessidade("precisa_comprar");
+                    }}
                     className={cn(
-                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                      filtroNecessidade === "precisa_comprar"
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
+                      filtroExibicaoCatalogo === "apenas_vinculados_selecionados"
                         ? "bg-background text-foreground shadow-sm font-semibold"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    O que precisa comprar
+                    <span>Apenas Vinculados / Demanda</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFiltroNecessidade("todos")}
+                    onClick={() => {
+                      setFiltroExibicaoCatalogo("catalogo_completo");
+                      setFiltroNecessidade("todos");
+                    }}
                     className={cn(
-                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                      filtroNecessidade === "todos"
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
+                      filtroExibicaoCatalogo === "catalogo_completo"
                         ? "bg-background text-foreground shadow-sm font-semibold"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    Catálogo completo
+                    <span>Catálogo completo</span>
                   </button>
                 </div>
               </div>
+
+              {/* BOTÃO TOGGLE OCULTAR JÁ COMPRADOS */}
+              <Button
+                type="button"
+                variant={ocultarJaComprados ? "outline" : "secondary"}
+                size="sm"
+                onClick={() => setOcultarJaComprados(!ocultarJaComprados)}
+                className={cn(
+                  "text-xs h-8 gap-1.5 transition-all",
+                  ocultarJaComprados
+                    ? "border-primary/30 text-foreground hover:bg-muted"
+                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30",
+                )}
+                title={
+                  ocultarJaComprados
+                    ? "Itens que já tiveram ordem de compra gerada ou já foram comprados estão ocultos. Clique para exibir."
+                    : "Exibindo itens já comprados. Clique para ocultar."
+                }
+              >
+                {ocultarJaComprados ? (
+                  <>
+                    <EyeOff className="size-3.5 text-muted-foreground" />
+                    <span>Ocultando já comprados</span>
+                    {totalJaCompradosOcultos > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] py-0 px-1 font-mono font-bold bg-muted"
+                      >
+                        {totalJaCompradosOcultos}
+                      </Badge>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Eye className="size-3.5 text-amber-600" />
+                    <span className="font-semibold">Exibindo já comprados</span>
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* AÇÕES DE EXPANSÃO E SELEÇÃO */}
@@ -2557,6 +2776,40 @@ function OrdensCompra() {
                         </p>
                       </div>
 
+                      {(() => {
+                        const produtosDesteFornecedor = produtos.filter(
+                          (p) => fornecedorDaCompra(p)?.id === grupo.fornecedor.id,
+                        );
+                        const produtosDisponiveis = produtosDesteFornecedor.filter(
+                          (p) => !grupo.itens.some((it) => it.produto.id === p.id),
+                        );
+                        if (produtosDisponiveis.length === 0) return null;
+                        return (
+                          <Select
+                            value=""
+                            onValueChange={(prodId) => {
+                              if (!prodId) return;
+                              setSelecionadosCompra((prev) => ({ ...prev, [prodId]: true }));
+                              setQuantidadesCompra((prev) => ({ ...prev, [prodId]: prev[prodId] ?? 1 }));
+                              const pNome = produtos.find((p) => p.id === prodId)?.nome;
+                              toast.success(`"${pNome}" adicionado à lista`);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-44 bg-background border-dashed">
+                              <Plus className="size-3.5 mr-1 text-primary" />
+                              <SelectValue placeholder="+ Adicionar produto..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-64">
+                              {produtosDisponiveis.map((prod) => (
+                                <SelectItem key={prod.id} value={prod.id}>
+                                  {prod.nome} {prod.codigo ? `(${prod.codigo})` : ""} · {brl(Number(prod.preco_custo ?? 0))}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })()}
+
                       <Button
                         type="button"
                         variant="outline"
@@ -2677,6 +2930,22 @@ function OrdensCompra() {
                                     <span className="text-[11px] text-muted-foreground font-mono">
                                       {[item.produto.cor_pastilha, item.produto.modelo_pastilha].filter(Boolean).join(" · ")}
                                     </span>
+                                  )}
+                                  {item.jaComprado && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] py-0 px-1.5 font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                    >
+                                      Já Comprado / O.C. Gerada
+                                    </Badge>
+                                  )}
+                                  {item.jaFaturado && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] py-0 px-1.5 font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                                    >
+                                      Faturado
+                                    </Badge>
                                   )}
                                 </div>
                               </TableCell>
@@ -2956,12 +3225,36 @@ function OrdensCompra() {
           <ExpandableCard>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div>
-            <CardTitle>Ordem de compra</CardTitle>
+            <CardTitle>Ordem de compra · Grade Geral</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Selecione e ajuste os produtos. Ao executar, a ordem recebe um número e uma nova fica pronta.
+              Mostrando {produtosFiltrados.length} item(ns) vinculados ou selecionados para compra. Itens já comprados são ocultados automaticamente.
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-4">
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button
+              type="button"
+              variant={ocultarJaComprados ? "outline" : "secondary"}
+              size="sm"
+              onClick={() => setOcultarJaComprados(!ocultarJaComprados)}
+              className="text-xs h-8 gap-1.5"
+            >
+              {ocultarJaComprados ? (
+                <>
+                  <EyeOff className="size-3.5 text-muted-foreground" />
+                  <span>Ocultando já comprados</span>
+                  {totalJaCompradosOcultos > 0 && (
+                    <Badge variant="secondary" className="text-[10px] py-0 px-1 font-mono font-bold">
+                      {totalJaCompradosOcultos}
+                    </Badge>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Eye className="size-3.5 text-primary" />
+                  <span>Exibindo já comprados</span>
+                </>
+              )}
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -3081,7 +3374,27 @@ function OrdensCompra() {
                       <TableCell className="font-mono text-xs text-muted-foreground">Nova</TableCell>
                       <TableCell className="font-medium">{fornecedor?.nome ?? "Não encontrado"}</TableCell>
                       <TableCell className="font-mono text-xs">{produto.codigo ?? "—"}</TableCell>
-                      <TableCell>{produto.nome}</TableCell>
+                      <TableCell>
+                        <p className="font-medium text-sm leading-snug">{produto.nome}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          {ehProdutoJaCompradoOuFaturado(produto) && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                            >
+                              Já Comprado / O.C. Gerada
+                            </Badge>
+                          )}
+                          {itensCompradosInfo.produtosFaturadosOuConcluidos.has(produto.id) && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                            >
+                              Faturado
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Input
                           aria-label={`Cor da pastilha de ${produto.nome}`}
