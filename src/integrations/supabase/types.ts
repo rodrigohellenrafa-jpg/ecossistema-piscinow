@@ -248,6 +248,34 @@ export type Database = {
             referencedRelation: "cargas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cargas_itens_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cargas_itens_item_ordem_id_fkey"
+            columns: ["item_ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordem_compra_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cargas_itens_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cargas_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       categorias_financeiras: {
@@ -1561,6 +1589,7 @@ export type Database = {
       }
       ordem_compra_itens: {
         Row: {
+          carga_id: string | null
           cliente_id: string | null
           cliente_nome: string | null
           codigo: string | null
@@ -1576,14 +1605,14 @@ export type Database = {
           pastilha: string | null
           produto_id: string | null
           quantidade: number
+          status_carga: string | null
           total: number
           unidade: string
           valor_unitario: number
           venda_id: string | null
-          carga_id: string | null
-          status_carga: string | null
         }
         Insert: {
+          carga_id?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           codigo?: string | null
@@ -1599,14 +1628,14 @@ export type Database = {
           pastilha?: string | null
           produto_id?: string | null
           quantidade?: number
+          status_carga?: string | null
           total?: number
           unidade?: string
           valor_unitario?: number
           venda_id?: string | null
-          carga_id?: string | null
-          status_carga?: string | null
         }
         Update: {
+          carga_id?: string | null
           cliente_id?: string | null
           cliente_nome?: string | null
           codigo?: string | null
@@ -1622,14 +1651,20 @@ export type Database = {
           pastilha?: string | null
           produto_id?: string | null
           quantidade?: number
+          status_carga?: string | null
           total?: number
           unidade?: string
           valor_unitario?: number
           venda_id?: string | null
-          carga_id?: string | null
-          status_carga?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ordem_compra_itens_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordem_compra_itens_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -1744,6 +1779,9 @@ export type Database = {
       }
       ordens_compra: {
         Row: {
+          carga_id: string | null
+          cliente_id: string | null
+          cliente_nome: string | null
           condicoes: string | null
           created_at: string
           created_by: string | null
@@ -1763,17 +1801,17 @@ export type Database = {
           observacoes: string | null
           previsao_entrega: string | null
           status: string
+          status_carga: string | null
           updated_at: string
           valor_nota: number
           valor_pago: number
           valor_produtos: number
           valor_total: number
-          cliente_id: string | null
-          cliente_nome: string | null
-          carga_id: string | null
-          status_carga: string | null
         }
         Insert: {
+          carga_id?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
           condicoes?: string | null
           created_at?: string
           created_by?: string | null
@@ -1793,17 +1831,17 @@ export type Database = {
           observacoes?: string | null
           previsao_entrega?: string | null
           status?: string
+          status_carga?: string | null
           updated_at?: string
           valor_nota?: number
           valor_pago?: number
           valor_produtos?: number
           valor_total?: number
-          cliente_id?: string | null
-          cliente_nome?: string | null
-          carga_id?: string | null
-          status_carga?: string | null
         }
         Update: {
+          carga_id?: string | null
+          cliente_id?: string | null
+          cliente_nome?: string | null
           condicoes?: string | null
           created_at?: string
           created_by?: string | null
@@ -1823,17 +1861,28 @@ export type Database = {
           observacoes?: string | null
           previsao_entrega?: string | null
           status?: string
+          status_carga?: string | null
           updated_at?: string
           valor_nota?: number
           valor_pago?: number
           valor_produtos?: number
           valor_total?: number
-          cliente_id?: string | null
-          cliente_nome?: string | null
-          carga_id?: string | null
-          status_carga?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ordens_compra_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_compra_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ordens_compra_fornecedor_id_fkey"
             columns: ["fornecedor_id"]

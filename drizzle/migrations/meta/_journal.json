@@ -8,6 +8,13 @@
       "when": 1791897630921,
       "tag": "0000_fluxo_um_lancamento_por_pagamento",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792065016459,
+      "tag": "0001_modulo_dossie_documentos_e_cargas",
+      "breakpoints": true
     }
   ]
 }
