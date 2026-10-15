@@ -250,13 +250,25 @@ export function ModalPedirCarga({
     },
   });
 
-  // Filtra itens que ainda não foram consolidados em nenhuma carga
+  // Filtra itens que ainda não foram consolidados em nenhuma carga e que não foram finalizados/recebidos
   const itensPendentes = useMemo(() => {
     return itensTodos.filter((item) => {
-      // Ignora ordens canceladas ou já em carga
-      if (item.ordem_status === "cancelada") return false;
+      // Ignora ordens canceladas, recebidas/concluídas ou já em carga
+      if (
+        item.ordem_status === "cancelada" ||
+        item.ordem_status === "recebida" ||
+        item.ordem_status === "concluida" ||
+        item.ordem_status === "finalizada"
+      ) {
+        return false;
+      }
       if (item.carga_id) return false;
-      if (item.status_carga && item.status_carga !== "pendente_carga") return false;
+      if (
+        item.status_carga &&
+        item.status_carga !== "pendente_carga"
+      ) {
+        return false;
+      }
       return true;
     });
   }, [itensTodos]);

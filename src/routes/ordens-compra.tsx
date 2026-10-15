@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -11,9 +11,11 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  ExternalLink,
   Eye,
   EyeOff,
   Factory,
+  FileText,
   Filter,
   Layers,
   Link2,
@@ -276,6 +278,7 @@ const novoItemVazio = {
 
 function OrdensCompra() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [abaVisao, setAbaVisao] = useState<"fornecedores" | "grade" | "executadas">("fornecedores");
   const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("com_vinculo");
   const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("precisa_comprar");
@@ -306,10 +309,92 @@ function OrdensCompra() {
   });
   const [itensNovaOrdem, setItensNovaOrdem] = useState<ItemForm[]>([]);
   const [selecionadosCompra, setSelecionadosCompra] = useState<Record<string, boolean>>({});
+  const [vinculosSelecionadosCompra, setVinculosSelecionadosCompra] = useState<
+    Record<string, Record<number, boolean>>
+  >({});
   const [selecionadosExecutados, setSelecionadosExecutados] = useState<Record<string, boolean>>({});
   const [usarCreditoFabricante, setUsarCreditoFabricante] = useState(false);
   const [creditoFabricante, setCreditoFabricante] = useState("");
   const [creditoDisponivelInput, setCreditoDisponivelInput] = useState<string | null>(null);
+
+  // Sincronização em tempo real para ordens e itens de compra
+  useEffect(() => {
+    const canal = supabase
+      .channel("realtime-ordens-compra-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ordens_compra" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+          qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+          qc.invalidateQueries({ queryKey: ["produtos"] });
+          qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ordem_compra_itens" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+          qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+          qc.invalidateQueries({ queryKey: ["produtos"] });
+          qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+  }, [qc]);
+
+  const isVinculoSelecionado = useCallback(
+    (produtoId: string, indice: number) => {
+      const prodSel = vinculosSelecionadosCompra[produtoId];
+      if (prodSel !== undefined && prodSel[indice] !== undefined) {
+        return prodSel[indice];
+      }
+      return selecionadosCompra[produtoId] === true;
+    },
+    [vinculosSelecionadosCompra, selecionadosCompra],
+  );
+
+  const alternarSelecaoVinculo = useCallback(
+    (produtoId: string, indice: number, totalVinculos: number) => {
+      setVinculosSelecionadosCompra((prev) => {
+        const atual = prev[produtoId] ?? {};
+        const mapa: Record<number, boolean> = {};
+        for (let i = 0; i < totalVinculos; i++) {
+          mapa[i] = atual[i] !== undefined ? atual[i] : (selecionadosCompra[produtoId] === true);
+        }
+        mapa[indice] = !mapa[indice];
+        const algumMarcado = Object.values(mapa).some(Boolean);
+        setSelecionadosCompra((sPrev) => ({
+          ...sPrev,
+          [produtoId]: algumMarcado,
+        }));
+        return { ...prev, [produtoId]: mapa };
+      });
+    },
+    [selecionadosCompra],
+  );
+
+  const alternarSelecaoProdutoPai = useCallback(
+    (produtoId: string, marcado: boolean, totalVinculos: number) => {
+      setSelecionadosCompra((prev) => ({
+        ...prev,
+        [produtoId]: marcado,
+      }));
+      setVinculosSelecionadosCompra((prev) => {
+        const mapa: Record<number, boolean> = {};
+        for (let i = 0; i < totalVinculos; i++) {
+          mapa[i] = marcado;
+        }
+        return { ...prev, [produtoId]: mapa };
+      });
+    },
+    [],
+  );
 
   const [quantidadesCompra, setQuantidadesCompra] = useState<Record<string, string>>({});
   const [valoresCompra, setValoresCompra] = useState<Record<string, string>>({});
@@ -768,6 +853,8 @@ function OrdensCompra() {
     const produtosFaturadosOuConcluidos = new Set<string>();
     // Conjunto de IDs de produtos comprados ou consolidados em lotes/cargas anteriores
     const produtosEmCargasAnteriores = new Set<string>();
+    // Conjunto de IDs de produtos finalizados (ordem concluída/recebida)
+    const produtosFinalizados = new Set<string>();
 
     for (const it of itensTodos) {
       if (!it.produto_id) continue;
@@ -777,6 +864,15 @@ function OrdensCompra() {
 
       const qtd = Number(it.quantidade ?? 1);
       produtosComOrdemGerada.add(it.produto_id);
+
+      if (
+        ordem &&
+        (ordem.status === "recebida" ||
+          ordem.status === "concluida" ||
+          ordem.status === "finalizada")
+      ) {
+        produtosFinalizados.add(it.produto_id);
+      }
 
       // Itens já consolidados em carga/lote anterior
       if (
@@ -805,8 +901,13 @@ function OrdensCompra() {
       const totalAnt = qtdTotalCompradaPorProduto.get(it.produto_id) ?? 0;
       qtdTotalCompradaPorProduto.set(it.produto_id, totalAnt + qtd);
 
-      if (it.venda_id) {
-        const chave = `${it.produto_id}::${it.venda_id}`;
+      const vendaIdEfetiva =
+        it.venda_id ||
+        (it.cliente_id
+          ? vendasVinculo.find((v) => v.cliente_id === it.cliente_id)?.id
+          : null);
+      if (vendaIdEfetiva) {
+        const chave = `${it.produto_id}::${vendaIdEfetiva}`;
         const ant = qtdCompradaPorProdutoVenda.get(chave) ?? 0;
         qtdCompradaPorProdutoVenda.set(chave, ant + qtd);
       }
@@ -818,8 +919,9 @@ function OrdensCompra() {
       produtosComOrdemGerada,
       produtosFaturadosOuConcluidos,
       produtosEmCargasAnteriores,
+      produtosFinalizados,
     };
-  }, [itensTodos, ordens]);
+  }, [itensTodos, ordens, vendasVinculo]);
 
   /** Demanda consolidada PENDENTE: apenas pedidos de venda ativos que ainda NÃO tiveram ordem de compra gerada e que não foram entregues/instalados/concluídos. Desmembra combos de venda_kit automaticamente. */
   const demandaPorProduto = useMemo(() => {
@@ -1094,6 +1196,11 @@ function OrdensCompra() {
         return true;
       }
 
+      // Se já teve ordem de compra finalizada/recebida, oculta da visualização
+      if (itensCompradosInfo.produtosFinalizados.has(p.id)) {
+        return true;
+      }
+
       if (itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id)) {
         const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
         if (pendente === 0) return true;
@@ -1265,8 +1372,18 @@ function OrdensCompra() {
       ? Math.min(Math.max(Number(produto.desconto_compra ?? 0) || 0, 0), 100)
       : Math.min(Math.max(Number(percentuaisCompra[produto.id]) || 0, 0), 100);
 
-  const totalCompra = (produto: Produto) =>
-    quantidadeCompra(produto) * valorCompra(produto) * (1 - percentualCompra(produto) / 100);
+  const totalCompra = (produto: Produto) => {
+    const vinculos = vinculosDoProduto(produto);
+    const vincSel = vinculosSelecionadosCompra[produto.id];
+    let qtd = quantidadeCompra(produto);
+    if (vincSel && Object.keys(vincSel).length > 0) {
+      const selecionadosCount = vinculos.filter((_, idx) => isVinculoSelecionado(produto.id, idx)).length;
+      if (selecionadosCount > 0) {
+        qtd = selecionadosCount;
+      }
+    }
+    return qtd * valorCompra(produto) * (1 - percentualCompra(produto) / 100);
+  };
 
   const produtosSelecionados = produtosFiltrados.filter((p) => selecionadosCompra[p.id]);
   const totalSelecionadoCompra = produtosSelecionados.reduce((total, p) => total + totalCompra(p), 0);
@@ -1298,6 +1415,18 @@ function OrdensCompra() {
   const marcarTodosProdutos = (marcado: boolean) => {
     setSelecionadosCompra(
       marcado ? Object.fromEntries(produtosFiltrados.map((produto) => [produto.id, true])) : {},
+    );
+    setVinculosSelecionadosCompra(
+      marcado
+        ? Object.fromEntries(
+            produtosFiltrados.map((produto) => [
+              produto.id,
+              Object.fromEntries(
+                vinculosDoProduto(produto).map((_, idx) => [idx, true]),
+              ),
+            ]),
+          )
+        : {},
     );
     setSelecionadosExecutados(
       marcado ? Object.fromEntries(linhasExecutadas.map(({ item }) => [item.id, true])) : {},
@@ -1563,6 +1692,19 @@ function OrdensCompra() {
       }
       return proximo;
     });
+    setVinculosSelecionadosCompra((atual) => {
+      const proximo = { ...atual };
+      for (const item of grupo.itens) {
+        if (marcar) {
+          proximo[item.produto.id] = Object.fromEntries(
+            item.vinculos.map((_, idx) => [idx, true]),
+          );
+        } else {
+          delete proximo[item.produto.id];
+        }
+      }
+      return proximo;
+    });
   };
 
   const comprarItensDoFornecedor = (grupo: GrupoVisaoFornecedor) => {
@@ -1575,10 +1717,19 @@ function OrdensCompra() {
     }
 
     const novoMapa: Record<string, boolean> = {};
+    const novoMapaVinculos: Record<string, Record<number, boolean>> = {};
     for (const i of itensAlvo) {
       novoMapa[i.produto.id] = true;
+      const vincs = i.vinculos;
+      const vincAtual = vinculosSelecionadosCompra[i.produto.id];
+      if (vincAtual && Object.values(vincAtual).some(Boolean)) {
+        novoMapaVinculos[i.produto.id] = vincAtual;
+      } else {
+        novoMapaVinculos[i.produto.id] = Object.fromEntries(vincs.map((_, idx) => [idx, true]));
+      }
     }
     setSelecionadosCompra(novoMapa);
+    setVinculosSelecionadosCompra(novoMapaVinculos);
     setSelecionadosExecutados({});
 
     toast.info(`Iniciando ordem de compra para ${grupo.nome} (${itensAlvo.length} itens)...`);
@@ -1591,21 +1742,19 @@ function OrdensCompra() {
     mutationFn: async () => {
       if (produtosSelecionados.length === 0) throw new Error("Selecione ao menos um produto");
 
-      const semFornecedor = produtosSelecionados.filter((produto) => !fornecedorDaCompra(produto));
+      // Filtra apenas produtos que têm pelo menos um vínculo selecionado para compra
+      const produtosParaComprar = produtosSelecionados.filter((produto) => {
+        const vinculos = vinculosDoProduto(produto);
+        return vinculos.some((_, idx) => isVinculoSelecionado(produto.id, idx));
+      });
+
+      if (produtosParaComprar.length === 0) {
+        throw new Error("Selecione ao menos um vínculo para realizar a compra");
+      }
+
+      const semFornecedor = produtosParaComprar.filter((produto) => !fornecedorDaCompra(produto));
       if (semFornecedor.length > 0) {
         throw new Error(`Fornecedor não encontrado para: ${semFornecedor.map((p) => p.nome).join(", ")}`);
-      }
-      if (produtosSelecionados.some((produto) => quantidadeCompra(produto) <= 0)) {
-        throw new Error("A quantidade dos produtos selecionados deve ser maior que zero");
-      }
-      if (produtosSelecionados.some((produto) => !Number.isInteger(quantidadeCompra(produto)))) {
-        throw new Error("A quantidade deve ser inteira para permitir um vínculo por unidade");
-      }
-      const vinculosIncompletos = produtosSelecionados.filter(
-        (produto) => vinculosDoProduto(produto).length !== quantidadeCompra(produto),
-      );
-      if (vinculosIncompletos.length > 0) {
-        throw new Error("A quantidade de vínculos deve ser igual à quantidade de unidades");
       }
 
       const { data: auth } = await supabase.auth.getUser();
@@ -1616,7 +1765,7 @@ function OrdensCompra() {
       const numeros = (existentes ?? []).map((ordem) => ordem.numero);
       const grupos = new Map<string, { fornecedor: Fornecedor; itens: Produto[] }>();
 
-      for (const produto of produtosSelecionados) {
+      for (const produto of produtosParaComprar) {
         const fornecedor = fornecedorDaCompra(produto);
         if (!fornecedor) continue;
         const grupo = grupos.get(fornecedor.id);
@@ -1634,25 +1783,28 @@ function OrdensCompra() {
       for (const { fornecedor, itens } of grupos.values()) {
         const fornecedorIdAlvo = fornecedor.id === SEM_CLIENTE ? null : fornecedor.id;
 
-        // Identifica clientes e pedidos vinculados aos itens desta compra
+        // Identifica clientes e pedidos vinculados aos itens selecionados desta compra
+        const vinculosSelecionadosDosItens = itens.flatMap((produto) => {
+          const todos = vinculosDoProduto(produto);
+          return todos
+            .map((vendaId, idx) => ({ vendaId, idx }))
+            .filter(({ idx }) => isVinculoSelecionado(produto.id, idx));
+        });
+
         const clientesDosItens = Array.from(
           new Set(
-            itens
-              .flatMap((produto) =>
-                vinculosDoProduto(produto).map((vid) => (vid ? vendaPorId.get(vid)?.cliente_id : null)),
-              )
+            vinculosSelecionadosDosItens
+              .map(({ vendaId }) => (vendaId ? vendaPorId.get(vendaId)?.cliente_id : null))
               .filter(Boolean) as string[],
           ),
         );
         const vendasDosItens = Array.from(
-          new Set(itens.flatMap((produto) => vinculosDoProduto(produto)).filter(Boolean)),
+          new Set(vinculosSelecionadosDosItens.map(({ vendaId }) => vendaId).filter(Boolean) as string[]),
         );
         const nomesDosItens = Array.from(
           new Set(
-            itens
-              .flatMap((produto) =>
-                vinculosDoProduto(produto).map((vid) => (vid ? vendaPorId.get(vid)?.cliente_nome : null)),
-              )
+            vinculosSelecionadosDosItens
+              .map(({ vendaId }) => (vendaId ? vendaPorId.get(vendaId)?.cliente_nome : null))
               .filter(Boolean) as string[],
           ),
         );
@@ -1760,7 +1912,12 @@ function OrdensCompra() {
         const payload = itens.flatMap((produto) => {
           const valorUnitario = valorCompra(produto);
           const descontoUnitario = valorUnitario * (percentualCompra(produto) / 100);
-          return vinculosDoProduto(produto).map((vendaId) => {
+          const vinculosTodos = vinculosDoProduto(produto);
+          const vinculosParaComprar = vinculosTodos
+            .map((vendaId, idx) => ({ vendaId, idx }))
+            .filter(({ idx }) => isVinculoSelecionado(produto.id, idx));
+
+          return vinculosParaComprar.map(({ vendaId }) => {
             const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
             return {
               ordem_id: ordemFinalId,
@@ -1777,8 +1934,8 @@ function OrdensCompra() {
               cliente_id: venda?.cliente_id ?? null,
               cliente_nome: venda?.cliente_nome ?? null,
               venda_id: vendaId || null,
-              cor: produto.cor_pastilha ?? null,
-              pastilha: produto.modelo_pastilha ?? null,
+              cor: coresCompra[produto.id] ?? produto.cor_pastilha ?? null,
+              pastilha: modelosCompra[produto.id] ?? produto.modelo_pastilha ?? null,
               status_carga: "pendente_carga",
             };
           });
@@ -1827,11 +1984,42 @@ function OrdensCompra() {
         setCreditoFabricante("");
         setUsarCreditoFabricante(false);
       }
+
+      // Mantém apenas os vínculos que NÃO foram selecionados para compra
+      setVinculosCompra((prev) => {
+        const proximo = { ...prev };
+        for (const produto of produtosSelecionados) {
+          const vinculosTodos = vinculosDoProduto(produto);
+          const restantes = vinculosTodos.filter(
+            (_, idx) => !isVinculoSelecionado(produto.id, idx),
+          );
+          if (restantes.length > 0) {
+            proximo[produto.id] = restantes;
+          } else {
+            delete proximo[produto.id];
+          }
+        }
+        return proximo;
+      });
+
+      setQuantidadesCompra((prev) => {
+        const proximo = { ...prev };
+        for (const produto of produtosSelecionados) {
+          const vinculosTodos = vinculosDoProduto(produto);
+          const restantes = vinculosTodos.filter(
+            (_, idx) => !isVinculoSelecionado(produto.id, idx),
+          );
+          if (restantes.length > 0) {
+            proximo[produto.id] = String(restantes.length);
+          } else {
+            delete proximo[produto.id];
+          }
+        }
+        return proximo;
+      });
+
       setSelecionadosCompra({});
-      setQuantidadesCompra({});
-      setValoresCompra({});
-      setPercentuaisCompra({});
-      setVinculosCompra({});
+      setVinculosSelecionadosCompra({});
       qc.setQueryData<Ordem[]>(["ordens_compra"], (atuais = []) => [
         ...ordensCriadas,
         ...atuais.filter((atual) => !ordensCriadas.some((criada) => criada.id === atual.id)),
@@ -1840,7 +2028,9 @@ function OrdensCompra() {
         qc.invalidateQueries({ queryKey: ["ordens_compra"] }),
         qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] }),
         qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] }),
+        qc.invalidateQueries({ queryKey: ["venda_kit", "consumo-compras"] }),
         qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] }),
+        qc.invalidateQueries({ queryKey: ["produtos"] }),
       ]);
       const primeiraOrdem = ordensCriadas[0];
       if (primeiraOrdem) {
@@ -2222,12 +2412,46 @@ function OrdensCompra() {
 
   const atualizarStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from("ordens_compra").update({ status }).eq("id", id);
+      const updates: any = { status };
+      if (status === "recebida" || status === "concluida" || status === "entregue") {
+        updates.status_carga = "entregue";
+      }
+      const { error } = await supabase.from("ordens_compra").update(updates).eq("id", id);
       if (error) throw error;
+
+      // Se a ordem foi finalizada/recebida/concluída, atualiza os itens e produtos correspondentes
+      if (
+        status === "recebida" ||
+        status === "concluida" ||
+        status === "entregue" ||
+        status === "comprado"
+      ) {
+        await supabase
+          .from("ordem_compra_itens")
+          .update({ status_carga: "entregue" })
+          .eq("ordem_id", id);
+
+        const itensDaOrdem = itensTodos.filter((it) => it.ordem_id === id);
+        const produtoIds = Array.from(
+          new Set(itensDaOrdem.map((it) => it.produto_id).filter(Boolean) as string[]),
+        );
+        if (produtoIds.length > 0) {
+          await supabase
+            .from("produtos")
+            .update({ status_compra: status })
+            .in("id", produtoIds);
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Status atualizado");
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+      qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] });
+      qc.invalidateQueries({ queryKey: ["venda_kit", "consumo-compras"] });
+      qc.invalidateQueries({ queryKey: ["cargas"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -3527,7 +3751,7 @@ function OrdensCompra() {
                   {/* TABELA DE PRODUTOS DO FORNECEDOR */}
                   {!recolhido && (
                     <div className="overflow-x-auto">
-                      <Table>
+                      <Table className="w-full min-w-[1300px]">
                         <TableHeader>
                           <TableRow className="text-xs bg-muted/10">
                             <TableHead className="w-10">
@@ -3547,7 +3771,7 @@ function OrdensCompra() {
                             <TableHead className="w-20 text-right">% Desc.</TableHead>
                             <TableHead className="w-28 text-right">Total</TableHead>
                             <TableHead className="w-32">Status</TableHead>
-                            <TableHead className="w-16 text-right">Ações</TableHead>
+                            <TableHead className="w-40 min-w-[160px] text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -3565,10 +3789,11 @@ function OrdensCompra() {
                                   aria-label={`Selecionar ${item.produto.nome}`}
                                   checked={selecionadosCompra[item.produto.id] === true}
                                   onCheckedChange={(valor) =>
-                                    setSelecionadosCompra((atual) => ({
-                                      ...atual,
-                                      [item.produto.id]: valor === true,
-                                    }))
+                                    alternarSelecaoProdutoPai(
+                                      item.produto.id,
+                                      valor === true,
+                                      item.vinculos.length,
+                                    )
                                   }
                                 />
                               </TableCell>
@@ -3656,6 +3881,17 @@ function OrdensCompra() {
                                 <div className="space-y-1">
                                   {item.vinculos.map((vinculoAtual, indice) => (
                                     <div key={`${item.produto.id}-vinculo-${indice}`} className="flex items-center gap-1.5">
+                                      <Checkbox
+                                        aria-label={`Comprar vínculo ${indice + 1} de ${item.produto.nome}`}
+                                        checked={isVinculoSelecionado(item.produto.id, indice)}
+                                        onCheckedChange={() =>
+                                          alternarSelecaoVinculo(
+                                            item.produto.id,
+                                            indice,
+                                            item.vinculos.length,
+                                          )
+                                        }
+                                      />
                                       {item.vinculos.length > 1 && (
                                         <span className="w-4 shrink-0 text-[10px] font-mono text-muted-foreground">
                                           #{indice + 1}
@@ -3843,7 +4079,7 @@ function OrdensCompra() {
                                 </Select>
                               </TableCell>
 
-                              <TableCell className="text-right">
+                              <TableCell className="text-right w-40 min-w-[160px] whitespace-nowrap">
                                 <div className="flex justify-end items-center gap-1">
                                   <Button
                                     type="button"
@@ -4129,7 +4365,7 @@ function OrdensCompra() {
                   <TableHead>Vínculo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>NF</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead className="text-right w-40 min-w-[160px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -4143,10 +4379,11 @@ function OrdensCompra() {
                           aria-label={`Selecionar ${produto.nome}`}
                           checked={selecionadosCompra[produto.id] === true}
                           onCheckedChange={(valor) =>
-                            setSelecionadosCompra((atual) => ({
-                              ...atual,
-                              [produto.id]: valor === true,
-                            }))
+                            alternarSelecaoProdutoPai(
+                              produto.id,
+                              valor === true,
+                              vinculosDoProduto(produto).length,
+                            )
                           }
                         />
                       </TableCell>
@@ -4275,6 +4512,17 @@ function OrdensCompra() {
                         <div className="space-y-1.5">
                           {vinculosDoProduto(produto).map((vinculoAtual, indice) => (
                             <div key={`${produto.id}-vinculo-${indice}`} className="flex items-center gap-1.5">
+                              <Checkbox
+                                aria-label={`Comprar vínculo ${indice + 1} de ${produto.nome}`}
+                                checked={isVinculoSelecionado(produto.id, indice)}
+                                onCheckedChange={() =>
+                                  alternarSelecaoVinculo(
+                                    produto.id,
+                                    indice,
+                                    vinculosDoProduto(produto).length,
+                                  )
+                                }
+                              />
                               <span className="w-5 shrink-0 text-xs text-muted-foreground">{indice + 1}.</span>
                               <Select
                                 value={vinculoAtual || SEM_CLIENTE}
@@ -4355,7 +4603,7 @@ function OrdensCompra() {
                         </Select>
                       </TableCell>
                       <TableCell className="text-muted-foreground">Após faturar</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right w-40 min-w-[160px] whitespace-nowrap">
                         <div className="flex justify-end items-center gap-1">
                           <Button
                             type="button"
@@ -4836,6 +5084,16 @@ function OrdensCompra() {
                           >
                             <Mail className="size-3.5" />
                           </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="size-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                            title="Abrir tela de Notas de Compra (/notas-compra)"
+                            onClick={() => navigate({ to: "/notas-compra" })}
+                          >
+                            <FileText className="size-3.5" />
+                          </Button>
                           {ordem.status !== "cancelada" && (
                             <Button
                               type="button"
@@ -5006,6 +5264,18 @@ function OrdensCompra() {
                     </DialogDescription>
                   </div>
                   <div className="flex items-center gap-1.5 mr-6">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/10 font-medium"
+                      title="Abrir tela de Notas Fiscais de Compra (/notas-compra)"
+                      onClick={() => navigate({ to: "/notas-compra" })}
+                    >
+                      <FileText className="size-3.5" />
+                      <span>NFs de Compra</span>
+                      <ExternalLink className="size-3 text-muted-foreground" />
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
@@ -5295,15 +5565,29 @@ function OrdensCompra() {
                 <div className="sm:col-span-3 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">Notas fiscais do fornecedor</p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => adicionarNota.mutate()}
-                      disabled={adicionarNota.isPending}
-                    >
-                      <Plus className="size-4" /> Adicionar nota
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs h-7 gap-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 font-medium"
+                        onClick={() => navigate({ to: "/notas-compra" })}
+                        title="Abrir tela de Notas de Compra"
+                      >
+                        <FileText className="size-3.5" />
+                        <span>Abrir tela de Notas de Compra</span>
+                        <ExternalLink className="size-3 text-muted-foreground" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => adicionarNota.mutate()}
+                        disabled={adicionarNota.isPending}
+                      >
+                        <Plus className="size-4" /> Adicionar nota
+                      </Button>
+                    </div>
                   </div>
                   {notasLista.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
