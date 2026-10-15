@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useMemo } from "react";
 import {
   Printer,
   FileDown,
@@ -68,16 +68,34 @@ export function ManifestoCargaModal({ open, onOpenChange, carga }: Props) {
 
   if (!carga) return null;
 
-  // Agrupa itens da carga por cliente para exibição clara de remessa
-  const itensPorCliente = carga.itens.reduce<Record<string, ItemCargaManifesto[]>>(
-    (acc, item) => {
+  // Agrupa e consolida produtos idênticos por cliente para exibição clara de remessa
+  const itensPorCliente = useMemo(() => {
+    const acc: Record<string, ItemCargaManifesto[]> = {};
+    for (const item of carga.itens) {
       const cliente = item.cliente_nome || "Estoque Geral";
       if (!acc[cliente]) acc[cliente] = [];
-      acc[cliente].push(item);
-      return acc;
-    },
-    {},
-  );
+      const nomeNorm = (item.produto_nome || "").trim().toLowerCase();
+      const existente = acc[cliente].find(
+        (i) => (i.produto_nome || "").trim().toLowerCase() === nomeNorm,
+      );
+      if (existente) {
+        existente.quantidade += item.quantidade;
+        existente.valor_total = (existente.valor_total || 0) + (item.valor_total || 0);
+        if (item.ordem_numero) {
+          if (existente.ordem_numero) {
+            if (!existente.ordem_numero.includes(item.ordem_numero)) {
+              existente.ordem_numero = `${existente.ordem_numero}, ${item.ordem_numero}`;
+            }
+          } else {
+            existente.ordem_numero = item.ordem_numero;
+          }
+        }
+      } else {
+        acc[cliente].push({ ...item });
+      }
+    }
+    return acc;
+  }, [carga.itens]);
 
   const clientesUnicos = Object.keys(itensPorCliente);
 

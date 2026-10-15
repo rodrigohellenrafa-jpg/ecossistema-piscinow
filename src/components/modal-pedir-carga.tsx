@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Truck,
@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Calendar,
   AlertCircle,
   Users,
@@ -51,6 +53,12 @@ import {
   type ItemCargaManifesto,
 } from "@/components/manifesto-carga-modal";
 
+const normalizar = (valor: string) =>
+  (valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
 interface Fornecedor {
   id: string;
   nome: string;
@@ -74,6 +82,24 @@ interface ItemPendente {
   fornecedor_nome: string;
 }
 
+export interface ItemConsolidado {
+  chave: string;
+  cliente_id: string | null;
+  cliente_nome: string;
+  produto_id: string | null;
+  produto_nome: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  ordem_numeros: string[];
+  ordem_ids: string[];
+  itensOriginais: (ItemPendente & {
+    carga_id?: string | null;
+    status_carga?: string | null;
+    ordem_status?: string;
+  })[];
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -92,6 +118,7 @@ export function ModalPedirCarga({
   const [fornecedorId, setFornecedorId] = useState<string>(fornecedorInicialId || "");
   const [itensSelecionados, setItensSelecionados] = useState<Record<string, boolean>>({});
   const [valoresUnitarios, setValoresUnitarios] = useState<Record<string, number>>({});
+  const [linhasExpandidas, setLinhasExpandidas] = useState<Record<string, boolean>>({});
   const [busca, setBusca] = useState("");
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -103,16 +130,10 @@ export function ModalPedirCarga({
       } else {
         setPasso(1);
       }
-      if (itensIniciaisIds && itensIniciaisIds.length > 0) {
-        setItensSelecionados(
-          Object.fromEntries(itensIniciaisIds.map((id) => [id, true])),
-        );
-      } else {
-        setItensSelecionados({});
-      }
       setValoresUnitarios({});
+      setLinhasExpandidas({});
     }
-  }, [open, fornecedorInicialId, itensIniciaisIds]);
+  }, [open, fornecedorInicialId]);
 
   // Dados do formulário de fechamento (Passo 4)
   const [previsaoEntrega, setPrevisaoEntrega] = useState("");
@@ -138,7 +159,47 @@ export function ModalPedirCarga({
     },
   });
 
-  // 2. Carrega ordens de compra e seus itens pendentes de carga
+  const fornecedoresCompletos = useMemo(() => {
+    const lista = [...fornecedores];
+    const temAnalandia = lista.some(
+      (f) =>
+        normalizar(f.nome).includes("analandia") ||
+        normalizar(f.nome).includes("analândia"),
+    );
+    if (!temAnalandia) {
+      lista.unshift({ id: "analandia", nome: "Analândia" });
+    }
+    const temProgeu = lista.some((f) => normalizar(f.nome).includes("progeu"));
+    if (!temProgeu) {
+      lista.push({ id: "progeu", nome: "Progeu" });
+    }
+    return lista;
+  }, [fornecedores]);
+
+  // 2. Carrega produtos simples para verificar categorias (casco piscina vs acessórios/bombas/filtros)
+  const { data: produtos = [] } = useQuery({
+    queryKey: ["produtos", "lista-simples-cargas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("id, nome, categoria, tipo, fornecedor_id")
+        .order("nome");
+      if (error) throw error;
+      return data as {
+        id: string;
+        nome: string;
+        categoria: string | null;
+        tipo: string | null;
+        fornecedor_id: string | null;
+      }[];
+    },
+  });
+
+  const produtosMap = useMemo(() => {
+    return new Map(produtos.map((p) => [p.id, p]));
+  }, [produtos]);
+
+  // 3. Carrega ordens de compra e seus itens pendentes de carga
   const { data: itensTodos = [] } = useQuery({
     queryKey: ["ordem_compra_itens", "pendentes-carga"],
     enabled: open,
@@ -200,12 +261,114 @@ export function ModalPedirCarga({
     });
   }, [itensTodos]);
 
+  // Resolução inteligente de fornecedor por item (garante Progeu para bombas/filtros/acessórios e Analândia para cascos)
+  const resolverFornecedorItem = useCallback(
+    (item: ItemPendente) => {
+      const prod = item.produto_id ? produtosMap.get(item.produto_id) : null;
+      const desc = normalizar(item.produto_nome || prod?.nome || "");
+      const categ = normalizar(prod?.categoria || "");
+      const tipo = normalizar(prod?.tipo || "");
+
+      const ehPiscina =
+        categ.includes("piscina") ||
+        desc.includes("piscina") ||
+        tipo.includes("casco");
+
+      const fornNome = normalizar(item.fornecedor_nome || "");
+      const fornId = (item.fornecedor_id || "").toLowerCase();
+
+      const progeuForn = fornecedoresCompletos.find((f) =>
+        normalizar(f.nome).includes("progeu"),
+      );
+      const analandiaForn = fornecedoresCompletos.find(
+        (f) =>
+          normalizar(f.nome).includes("analandia") ||
+          normalizar(f.nome).includes("analândia"),
+      );
+
+      // Se for explicitamente Progeu
+      if (fornNome.includes("progeu") || fornId.includes("progeu")) {
+        return progeuForn?.id || "progeu";
+      }
+
+      // Se a ordem foi marcada como Analândia mas NÃO é piscina (ex: bomba, filtro, acessório)
+      if ((fornNome.includes("analand") || fornId.includes("analand")) && !ehPiscina) {
+        return progeuForn?.id || "progeu";
+      }
+
+      // Se for piscina -> Analândia
+      if (ehPiscina) {
+        return analandiaForn?.id || "analandia";
+      }
+
+      // Se tem fornecedor_id e existe na lista
+      if (item.fornecedor_id) {
+        const fExistente = fornecedoresCompletos.find((f) => f.id === item.fornecedor_id);
+        if (fExistente) {
+          if (
+            (normalizar(fExistente.nome).includes("analandia") ||
+              normalizar(fExistente.nome).includes("analândia")) &&
+            !ehPiscina
+          ) {
+            return progeuForn?.id || "progeu";
+          }
+          return fExistente.id;
+        }
+      }
+
+      // Fallback inteligente padrão: não é piscina -> Progeu
+      return progeuForn?.id || "progeu";
+    },
+    [fornecedoresCompletos, produtosMap],
+  );
+
+  const itemPertenceAoFornecedor = useCallback(
+    (item: ItemPendente, fornId: string) => {
+      if (!fornId) return false;
+      const fornAlvo = fornecedoresCompletos.find((f) => f.id === fornId);
+      const fornAlvoNome = normalizar(fornAlvo?.nome || "");
+      const alvoEhProgeu = fornId === "progeu" || fornAlvoNome.includes("progeu");
+      const alvoEhAnalandia =
+        fornId === "analandia" ||
+        fornAlvoNome.includes("analandia") ||
+        fornAlvoNome.includes("analândia");
+
+      const resId = resolverFornecedorItem(item);
+      if (resId === fornId) return true;
+
+      const resForn = fornecedoresCompletos.find((f) => f.id === resId);
+      const resFornNome = normalizar(resForn?.nome || "");
+
+      if (alvoEhProgeu && (resId === "progeu" || resFornNome.includes("progeu"))) {
+        return true;
+      }
+      if (
+        alvoEhAnalandia &&
+        (resId === "analandia" ||
+          resFornNome.includes("analandia") ||
+          resFornNome.includes("analândia"))
+      ) {
+        return true;
+      }
+
+      return false;
+    },
+    [fornecedoresCompletos, resolverFornecedorItem],
+  );
+
   // Contadores por fornecedor para o Passo 1
   const contagemPorFornecedor = useMemo(() => {
-    const mapa = new Map<string, { totalItens: number; totalOcs: Set<string>; totalValor: number }>();
+    const mapa = new Map<
+      string,
+      { totalItens: number; totalOcs: Set<string>; totalValor: number }
+    >();
+
     for (const item of itensPendentes) {
-      if (!item.fornecedor_id) continue;
-      const atual = mapa.get(item.fornecedor_id) ?? {
+      const fId = resolverFornecedorItem(item);
+      const fornObj = fornecedoresCompletos.find((f) => f.id === fId);
+      const chaveForn = fornObj?.id || fId;
+
+      const atual = mapa.get(chaveForn) ?? {
         totalItens: 0,
         totalOcs: new Set<string>(),
         totalValor: 0,
@@ -213,94 +376,227 @@ export function ModalPedirCarga({
       atual.totalItens += item.quantidade;
       if (item.ordem_numero) atual.totalOcs.add(item.ordem_numero);
       atual.totalValor += item.valor_total;
-      mapa.set(item.fornecedor_id, atual);
+      mapa.set(chaveForn, atual);
+
+      if (fornObj) {
+        if (normalizar(fornObj.nome).includes("progeu")) {
+          for (const f of fornecedoresCompletos) {
+            if (normalizar(f.nome).includes("progeu") && f.id !== chaveForn) {
+              const a = mapa.get(f.id) ?? { totalItens: 0, totalOcs: new Set<string>(), totalValor: 0 };
+              a.totalItens += item.quantidade;
+              if (item.ordem_numero) a.totalOcs.add(item.ordem_numero);
+              a.totalValor += item.valor_total;
+              mapa.set(f.id, a);
+            }
+          }
+        }
+        if (
+          normalizar(fornObj.nome).includes("analandia") ||
+          normalizar(fornObj.nome).includes("analândia")
+        ) {
+          for (const f of fornecedoresCompletos) {
+            if (
+              (normalizar(f.nome).includes("analandia") ||
+                normalizar(f.nome).includes("analândia")) &&
+              f.id !== chaveForn
+            ) {
+              const a = mapa.get(f.id) ?? { totalItens: 0, totalOcs: new Set<string>(), totalValor: 0 };
+              a.totalItens += item.quantidade;
+              if (item.ordem_numero) a.totalOcs.add(item.ordem_numero);
+              a.totalValor += item.valor_total;
+              mapa.set(f.id, a);
+            }
+          }
+        }
+      }
     }
     return mapa;
-  }, [itensPendentes]);
+  }, [itensPendentes, resolverFornecedorItem, fornecedoresCompletos]);
 
   // Fornecedor selecionado
   const fornecedorAtual = useMemo(() => {
-    return fornecedores.find((f) => f.id === fornecedorId) ?? null;
-  }, [fornecedores, fornecedorId]);
+    if (!fornecedorId) return null;
+    return (
+      fornecedoresCompletos.find(
+        (f) =>
+          f.id === fornecedorId ||
+          (fornecedorId === "progeu" && normalizar(f.nome).includes("progeu")) ||
+          (fornecedorId === "analandia" &&
+            (normalizar(f.nome).includes("analandia") ||
+              normalizar(f.nome).includes("analândia"))),
+      ) ?? null
+    );
+  }, [fornecedoresCompletos, fornecedorId]);
 
-  // Itens pendentes do fornecedor escolhido
-  const itensDoFornecedor = useMemo(() => {
-    if (!fornecedorId) return [];
-    return itensPendentes.filter((item) => item.fornecedor_id === fornecedorId);
-  }, [itensPendentes, fornecedorId]);
+  // Agrupamento consolidado: consolida produtos idênticos vinculados ao mesmo cliente em uma única linha somando as quantidades
+  const itensConsolidados = useMemo(() => {
+    if (!fornecedorAtual) return [];
 
-  // Itens filtrados pela busca
-  const itensFiltrados = useMemo(() => {
-    if (!busca.trim()) return itensDoFornecedor;
+    const itensDoForn = itensPendentes.filter((item) =>
+      itemPertenceAoFornecedor(item, fornecedorAtual.id),
+    );
+
+    const mapa = new Map<string, ItemConsolidado>();
+
+    for (const item of itensDoForn) {
+      const clienteKey = (item.cliente_id || normalizar(item.cliente_nome || "estoque")).trim();
+      const produtoKey = (item.produto_id || normalizar(item.produto_nome || "")).trim();
+      const chave = `${clienteKey}:::${produtoKey}`;
+
+      const existente = mapa.get(chave);
+      if (existente) {
+        existente.quantidade += item.quantidade;
+        existente.valor_total += item.valor_total;
+        if (item.ordem_numero && !existente.ordem_numeros.includes(item.ordem_numero)) {
+          existente.ordem_numeros.push(item.ordem_numero);
+        }
+        if (item.ordem_id && !existente.ordem_ids.includes(item.ordem_id)) {
+          existente.ordem_ids.push(item.ordem_id);
+        }
+        existente.itensOriginais.push(item);
+      } else {
+        mapa.set(chave, {
+          chave,
+          cliente_id: item.cliente_id,
+          cliente_nome: item.cliente_nome || "Estoque Geral",
+          produto_id: item.produto_id,
+          produto_nome: item.produto_nome,
+          quantidade: item.quantidade,
+          valor_unitario: item.valor_unitario,
+          valor_total: item.valor_total,
+          ordem_numeros: item.ordem_numero ? [item.ordem_numero] : [],
+          ordem_ids: item.ordem_id ? [item.ordem_id] : [],
+          itensOriginais: [item],
+        });
+      }
+    }
+
+    return Array.from(mapa.values());
+  }, [itensPendentes, fornecedorAtual, itemPertenceAoFornecedor]);
+
+  // Sincroniza pré-seleção dos itens iniciais (ou de todos) com as linhas consolidadas
+  useEffect(() => {
+    if (!open) return;
+    if (itensIniciaisIds && itensIniciaisIds.length > 0) {
+      const mapa: Record<string, boolean> = {};
+      for (const item of itensConsolidados) {
+        const foiMarcado =
+          itensIniciaisIds.includes(item.chave) ||
+          item.itensOriginais.some((orig) => itensIniciaisIds.includes(orig.id));
+        if (foiMarcado) {
+          mapa[item.chave] = true;
+        }
+      }
+      setItensSelecionados(mapa);
+    } else if (fornecedorInicialId && itensConsolidados.length > 0) {
+      setItensSelecionados((prev) => {
+        if (Object.keys(prev).length > 0) return prev;
+        const mapa: Record<string, boolean> = {};
+        for (const item of itensConsolidados) mapa[item.chave] = true;
+        return mapa;
+      });
+    }
+  }, [open, itensIniciaisIds, itensConsolidados, fornecedorInicialId]);
+
+  // Itens consolidados filtrados pela busca
+  const itensConsolidadosFiltrados = useMemo(() => {
+    if (!busca.trim()) return itensConsolidados;
     const termo = busca.toLowerCase();
-    return itensDoFornecedor.filter(
+    return itensConsolidados.filter(
       (item) =>
         item.produto_nome.toLowerCase().includes(termo) ||
         item.cliente_nome.toLowerCase().includes(termo) ||
-        (item.ordem_numero && item.ordem_numero.toLowerCase().includes(termo)),
+        item.ordem_numeros.some((num) => num.toLowerCase().includes(termo)),
     );
-  }, [itensDoFornecedor, busca]);
+  }, [itensConsolidados, busca]);
 
-  // Itens efetivamente marcados para entrarem na carga
-  const itensMarcados = useMemo(() => {
-    return itensDoFornecedor.filter((item) => itensSelecionados[item.id] === true);
-  }, [itensDoFornecedor, itensSelecionados]);
+  // Itens consolidados efetivamente marcados para entrarem na carga
+  const itensConsolidadosMarcados = useMemo(() => {
+    return itensConsolidados.filter((item) => itensSelecionados[item.chave] === true);
+  }, [itensConsolidados, itensSelecionados]);
 
-  const getValorUnitario = (item: ItemPendente) => {
-    if (valoresUnitarios[item.id] !== undefined) {
-      return valoresUnitarios[item.id];
+  const getValorUnitarioConsolidado = (item: ItemConsolidado) => {
+    if (valoresUnitarios[item.chave] !== undefined) {
+      return valoresUnitarios[item.chave];
     }
     return item.valor_unitario;
   };
 
-  const getTotalItem = (item: ItemPendente) => {
-    const unit = getValorUnitario(item);
+  const getTotalConsolidado = (item: ItemConsolidado) => {
+    const unit = getValorUnitarioConsolidado(item);
     return unit * item.quantidade;
   };
 
-  const atualizarValorUnitarioItem = async (item: ItemPendente, novoValor: number) => {
-    const novoTotal = novoValor * item.quantidade;
+  const atualizarValorUnitarioGrupo = async (
+    item: ItemConsolidado,
+    novoValor: number,
+  ) => {
     try {
-      await supabase
-        .from("ordem_compra_itens")
-        .update({
-          valor_unitario: novoValor,
-          total: novoTotal,
-        })
-        .eq("id", item.id);
+      for (const orig of item.itensOriginais) {
+        const novoTotalItem = novoValor * orig.quantidade;
+        await supabase
+          .from("ordem_compra_itens")
+          .update({
+            valor_unitario: novoValor,
+            total: novoTotalItem,
+          })
+          .eq("id", orig.id);
+      }
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
-    } catch (err) {
-      console.error("Erro ao atualizar valor unitário:", err);
+      toast.success(
+        `Valor unitário de "${item.produto_nome}" atualizado para ${brl(novoValor)}`,
+      );
+    } catch (err: any) {
+      console.error("Erro ao atualizar valor unitário consolidado:", err);
+      toast.error("Erro ao atualizar valor unitário: " + (err?.message || ""));
     }
   };
 
-  const totalItensMarcados = itensMarcados.reduce((sum, item) => sum + item.quantidade, 0);
-  const totalValorMarcado = itensMarcados.reduce((sum, item) => sum + getTotalItem(item), 0);
-  const clientesAtendidos = Array.from(new Set(itensMarcados.map((i) => i.cliente_nome)));
+  const totalItensMarcados = itensConsolidadosMarcados.reduce(
+    (sum, item) => sum + item.quantidade,
+    0,
+  );
+  const totalValorMarcado = itensConsolidadosMarcados.reduce(
+    (sum, item) => sum + getTotalConsolidado(item),
+    0,
+  );
+  const clientesAtendidos = Array.from(
+    new Set(itensConsolidadosMarcados.map((i) => i.cliente_nome)),
+  );
 
   const todosFiltradosMarcados =
-    itensFiltrados.length > 0 && itensFiltrados.every((i) => itensSelecionados[i.id]);
+    itensConsolidadosFiltrados.length > 0 &&
+    itensConsolidadosFiltrados.every((i) => itensSelecionados[i.chave]);
 
   const marcarTodosItens = (marcar: boolean) => {
     setItensSelecionados((atual) => {
       const proximo = { ...atual };
-      for (const item of itensFiltrados) {
+      for (const item of itensConsolidadosFiltrados) {
         if (marcar) {
-          proximo[item.id] = true;
+          proximo[item.chave] = true;
         } else {
-          delete proximo[item.id];
+          delete proximo[item.chave];
         }
       }
       return proximo;
     });
   };
 
+  const toggleExpandir = (chave: string) => {
+    setLinhasExpandidas((prev) => ({
+      ...prev,
+      [chave]: !prev[chave],
+    }));
+  };
+
   // Mutação para criar a carga e fechar o lote
   const criarCargaMutation = useMutation({
     mutationFn: async () => {
       if (!fornecedorAtual) throw new Error("Selecione um fornecedor");
-      if (itensMarcados.length === 0) throw new Error("Selecione ao menos um item para a carga");
+      if (itensConsolidadosMarcados.length === 0) {
+        throw new Error("Selecione ao menos um item para a carga");
+      }
 
       const { data: auth } = await supabase.auth.getUser();
 
@@ -311,14 +607,14 @@ export function ModalPedirCarga({
       const numeros = (cargasExistentes ?? []).map((c: any) => c.numero);
       const numeroCarga = proximoCodigo("CRG", numeros);
 
-      // Snapshot dos itens com valores atualizados
-      const itensSnapshot: ItemCargaManifesto[] = itensMarcados.map((item) => ({
-        ordem_numero: item.ordem_numero,
+      // Snapshot dos itens consolidados com valores atualizados para o manifesto
+      const itensSnapshot: ItemCargaManifesto[] = itensConsolidadosMarcados.map((item) => ({
+        ordem_numero: item.ordem_numeros.join(", "),
         cliente_nome: item.cliente_nome,
         produto_nome: item.produto_nome,
         quantidade: item.quantidade,
-        valor_unitario: getValorUnitario(item),
-        valor_total: getTotalItem(item),
+        valor_unitario: getValorUnitarioConsolidado(item),
+        valor_total: getTotalConsolidado(item),
       }));
 
       // 1. Cria a carga
@@ -348,18 +644,21 @@ export function ModalPedirCarga({
       const cargaId = novaCarga.id;
 
       // 2. Insere itens na tabela cargas_itens com valores atualizados
-      const payloadItens = itensMarcados.map((item) => ({
-        carga_id: cargaId,
-        ordem_id: item.ordem_id,
-        item_ordem_id: item.id,
-        cliente_id: item.cliente_id,
-        cliente_nome: item.cliente_nome,
-        produto_id: item.produto_id,
-        produto_nome: item.produto_nome,
-        quantidade: item.quantidade,
-        valor_unitario: getValorUnitario(item),
-        valor_total: getTotalItem(item),
-      }));
+      const payloadItens = itensConsolidadosMarcados.flatMap((itemConsolidado) => {
+        const unitario = getValorUnitarioConsolidado(itemConsolidado);
+        return itemConsolidado.itensOriginais.map((orig) => ({
+          carga_id: cargaId,
+          ordem_id: orig.ordem_id,
+          item_ordem_id: orig.id,
+          cliente_id: orig.cliente_id,
+          cliente_nome: orig.cliente_nome,
+          produto_id: orig.produto_id,
+          produto_nome: orig.produto_nome,
+          quantidade: orig.quantidade,
+          valor_unitario: unitario,
+          valor_total: unitario * orig.quantidade,
+        }));
+      });
 
       const { error: erroItens } = await (supabase as any)
         .from("cargas_itens")
@@ -367,23 +666,31 @@ export function ModalPedirCarga({
       if (erroItens) throw erroItens;
 
       // 3. Atualiza ordem_compra_itens para em_carga e sincroniza valor_unitario e total editados
-      for (const item of itensMarcados) {
-        const vlUnit = getValorUnitario(item);
-        const vlTotal = getTotalItem(item);
-        const { error: erroUpItens } = await supabase
-          .from("ordem_compra_itens")
-          .update({
-            carga_id: cargaId,
-            status_carga: "em_carga",
-            valor_unitario: vlUnit,
-            total: vlTotal,
-          } as any)
-          .eq("id", item.id);
-        if (erroUpItens) throw erroUpItens;
+      for (const itemConsolidado of itensConsolidadosMarcados) {
+        const unitario = getValorUnitarioConsolidado(itemConsolidado);
+        for (const orig of itemConsolidado.itensOriginais) {
+          const vlTotal = unitario * orig.quantidade;
+          const { error: erroUpItens } = await supabase
+            .from("ordem_compra_itens")
+            .update({
+              carga_id: cargaId,
+              status_carga: "em_carga",
+              valor_unitario: unitario,
+              total: vlTotal,
+            } as any)
+            .eq("id", orig.id);
+          if (erroUpItens) throw erroUpItens;
+        }
       }
 
       // 4. Atualiza ordens_compra relacionadas como Comprado / Em Trânsito
-      const idsOrdens = Array.from(new Set(itensMarcados.map((i) => i.ordem_id)));
+      const idsOrdens = Array.from(
+        new Set(
+          itensConsolidadosMarcados.flatMap((i) =>
+            i.itensOriginais.map((orig) => orig.ordem_id),
+          ),
+        ),
+      );
       for (const ordemId of idsOrdens) {
         await supabase
           .from("ordens_compra")
@@ -397,7 +704,11 @@ export function ModalPedirCarga({
 
       // 5. Atualiza status dos produtos marcados
       const idsProdutos = Array.from(
-        new Set(itensMarcados.map((i) => i.produto_id).filter(Boolean)),
+        new Set(
+          itensConsolidadosMarcados
+            .flatMap((i) => i.itensOriginais.map((orig) => orig.produto_id))
+            .filter(Boolean),
+        ),
       ) as string[];
       if (idsProdutos.length > 0) {
         await supabase
@@ -430,6 +741,7 @@ export function ModalPedirCarga({
       qc.invalidateQueries({ queryKey: ["ordens_compra"] });
       qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
       qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
+      qc.invalidateQueries({ queryKey: ["produtos", "lista-simples-cargas"] });
       qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] });
 
       setCargaCriada(dados);
@@ -446,6 +758,7 @@ export function ModalPedirCarga({
     setPasso(1);
     setFornecedorId("");
     setItensSelecionados({});
+    setLinhasExpandidas({});
     setBusca("");
     setPrevisaoEntrega("");
     setPlacaVeiculo("");
@@ -460,13 +773,13 @@ export function ModalPedirCarga({
         toast.error("Selecione um fornecedor para continuar");
         return;
       }
-      // Marca todos os itens deste fornecedor por padrão
+      // Marca todos os itens consolidados deste fornecedor por padrão
       const mapa: Record<string, boolean> = {};
-      for (const item of itensDoFornecedor) mapa[item.id] = true;
+      for (const item of itensConsolidados) mapa[item.chave] = true;
       setItensSelecionados(mapa);
       setPasso(2);
     } else if (passo === 2 || passo === 3) {
-      if (itensMarcados.length === 0) {
+      if (itensConsolidadosMarcados.length === 0) {
         toast.error("Selecione ao menos um produto para entrar no caminhão");
         return;
       }
@@ -563,7 +876,7 @@ export function ModalPedirCarga({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {fornecedores.map((forn) => {
+                  {fornecedoresCompletos.map((forn) => {
                     const stats = contagemPorFornecedor.get(forn.id);
                     const temPendencias = Boolean(stats && stats.totalItens > 0);
                     const isSelected = fornecedorId === forn.id;
@@ -628,11 +941,11 @@ export function ModalPedirCarga({
                     <h3 className="font-semibold text-sm flex items-center gap-2">
                       <span>Passo {passo}: Produtos Pendentes de {fornecedorAtual?.nome}</span>
                       <Badge variant="outline" className="font-mono text-xs">
-                        {itensDoFornecedor.length} itens disponíveis
+                        {itensConsolidados.length} itens consolidados ({itensConsolidados.reduce((s, i) => s + i.quantidade, 0)} un.)
                       </Badge>
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      Marque exatamente quais produtos entrarão no caminhão desta carga.
+                      Itens idênticos do mesmo cliente consolidados em linha única. Marque quais produtos entrarão no caminhão.
                     </p>
                   </div>
 
@@ -658,127 +971,200 @@ export function ModalPedirCarga({
                             onCheckedChange={(val) => marcarTodosItens(val === true)}
                           />
                         </TableHead>
-                        <TableHead className="w-24">Ordem (O.C.)</TableHead>
+                        <TableHead className="w-28">Ordem (O.C.)</TableHead>
                         <TableHead className="min-w-44">Cliente de Destino</TableHead>
                         <TableHead className="min-w-56">Produto / Modelo</TableHead>
                         <TableHead className="w-20 text-right">Qtd</TableHead>
                         <TableHead className="w-28 text-right">Valor Unit.</TableHead>
                         <TableHead className="w-28 text-right">Total</TableHead>
-                        <TableHead className="w-20 text-right">Ações</TableHead>
+                        <TableHead className="w-24 text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {itensFiltrados.length === 0 ? (
+                      {itensConsolidadosFiltrados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center py-8 text-muted-foreground text-xs">
                             Nenhum item pendente de carga encontrado para este fornecedor.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        itensFiltrados.map((item) => {
-                          const isChecked = itensSelecionados[item.id] === true;
+                        itensConsolidadosFiltrados.map((item) => {
+                          const isChecked = itensSelecionados[item.chave] === true;
+                          const temMultiplos = item.itensOriginais.length > 1;
+                          const estaExpandido = linhasExpandidas[item.chave] === true;
+
                           return (
-                            <TableRow
-                              key={item.id}
-                              className={`text-xs cursor-pointer ${isChecked ? "bg-primary/5" : ""}`}
-                              onClick={() => {
-                                setItensSelecionados((atual) => ({
-                                  ...atual,
-                                  [item.id]: !atual[item.id],
-                                }));
-                              }}
-                            >
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={isChecked}
-                                  onCheckedChange={(val) => {
-                                    setItensSelecionados((atual) => ({
-                                      ...atual,
-                                      [item.id]: val === true,
-                                    }));
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell className="font-mono font-semibold">
-                                {item.ordem_numero}
-                              </TableCell>
-                              <TableCell className="font-medium text-foreground">
-                                {item.cliente_nome}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {item.produto_nome}
-                              </TableCell>
-                              <TableCell className="text-right font-bold">
-                                {item.quantidade} un.
-                              </TableCell>
-                              <TableCell className="text-right font-mono" onClick={(e) => e.stopPropagation()}>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  className="h-7 w-24 text-right font-mono text-xs ml-auto font-medium"
-                                  value={
-                                    valoresUnitarios[item.id] !== undefined
-                                      ? valoresUnitarios[item.id]
-                                      : item.valor_unitario
-                                  }
-                                  onChange={(e) => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    setValoresUnitarios((prev) => ({
-                                      ...prev,
-                                      [item.id]: val,
-                                    }));
-                                  }}
-                                  onBlur={(e) => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    atualizarValorUnitarioItem(item, val);
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-bold text-foreground">
-                                {brl(getTotalItem(item))}
-                              </TableCell>
-                              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    className="size-7"
-                                    title="Editar valor unitário"
-                                    onClick={() => {
-                                      const input = window.prompt(
-                                        `Novo valor unitário para "${item.produto_nome}":`,
-                                        String(
-                                          valoresUnitarios[item.id] !== undefined
-                                            ? valoresUnitarios[item.id]
-                                            : item.valor_unitario,
-                                        ),
-                                      );
-                                      if (input !== null) {
-                                        const val = parseFloat(input) || 0;
-                                        setValoresUnitarios((prev) => ({ ...prev, [item.id]: val }));
-                                        atualizarValorUnitarioItem(item, val);
-                                      }
+                            <>
+                              <TableRow
+                                key={item.chave}
+                                className={`text-xs cursor-pointer ${isChecked ? "bg-primary/5" : ""}`}
+                                onClick={() => {
+                                  setItensSelecionados((atual) => ({
+                                    ...atual,
+                                    [item.chave]: !atual[item.chave],
+                                  }));
+                                }}
+                              >
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(val) => {
+                                      setItensSelecionados((atual) => ({
+                                        ...atual,
+                                        [item.chave]: val === true,
+                                      }));
                                     }}
-                                  >
-                                    <Pencil className="size-3.5" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    className="size-7 text-destructive hover:bg-destructive/10"
-                                    title="Remover/desmarcar da carga"
-                                    onClick={() => {
-                                      setItensSelecionados((prev) => ({ ...prev, [item.id]: false }));
+                                  />
+                                </TableCell>
+                                <TableCell className="font-mono font-semibold">
+                                  {item.ordem_numeros.length === 0 ? (
+                                    "-"
+                                  ) : item.ordem_numeros.length === 1 ? (
+                                    item.ordem_numeros[0]
+                                  ) : (
+                                    <span title={item.ordem_numeros.join(", ")}>
+                                      {item.ordem_numeros[0]}{" "}
+                                      <span className="text-[10px] text-muted-foreground font-normal">
+                                        +{item.ordem_numeros.length - 1}
+                                      </span>
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="font-medium text-foreground">
+                                  {item.cliente_nome}
+                                </TableCell>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>{item.produto_nome}</span>
+                                    {temMultiplos && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-primary/10 text-primary border-primary/20 text-[10px] py-0 px-1.5 font-semibold"
+                                      >
+                                        {item.itensOriginais.length}x somados
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right font-bold">
+                                  {item.quantidade} un.
+                                </TableCell>
+                                <TableCell className="text-right font-mono" onClick={(e) => e.stopPropagation()}>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    className="h-7 w-24 text-right font-mono text-xs ml-auto font-medium"
+                                    value={
+                                      valoresUnitarios[item.chave] !== undefined
+                                        ? valoresUnitarios[item.chave]
+                                        : item.valor_unitario
+                                    }
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setValoresUnitarios((prev) => ({
+                                        ...prev,
+                                        [item.chave]: val,
+                                      }));
                                     }}
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
+                                    onBlur={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      atualizarValorUnitarioGrupo(item, val);
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right font-mono font-bold text-foreground">
+                                  {brl(getTotalConsolidado(item))}
+                                </TableCell>
+                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-end gap-1">
+                                    {temMultiplos && (
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="size-7 text-muted-foreground hover:text-foreground"
+                                        title={estaExpandido ? "Ocultar detalhes dos pedidos somados" : "Expandir detalhes dos pedidos somados"}
+                                        onClick={() => toggleExpandir(item.chave)}
+                                      >
+                                        {estaExpandido ? (
+                                          <ChevronUp className="size-3.5" />
+                                        ) : (
+                                          <ChevronDown className="size-3.5" />
+                                        )}
+                                      </Button>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="ghost"
+                                      className="size-7"
+                                      title="Editar valor unitário"
+                                      onClick={() => {
+                                        const input = window.prompt(
+                                          `Novo valor unitário para "${item.produto_nome}" (${item.cliente_nome}):`,
+                                          String(
+                                            valoresUnitarios[item.chave] !== undefined
+                                              ? valoresUnitarios[item.chave]
+                                              : item.valor_unitario,
+                                          ),
+                                        );
+                                        if (input !== null) {
+                                          const val = parseFloat(input) || 0;
+                                          setValoresUnitarios((prev) => ({ ...prev, [item.chave]: val }));
+                                          atualizarValorUnitarioGrupo(item, val);
+                                        }
+                                      }}
+                                    >
+                                      <Pencil className="size-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="ghost"
+                                      className="size-7 text-destructive hover:bg-destructive/10"
+                                      title="Remover/desmarcar da carga"
+                                      onClick={() => {
+                                        setItensSelecionados((prev) => ({ ...prev, [item.chave]: false }));
+                                      }}
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+
+                              {/* LINHA EXPANDIDA COM DETALHAMENTO DOS PEDIDOS SOMADOS */}
+                              {temMultiplos && estaExpandido && (
+                                <TableRow className="bg-muted/30 text-xs hover:bg-muted/30">
+                                  <TableCell colSpan={8} className="p-3">
+                                    <div className="rounded border bg-background/95 p-2.5 space-y-2">
+                                      <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                                        <span>Pedidos somados para {item.cliente_nome} ({item.itensOriginais.length} registros originais):</span>
+                                        <span>Total consolidado: <strong className="text-foreground font-mono">{item.quantidade} un.</strong></span>
+                                      </div>
+                                      <div className="divide-y divide-border/60">
+                                        {item.itensOriginais.map((orig, idx) => (
+                                          <div key={orig.id || idx} className="flex items-center justify-between py-1.5 text-xs">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-mono text-muted-foreground font-semibold">{orig.ordem_numero}</span>
+                                              <span className="text-foreground">{orig.produto_nome}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                              <span className="font-bold">{orig.quantidade} un.</span>
+                                              <span className="font-mono text-muted-foreground">{brl(getValorUnitarioConsolidado(item))} / un.</span>
+                                              <span className="font-mono font-bold text-foreground">
+                                                {brl(getValorUnitarioConsolidado(item) * orig.quantidade)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
                           );
                         })
                       )}
@@ -790,7 +1176,7 @@ export function ModalPedirCarga({
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg border bg-muted/10 text-xs">
                   <div className="flex items-center gap-4">
                     <span>
-                      Marcados: <strong>{itensMarcados.length} produtos ({totalItensMarcados} un.)</strong>
+                      Marcados: <strong>{itensConsolidadosMarcados.length} produtos ({totalItensMarcados} un.)</strong>
                     </span>
                     <span>·</span>
                     <span>
@@ -831,7 +1217,7 @@ export function ModalPedirCarga({
                     <CardContent className="p-3.5 space-y-1">
                       <p className="text-[11px] text-muted-foreground uppercase font-medium">Total de Produtos</p>
                       <p className="font-bold text-sm text-foreground">
-                        {totalItensMarcados} volumes em {itensMarcados.length} itens
+                        {totalItensMarcados} volumes em {itensConsolidadosMarcados.length} itens consolidados
                       </p>
                     </CardContent>
                   </Card>
@@ -964,7 +1350,7 @@ export function ModalPedirCarga({
                   type="button"
                   size="sm"
                   onClick={() => criarCargaMutation.mutate()}
-                  disabled={criarCargaMutation.isPending || itensMarcados.length === 0}
+                  disabled={criarCargaMutation.isPending || itensConsolidadosMarcados.length === 0}
                   className="gap-1.5 text-xs font-bold bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
                 >
                   <ShoppingCart className="size-4" />

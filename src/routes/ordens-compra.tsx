@@ -1043,10 +1043,25 @@ function OrdensCompra() {
 
   const fornecedorDaCompra = useCallback(
     (produto: Produto) => {
+      const categoria = normalizar(produto.categoria ?? "");
+      const nome = normalizar(produto.nome);
+      const ehPiscina =
+        categoria.includes("piscina") ||
+        nome.includes("piscina") ||
+        normalizar(produto.tipo ?? "").includes("casco");
+
       // 1. Prioridade: fornecedor direto cadastrado no produto
       if (produto.fornecedor_id) {
         const fDireto = fornecedoresCompletos.find((f) => f.id === produto.fornecedor_id);
-        if (fDireto) return fDireto;
+        if (fDireto) {
+          const ehAnal = normalizar(fDireto.nome).includes("analandia") || normalizar(fDireto.nome).includes("analândia");
+          // Analândia é exclusivo de cascos de piscina; se o produto não for piscina, direciona obrigatoriamente para Progeu
+          if (ehAnal && !ehPiscina) {
+            const fProgeu = fornecedoresCompletos.find((f) => normalizar(f.nome).includes("progeu"));
+            return fProgeu ?? ({ id: "progeu", nome: "Progeu" } satisfies Fornecedor);
+          }
+          return fDireto;
+        }
       }
       // 2. Serviço interno Splash
       if (produto.tipo === "servico") {
@@ -1056,12 +1071,6 @@ function OrdensCompra() {
         return fSplash ?? ({ id: SEM_CLIENTE, nome: "Splash Jardim do Trevo" } satisfies Fornecedor);
       }
       // 3. Fallback inteligente: Casco/Piscina -> Analândia, Demais -> Progeu
-      const categoria = normalizar(produto.categoria ?? "");
-      const nome = normalizar(produto.nome);
-      const ehPiscina =
-        categoria.includes("piscina") ||
-        nome.includes("piscina") ||
-        normalizar(produto.tipo).includes("casco");
       const alvo = ehPiscina ? "analandia" : "progeu";
       const encontrado = fornecedoresCompletos.find((f) => normalizar(f.nome).includes(alvo));
       if (encontrado) return encontrado;
