@@ -309,6 +309,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
         .select(
           "id, codigo, nome, categoria, unidade, preco_venda, preco_custo, estoque_atual, sob_encomenda",
         )
+        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data;
