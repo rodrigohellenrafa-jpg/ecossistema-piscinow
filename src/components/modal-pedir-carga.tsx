@@ -487,9 +487,14 @@ export function ModalPedirCarga({
   }, [itensPendentes, fornecedorAtual, itemPertenceAoFornecedor]);
 
   // Sincroniza pré-seleção dos itens iniciais (ou de todos) com as linhas consolidadas
+  const preSelecaoAplicadaRef = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      preSelecaoAplicadaRef.current = false;
+      return;
+    }
     if (itensIniciaisIds && itensIniciaisIds.length > 0) {
+      if (preSelecaoAplicadaRef.current || itensConsolidados.length === 0) return;
       const mapa: Record<string, boolean> = {};
       for (const item of itensConsolidados) {
         const foiMarcado =
@@ -499,6 +504,7 @@ export function ModalPedirCarga({
           mapa[item.chave] = true;
         }
       }
+      preSelecaoAplicadaRef.current = true;
       setItensSelecionados(mapa);
     } else if (fornecedorInicialId && itensConsolidados.length > 0) {
       setItensSelecionados((prev) => {
