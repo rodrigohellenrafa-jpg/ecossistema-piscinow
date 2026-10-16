@@ -2420,12 +2420,7 @@ function OrdensCompra() {
       if (error) throw error;
 
       // Se a ordem foi finalizada/recebida/concluída, atualiza os itens e produtos correspondentes
-      if (
-        status === "recebida" ||
-        status === "concluida" ||
-        status === "entregue" ||
-        status === "comprado"
-      ) {
+      if (status === "recebida" || status === "concluida" || status === "entregue") {
         await supabase
           .from("ordem_compra_itens")
           .update({ status_carga: "entregue" })
