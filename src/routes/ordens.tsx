@@ -42,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { addDiasUteis, hojeISO, proximoCodigo } from "@/lib/erp";
 import { useAbrirModal } from "@/hooks/use-abrir-modal";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/ordens")({
   staticData: { sitemap: false },
@@ -101,6 +102,7 @@ const vazio = {
 
 function Ordens() {
   const qc = useQueryClient();
+  useSincronizarPecasEstoque();
   const [busca, setBusca] = useState("");
   const [registro, setRegistro] = useState<{id:string; materiais:string; horas:string} | null>(null);
   const [gravando, setGravando] = useState(false);
@@ -115,6 +117,18 @@ function Ordens() {
   const [vendasSel, setVendasSel] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");
+
+  const { data: produtosCatalogo = [] } = useQuery({
+    queryKey: ["produtos", "catalogo-os"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("id, codigo, nome, unidade")
+        .order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes", "os"],
@@ -614,7 +628,7 @@ function Ordens() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!registro} onOpenChange={v=>{if(!v)setRegistro(null);}}><DialogContent><DialogHeader><DialogTitle>Registro de execução</DialogTitle></DialogHeader><Field label="Materiais utilizados"><Textarea value={registro?.materiais ?? ""} onChange={e=>registro && setRegistro({...registro,materiais:e.target.value})}/></Field><Field label="Horas trabalhadas"><Input type="number" min="0" step="0.25" value={registro?.horas ?? "0"} onChange={e=>registro && setRegistro({...registro,horas:e.target.value})}/></Field><Button disabled={gravando} onClick={async()=>{if(!registro)return;const horas=Number(registro.horas);if(!Number.isFinite(horas)||horas<0){toast.error("Informe horas válidas.");return;}setGravando(true);try{const {error}=await supabase.from("ordens_servico").update({materiais_utilizados:registro.materiais,horas_trabalhadas:horas}).eq("id",registro.id);if(error)throw error;await qc.invalidateQueries({queryKey:["ordens"]});setRegistro(null);toast.success("Execução registrada.");}catch(e){toast.error(e instanceof Error?e.message:"Não foi possível salvar.");}finally{setGravando(false);}}}>Salvar</Button></DialogContent></Dialog>
+      <Dialog open={!!registro} onOpenChange={v=>{if(!v)setRegistro(null);}}><DialogContent><DialogHeader><DialogTitle>Registro de execução</DialogTitle></DialogHeader><Field label="Adicionar item do catálogo global"><Select value="" onValueChange={id=>{const p=produtosCatalogo.find(x=>x.id===id);if(!p||!registro)return;const linha=`1 ${p.unidade||"UN"} - ${p.codigo?`${p.codigo} ` : ""}${p.nome}`;setRegistro({...registro,materiais:registro.materiais?`${registro.materiais}\n${linha}`:linha});}}><SelectTrigger><SelectValue placeholder="Selecionar produto/peça do catálogo..."/></SelectTrigger><SelectContent className="max-h-64">{produtosCatalogo.map(p=>(<SelectItem key={p.id} value={p.id}>{p.codigo?`${p.codigo} — `:""}{p.nome}</SelectItem>))}</SelectContent></Select></Field><Field label="Materiais utilizados"><Textarea value={registro?.materiais ?? ""} onChange={e=>registro && setRegistro({...registro,materiais:e.target.value})}/></Field><Field label="Horas trabalhadas"><Input type="number" min="0" step="0.25" value={registro?.horas ?? "0"} onChange={e=>registro && setRegistro({...registro,horas:e.target.value})}/></Field><Button disabled={gravando} onClick={async()=>{if(!registro)return;const horas=Number(registro.horas);if(!Number.isFinite(horas)||horas<0){toast.error("Informe horas válidas.");return;}setGravando(true);try{const {error}=await supabase.from("ordens_servico").update({materiais_utilizados:registro.materiais,horas_trabalhadas:horas}).eq("id",registro.id);if(error)throw error;await qc.invalidateQueries({queryKey:["ordens"]});setRegistro(null);toast.success("Execução registrada.");}catch(e){toast.error(e instanceof Error?e.message:"Não foi possível salvar.");}finally{setGravando(false);}}}>Salvar</Button></DialogContent></Dialog>
     </div>
   );
 }

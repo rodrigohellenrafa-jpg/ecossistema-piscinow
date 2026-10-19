@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, hojeISO, proximoCodigo } from "@/lib/erp";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/compras")({
   staticData: { sitemap: false },
@@ -65,6 +66,7 @@ type Fornecedor = { id: string; nome: string; codigo: string | null };
 
 function Compras() {
   const qc = useQueryClient();
+  useSincronizarPecasEstoque();
   const [selecionados, setSelecionados] = useState<Record<string, boolean>>({});
   const [qtds, setQtds] = useState<Record<string, string>>({});
   const [modalPedirCargaAberto, setModalPedirCargaAberto] = useState(false);
@@ -77,7 +79,6 @@ function Compras() {
         .select(
           "id, codigo, nome, categoria, unidade, preco_custo, estoque_atual, estoque_minimo, fornecedor_id",
         )
-        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data as Produto[];

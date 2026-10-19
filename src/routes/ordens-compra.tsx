@@ -27,12 +27,15 @@ import {
   Pencil,
   Plus,
   Printer,
+  ArrowLeft,
+  ChevronRight,
   Save,
   Search,
   ShoppingCart,
   Trash2,
   Truck,
   Unlink,
+  Users,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -57,6 +60,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -77,10 +88,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { DocumentoOrdemCompra, gerarPdfOrdemCompra } from "@/components/documento-ordem-compra";
 import { BotaoVisualizarDocumento } from "@/components/visualizador-documento-modal";
 import { ModalPedirCarga } from "@/components/modal-pedir-carga";
+import { ProdutoRapidoDialog } from "@/components/produto-rapido-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { brl, dataBR, hojeISO, proximoCodigo } from "@/lib/erp";
 import logoSplash from "@/assets/logo-splash.png.asset.json";
 import { useAbrirModal } from "@/hooks/use-abrir-modal";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/ordens-compra")({
   staticData: { sitemap: false },
@@ -276,11 +289,87 @@ const novoItemVazio = {
   pastilha: "",
 };
 
+type VinculoFilaDetalhe = {
+  key: string;
+  produto: Produto;
+  indiceOriginal: number;
+  vendaId: string;
+  pedidoNumero: string | null;
+  clienteId: string | null;
+  clienteNome: string;
+  rotulo: string;
+  comVinculo: boolean;
+  valorUnitario: number;
+  descontoPercentual: number;
+  valorLiquido: number;
+};
+
+type LinhaConsolidadaFornecedor = {
+  chaveLinha: string;
+  fornecedorChave: string;
+  produtoPrincipal: Produto;
+  nome: string;
+  codigo: string | null;
+  categoria: string | null;
+  unidade: string;
+  comVinculo: boolean;
+  vinculos: VinculoFilaDetalhe[];
+  totalFila: number;
+  selecionadosCount: number;
+  pendenteDinamico: number;
+  todosMarcados: boolean;
+  algumMarcado: boolean;
+  valorUnitario: number;
+  descontoPercentual: number;
+  totalValorPendente: number;
+  totalValorSelecionado: number;
+  estoqueAtual: number;
+  estoqueMinimo: number;
+  estoqueZerado: boolean;
+  estoqueBaixo: boolean;
+};
+
+type ItemRascunhoOC = {
+  key: string;
+  produtoId: string;
+  codigo: string | null;
+  descricao: string;
+  unidade: string;
+  ncm: string | null;
+  cst: string | null;
+  cor: string | null;
+  pastilha: string | null;
+  vendaId: string | null;
+  pedidoNumero: string | null;
+  clienteId: string | null;
+  clienteNome: string | null;
+  comVinculo: boolean;
+  quantidade: number;
+  valorUnitario: number;
+  descontoPercentual: number;
+};
+
+type RascunhoOCFornecedor = {
+  fornecedorChave: string;
+  fornecedorId: string;
+  fornecedorNome: string;
+  previsaoEntrega: string;
+  condicoes: string;
+  formaPagamento: string;
+  vencimentoFinanceiro: string;
+  observacoes: string;
+  itens: ItemRascunhoOC[];
+  updatedAt: string;
+};
+
+const STORAGE_KEY_RASCUNHOS_OC = "erp:rascunhos_oc_fornecedor_v1";
+
 function OrdensCompra() {
   const qc = useQueryClient();
+  useSincronizarPecasEstoque();
   const navigate = useNavigate();
   const [abaVisao, setAbaVisao] = useState<"fornecedores" | "grade" | "executadas">("fornecedores");
-  const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("com_vinculo");
+  const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("todos");
   const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("precisa_comprar");
   const [filtroExibicaoCatalogo, setFiltroExibicaoCatalogo] = useState<
     "apenas_vinculados_selecionados" | "catalogo_completo"
@@ -289,6 +378,33 @@ function OrdensCompra() {
   const [linhasExpandidas, setLinhasExpandidas] = useState<Record<string, boolean>>({});
   const [ordensExpandidas, setOrdensExpandidas] = useState<Record<string, boolean>>({});
   const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
+  const [fornecedorCardAberto, setFornecedorCardAberto] = useState<string | null>(null);
+  const [gavetaOCFornecedorChave, setGavetaOCFornecedorChave] = useState<string | null>(null);
+  const [vinculosKeysSelecionados, setVinculosKeysSelecionados] = useState<Record<string, boolean>>({});
+  const [vinculosExpandidosPorLinha, setVinculosExpandidosPorLinha] = useState<Record<string, boolean>>({});
+  const [rascunhosOCPorFornecedor, setRascunhosOCPorFornecedor] = useState<
+    Record<string, RascunhoOCFornecedor>
+  >(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY_RASCUNHOS_OC);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY_RASCUNHOS_OC, JSON.stringify(rascunhosOCPorFornecedor));
+    } catch {
+      // ignore storage errors
+    }
+  }, [rascunhosOCPorFornecedor]);
+
   const [filtroFornecedor, setFiltroFornecedor] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
@@ -317,30 +433,26 @@ function OrdensCompra() {
   const [creditoFabricante, setCreditoFabricante] = useState("");
   const [creditoDisponivelInput, setCreditoDisponivelInput] = useState<string | null>(null);
 
-  // Sincronização em tempo real para ordens e itens de compra
+  // Sincronização em tempo real para ordens, itens de compra, vendas e produtos
   useEffect(() => {
+    const invalidarTudo = () => {
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["vendas", "vinculo-compras"] });
+      qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] });
+      qc.invalidateQueries({ queryKey: ["venda_kit", "consumo-compras"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+      qc.invalidateQueries({ queryKey: ["produtos-select"] });
+    };
+
     const canal = supabase
       .channel("realtime-ordens-compra-sync")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ordens_compra" },
-        () => {
-          qc.invalidateQueries({ queryKey: ["ordens_compra"] });
-          qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
-          qc.invalidateQueries({ queryKey: ["produtos"] });
-          qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ordem_compra_itens" },
-        () => {
-          qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
-          qc.invalidateQueries({ queryKey: ["ordens_compra"] });
-          qc.invalidateQueries({ queryKey: ["produtos"] });
-          qc.invalidateQueries({ queryKey: ["produtos", "lista-simples"] });
-        },
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "ordens_compra" }, invalidarTudo)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ordem_compra_itens" }, invalidarTudo)
+      .on("postgres_changes", { event: "*", schema: "public", table: "vendas" }, invalidarTudo)
+      .on("postgres_changes", { event: "*", schema: "public", table: "venda_itens" }, invalidarTudo)
+      .on("postgres_changes", { event: "*", schema: "public", table: "venda_kit" }, invalidarTudo)
+      .on("postgres_changes", { event: "*", schema: "public", table: "produtos" }, invalidarTudo)
       .subscribe();
 
     return () => {
@@ -441,14 +553,24 @@ function OrdensCompra() {
     },
   });
 
-  /** Garante que Analândia e Progeu estejam sempre presentes na lista de fornecedores */
+  /** Garante que Analandia Ind Piscinas e Progeu estejam sempre presentes na lista de fornecedores */
   const fornecedoresCompletos = useMemo(() => {
-    const lista = [...fornecedores];
-    const temAnalandia = lista.some(
-      (f) => normalizar(f.nome).includes("analandia") || normalizar(f.nome).includes("analândia"),
-    );
+    const lista = fornecedores.map((f) => {
+      const n = normalizar(f.nome);
+      if (
+        n.includes("analandia") ||
+        n.includes("analândia") ||
+        n.includes("splash piscinas") ||
+        n.includes("by igui") ||
+        n === "splash"
+      ) {
+        return { ...f, nome: "Analandia Ind Piscinas" };
+      }
+      return f;
+    });
+    const temAnalandia = lista.some((f) => normalizar(f.nome).includes("analandia"));
     if (!temAnalandia) {
-      lista.unshift({ id: "analandia", nome: "Analândia" });
+      lista.unshift({ id: "analandia", nome: "Analandia Ind Piscinas" });
     }
     const temProgeu = lista.some((f) => normalizar(f.nome).includes("progeu"));
     if (!temProgeu) {
@@ -457,18 +579,53 @@ function OrdensCompra() {
     return lista;
   }, [fornecedores]);
 
-  const { data: produtos = [] } = useQuery({
-    queryKey: ["produtos", "lista-simples"],
+  const { data: produtos = [], refetch: refetchProdutos } = useQuery({
+    queryKey: ["produtos", "catalogo-compras"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
         .select("id, codigo, nome, categoria, tipo, unidade, ncm, cst, preco_custo, fornecedor_id, cor_pastilha, modelo_pastilha, quantidade_compra, desconto_compra, status_compra, venda_vinculo_id, estoque_atual, estoque_minimo")
-        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data as Produto[];
     },
   });
+
+  const qtdNovaOrdemInputRef = useRef<HTMLInputElement | null>(null);
+  const produtoUrlAplicadoRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || produtos.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get("produtoId");
+    if (!pid || produtoUrlAplicadoRef.current === pid) return;
+    const prod = produtos.find((p) => p.id === pid);
+    if (!prod) return;
+
+    produtoUrlAplicadoRef.current = pid;
+    const fornId =
+      (prod.fornecedor_id && fornecedores.some((f) => f.id === prod.fornecedor_id)
+        ? prod.fornecedor_id
+        : null) ??
+      fornecedores[0]?.id ??
+      "";
+    setNovaOrdem((prev) => ({
+      ...prev,
+      fornecedor_id: fornId || prev.fornecedor_id,
+    }));
+    setNovoItem((prev) => ({
+      ...prev,
+      produto_id: prod.id,
+      valor_unitario: String(prod.preco_custo ?? 0),
+      cor: prod.cor_pastilha ?? "",
+      pastilha: prod.modelo_pastilha ?? "",
+    }));
+    setNovaOpen(true);
+    setTimeout(() => {
+      qtdNovaOrdemInputRef.current?.focus();
+      qtdNovaOrdemInputRef.current?.select();
+    }, 80);
+  }, [produtos, fornecedores]);
 
   const { data: creditoRegistro } = useQuery({
     queryKey: ["credito_fabricante"],
@@ -843,8 +1000,10 @@ function OrdensCompra() {
     const mapaOrdens = new Map<string, Ordem>();
     for (const o of ordens) mapaOrdens.set(o.id, o);
 
-    // Quantidade já comprada por par (produto_id, venda_id)
+    // Quantidade já comprada/finalizada por par (produto_id, venda_id)
     const qtdCompradaPorProdutoVenda = new Map<string, number>();
+    // Quantidade total em ordens de compra ativas por par (produto_id, venda_id)
+    const qtdComOCAtivaPorProdutoVenda = new Map<string, number>();
     // Quantidade total já comprada por produto_id
     const qtdTotalCompradaPorProduto = new Map<string, number>();
     // Conjunto de IDs de produtos com ordem gerada em ordens ativas (não-canceladas)
@@ -865,36 +1024,43 @@ function OrdensCompra() {
       const qtd = Number(it.quantidade ?? 1);
       produtosComOrdemGerada.add(it.produto_id);
 
-      if (
+      const ehFinalizada = Boolean(
         ordem &&
-        (ordem.status === "recebida" ||
-          ordem.status === "concluida" ||
-          ordem.status === "finalizada")
-      ) {
+          (ordem.status === "recebida" ||
+            ordem.status === "concluida" ||
+            ordem.status === "finalizada" ||
+            ordem.status === "entregue"),
+      );
+
+      if (ehFinalizada) {
         produtosFinalizados.add(it.produto_id);
       }
 
       // Itens já consolidados em carga/lote anterior
-      if (
+      const ehEmCarga = Boolean(
         it.carga_id ||
-        it.status_carga === "em_carga" ||
-        it.status_carga === "em_transito" ||
-        it.status_carga === "entregue" ||
-        (ordem as any)?.carga_id
-      ) {
+          it.status_carga === "em_carga" ||
+          it.status_carga === "em_transito" ||
+          it.status_carga === "entregue" ||
+          (ordem as any)?.carga_id,
+      );
+
+      if (ehEmCarga) {
         produtosEmCargasAnteriores.add(it.produto_id);
       }
 
-      if (
-        it.numero_nf ||
-        (ordem &&
-          (ordem.status === "faturada" ||
-            ordem.status === "entregue" ||
-            ordem.status === "concluida" ||
-            ordem.status === "recebida" ||
-            ordem.status === "comprado" ||
-            Boolean(ordem.faturada_em)))
-      ) {
+      const ehEfetivamenteComprado = Boolean(
+        ehFinalizada ||
+          ehEmCarga ||
+          it.numero_nf ||
+          (ordem &&
+            (ordem.status === "faturada" ||
+              ordem.status === "enviada" ||
+              ordem.status === "comprado" ||
+              Boolean(ordem.faturada_em))),
+      );
+
+      if (ehEfetivamenteComprado) {
         produtosFaturadosOuConcluidos.add(it.produto_id);
       }
 
@@ -908,13 +1074,26 @@ function OrdensCompra() {
           : null);
       if (vendaIdEfetiva) {
         const chave = `${it.produto_id}::${vendaIdEfetiva}`;
-        const ant = qtdCompradaPorProdutoVenda.get(chave) ?? 0;
-        qtdCompradaPorProdutoVenda.set(chave, ant + qtd);
+        const antOC = qtdComOCAtivaPorProdutoVenda.get(chave) ?? 0;
+        qtdComOCAtivaPorProdutoVenda.set(chave, antOC + qtd);
+
+        // Só abate da demanda pendente se a ordem já foi efetivamente comprada/em carga/faturada/concluída
+        // ou se foi uma ordem lançada manualmente na grade (não apenas pré-gerada automaticamente no pedido)
+        const ehGeradaManualmenteNaGrade = Boolean(
+          ordem?.observacoes?.includes("grade de produtos") ||
+            ordem?.observacoes?.includes("Central de Reposição"),
+        );
+
+        if (ehEfetivamenteComprado || ehGeradaManualmenteNaGrade) {
+          const ant = qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+          qtdCompradaPorProdutoVenda.set(chave, ant + qtd);
+        }
       }
     }
 
     return {
       qtdCompradaPorProdutoVenda,
+      qtdComOCAtivaPorProdutoVenda,
       qtdTotalCompradaPorProduto,
       produtosComOrdemGerada,
       produtosFaturadosOuConcluidos,
@@ -923,7 +1102,7 @@ function OrdensCompra() {
     };
   }, [itensTodos, ordens, vendasVinculo]);
 
-  /** Demanda consolidada PENDENTE: apenas pedidos de venda ativos que ainda NÃO tiveram ordem de compra gerada e que não foram entregues/instalados/concluídos. Desmembra combos de venda_kit automaticamente. */
+  /** Demanda consolidada PENDENTE: pedidos de venda ativos que ainda precisam ser comprados e que não foram entregues/instalados/concluídos. Desmembra combos de venda_kit automaticamente. */
   const demandaPorProduto = useMemo(() => {
     const mapa = new Map<
       string,
@@ -955,12 +1134,12 @@ function OrdensCompra() {
         continue;
       }
 
-      // Abate o que já teve Ordem de Compra gerada para esta venda específica
+      // Abate o que já foi efetivamente comprado para esta venda específica
       const chave = `${item.produto_id}::${item.venda_id}`;
       const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
       const quantidadePendente = Math.max(0, quantidadeTotal - jaComprado);
 
-      // Se já foi totalmente pedido/comprado, não há demanda pendente para esta venda
+      // Se já foi totalmente comprado, não há demanda pendente para esta venda
       if (quantidadePendente <= 0) continue;
 
       const atual = mapa.get(item.produto_id) ?? { total: 0, pedidos: [] };
@@ -1150,18 +1329,13 @@ function OrdensCompra() {
       const ehPiscina =
         categoria.includes("piscina") ||
         nome.includes("piscina") ||
+        (produto.codigo ?? "").toUpperCase().startsWith("SPL-") ||
         normalizar(produto.tipo ?? "").includes("casco");
 
       // 1. Prioridade: fornecedor direto cadastrado no produto
       if (produto.fornecedor_id) {
         const fDireto = fornecedoresCompletos.find((f) => f.id === produto.fornecedor_id);
         if (fDireto) {
-          const ehAnal = normalizar(fDireto.nome).includes("analandia") || normalizar(fDireto.nome).includes("analândia");
-          // Analândia é exclusivo de cascos de piscina; se o produto não for piscina, direciona obrigatoriamente para Progeu
-          if (ehAnal && !ehPiscina) {
-            const fProgeu = fornecedoresCompletos.find((f) => normalizar(f.nome).includes("progeu"));
-            return fProgeu ?? ({ id: "progeu", nome: "Progeu" } satisfies Fornecedor);
-          }
           return fDireto;
         }
       }
@@ -1172,63 +1346,88 @@ function OrdensCompra() {
         );
         return fSplash ?? ({ id: SEM_CLIENTE, nome: "Splash Jardim do Trevo" } satisfies Fornecedor);
       }
-      // 3. Fallback inteligente: Casco/Piscina -> Analândia, Demais -> Progeu
+      // 3. Fallback inteligente: Casco/Piscina -> Analandia Ind Piscinas, Demais -> Progeu
       const alvo = ehPiscina ? "analandia" : "progeu";
       const encontrado = fornecedoresCompletos.find((f) => normalizar(f.nome).includes(alvo));
       if (encontrado) return encontrado;
       return ehPiscina
-        ? ({ id: "analandia", nome: "Analândia" } satisfies Fornecedor)
+        ? ({ id: "analandia", nome: "Analandia Ind Piscinas" } satisfies Fornecedor)
         : ({ id: "progeu", nome: "Progeu" } satisfies Fornecedor);
     },
     [fornecedoresCompletos],
   );
 
-  /** Identifica se o produto já teve ordem de compra gerada ou já foi faturado/comprado ou está em lote anterior. */
+  /** Identifica se o produto já foi efetivamente comprado/faturado e não possui nova demanda pendente. */
   const ehProdutoJaCompradoOuFaturado = useCallback(
     (p: Produto) => {
-      const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
+      const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
+      const temVinculoManual = Boolean(
+        vinculosCompra[p.id]?.some((v) => v && v !== SEM_CLIENTE),
+      );
+
+      // Se existe demanda pendente de pedidos de venda ativos ou vínculo manual, NUNCA oculta como já comprado!
+      if (pendente > 0 || temVinculoManual) {
+        return false;
+      }
+
+      // Se o status manual na linha foi explicitamente marcado pelo usuário nesta sessão
+      const statusManual = statusCompra[p.id];
       if (
-        status === "comprado" ||
-        status === "faturada" ||
-        status === "concluida" ||
-        status === "recebida"
+        statusManual === "comprado" ||
+        statusManual === "faturada" ||
+        statusManual === "concluida" ||
+        statusManual === "recebida" ||
+        statusManual === "recebido"
       ) {
         return true;
       }
 
-      // Se já teve ordem de compra finalizada/recebida, oculta da visualização
-      if (itensCompradosInfo.produtosFinalizados.has(p.id)) {
+      // Se o produto possui vínculo direto com venda ativa ainda não comprada, mantém visível
+      if (p.venda_vinculo_id) {
+        const chave = `${p.id}::${p.venda_vinculo_id}`;
+        const jaCompradoVinculo = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+        const v = vendaPorId.get(p.venda_vinculo_id);
+        const st = (v?.status_pedido || "").toLowerCase().trim();
+        const vendaAtiva =
+          st !== "entregue" &&
+          st !== "instalado" &&
+          st !== "instalada" &&
+          st !== "concluido" &&
+          st !== "concluida" &&
+          st !== "cancelado" &&
+          st !== "cancelada" &&
+          st !== "orcamento";
+        if (vendaAtiva && jaCompradoVinculo === 0) {
+          return false;
+        }
+        if (jaCompradoVinculo > 0) {
+          return true;
+        }
+      }
+
+      const status = p.status_compra ?? "a_comprar";
+      if (
+        status === "comprado" ||
+        status === "faturada" ||
+        status === "concluida" ||
+        status === "recebida" ||
+        status === "recebido"
+      ) {
         return true;
       }
 
-      if (itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id)) {
-        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
-        if (pendente === 0) return true;
-      }
-
-      // Se já está consolidado em lote/carga anterior e não possui demanda pendente
-      if (itensCompradosInfo.produtosEmCargasAnteriores.has(p.id)) {
-        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
-        if (pendente === 0) return true;
-      }
-
-      // Se possui vínculo direto com venda e esse vínculo já teve OC gerada e não há mais demanda pendente
-      if (p.venda_vinculo_id) {
-        const chave = `${p.id}::${p.venda_vinculo_id}`;
-        const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
-        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
-        if (jaComprado > 0 && pendente === 0) return true;
-      }
-
-      // Se já teve ordem de compra gerada em ordem ativa e não possui demanda pendente
-      if (itensCompradosInfo.produtosComOrdemGerada.has(p.id)) {
-        const pendente = demandaPorProduto.get(p.id)?.total ?? 0;
-        if (pendente === 0) return true;
+      // Se já teve ordem de compra finalizada/faturada/em carga e não há demanda pendente
+      if (
+        itensCompradosInfo.produtosFinalizados.has(p.id) ||
+        itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id) ||
+        itensCompradosInfo.produtosEmCargasAnteriores.has(p.id)
+      ) {
+        return true;
       }
 
       return false;
     },
-    [statusCompra, itensCompradosInfo, demandaPorProduto],
+    [statusCompra, itensCompradosInfo, demandaPorProduto, vinculosCompra, vendaPorId],
   );
 
   const produtosFiltrados = useMemo(() => {
@@ -1243,24 +1442,22 @@ function OrdensCompra() {
       const jaComprado = ehProdutoJaCompradoOuFaturado(produto);
       const estaSelecionado = Boolean(selecionadosCompra[produto.id]);
 
-      // 1. Ocultar automaticamente itens já comprados, faturados ou em lotes anteriores
-      if (ocultarJaComprados && jaComprado && !estaSelecionado) {
-        return false;
-      }
-
-      // 2. Se o usuário ativamente marcou/selecionou este item, sempre exibe
+      // 1. Se o usuário ativamente marcou/selecionou este item, sempre exibe
       if (estaSelecionado) return true;
 
-      // 3. Verifica vínculo explícito ou demanda pendente de pedidos de venda ativos
+      // 2. Verifica vínculo explícito ou demanda pendente de pedidos de venda ativos
       const temDemandaPendente = (demandaPorProduto.get(produto.id)?.total ?? 0) > 0;
       const temVinculoManual = Boolean(
         vinculosCompra[produto.id]?.some((v) => v && v !== SEM_CLIENTE),
       );
       let temVinculoProduto = false;
-      if (produto.venda_vinculo_id && !jaComprado) {
+      if (produto.venda_vinculo_id) {
+        const chave = `${produto.id}::${produto.venda_vinculo_id}`;
+        const jaCompradoVinculo = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
         const v = vendaPorId.get(produto.venda_vinculo_id);
         const st = (v?.status_pedido || "").toLowerCase().trim();
         if (
+          jaCompradoVinculo === 0 &&
           st !== "entregue" &&
           st !== "instalado" &&
           st !== "instalada" &&
@@ -1277,8 +1474,21 @@ function OrdensCompra() {
       const estaExplicitamenteVinculado =
         temDemandaPendente || temVinculoManual || temVinculoProduto;
 
+      // 3. Ocultar automaticamente itens já comprados SOMENTE se não tiverem demanda pendente e não estivermos no catálogo completo
+      if (
+        ocultarJaComprados &&
+        jaComprado &&
+        !estaExplicitamenteVinculado &&
+        filtroExibicaoCatalogo !== "catalogo_completo"
+      ) {
+        return false;
+      }
+
       // 4. Se o usuário ativou o modo "Catálogo completo"
       if (filtroExibicaoCatalogo === "catalogo_completo") {
+        if (ocultarJaComprados && jaComprado && !estaExplicitamenteVinculado) {
+          return false;
+        }
         if (termoBusca) {
           const casaFornecedor = normalizar(forn?.nome ?? "").includes(termoBusca);
           const casaProduto =
@@ -1300,7 +1510,7 @@ function OrdensCompra() {
         return true;
       }
 
-      // 5. Padrão: "Apenas Vinculados / Demanda": nunca exibe o catálogo completo automaticamente
+      // 5. Padrão: "Apenas Vinculados / Demanda" + Itens que precisam de reposição de estoque
       if (termoBusca) {
         const casaProduto =
           normalizar(produto.nome).includes(termoBusca) ||
@@ -1323,6 +1533,16 @@ function OrdensCompra() {
         return false;
       }
 
+      const estoqueAtual = Number(produto.estoque_atual ?? 0);
+      const estoqueMinimo = Number(produto.estoque_minimo ?? 0);
+      const precisaReporEstoque =
+        (estoqueAtual <= 0 || (estoqueMinimo > 0 && estoqueAtual <= estoqueMinimo)) &&
+        !jaComprado;
+
+      if (filtroVinculo === "todos" || filtroVinculo === "sem_vinculo") {
+        return estaExplicitamenteVinculado || precisaReporEstoque;
+      }
+
       return estaExplicitamenteVinculado;
     });
   }, [
@@ -1336,7 +1556,9 @@ function OrdensCompra() {
     vinculosCompra,
     ocultarJaComprados,
     filtroExibicaoCatalogo,
+    filtroVinculo,
     ehProdutoJaCompradoOuFaturado,
+    itensCompradosInfo,
   ]);
 
   const quantidadeCompra = (produto: Produto) => {
@@ -1433,6 +1655,68 @@ function OrdensCompra() {
     );
   };
 
+  const chavesEmRascunho = useMemo(() => {
+    const s = new Set<string>();
+    for (const rascunho of Object.values(rascunhosOCPorFornecedor)) {
+      for (const it of rascunho?.itens ?? []) {
+        if (it?.key) s.add(it.key);
+      }
+    }
+    return s;
+  }, [rascunhosOCPorFornecedor]);
+
+  const vinculosDetalhadosDoProduto = useCallback(
+    (produto: Produto): VinculoFilaDetalhe[] => {
+      const brutos = vinculosDoProduto(produto);
+      const contadores = new Map<string, number>();
+      const vlrUnit = valorCompra(produto);
+      const descPct = percentualCompra(produto);
+      const vlrLiq = vlrUnit * (1 - descPct / 100);
+      const lista: VinculoFilaDetalhe[] = [];
+
+      brutos.forEach((vendaIdBruto, indiceOriginal) => {
+        const vendaId = vendaIdBruto && vendaIdBruto !== SEM_CLIENTE ? vendaIdBruto : "";
+        const chaveTipo = vendaId ? `venda::${vendaId}` : "estoque";
+        const ocorrencia = contadores.get(chaveTipo) ?? 0;
+        contadores.set(chaveTipo, ocorrencia + 1);
+        const key = `${produto.id}::${chaveTipo}::${ocorrencia}`;
+
+        // Se já foi transferido para a Ordem de Compra em aberto (rascunho), sai da fila pendente do card
+        if (chavesEmRascunho.has(key)) {
+          return;
+        }
+
+        const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
+        const comVinculo = Boolean(vendaId);
+        const clienteNome = comVinculo
+          ? (venda?.cliente_nome ?? "Cliente Vinculado")
+          : "Estoque Geral";
+        const pedidoNumero = comVinculo ? (venda?.numero ?? "Pedido") : null;
+        const rotulo = comVinculo
+          ? `${pedidoNumero} — ${clienteNome}`
+          : "Reposição de Estoque Geral";
+
+        lista.push({
+          key,
+          produto,
+          indiceOriginal,
+          vendaId,
+          pedidoNumero,
+          clienteId: venda?.cliente_id ?? null,
+          clienteNome,
+          rotulo,
+          comVinculo,
+          valorUnitario: vlrUnit,
+          descontoPercentual: descPct,
+          valorLiquido: vlrLiq,
+        });
+      });
+
+      return lista;
+    },
+    [vinculosDoProduto, valorCompra, percentualCompra, chavesEmRascunho, vendaPorId],
+  );
+
   type ItemVisaoFornecedor = {
     produto: Produto;
     fornecedor: Fornecedor;
@@ -1446,6 +1730,7 @@ function OrdensCompra() {
     desconto: number;
     totalItem: number;
     vinculos: string[];
+    vinculosDetalhados: VinculoFilaDetalhe[];
     comVinculoCount: number;
     semVinculoCount: number;
     temVinculo: boolean;
@@ -1461,52 +1746,55 @@ function OrdensCompra() {
     chave: string;
     nome: string;
     itens: ItemVisaoFornecedor[];
+    itensComVinculoConsolidados: LinhaConsolidadaFornecedor[];
+    itensSemVinculoConsolidados: LinhaConsolidadaFornecedor[];
     totalItens: number;
     totalUnidades: number;
+    totalUnidadesPendentesDinamico: number;
     totalValor: number;
     totalComVinculo: number;
     totalSemVinculo: number;
     totalDemandaPedidos: number;
+    pedidosDistintosCount: number;
     selecionadosQtd: number;
+    selecionadosVinculosQtd: number;
     todosSelecionados: boolean;
     totalValorSelecionados: number;
+    rascunho: RascunhoOCFornecedor | undefined;
+    totalUnidadesRascunho: number;
+    totalValorRascunho: number;
   };
 
   const dadosItensCompra = useMemo(() => {
     return produtosFiltrados.map((p): ItemVisaoFornecedor => {
       const fornecedor = fornecedorDaCompra(p) ?? { id: "outros", nome: "Outros Fornecedores" };
       const demanda = demandaPorProduto.get(p.id);
-      const totalDemanda = demanda?.total ?? 0;
       const estoqueAtual = Number(p.estoque_atual ?? 0);
       const estoqueMinimo = Number(p.estoque_minimo ?? 0);
       const estoqueZerado = estoqueAtual <= 0;
       const estoqueBaixo = estoqueAtual <= estoqueMinimo && estoqueMinimo > 0;
-      const quantidadeAComprar = quantidadeCompra(p);
+      const vinculosDetalhados = vinculosDetalhadosDoProduto(p);
+      const vinculos = vinculosDetalhados.map((v) => v.vendaId);
+      const quantidadeAComprar = vinculosDetalhados.length;
       const valorUnitario = valorCompra(p);
       const desconto = percentualCompra(p);
-      const totalItem = totalCompra(p);
-      const vinculos = vinculosDoProduto(p);
-      const comVinculoCount = vinculos.filter((v) => v && v !== SEM_CLIENTE).length;
-      const semVinculoCount = vinculos.filter((v) => !v || v === SEM_CLIENTE).length;
+      const totalItem = quantidadeAComprar * valorUnitario * (1 - desconto / 100);
+      const comVinculoCount = vinculosDetalhados.filter((v) => v.comVinculo).length;
+      const semVinculoCount = vinculosDetalhados.filter((v) => !v.comVinculo).length;
       const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
 
       const jaComprado = ehProdutoJaCompradoOuFaturado(p);
       const jaFaturado = itensCompradosInfo.produtosFaturadosOuConcluidos.has(p.id);
 
-      const temVinculo =
-        comVinculoCount > 0 ||
-        totalDemanda > 0 ||
-        Boolean(p.venda_vinculo_id && !jaComprado);
-      const temSemVinculo =
-        semVinculoCount > 0 || (!p.venda_vinculo_id && totalDemanda === 0);
+      const temVinculo = comVinculoCount > 0;
+      const temSemVinculo = semVinculoCount > 0;
 
       const precisaComprar =
-        totalDemanda > 0 ||
-        (Boolean(p.venda_vinculo_id) && !jaComprado) ||
-        Boolean(selecionadosCompra[p.id]) ||
-        Boolean(vinculosCompra[p.id]?.some((v) => v && v !== SEM_CLIENTE)) ||
-        (estoqueZerado && !jaComprado) ||
-        (estoqueBaixo && !jaComprado);
+        quantidadeAComprar > 0 &&
+        (comVinculoCount > 0 ||
+          Boolean(selecionadosCompra[p.id]) ||
+          (estoqueZerado && !jaComprado) ||
+          (estoqueBaixo && !jaComprado));
 
       return {
         produto: p,
@@ -1521,6 +1809,7 @@ function OrdensCompra() {
         desconto,
         totalItem,
         vinculos,
+        vinculosDetalhados,
         comVinculoCount,
         semVinculoCount,
         temVinculo,
@@ -1542,6 +1831,7 @@ function OrdensCompra() {
     statusCompra,
     selecionadosCompra,
     itensCompradosInfo,
+    vinculosDetalhadosDoProduto,
   ]);
 
   const totalJaCompradosOcultos = useMemo(() => {
@@ -1558,71 +1848,212 @@ function OrdensCompra() {
   }, [produtos, filtroFornecedor, fornecedorDaCompra, ehProdutoJaCompradoOuFaturado, selecionadosCompra]);
 
   const contagensFiltroVinculo = useMemo(() => {
+    const exibirTodosCatalogo =
+      Boolean(buscaFornecedor.trim()) || filtroExibicaoCatalogo === "catalogo_completo";
     const base = dadosItensCompra.filter((item) =>
-      filtroNecessidade === "precisa_comprar" ? item.precisaComprar : true,
+      item.quantidadeAComprar > 0 &&
+      (!exibirTodosCatalogo && filtroNecessidade === "precisa_comprar"
+        ? item.precisaComprar
+        : true),
     );
     return {
       todos: base.length,
       comVinculo: base.filter((i) => i.temVinculo).length,
       semVinculo: base.filter((i) => i.temSemVinculo).length,
     };
-  }, [dadosItensCompra, filtroNecessidade]);
+  }, [dadosItensCompra, filtroNecessidade, buscaFornecedor, filtroExibicaoCatalogo]);
 
   const itensVisaoFiltrados = useMemo(() => {
+    const exibirTodosCatalogo =
+      Boolean(buscaFornecedor.trim()) || filtroExibicaoCatalogo === "catalogo_completo";
     return dadosItensCompra.filter((item) => {
-      if (filtroNecessidade === "precisa_comprar" && !item.precisaComprar) {
+      if (item.quantidadeAComprar <= 0) return false;
+      if (
+        !exibirTodosCatalogo &&
+        filtroNecessidade === "precisa_comprar" &&
+        !item.precisaComprar
+      ) {
         return false;
       }
-      if (filtroVinculo === "com_vinculo" && !item.temVinculo) {
-        return false;
-      }
-      if (filtroVinculo === "sem_vinculo" && !item.temSemVinculo) {
-        return false;
+      if (!Boolean(buscaFornecedor.trim())) {
+        if (filtroVinculo === "com_vinculo" && !item.temVinculo) {
+          return false;
+        }
+        if (filtroVinculo === "sem_vinculo" && !item.temSemVinculo) {
+          return false;
+        }
       }
       return true;
     });
-  }, [dadosItensCompra, filtroNecessidade, filtroVinculo]);
+  }, [dadosItensCompra, filtroNecessidade, filtroVinculo, buscaFornecedor, filtroExibicaoCatalogo]);
 
   const gruposVisaoFornecedor = useMemo(() => {
     const mapa = new Map<string, GrupoVisaoFornecedor>();
 
-    for (const item of itensVisaoFiltrados) {
-      const chave = item.fornecedor.id || "sem-fornecedor";
-      const grupo =
-        mapa.get(chave) ??
-        {
-          fornecedor: item.fornecedor,
+    const garantirGrupo = (forn: Fornecedor) => {
+      const chave = forn.id || "sem-fornecedor";
+      let grupo = mapa.get(chave);
+      if (!grupo) {
+        const rascunho = rascunhosOCPorFornecedor[chave];
+        const totalUnidadesRascunho = (rascunho?.itens ?? []).reduce(
+          (s, it) => s + Number(it.quantidade || 1),
+          0,
+        );
+        const totalValorRascunho = (rascunho?.itens ?? []).reduce(
+          (s, it) =>
+            s +
+            Number(it.quantidade || 1) *
+              Number(it.valorUnitario || 0) *
+              (1 - Number(it.descontoPercentual || 0) / 100),
+          0,
+        );
+        grupo = {
+          fornecedor: forn,
           chave,
-          nome: item.fornecedor.nome,
+          nome: forn.nome,
           itens: [],
+          itensComVinculoConsolidados: [],
+          itensSemVinculoConsolidados: [],
           totalItens: 0,
           totalUnidades: 0,
+          totalUnidadesPendentesDinamico: 0,
           totalValor: 0,
           totalComVinculo: 0,
           totalSemVinculo: 0,
           totalDemandaPedidos: 0,
+          pedidosDistintosCount: 0,
           selecionadosQtd: 0,
+          selecionadosVinculosQtd: 0,
           todosSelecionados: false,
           totalValorSelecionados: 0,
+          rascunho,
+          totalUnidadesRascunho,
+          totalValorRascunho,
         };
-
-      grupo.itens.push(item);
-      grupo.totalItens += 1;
-      grupo.totalUnidades += item.quantidadeAComprar;
-      grupo.totalValor += item.totalItem;
-      grupo.totalComVinculo += item.comVinculoCount;
-      grupo.totalSemVinculo += item.semVinculoCount;
-      grupo.totalDemandaPedidos += item.demanda?.total ?? 0;
-      if (selecionadosCompra[item.produto.id]) {
-        grupo.selecionadosQtd += 1;
-        grupo.totalValorSelecionados += item.totalItem;
+        mapa.set(chave, grupo);
       }
-      mapa.set(chave, grupo);
+      return grupo;
+    };
+
+    for (const item of itensVisaoFiltrados) {
+      const grupo = garantirGrupo(item.fornecedor);
+      grupo.itens.push(item);
     }
+
+    // Também garante que fornecedores com rascunho ativo apareçam nos cards
+    for (const [chave, rascunho] of Object.entries(rascunhosOCPorFornecedor)) {
+      if ((rascunho?.itens?.length ?? 0) > 0 && !mapa.has(chave)) {
+        if (filtroFornecedor === "todos" || filtroFornecedor === chave) {
+          garantirGrupo({ id: rascunho.fornecedorId || chave, nome: rascunho.fornecedorNome });
+        }
+      }
+    }
+
+    const montarLinhaConsolidada = (
+      fornecedorChave: string,
+      tipo: "vinculo" | "estoque",
+      chaveNorm: string,
+      produtoPrincipal: Produto,
+      vinculos: VinculoFilaDetalhe[],
+    ): LinhaConsolidadaFornecedor => {
+      const totalFila = vinculos.length;
+      const selecionadosCount = vinculos.filter((v) => vinculosKeysSelecionados[v.key] === true).length;
+      const pendenteDinamico = Math.max(0, totalFila - selecionadosCount);
+      const valorUnitario = valorCompra(produtoPrincipal);
+      const descontoPercentual = percentualCompra(produtoPrincipal);
+      const vlrLiquidoUnit = valorUnitario * (1 - descontoPercentual / 100);
+      const estoqueAtual = Number(produtoPrincipal.estoque_atual ?? 0);
+      const estoqueMinimo = Number(produtoPrincipal.estoque_minimo ?? 0);
+
+      return {
+        chaveLinha: `${fornecedorChave}::${tipo}::${chaveNorm}`,
+        fornecedorChave,
+        produtoPrincipal,
+        nome: produtoPrincipal.nome,
+        codigo: produtoPrincipal.codigo,
+        categoria: produtoPrincipal.categoria,
+        unidade: produtoPrincipal.unidade || "UN",
+        comVinculo: tipo === "vinculo",
+        vinculos,
+        totalFila,
+        selecionadosCount,
+        pendenteDinamico,
+        todosMarcados: totalFila > 0 && selecionadosCount === totalFila,
+        algumMarcado: selecionadosCount > 0,
+        valorUnitario,
+        descontoPercentual,
+        totalValorPendente: pendenteDinamico * vlrLiquidoUnit,
+        totalValorSelecionado: selecionadosCount * vlrLiquidoUnit,
+        estoqueAtual,
+        estoqueMinimo,
+        estoqueZerado: estoqueAtual <= 0,
+        estoqueBaixo: estoqueMinimo > 0 && estoqueAtual <= estoqueMinimo,
+      };
+    };
 
     const lista = Array.from(mapa.values());
     for (const g of lista) {
-      g.todosSelecionados = g.itens.length > 0 && g.selecionadosQtd === g.itens.length;
+      const mapaComVinculo = new Map<string, { prod: Produto; vincs: VinculoFilaDetalhe[] }>();
+      const mapaSemVinculo = new Map<string, { prod: Produto; vincs: VinculoFilaDetalhe[] }>();
+      const pedidosSet = new Set<string>();
+
+      for (const item of g.itens) {
+        const chaveProd = normalizar(item.produto.nome.trim()) || item.produto.id;
+        const vincsCom = item.vinculosDetalhados.filter((v) => v.comVinculo);
+        const vincsSem = item.vinculosDetalhados.filter((v) => !v.comVinculo);
+
+        for (const v of vincsCom) {
+          if (v.vendaId) pedidosSet.add(v.vendaId);
+        }
+
+        if (vincsCom.length > 0 && filtroVinculo !== "sem_vinculo") {
+          const atual = mapaComVinculo.get(chaveProd) ?? { prod: item.produto, vincs: [] };
+          atual.vincs.push(...vincsCom);
+          mapaComVinculo.set(chaveProd, atual);
+        }
+
+        if (vincsSem.length > 0 && filtroVinculo !== "com_vinculo") {
+          const atual = mapaSemVinculo.get(chaveProd) ?? { prod: item.produto, vincs: [] };
+          atual.vincs.push(...vincsSem);
+          mapaSemVinculo.set(chaveProd, atual);
+        }
+      }
+
+      g.itensComVinculoConsolidados = Array.from(mapaComVinculo.entries())
+        .map(([chaveNorm, { prod, vincs }]) =>
+          montarLinhaConsolidada(g.chave, "vinculo", chaveNorm, prod, vincs),
+        )
+        .sort((a, b) => b.totalFila - a.totalFila || a.nome.localeCompare(b.nome));
+
+      g.itensSemVinculoConsolidados = Array.from(mapaSemVinculo.entries())
+        .map(([chaveNorm, { prod, vincs }]) =>
+          montarLinhaConsolidada(g.chave, "estoque", chaveNorm, prod, vincs),
+        )
+        .sort((a, b) => b.totalFila - a.totalFila || a.nome.localeCompare(b.nome));
+
+      const todasLinhas = [
+        ...g.itensComVinculoConsolidados,
+        ...g.itensSemVinculoConsolidados,
+      ];
+
+      g.totalItens = todasLinhas.length;
+      g.totalComVinculo = g.itensComVinculoConsolidados.reduce((s, l) => s + l.totalFila, 0);
+      g.totalSemVinculo = g.itensSemVinculoConsolidados.reduce((s, l) => s + l.totalFila, 0);
+      g.totalUnidades = g.totalComVinculo + g.totalSemVinculo;
+      g.totalUnidadesPendentesDinamico = todasLinhas.reduce((s, l) => s + l.pendenteDinamico, 0);
+      g.totalValor = todasLinhas.reduce(
+        (s, l) =>
+          s + l.totalFila * l.valorUnitario * (1 - l.descontoPercentual / 100),
+        0,
+      );
+      g.totalDemandaPedidos = g.totalComVinculo;
+      g.pedidosDistintosCount = pedidosSet.size;
+      g.selecionadosQtd = todasLinhas.filter((l) => l.algumMarcado).length;
+      g.selecionadosVinculosQtd = todasLinhas.reduce((s, l) => s + l.selecionadosCount, 0);
+      g.totalValorSelecionados = todasLinhas.reduce((s, l) => s + l.totalValorSelecionado, 0);
+      g.todosSelecionados =
+        g.totalUnidades > 0 && g.selecionadosVinculosQtd === g.totalUnidades;
+
       g.itens.sort((a, b) => {
         if (a.temVinculo !== b.temVinculo) return a.temVinculo ? -1 : 1;
         if ((b.demanda?.total ?? 0) !== (a.demanda?.total ?? 0)) {
@@ -1633,7 +2064,15 @@ function OrdensCompra() {
     }
 
     return lista.sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [itensVisaoFiltrados, selecionadosCompra]);
+  }, [
+    itensVisaoFiltrados,
+    rascunhosOCPorFornecedor,
+    filtroFornecedor,
+    filtroVinculo,
+    vinculosKeysSelecionados,
+    valorCompra,
+    percentualCompra,
+  ]);
 
   const resumoGeralCompra = useMemo(() => {
     let totalValor = 0;
@@ -1642,14 +2081,18 @@ function OrdensCompra() {
     let totalComVinculo = 0;
     let totalSemVinculo = 0;
     let totalFornecedoresComItens = 0;
+    let totalSelecionadosVinculos = 0;
+    let totalValorSelecionadosVinculos = 0;
 
     for (const g of gruposVisaoFornecedor) {
-      if (g.itens.length > 0) totalFornecedoresComItens++;
+      if (g.totalItens > 0 || g.totalUnidadesRascunho > 0) totalFornecedoresComItens++;
       totalValor += g.totalValor;
       totalUnidades += g.totalUnidades;
       totalProdutos += g.totalItens;
       totalComVinculo += g.totalComVinculo;
       totalSemVinculo += g.totalSemVinculo;
+      totalSelecionadosVinculos += g.selecionadosVinculosQtd;
+      totalValorSelecionadosVinculos += g.totalValorSelecionados;
     }
 
     return {
@@ -1659,8 +2102,34 @@ function OrdensCompra() {
       totalComVinculo,
       totalSemVinculo,
       totalFornecedoresComItens,
+      totalSelecionadosVinculos,
+      totalValorSelecionadosVinculos,
     };
   }, [gruposVisaoFornecedor]);
+
+  const alternarSelecaoVinculoKey = useCallback((key: string) => {
+    setVinculosKeysSelecionados((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  }, []);
+
+  const alternarSelecaoLinhaConsolidada = useCallback(
+    (linha: LinhaConsolidadaFornecedor, marcar: boolean) => {
+      setVinculosKeysSelecionados((prev) => {
+        const proximo = { ...prev };
+        for (const v of linha.vinculos) {
+          if (marcar) {
+            proximo[v.key] = true;
+          } else {
+            delete proximo[v.key];
+          }
+        }
+        return proximo;
+      });
+    },
+    [],
+  );
 
   const alternarRecolhimentoFornecedor = (chave: string) => {
     setFornecedoresRecolhidos((atual) => ({
@@ -1674,68 +2143,469 @@ function OrdensCompra() {
       const mapa: Record<string, boolean> = {};
       for (const g of gruposVisaoFornecedor) mapa[g.chave] = true;
       setFornecedoresRecolhidos(mapa);
+      setFornecedorCardAberto(null);
     } else {
       setFornecedoresRecolhidos({});
+      if (gruposVisaoFornecedor[0]) {
+        setFornecedorCardAberto(gruposVisaoFornecedor[0].chave);
+      }
     }
   };
 
   const alternarSelecaoGrupoFornecedor = (grupo: GrupoVisaoFornecedor) => {
     const marcar = !grupo.todosSelecionados;
-    setSelecionadosCompra((atual) => {
+    const todasLinhas = [
+      ...grupo.itensComVinculoConsolidados,
+      ...grupo.itensSemVinculoConsolidados,
+    ];
+    setVinculosKeysSelecionados((atual) => {
       const proximo = { ...atual };
-      for (const item of grupo.itens) {
-        if (marcar) {
-          proximo[item.produto.id] = true;
-        } else {
-          delete proximo[item.produto.id];
-        }
-      }
-      return proximo;
-    });
-    setVinculosSelecionadosCompra((atual) => {
-      const proximo = { ...atual };
-      for (const item of grupo.itens) {
-        if (marcar) {
-          proximo[item.produto.id] = Object.fromEntries(
-            item.vinculos.map((_, idx) => [idx, true]),
-          );
-        } else {
-          delete proximo[item.produto.id];
+      for (const linha of todasLinhas) {
+        for (const v of linha.vinculos) {
+          if (marcar) {
+            proximo[v.key] = true;
+          } else {
+            delete proximo[v.key];
+          }
         }
       }
       return proximo;
     });
   };
 
-  const comprarItensDoFornecedor = (grupo: GrupoVisaoFornecedor) => {
-    const itensSelecionados = grupo.itens.filter((i) => selecionadosCompra[i.produto.id]);
-    const itensAlvo = itensSelecionados.length > 0 ? itensSelecionados : grupo.itens;
+  /**
+   * Ação "Selecionar Itens":
+   * Remove os vínculos/produtos marcados da fila de pendências do card e os transfere
+   * para a tela/gaveta da Ordem de Compra em aberto (rascunho) deste fornecedor.
+   */
+  const transferirItensSelecionadosParaOC = (grupo: GrupoVisaoFornecedor) => {
+    const todasLinhas = [
+      ...grupo.itensComVinculoConsolidados,
+      ...grupo.itensSemVinculoConsolidados,
+    ];
+    const vinculosMarcados = todasLinhas.flatMap((l) =>
+      l.vinculos.filter((v) => vinculosKeysSelecionados[v.key] === true),
+    );
 
-    if (itensAlvo.length === 0) {
-      toast.error(`Nenhum produto deste fornecedor para comprar`);
+    if (vinculosMarcados.length === 0) {
+      if ((grupo.rascunho?.itens.length ?? 0) > 0) {
+        setGavetaOCFornecedorChave(grupo.chave);
+        return;
+      }
+      toast.error(
+        "Selecione ao menos um vínculo ou produto marcando os checkboxes antes de clicar em Selecionar Itens.",
+      );
       return;
     }
 
-    const novoMapa: Record<string, boolean> = {};
-    const novoMapaVinculos: Record<string, Record<number, boolean>> = {};
-    for (const i of itensAlvo) {
-      novoMapa[i.produto.id] = true;
-      const vincs = i.vinculos;
-      const vincAtual = vinculosSelecionadosCompra[i.produto.id];
-      if (vincAtual && Object.values(vincAtual).some(Boolean)) {
-        novoMapaVinculos[i.produto.id] = vincAtual;
-      } else {
-        novoMapaVinculos[i.produto.id] = Object.fromEntries(vincs.map((_, idx) => [idx, true]));
-      }
-    }
-    setSelecionadosCompra(novoMapa);
-    setVinculosSelecionadosCompra(novoMapaVinculos);
-    setSelecionadosExecutados({});
+    const novosItensRascunho: ItemRascunhoOC[] = vinculosMarcados.map((v) => ({
+      key: v.key,
+      produtoId: v.produto.id,
+      codigo: v.produto.codigo,
+      descricao: v.produto.nome,
+      unidade: v.produto.unidade || "UN",
+      ncm: v.produto.ncm,
+      cst: v.produto.cst,
+      cor: coresCompra[v.produto.id] ?? v.produto.cor_pastilha ?? null,
+      pastilha: modelosCompra[v.produto.id] ?? v.produto.modelo_pastilha ?? null,
+      vendaId: v.vendaId || null,
+      pedidoNumero: v.pedidoNumero,
+      clienteId: v.clienteId,
+      clienteNome: v.comVinculo ? v.clienteNome : null,
+      comVinculo: v.comVinculo,
+      quantidade: 1,
+      valorUnitario: valorCompra(v.produto),
+      descontoPercentual: percentualCompra(v.produto),
+    }));
 
-    toast.info(`Iniciando ordem de compra para ${grupo.nome} (${itensAlvo.length} itens)...`);
-    setTimeout(() => {
-      comprarSelecionados.mutate();
-    }, 100);
+    setRascunhosOCPorFornecedor((prev) => {
+      const existente = prev[grupo.chave];
+      const chavesExistentes = new Set((existente?.itens ?? []).map((i) => i.key));
+      const itensMesclados = [
+        ...(existente?.itens ?? []),
+        ...novosItensRascunho.filter((novo) => !chavesExistentes.has(novo.key)),
+      ];
+      return {
+        ...prev,
+        [grupo.chave]: {
+          fornecedorChave: grupo.chave,
+          fornecedorId: grupo.fornecedor.id,
+          fornecedorNome: grupo.nome,
+          previsaoEntrega: existente?.previsaoEntrega ?? "",
+          condicoes: existente?.condicoes ?? "",
+          formaPagamento: existente?.formaPagamento ?? "Boleto",
+          vencimentoFinanceiro: existente?.vencimentoFinanceiro ?? hojeISO(),
+          observacoes: existente?.observacoes ?? "",
+          itens: itensMesclados,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+
+    // Limpa os checkboxes dos vínculos que acabaram de ser transferidos
+    setVinculosKeysSelecionados((prev) => {
+      const proximo = { ...prev };
+      for (const v of vinculosMarcados) {
+        delete proximo[v.key];
+      }
+      return proximo;
+    });
+
+    toast.success(
+      `${novosItensRascunho.length} vínculo(s)/item(ns) transferido(s) para a Ordem de Compra em aberto de ${grupo.nome}.`,
+    );
+    setGavetaOCFornecedorChave(grupo.chave);
+  };
+
+  const removerVinculoDoRascunhoOC = (fornecedorChave: string, itemKey: string) => {
+    setRascunhosOCPorFornecedor((prev) => {
+      const atual = prev[fornecedorChave];
+      if (!atual) return prev;
+      const novosItens = atual.itens.filter((i) => i.key !== itemKey);
+      if (novosItens.length === 0) {
+        const copia = { ...prev };
+        delete copia[fornecedorChave];
+        return copia;
+      }
+      return {
+        ...prev,
+        [fornecedorChave]: {
+          ...atual,
+          itens: novosItens,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+    toast.info("Item devolvido para a fila de pendências do fornecedor.");
+  };
+
+  const atualizarMetadadosRascunhoOC = (
+    fornecedorChave: string,
+    campos: Partial<Omit<RascunhoOCFornecedor, "itens" | "fornecedorChave">>,
+  ) => {
+    setRascunhosOCPorFornecedor((prev) => {
+      const atual = prev[fornecedorChave];
+      if (!atual) return prev;
+      return {
+        ...prev,
+        [fornecedorChave]: {
+          ...atual,
+          ...campos,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+  };
+
+  const atualizarPrecoDescontoRascunhoOC = (
+    fornecedorChave: string,
+    produtoId: string,
+    campo: "valorUnitario" | "descontoPercentual",
+    valorNumerico: number,
+  ) => {
+    setRascunhosOCPorFornecedor((prev) => {
+      const atual = prev[fornecedorChave];
+      if (!atual) return prev;
+      return {
+        ...prev,
+        [fornecedorChave]: {
+          ...atual,
+          itens: atual.itens.map((it) =>
+            it.produtoId === produtoId ? { ...it, [campo]: valorNumerico } : it,
+          ),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+    if (campo === "valorUnitario") {
+      setValoresCompra((p) => ({ ...p, [produtoId]: String(valorNumerico) }));
+      salvarAutomaticamente(produtoId, "preco_custo", valorNumerico);
+    } else {
+      setPercentuaisCompra((p) => ({ ...p, [produtoId]: String(valorNumerico) }));
+      salvarAutomaticamente(produtoId, "desconto_compra", valorNumerico);
+    }
+  };
+
+  /**
+   * Ação "Fechar Compra":
+   * Finaliza a Ordem de Compra em aberto do fornecedor, gera os registros financeiros/cobrança
+   * no sistema (Contas a Pagar) e remove em definitivo os itens processados da lista de pendências.
+   */
+  const fecharCompraRascunhoOC = useMutation({
+    mutationFn: async (fornecedorChave: string) => {
+      const rascunho = rascunhosOCPorFornecedor[fornecedorChave];
+      if (!rascunho || rascunho.itens.length === 0) {
+        throw new Error("A Ordem de Compra está vazia. Adicione itens antes de fechar a compra.");
+      }
+
+      const { data: auth } = await supabase.auth.getUser();
+      const { data: existentes, error: erroNumeros } = await supabase
+        .from("ordens_compra")
+        .select("numero");
+      if (erroNumeros) throw erroNumeros;
+      const numeros = (existentes ?? []).map((o) => o.numero);
+
+      // Identifica o ID real do fornecedor na tabela fornecedores (caso exista)
+      const fornecedorCadastrado =
+        fornecedores.find((f) => f.id === rascunho.fornecedorId) ??
+        fornecedores.find((f) => normalizar(f.nome) === normalizar(rascunho.fornecedorNome));
+      const fornecedorIdReal = fornecedorCadastrado?.id ?? null;
+
+      // Remove eventuais itens pré-gerados automaticamente (ainda não comprados) para evitar duplicidade
+      const ordensPreGeradasAfetadas = new Set<string>();
+      const mapaOrdens = new Map(ordens.map((o) => [o.id, o]));
+      for (const itemRascunho of rascunho.itens) {
+        if (!itemRascunho.vendaId) continue;
+        const candidatoPreGerado = itensTodos.find((it) => {
+          if (it.produto_id !== itemRascunho.produtoId || it.venda_id !== itemRascunho.vendaId) {
+            return false;
+          }
+          const ord = mapaOrdens.get(it.ordem_id);
+          if (!ord || ord.status !== "pendente") return false;
+          const ehConfirmada = Boolean(
+            ord.observacoes?.includes("grade de produtos") ||
+              ord.observacoes?.includes("Central de Reposição") ||
+              ord.observacoes?.includes("Compra fechada"),
+          );
+          return !ehConfirmada && !it.carga_id && !it.numero_nf;
+        });
+        if (candidatoPreGerado) {
+          ordensPreGeradasAfetadas.add(candidatoPreGerado.ordem_id);
+          await supabase.from("ordem_compra_itens").delete().eq("id", candidatoPreGerado.id);
+        }
+      }
+
+      for (const ordId of ordensPreGeradasAfetadas) {
+        const { data: rest } = await supabase
+          .from("ordem_compra_itens")
+          .select("id, total")
+          .eq("ordem_id", ordId);
+        if (!rest || rest.length === 0) {
+          await supabase.from("ordens_compra").delete().eq("id", ordId);
+        } else {
+          const somaRest = rest.reduce((s, r) => s + Number(r.total || 0), 0);
+          await supabase
+            .from("ordens_compra")
+            .update({
+              valor_produtos: somaRest,
+              valor_total: somaRest,
+              icms_base: somaRest,
+              icms_valor: somaRest * 0.18,
+            })
+            .eq("id", ordId);
+        }
+      }
+
+      const numero = proximoCodigo("OC", numeros);
+      const valorProdutos = rascunho.itens.reduce(
+        (s, it) =>
+          s +
+          Number(it.quantidade || 1) *
+            Number(it.valorUnitario || 0) *
+            (1 - Number(it.descontoPercentual || 0) / 100),
+        0,
+      );
+      const creditoAplicar = usarCreditoFabricante
+        ? Math.min(Math.max(Number(creditoFabricante) || 0, 0), valorProdutos)
+        : 0;
+      const valorTotal = Math.max(0, valorProdutos - creditoAplicar);
+      const condicoesTexto = [rascunho.formaPagamento, rascunho.condicoes?.trim()]
+        .filter(Boolean)
+        .join(" · ");
+
+      const { data: ordemCriada, error: erroOrdem } = await supabase
+        .from("ordens_compra")
+        .insert({
+          numero,
+          fornecedor_id: fornecedorIdReal,
+          fornecedor_nome: rascunho.fornecedorNome,
+          data_pedido: hojeISO(),
+          previsao_entrega: rascunho.previsaoEntrega || null,
+          condicoes: condicoesTexto || null,
+          valor_produtos: valorProdutos,
+          desconto: creditoAplicar,
+          icms_base: valorProdutos,
+          icms_valor: valorProdutos * 0.18,
+          icms_st_base: 0,
+          icms_st_valor: 0,
+          valor_total: valorTotal,
+          status: "comprado",
+          status_carga: "pendente_carga",
+          faturada_em: new Date().toISOString(),
+          observacoes: [
+            rascunho.observacoes?.trim(),
+            "Compra fechada na Gestão de Compras | grade de produtos",
+            creditoAplicar > 0 ? `Crédito fabricante abatido: ${brl(creditoAplicar)}` : null,
+          ]
+            .filter(Boolean)
+            .join(" | "),
+          created_by: auth.user?.id ?? null,
+        })
+        .select("*")
+        .single();
+      if (erroOrdem) throw erroOrdem;
+
+      const payloadItens = rascunho.itens.map((it) => {
+        const descValor =
+          Number(it.quantidade || 1) *
+          Number(it.valorUnitario || 0) *
+          (Number(it.descontoPercentual || 0) / 100);
+        const totalItem =
+          Number(it.quantidade || 1) * Number(it.valorUnitario || 0) - descValor;
+        return {
+          ordem_id: ordemCriada.id,
+          produto_id: it.produtoId,
+          codigo: it.codigo,
+          descricao: it.descricao,
+          ncm: it.ncm,
+          cst: it.cst,
+          unidade: it.unidade,
+          quantidade: Number(it.quantidade || 1),
+          valor_unitario: Number(it.valorUnitario || 0),
+          desconto: descValor,
+          total: totalItem,
+          cliente_id: it.clienteId,
+          cliente_nome: it.clienteNome,
+          venda_id: it.vendaId,
+          cor: it.cor,
+          pastilha: it.pastilha,
+          status_carga: "pendente_carga",
+        };
+      });
+
+      const { error: erroItens } = await supabase
+        .from("ordem_compra_itens")
+        .insert(payloadItens);
+      if (erroItens) throw erroItens;
+
+      // Gera / atualiza registro financeiro/cobrança no Contas a Pagar
+      const vencimento = rascunho.vencimentoFinanceiro || rascunho.previsaoEntrega || hojeISO();
+      const { data: existentesConta } = await supabase
+        .from("contas")
+        .select("id")
+        .eq("ordem_compra_id" as never, ordemCriada.id as never)
+        .is("ordem_pagamento_id" as never, null);
+      const tituloId = (existentesConta?.[0] as { id?: string } | undefined)?.id;
+      const dadosConta = {
+        tipo: "pagar",
+        descricao: `Ordem de compra ${numero} - ${rascunho.fornecedorNome}`,
+        parceiro: rascunho.fornecedorNome,
+        categoria: "Compras",
+        valor: valorTotal,
+        vencimento,
+        numero_documento: numero,
+        observacoes:
+          [rascunho.formaPagamento, rascunho.condicoes?.trim(), rascunho.observacoes?.trim()]
+            .filter(Boolean)
+            .join(" - ") || "Cobrança gerada ao fechar Ordem de Compra",
+        ordem_compra_id: ordemCriada.id,
+        created_by: auth.user?.id ?? null,
+        saldo_gerenciado_externamente: true,
+      };
+      if (tituloId) {
+        await supabase.from("contas").update(dadosConta as never).eq("id", tituloId);
+      } else {
+        await supabase.from("contas").insert({ ...dadosConta, status: "aberto" } as never);
+      }
+
+      // Atualiza status_compra / quantidade_compra dos produtos processados para removê-los em definitivo da fila pendente
+      const grupoAtual = gruposVisaoFornecedor.find((g) => g.chave === fornecedorChave);
+      const produtosDistintosIds = Array.from(new Set(rascunho.itens.map((i) => i.produtoId)));
+      for (const pid of produtosDistintosIds) {
+        const restantesNoCard =
+          grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados.length ?? 0;
+        if (restantesNoCard <= 0) {
+          await supabase
+            .from("produtos")
+            .update({ status_compra: "comprado", venda_vinculo_id: null } as never)
+            .eq("id", pid);
+        } else {
+          await supabase
+            .from("produtos")
+            .update({ quantidade_compra: restantesNoCard } as never)
+            .eq("id", pid);
+        }
+      }
+
+      return {
+        ordemCriada: ordemCriada as Ordem,
+        fornecedorChave,
+        produtosDistintosIds,
+        creditoAplicar,
+      };
+    },
+    onSuccess: async ({ ordemCriada, fornecedorChave, produtosDistintosIds, creditoAplicar }) => {
+      toast.success(
+        `Ordem de Compra ${ordemCriada.numero} fechada com sucesso! Cobrança financeira registrada em Contas a Pagar.`,
+      );
+
+      if (creditoAplicar > 0) {
+        salvarCreditoDisponivel.mutate(Math.max(0, creditoDisponivelValor - creditoAplicar));
+        setCreditoDisponivelInput(null);
+        setCreditoFabricante("");
+        setUsarCreditoFabricante(false);
+      }
+
+      // Atualiza estados locais dos produtos cujas filas zeraram
+      const grupoAtual = gruposVisaoFornecedor.find((g) => g.chave === fornecedorChave);
+      setStatusCompra((prev) => {
+        const proximo = { ...prev };
+        for (const pid of produtosDistintosIds) {
+          const rest =
+            grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados.length ?? 0;
+          if (rest <= 0) proximo[pid] = "comprado";
+        }
+        return proximo;
+      });
+      setQuantidadesCompra((prev) => {
+        const proximo = { ...prev };
+        for (const pid of produtosDistintosIds) {
+          const rest =
+            grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados.length ?? 0;
+          if (rest > 0) proximo[pid] = String(rest);
+          else delete proximo[pid];
+        }
+        return proximo;
+      });
+      setVinculosCompra((prev) => {
+        const proximo = { ...prev };
+        for (const pid of produtosDistintosIds) {
+          const restVincs =
+            grupoAtual?.itens
+              .find((i) => i.produto.id === pid)
+              ?.vinculosDetalhados.map((v) => v.vendaId) ?? [];
+          if (restVincs.length > 0) proximo[pid] = restVincs;
+          else delete proximo[pid];
+        }
+        return proximo;
+      });
+
+      // Remove o rascunho finalizado
+      setRascunhosOCPorFornecedor((prev) => {
+        const copia = { ...prev };
+        delete copia[fornecedorChave];
+        return copia;
+      });
+      setGavetaOCFornecedorChave(null);
+
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["ordens_compra"] }),
+        qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] }),
+        qc.invalidateQueries({ queryKey: ["contas"] }),
+        qc.invalidateQueries({ queryKey: ["venda_itens", "consumo-compras"] }),
+        qc.invalidateQueries({ queryKey: ["venda_kit", "consumo-compras"] }),
+        qc.invalidateQueries({ queryKey: ["produtos"] }),
+        qc.invalidateQueries({ queryKey: ["produtos", "catalogo-compras"] }),
+      ]);
+
+      setModoEdicao(false);
+      setDetalheId(ordemCriada.id);
+    },
+    onError: (erro: Error) => toast.error(erro.message),
+  });
+
+  const comprarItensDoFornecedor = (grupo: GrupoVisaoFornecedor) => {
+    transferirItensSelecionadosParaOC(grupo);
   };
 
   const comprarSelecionados = useMutation({
@@ -1909,7 +2779,11 @@ function OrdensCompra() {
           ordemFinalObj = ordem as Ordem;
         }
 
-        const payload = itens.flatMap((produto) => {
+        const itensJaNaOrdem = itensTodos.filter((it) => it.ordem_id === ordemFinalId);
+        const idsJaUsadosNaOrdem = new Set<string>();
+        const payloadParaInserir: any[] = [];
+
+        for (const produto of itens) {
           const valorUnitario = valorCompra(produto);
           const descontoUnitario = valorUnitario * (percentualCompra(produto) / 100);
           const vinculosTodos = vinculosDoProduto(produto);
@@ -1917,47 +2791,77 @@ function OrdensCompra() {
             .map((vendaId, idx) => ({ vendaId, idx }))
             .filter(({ idx }) => isVinculoSelecionado(produto.id, idx));
 
-          return vinculosParaComprar.map(({ vendaId }) => {
+          for (const { vendaId } of vinculosParaComprar) {
             const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
-            return {
-              ordem_id: ordemFinalId,
-              produto_id: produto.id,
-              codigo: produto.codigo,
-              descricao: produto.nome,
-              ncm: produto.ncm,
-              cst: produto.cst,
-              unidade: produto.unidade,
-              quantidade: 1,
-              valor_unitario: valorUnitario,
-              desconto: descontoUnitario,
-              total: valorUnitario - descontoUnitario,
-              cliente_id: venda?.cliente_id ?? null,
-              cliente_nome: venda?.cliente_nome ?? null,
-              venda_id: vendaId || null,
-              cor: coresCompra[produto.id] ?? produto.cor_pastilha ?? null,
-              pastilha: modelosCompra[produto.id] ?? produto.modelo_pastilha ?? null,
-              status_carga: "pendente_carga",
-            };
-          });
-        });
-        const { data: itensInseridos, error: erroItens } = await supabase
-          .from("ordem_compra_itens")
-          .insert(payload)
-          .select("id");
-        if (erroItens) throw erroItens;
-        if (itensInseridos) {
-          for (const it of itensInseridos) {
-            todosItensCriadosIds.push(it.id);
+            const itemExistente = itensJaNaOrdem.find(
+              (it) =>
+                !idsJaUsadosNaOrdem.has(it.id) &&
+                it.produto_id === produto.id &&
+                ((vendaId && it.venda_id === vendaId) ||
+                  (!vendaId && !it.venda_id && (!it.cliente_id || it.cliente_id === venda?.cliente_id))),
+            );
+
+            if (itemExistente) {
+              idsJaUsadosNaOrdem.add(itemExistente.id);
+              todosItensCriadosIds.push(itemExistente.id);
+              await supabase
+                .from("ordem_compra_itens")
+                .update({
+                  valor_unitario: valorUnitario,
+                  desconto: descontoUnitario,
+                  total: (Number(itemExistente.quantidade) || 1) * valorUnitario - descontoUnitario,
+                  cor: coresCompra[produto.id] ?? produto.cor_pastilha ?? itemExistente.cor ?? null,
+                  pastilha: modelosCompra[produto.id] ?? produto.modelo_pastilha ?? itemExistente.pastilha ?? null,
+                })
+                .eq("id", itemExistente.id);
+            } else {
+              payloadParaInserir.push({
+                ordem_id: ordemFinalId,
+                produto_id: produto.id,
+                codigo: produto.codigo,
+                descricao: produto.nome,
+                ncm: produto.ncm,
+                cst: produto.cst,
+                unidade: produto.unidade,
+                quantidade: 1,
+                valor_unitario: valorUnitario,
+                desconto: descontoUnitario,
+                total: valorUnitario - descontoUnitario,
+                cliente_id: venda?.cliente_id ?? null,
+                cliente_nome: venda?.cliente_nome ?? null,
+                venda_id: vendaId || null,
+                cor: coresCompra[produto.id] ?? produto.cor_pastilha ?? null,
+                pastilha: modelosCompra[produto.id] ?? produto.modelo_pastilha ?? null,
+                status_carga: "pendente_carga",
+              });
+            }
           }
         }
 
-        // Se complementou ordem existente, recalcula o total
+        if (payloadParaInserir.length > 0) {
+          const { data: itensInseridos, error: erroItens } = await supabase
+            .from("ordem_compra_itens")
+            .insert(payloadParaInserir)
+            .select("id");
+          if (erroItens) throw erroItens;
+          if (itensInseridos) {
+            for (const it of itensInseridos) {
+              todosItensCriadosIds.push(it.id);
+            }
+          }
+        }
+
+        // Se complementou ou confirmou ordem existente, recalcula o total e registra confirmação na grade
         if (ordemExistente) {
           const { data: todosItens } = await supabase
             .from("ordem_compra_itens")
             .select("total")
             .eq("ordem_id", ordemFinalId);
           const novoTotal = (todosItens ?? []).reduce((s, it) => s + Number(it.total || 0), 0);
+          const obsAtual = ordemExistente.observacoes ?? "";
+          const novaObs = obsAtual.includes("grade de produtos")
+            ? obsAtual
+            : [obsAtual, "Compra selecionada na grade de produtos"].filter(Boolean).join(" | ");
           await supabase
             .from("ordens_compra")
             .update({
@@ -1965,6 +2869,7 @@ function OrdensCompra() {
               valor_total: Math.max(novoTotal - Number(ordemExistente.desconto || 0), 0),
               icms_base: novoTotal,
               icms_valor: novoTotal * 0.18,
+              observacoes: novaObs,
             })
             .eq("id", ordemFinalId);
         }
@@ -3204,7 +4109,15 @@ function OrdensCompra() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={filtroFornecedor} onValueChange={setFiltroFornecedor}>
+            <Select
+              value={filtroFornecedor}
+              onValueChange={(val) => {
+                setFiltroFornecedor(val);
+                if (val !== "todos") {
+                  setFornecedorCardAberto(val);
+                }
+              }}
+            >
               <SelectTrigger className="w-48">
                 <Building2 className="size-3.5 mr-1 text-muted-foreground" />
                 <SelectValue placeholder="Fornecedor: Todos" />
@@ -3243,7 +4156,7 @@ function OrdensCompra() {
           <TabsList className="grid w-full grid-cols-3 sm:w-auto">
             <TabsTrigger value="fornecedores" className="flex items-center gap-2">
               <Building2 className="size-4" />
-              <span>Visão por Fornecedor</span>
+              <span>Cards por Fornecedor</span>
               {resumoGeralCompra.totalProdutos > 0 && (
                 <Badge
                   variant="secondary"
@@ -3265,32 +4178,57 @@ function OrdensCompra() {
 
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>
-              Total a comprar:{" "}
+              Total estimado:{" "}
               <strong className="text-foreground font-semibold">
                 {brl(resumoGeralCompra.totalValor)}
               </strong>
             </span>
             <span>·</span>
             <span>
-              Selecionados:{" "}
+              Marcados:{" "}
               <strong className="text-primary font-semibold">
-                {produtosSelecionados.length} ({brl(totalSelecionadoCompra)})
+                {resumoGeralCompra.totalSelecionadosVinculos > 0
+                  ? `${resumoGeralCompra.totalSelecionadosVinculos} vínculo(s) (${brl(resumoGeralCompra.totalValorSelecionadosVinculos)})`
+                  : `${produtosSelecionados.length} (${brl(totalSelecionadoCompra)})`}
               </strong>
             </span>
           </div>
         </div>
 
-        {/* ABA 1: VISÃO GERAL POR FORNECEDOR (O QUE PRECISO COMPRAR) */}
+        {/* ABA 1: VISÃO GERAL EM CARDS POR FORNECEDOR E AGRUPAMENTO POR VÍNCULOS */}
         <TabsContent value="fornecedores" className="space-y-6 m-0 print:hidden">
           <ExpandableCard>
-            <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
+            <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle>Visão por Fornecedor · Compras Pendentes</CardTitle>
+                <CardTitle>Gestão de Compras · Cards por Fornecedor</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Demandas vinculadas a clientes e reposição de estoque agrupadas por fabricante.
+                  Selecione um card de fornecedor para visualizar os itens agrupados por vínculo de venda e montar a Ordem de Compra.
                 </p>
               </div>
+              {Object.values(rascunhosOCPorFornecedor).some((r) => (r?.itens?.length ?? 0) > 0) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {Object.values(rascunhosOCPorFornecedor)
+                    .filter((r) => (r?.itens?.length ?? 0) > 0)
+                    .map((r) => (
+                      <Button
+                        key={r.fornecedorChave}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setFornecedorCardAberto(r.fornecedorChave);
+                          setGavetaOCFornecedorChave(r.fornecedorChave);
+                        }}
+                        className="border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 font-semibold gap-1.5 text-xs"
+                      >
+                        <ShoppingCart className="size-3.5" />
+                        OC Aberta · {r.fornecedorNome} ({r.itens.length} un.)
+                      </Button>
+                    ))}
+                </div>
+              )}
             </CardHeader>
+
             <CardContent className="space-y-6">
               {/* BARRA DE CONTROLES: FILTRO DE VÍNCULO E NECESSIDADE */}
               <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm md:flex-row md:items-center md:justify-between">
@@ -3301,932 +4239,1267 @@ function OrdensCompra() {
                       <Filter className="size-3.5" />
                       Vínculo:
                     </span>
-                <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setFiltroVinculo("todos")}
-                    className={cn(
-                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                      filtroVinculo === "todos"
-                        ? "bg-background text-foreground shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    Todos ({contagensFiltroVinculo.todos})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFiltroVinculo("com_vinculo")}
-                    className={cn(
-                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
-                      filtroVinculo === "com_vinculo"
-                        ? "bg-emerald-600 text-white shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <Link2 className="size-3" />
-                    Com Vínculo ({contagensFiltroVinculo.comVinculo})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFiltroVinculo("sem_vinculo")}
-                    className={cn(
-                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
-                      filtroVinculo === "sem_vinculo"
-                        ? "bg-amber-600 text-white shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <Boxes className="size-3" />
-                    Sem Vínculo / Estoque ({contagensFiltroVinculo.semVinculo})
-                  </button>
-                </div>
-              </div>
-
-              {/* FILTRO DE NECESSIDADE E CATÁLOGO */}
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Catálogo:
-                </span>
-                <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFiltroExibicaoCatalogo("apenas_vinculados_selecionados");
-                      setFiltroNecessidade("precisa_comprar");
-                    }}
-                    className={cn(
-                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
-                      filtroExibicaoCatalogo === "apenas_vinculados_selecionados"
-                        ? "bg-background text-foreground shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <span>Apenas Vinculados / Demanda</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFiltroExibicaoCatalogo("catalogo_completo");
-                      setFiltroNecessidade("todos");
-                    }}
-                    className={cn(
-                      "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
-                      filtroExibicaoCatalogo === "catalogo_completo"
-                        ? "bg-background text-foreground shadow-sm font-semibold"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    <span>Catálogo completo</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* BOTÃO TOGGLE OCULTAR JÁ COMPRADOS */}
-              <Button
-                type="button"
-                variant={ocultarJaComprados ? "outline" : "secondary"}
-                size="sm"
-                onClick={() => setOcultarJaComprados(!ocultarJaComprados)}
-                className={cn(
-                  "text-xs h-8 gap-1.5 transition-all",
-                  ocultarJaComprados
-                    ? "border-primary/30 text-foreground hover:bg-muted"
-                    : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30",
-                )}
-                title={
-                  ocultarJaComprados
-                    ? "Itens que já tiveram ordem de compra gerada ou já foram comprados estão ocultos. Clique para exibir."
-                    : "Exibindo itens já comprados. Clique para ocultar."
-                }
-              >
-                {ocultarJaComprados ? (
-                  <>
-                    <EyeOff className="size-3.5 text-muted-foreground" />
-                    <span>Ocultando já comprados</span>
-                    {totalJaCompradosOcultos > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] py-0 px-1 font-mono font-bold bg-muted"
-                      >
-                        {totalJaCompradosOcultos}
-                      </Badge>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Eye className="size-3.5 text-amber-600" />
-                    <span className="font-semibold">Exibindo já comprados</span>
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* AÇÕES DE EXPANSÃO E SELEÇÃO */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => recolherTodosFornecedores(false)}
-                className="text-xs h-8"
-              >
-                <ChevronDown className="size-3.5 mr-1" />
-                Expandir todos
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => recolherTodosFornecedores(true)}
-                className="text-xs h-8"
-              >
-                <ChevronUp className="size-3.5 mr-1" />
-                Recolher todos
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => marcarTodosProdutos(!todosProdutosSelecionados)}
-                className="text-xs h-8"
-              >
-                {todosProdutosSelecionados ? "Limpar seleção" : "Selecionar todos"}
-              </Button>
-            </div>
-          </div>
-
-          {/* CARDS DE RESUMO GLOBAL */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="bg-card/70 border">
-              <CardContent className="p-4 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                  <ShoppingCart className="size-3.5 text-primary" />
-                  Total Estimado da Demanda
-                </p>
-                <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
-                  {brl(resumoGeralCompra.totalValor)}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {resumoGeralCompra.totalProdutos} produtos · {resumoGeralCompra.totalUnidades} unidades
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/70 border">
-              <CardContent className="p-4 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                  <Factory className="size-3.5 text-blue-500" />
-                  Fornecedores Envolvidos
-                </p>
-                <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
-                  {resumoGeralCompra.totalFornecedoresComItens}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Fabricantes com compras a realizar
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/70 border border-emerald-500/20 bg-emerald-500/5">
-              <CardContent className="p-4 space-y-1">
-                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                  <Link2 className="size-3.5" />
-                  Demandas com Vínculo
-                </p>
-                <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
-                  {resumoGeralCompra.totalComVinculo} un.
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Vinculadas a pedidos de clientes
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/70 border border-amber-500/20 bg-amber-500/5">
-              <CardContent className="p-4 space-y-1">
-                <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                  <Boxes className="size-3.5" />
-                  Reposição sem Vínculo
-                </p>
-                <p className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400 font-mono">
-                  {resumoGeralCompra.totalSemVinculo} un.
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Itens para estoque livre
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* BARRA DE AÇÃO FLUTUANTE / FIXA QUANDO HÁ SELEÇÃO */}
-          {produtosSelecionados.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/5 p-4 shadow-sm animate-in fade-in">
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold flex items-center gap-2 text-primary">
-                  <ShoppingCart className="size-4" />
-                  {produtosSelecionados.length} produto(s) selecionado(s) para compra
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Total selecionado: <strong>{brl(totalSelecionadoCompra)}</strong> · A pagar:{" "}
-                  <strong className="text-foreground">{brl(totalAPagarCompra)}</strong>
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => salvarTodosItens.mutate()}
-                  disabled={salvarTodosItens.isPending}
-                >
-                  <Save className="size-3.5 mr-1.5" /> Salvar alterações
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => pedirCarga(produtosSelecionados[0] ? fornecedorDaCompra(produtosSelecionados[0])?.id : null)}
-                  disabled={comprarSelecionados.isPending}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold flex items-center gap-1.5 shadow-sm"
-                >
-                  <Truck className="size-4" />
-                  Pedir Carga ({produtosSelecionados.length})
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => comprarSelecionados.mutate()}
-                  disabled={comprarSelecionados.isPending}
-                  className="font-semibold"
-                >
-                  <ShoppingCart className="size-4 mr-1.5" />
-                  Executar Ordem ({produtosSelecionados.length})
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* LISTA DE FORNECEDORES E PRODUTOS */}
-          {gruposVisaoFornecedor.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-12 text-center text-muted-foreground space-y-3">
-                <Package className="size-10 mx-auto text-muted-foreground/60" />
-                <p className="text-base font-medium">Nenhum produto encontrado para estes filtros.</p>
-                <p className="text-xs">
-                  Tente alterar o filtro de vínculo ou necessidade para ver mais itens.
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setFiltroVinculo("todos");
-                    setFiltroNecessidade("todos");
-                    setBuscaFornecedor("");
-                  }}
-                >
-                  Limpar filtros
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            gruposVisaoFornecedor.map((grupo) => {
-              const recolhido = fornecedoresRecolhidos[grupo.chave] === true;
-              return (
-                <ExpandableCard
-                  key={grupo.chave}
-                  className={cn(
-                    "overflow-hidden border transition-all shadow-sm",
-                    grupo.selecionadosQtd > 0 && "border-primary/40 ring-1 ring-primary/20",
-                  )}
-                >
-                  {/* CABEÇALHO DO FORNECEDOR */}
-                  <div className="flex flex-col gap-3 p-4 pr-12 bg-muted/20 border-b sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-primary/10 p-2 text-primary mt-0.5">
-                        <Factory className="size-5" />
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-base text-foreground tracking-tight">
-                            {grupo.nome}
-                          </h3>
-                          <Badge variant="secondary" className="text-xs font-mono font-semibold">
-                            {grupo.totalItens} {grupo.totalItens === 1 ? "produto" : "produtos"} · {grupo.totalUnidades} un.
-                          </Badge>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-xs">
-                          {grupo.totalComVinculo > 0 && (
-                            <Badge
-                              variant="outline"
-                              className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-medium"
-                            >
-                              <Link2 className="size-3 mr-1" />
-                              {grupo.totalComVinculo} un. com vínculo (pedidos)
-                            </Badge>
-                          )}
-                          {grupo.totalSemVinculo > 0 && (
-                            <Badge
-                              variant="outline"
-                              className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[11px] font-medium"
-                            >
-                              <Boxes className="size-3 mr-1" />
-                              {grupo.totalSemVinculo} un. para estoque
-                            </Badge>
-                          )}
-                          {grupo.totalDemandaPedidos > 0 && (
-                            <span className="text-muted-foreground">
-                              · Demanda de pedidos: <strong>{grupo.totalDemandaPedidos} un.</strong>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0">
-                      <div className="text-right mr-1">
-                        <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">
-                          Total Estimado
-                        </p>
-                        <p className="text-lg font-bold font-mono text-foreground">
-                          {brl(grupo.totalValor)}
-                        </p>
-                      </div>
-
-                      {(() => {
-                        const produtosDesteFornecedor = produtos.filter(
-                          (p) => fornecedorDaCompra(p)?.id === grupo.fornecedor.id,
-                        );
-                        const produtosDisponiveis = produtosDesteFornecedor.filter(
-                          (p) =>
-                            !grupo.itens.some((it) => it.produto.id === p.id) &&
-                            (!ocultarJaComprados || !ehProdutoJaCompradoOuFaturado(p)),
-                        );
-                        if (produtosDisponiveis.length === 0) return null;
-                        return (
-                          <Select
-                            value=""
-                            onValueChange={(prodId) => {
-                              if (!prodId) return;
-                              setSelecionadosCompra((prev) => ({ ...prev, [prodId]: true }));
-                              setQuantidadesCompra((prev) => ({ ...prev, [prodId]: prev[prodId] ?? 1 }));
-                              const pNome = produtos.find((p) => p.id === prodId)?.nome;
-                              toast.success(`"${pNome}" adicionado à lista`);
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs w-44 bg-background border-dashed">
-                              <Plus className="size-3.5 mr-1 text-primary" />
-                              <SelectValue placeholder="+ Adicionar produto..." />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-64">
-                              {produtosDisponiveis.map((prod) => (
-                                <SelectItem key={prod.id} value={prod.id}>
-                                  {prod.nome} {prod.codigo ? `(${prod.codigo})` : ""} · {brl(Number(prod.preco_custo ?? 0))}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        );
-                      })()}
-
-                      <Button
+                    <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+                      <button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => alternarSelecaoGrupoFornecedor(grupo)}
-                        className="text-xs h-8"
-                      >
-                        {grupo.todosSelecionados ? "Desmarcar itens" : "Selecionar itens"}
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => comprarItensDoFornecedor(grupo)}
-                        disabled={comprarSelecionados.isPending}
-                        className="text-xs h-8 font-medium gap-1.5"
-                      >
-                        <ShoppingCart className="size-3.5" />
-                        Comprar deste fornecedor
-                      </Button>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          pedirCarga(grupo.fornecedor.id);
-                        }}
-                        className="text-xs h-8 font-semibold gap-1.5 border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
-                      >
-                        <Truck className="size-3.5" />
-                        Pedir Carga
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => alternarRecolhimentoFornecedor(grupo.chave)}
-                        className="size-8"
-                        title={recolhido ? "Expandir fornecedor" : "Recolher fornecedor"}
-                        aria-label={recolhido ? "Expandir fornecedor" : "Recolher fornecedor"}
-                      >
-                        {recolhido ? (
-                          <ChevronDown className="size-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronUp className="size-4 text-muted-foreground" />
+                        onClick={() => setFiltroVinculo("todos")}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                          filtroVinculo === "todos"
+                            ? "bg-background text-foreground shadow-sm font-semibold"
+                            : "text-muted-foreground hover:text-foreground",
                         )}
-                      </Button>
+                      >
+                        Todos ({contagensFiltroVinculo.todos})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiltroVinculo("com_vinculo")}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                          filtroVinculo === "com_vinculo"
+                            ? "bg-emerald-600 text-white shadow-sm font-semibold"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <Link2 className="size-3" />
+                        Com Vínculo ({contagensFiltroVinculo.comVinculo})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiltroVinculo("sem_vinculo")}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                          filtroVinculo === "sem_vinculo"
+                            ? "bg-amber-600 text-white shadow-sm font-semibold"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <Boxes className="size-3" />
+                        Sem Vínculo / Estoque ({contagensFiltroVinculo.semVinculo})
+                      </button>
                     </div>
                   </div>
 
-                  {/* TABELA DE PRODUTOS DO FORNECEDOR */}
-                  {!recolhido && (
-                    <div className="overflow-x-auto">
-                      <Table className="w-full min-w-[1300px]">
-                        <TableHeader>
-                          <TableRow className="text-xs bg-muted/10">
-                            <TableHead className="w-10">
-                              <Checkbox
-                                aria-label={`Selecionar todos os produtos de ${grupo.nome}`}
-                                checked={grupo.todosSelecionados}
-                                onCheckedChange={() => alternarSelecaoGrupoFornecedor(grupo)}
-                              />
-                            </TableHead>
-                            <TableHead className="w-24">SKU</TableHead>
-                            <TableHead className="min-w-56">Produto</TableHead>
-                            <TableHead className="w-32">Estoque</TableHead>
-                            <TableHead className="w-44">Demanda Pedidos</TableHead>
-                            <TableHead className="min-w-48">Vínculo (Cliente / Estoque)</TableHead>
-                            <TableHead className="w-20 text-right">Qtde</TableHead>
-                            <TableHead className="w-28 text-right">Vl. Unit.</TableHead>
-                            <TableHead className="w-20 text-right">% Desc.</TableHead>
-                            <TableHead className="w-28 text-right">Total</TableHead>
-                            <TableHead className="w-32">Status</TableHead>
-                            <TableHead className="w-40 min-w-[160px] text-right">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {grupo.itens.map((item) => (
-                            <Fragment key={item.produto.id}>
-                              <TableRow
-                                key={item.produto.id}
-                              className={cn(
-                                selecionadosCompra[item.produto.id] && "bg-primary/5",
-                                item.temVinculo && "border-l-2 border-l-emerald-500",
-                              )}
-                            >
-                              <TableCell>
-                                <Checkbox
-                                  aria-label={`Selecionar ${item.produto.nome}`}
-                                  checked={selecionadosCompra[item.produto.id] === true}
-                                  onCheckedChange={(valor) =>
-                                    alternarSelecaoProdutoPai(
-                                      item.produto.id,
-                                      valor === true,
-                                      item.vinculos.length,
-                                    )
-                                  }
-                                />
-                              </TableCell>
+                  {/* FILTRO DE NECESSIDADE E CATÁLOGO */}
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Catálogo:
+                    </span>
+                    <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiltroExibicaoCatalogo("apenas_vinculados_selecionados");
+                          setFiltroNecessidade("precisa_comprar");
+                        }}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
+                          filtroExibicaoCatalogo === "apenas_vinculados_selecionados"
+                            ? "bg-background text-foreground shadow-sm font-semibold"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <span>Apenas Demanda Pendente</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiltroExibicaoCatalogo("catalogo_completo");
+                          setFiltroNecessidade("todos");
+                        }}
+                        className={cn(
+                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
+                          filtroExibicaoCatalogo === "catalogo_completo"
+                            ? "bg-background text-foreground shadow-sm font-semibold"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        <span>Catálogo Completo</span>
+                      </button>
+                    </div>
+                  </div>
 
-                              <TableCell className="font-mono text-xs text-muted-foreground">
-                                {item.produto.codigo ?? "—"}
-                              </TableCell>
+                  {/* BOTÃO TOGGLE OCULTAR JÁ COMPRADOS */}
+                  <Button
+                    type="button"
+                    variant={ocultarJaComprados ? "outline" : "secondary"}
+                    size="sm"
+                    onClick={() => setOcultarJaComprados(!ocultarJaComprados)}
+                    className={cn(
+                      "text-xs h-8 gap-1.5 transition-all",
+                      ocultarJaComprados
+                        ? "border-primary/30 text-foreground hover:bg-muted"
+                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30",
+                    )}
+                    title={
+                      ocultarJaComprados
+                        ? "Itens que já tiveram ordem de compra gerada ou já foram comprados estão ocultos. Clique para exibir."
+                        : "Exibindo itens já comprados. Clique para ocultar."
+                    }
+                  >
+                    {ocultarJaComprados ? (
+                      <>
+                        <EyeOff className="size-3.5 text-muted-foreground" />
+                        <span>Ocultando já comprados</span>
+                        {totalJaCompradosOcultos > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] py-0 px-1 font-mono font-bold bg-muted"
+                          >
+                            {totalJaCompradosOcultos}
+                          </Badge>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="size-3.5 text-amber-600" />
+                        <span className="font-semibold">Exibindo já comprados</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
 
-                              <TableCell>
-                                <p className="font-medium text-sm leading-snug">{item.produto.nome}</p>
-                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                  {item.produto.categoria && (
-                                    <Badge variant="outline" className="text-[10px] py-0 px-1 font-normal text-muted-foreground">
-                                      {item.produto.categoria}
-                                    </Badge>
-                                  )}
-                                  {item.produto.unidade && (
-                                    <span className="text-[11px] text-muted-foreground">({item.produto.unidade})</span>
-                                  )}
-                                  {(item.produto.cor_pastilha || item.produto.modelo_pastilha) && (
-                                    <span className="text-[11px] text-muted-foreground font-mono">
-                                      {[item.produto.cor_pastilha, item.produto.modelo_pastilha].filter(Boolean).join(" · ")}
-                                    </span>
-                                  )}
-                                  {item.jaComprado && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] py-0 px-1.5 font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                                    >
-                                      Já Comprado / O.C. Gerada
-                                    </Badge>
-                                  )}
-                                  {item.jaFaturado && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] py-0 px-1.5 font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
-                                    >
-                                      Faturado
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
+                {fornecedorCardAberto && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFornecedorCardAberto(null)}
+                    className="text-xs h-8 gap-1.5"
+                  >
+                    <ArrowLeft className="size-3.5" />
+                    Ver todos os cards de fornecedor
+                  </Button>
+                )}
+              </div>
 
-                              <TableCell>
-                                {item.estoqueZerado ? (
-                                  <Badge variant="destructive" className="text-[10px] py-0 px-1.5 font-semibold">
-                                    Zerado (0)
-                                  </Badge>
-                                ) : item.estoqueBaixo ? (
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[10px] py-0 px-1.5 font-semibold"
+              {/* CARDS DE RESUMO GLOBAL */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Card className="bg-card/70 border">
+                  <CardContent className="p-4 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <ShoppingCart className="size-3.5 text-primary" />
+                      Valor Estimado Acumulado
+                    </p>
+                    <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
+                      {brl(resumoGeralCompra.totalValor)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {resumoGeralCompra.totalProdutos} produtos · {resumoGeralCompra.totalUnidades} un. na fila
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/70 border">
+                  <CardContent className="p-4 space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Factory className="size-3.5 text-blue-500" />
+                      Cards de Fornecedores
+                    </p>
+                    <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
+                      {resumoGeralCompra.totalFornecedoresComItens}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Fabricantes com pendências ou OC aberta
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/70 border border-emerald-500/20 bg-emerald-500/5">
+                  <CardContent className="p-4 space-y-1">
+                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <Link2 className="size-3.5" />
+                      Itens com Vínculo Ativo
+                    </p>
+                    <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
+                      {resumoGeralCompra.totalComVinculo} un.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Atrelados a pedidos de clientes
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-card/70 border border-amber-500/20 bg-amber-500/5">
+                  <CardContent className="p-4 space-y-1">
+                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <Boxes className="size-3.5" />
+                      Itens sem Vínculo (Estoque)
+                    </p>
+                    <p className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400 font-mono">
+                      {resumoGeralCompra.totalSemVinculo} un.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Reposição de Estoque Geral
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* 1. VISÃO GERAL EM CARDS POR FORNECEDOR */}
+              {gruposVisaoFornecedor.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="py-12 text-center text-muted-foreground space-y-3">
+                    <Package className="size-10 mx-auto text-muted-foreground/60" />
+                    <p className="text-base font-medium">Nenhum fornecedor com itens pendentes para estes filtros.</p>
+                    <p className="text-xs">
+                      Altere os filtros acima ou mude para &ldquo;Catálogo Completo&rdquo; para incluir produtos de reposição.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFiltroVinculo("todos");
+                        setFiltroNecessidade("todos");
+                        setFiltroExibicaoCatalogo("catalogo_completo");
+                        setBuscaFornecedor("");
+                      }}
+                    >
+                      Exibir catálogo completo
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Factory className="size-3.5 text-primary" />
+                        Fornecedores ({gruposVisaoFornecedor.length}) — Clique em um card para abrir os itens e selecionar vínculos
+                      </h3>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {gruposVisaoFornecedor.map((grupo) => {
+                        const estaAberto = fornecedorCardAberto === grupo.chave;
+                        const temRascunho = grupo.totalUnidadesRascunho > 0;
+                        const temMarcados = grupo.selecionadosVinculosQtd > 0;
+
+                        return (
+                          <div
+                            key={grupo.chave}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() =>
+                              setFornecedorCardAberto((atual) =>
+                                atual === grupo.chave ? null : grupo.chave,
+                              )
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setFornecedorCardAberto((atual) =>
+                                  atual === grupo.chave ? null : grupo.chave,
+                                );
+                              }
+                            }}
+                            className={cn(
+                              "group relative flex flex-col justify-between rounded-xl border p-5 text-left transition-all cursor-pointer select-none",
+                              estaAberto
+                                ? "border-primary bg-primary/5 ring-2 ring-primary/25 shadow-md"
+                                : "bg-card hover:border-primary/50 hover:shadow-md",
+                              temMarcados && !estaAberto && "border-emerald-500/50 bg-emerald-500/[0.03]",
+                            )}
+                          >
+                            <div className="space-y-3">
+                              {/* Topo do Card: Nome do Fornecedor e Status */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div
+                                    className={cn(
+                                      "rounded-lg p-2.5 transition-colors shrink-0",
+                                      estaAberto
+                                        ? "bg-primary text-primary-foreground"
+                                        : "bg-primary/10 text-primary group-hover:bg-primary/20",
+                                    )}
                                   >
-                                    Baixo ({item.estoqueAtual} / mín {item.estoqueMinimo})
-                                  </Badge>
-                                ) : (
-                                  <span className="text-xs font-mono text-muted-foreground">
-                                    {item.estoqueAtual} {item.produto.unidade}
-                                  </span>
-                                )}
-                              </TableCell>
-
-                              <TableCell>
-                                {item.demanda && item.demanda.total > 0 ? (
-                                  <div className="space-y-0.5">
-                                    <Badge
-                                      variant="outline"
-                                      className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30 text-[10px] py-0 px-1.5 font-semibold"
-                                    >
-                                      {item.demanda.total} un. em {item.demanda.pedidos.length} pedido(s)
-                                    </Badge>
-                                    <p
-                                      className="text-[10px] text-muted-foreground truncate max-w-[180px]"
-                                      title={item.demanda.pedidos.map((p) => p.rotulo).join(" · ")}
-                                    >
-                                      {item.demanda.pedidos.map((p) => p.rotulo).join(" · ")}
+                                    <Factory className="size-5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h4 className="font-bold text-base text-foreground leading-tight truncate">
+                                      {grupo.nome}
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      {grupo.totalItens}{" "}
+                                      {grupo.totalItens === 1 ? "produto pendente" : "produtos pendentes"} ·{" "}
+                                      <strong className="text-foreground">
+                                        {grupo.totalUnidadesPendentesDinamico} un.
+                                      </strong>
                                     </p>
                                   </div>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">—</span>
-                                )}
-                              </TableCell>
-
-                              <TableCell>
-                                <div className="space-y-1">
-                                  {item.vinculos.map((vinculoAtual, indice) => (
-                                    <div key={`${item.produto.id}-vinculo-${indice}`} className="flex items-center gap-1.5">
-                                      <Checkbox
-                                        aria-label={`Comprar vínculo ${indice + 1} de ${item.produto.nome}`}
-                                        checked={isVinculoSelecionado(item.produto.id, indice)}
-                                        onCheckedChange={() =>
-                                          alternarSelecaoVinculo(
-                                            item.produto.id,
-                                            indice,
-                                            item.vinculos.length,
-                                          )
-                                        }
-                                      />
-                                      {item.vinculos.length > 1 && (
-                                        <span className="w-4 shrink-0 text-[10px] font-mono text-muted-foreground">
-                                          #{indice + 1}
-                                        </span>
-                                      )}
-                                      <Select
-                                        value={vinculoAtual || SEM_CLIENTE}
-                                        onValueChange={(valor) => {
-                                          const vinculo = valor === SEM_CLIENTE ? "" : valor;
-                                          const proximos = vinculosDoProduto(item.produto);
-                                          proximos[indice] = vinculo;
-                                          setVinculosCompra((atual) => ({
-                                            ...atual,
-                                            [item.produto.id]: proximos,
-                                          }));
-                                          if (indice === 0) {
-                                            salvarAutomaticamente(
-                                              item.produto.id,
-                                              "venda_vinculo_id",
-                                              vinculo || (null as unknown as string),
-                                              true,
-                                            );
-                                          }
-                                        }}
-                                      >
-                                        <SelectTrigger
-                                          className={cn(
-                                            "h-7 text-xs w-48 font-medium",
-                                            vinculoAtual && vinculoAtual !== SEM_CLIENTE
-                                              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold"
-                                              : "border-border bg-background text-muted-foreground",
-                                          )}
-                                        >
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value={SEM_CLIENTE}>
-                                            <span className="flex items-center gap-1.5 text-xs">
-                                              <Boxes className="size-3 text-amber-500" />
-                                              <span>Estoque Livre (Sem cliente)</span>
-                                            </span>
-                                          </SelectItem>
-                                          {vendasVinculo.map((venda) => (
-                                            <SelectItem key={venda.id} value={venda.id}>
-                                              <span className="flex items-center gap-1.5 text-xs">
-                                                <Link2 className="size-3 text-emerald-500" />
-                                                <span>
-                                                  {venda.numero ?? "Pedido"} — {venda.cliente_nome ?? "Cliente"}
-                                                </span>
-                                              </span>
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  ))}
                                 </div>
-                              </TableCell>
 
-                              <TableCell>
-                                <Input
-                                  aria-label={`Quantidade de ${item.produto.nome}`}
-                                  className="ml-auto h-8 w-20 text-right font-medium"
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  value={
-                                    quantidadesCompra[item.produto.id] ??
-                                    String(Number(item.produto.quantidade_compra ?? 1))
-                                  }
-                                  onChange={(evento) => {
-                                    const valor = evento.target.value;
-                                    setQuantidadesCompra((atual) => ({
-                                      ...atual,
-                                      [item.produto.id]: valor,
-                                    }));
-                                    salvarAutomaticamente(
-                                      item.produto.id,
-                                      "quantidade_compra",
-                                      Math.max(Number(valor) || 0, 0),
-                                    );
-                                  }}
-                                  onBlur={(evento) =>
-                                    salvarAutomaticamente(
-                                      item.produto.id,
-                                      "quantidade_compra",
-                                      Math.max(Number(evento.target.value) || 0, 0),
-                                      true,
-                                    )
-                                  }
+                                <ChevronRight
+                                  className={cn(
+                                    "size-5 text-muted-foreground transition-transform shrink-0 mt-1",
+                                    estaAberto && "rotate-90 text-primary",
+                                  )}
                                 />
-                              </TableCell>
+                              </div>
 
-                              <TableCell>
+                              {/* Badges de Pedidos / Vínculos Pendentes */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[11px] font-medium",
+                                    grupo.totalComVinculo > 0
+                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                      : "text-muted-foreground",
+                                  )}
+                                >
+                                  <Link2 className="size-3 mr-1" />
+                                  {grupo.totalComVinculo} un. com vínculo
+                                  {grupo.pedidosDistintosCount > 0
+                                    ? ` (${grupo.pedidosDistintosCount} ${grupo.pedidosDistintosCount === 1 ? "pedido" : "pedidos"})`
+                                    : ""}
+                                </Badge>
+
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "text-[11px] font-medium",
+                                    grupo.totalSemVinculo > 0
+                                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                      : "text-muted-foreground",
+                                  )}
+                                >
+                                  <Boxes className="size-3 mr-1" />
+                                  {grupo.totalSemVinculo} un. estoque geral
+                                </Badge>
+                              </div>
+
+                              {/* Indicador de seleção / rascunho de OC */}
+                              {(temMarcados || temRascunho) && (
+                                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                  {temMarcados && (
+                                    <Badge className="bg-primary text-primary-foreground text-[11px] font-semibold">
+                                      {grupo.selecionadosVinculosQtd} vínculo(s) marcado(s) ({brl(grupo.totalValorSelecionados)})
+                                    </Badge>
+                                  )}
+                                  {temRascunho && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-[11px] font-semibold"
+                                    >
+                                      <ShoppingCart className="size-3 mr-1" />
+                                      OC em rascunho: {grupo.totalUnidadesRascunho} un. ({brl(grupo.totalValorRascunho)})
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Rodapé do Card: Valor Estimado Acumulado e Ação */}
+                            <div className="mt-4 pt-3 border-t flex items-end justify-between gap-2">
+                              <div>
+                                <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+                                  Valor Estimado Acumulado
+                                </p>
+                                <p className="text-lg font-bold font-mono text-foreground">
+                                  {brl(grupo.totalValor)}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                {temRascunho && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    className="h-7 px-2.5 text-xs font-semibold border border-primary/30 text-primary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFornecedorCardAberto(grupo.chave);
+                                      setGavetaOCFornecedorChave(grupo.chave);
+                                    }}
+                                  >
+                                    Ver OC ({grupo.totalUnidadesRascunho})
+                                  </Button>
+                                )}
+                                <span
+                                  className={cn(
+                                    "text-xs font-semibold px-2.5 py-1 rounded-md transition-colors",
+                                    estaAberto
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-muted text-foreground group-hover:bg-primary/15 group-hover:text-primary",
+                                  )}
+                                >
+                                  {estaAberto ? "Card Aberto" : "Abrir Card"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2 & 3. ABERTURA DO CARD DO FORNECEDOR: HIERARQUIA (TOPO COM VÍNCULO / ABAIXO SEM VÍNCULO) E LINHAS CONSOLIDADAS */}
+                  {(() => {
+                    const grupoAtivo = gruposVisaoFornecedor.find(
+                      (g) => g.chave === fornecedorCardAberto,
+                    );
+                    if (!grupoAtivo) return null;
+
+                    const renderizarLinhaConsolidada = (linha: LinhaConsolidadaFornecedor) => {
+                      const expandido = vinculosExpandidosPorLinha[linha.chaveLinha] ?? true;
+
+                      return (
+                        <div
+                          key={linha.chaveLinha}
+                          className={cn(
+                            "rounded-xl border transition-all overflow-hidden",
+                            linha.algumMarcado
+                              ? "border-primary/50 bg-primary/[0.03] shadow-sm"
+                              : "bg-card",
+                          )}
+                        >
+                          {/* LINHA CONSOLIDADA DO PRODUTO */}
+                          <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <Checkbox
+                                className="mt-1"
+                                aria-label={`Selecionar todos os vínculos de ${linha.nome}`}
+                                checked={linha.todosMarcados}
+                                onCheckedChange={(valor) =>
+                                  alternarSelecaoLinhaConsolidada(linha, valor === true)
+                                }
+                              />
+
+                              <div className="min-w-0 space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-bold text-sm sm:text-base text-foreground">
+                                    {linha.nome} — Total:{" "}
+                                    <span
+                                      className={cn(
+                                        "font-mono",
+                                        linha.selecionadosCount > 0
+                                          ? "text-amber-600 dark:text-amber-400"
+                                          : "text-primary",
+                                      )}
+                                    >
+                                      {linha.pendenteDinamico} un.
+                                    </span>
+                                  </span>
+
+                                  {linha.selecionadosCount > 0 && (
+                                    <Badge className="bg-primary/15 text-primary border border-primary/30 text-xs font-mono font-semibold">
+                                      {linha.totalFila} un. − {linha.selecionadosCount} selecionado(s) ={" "}
+                                      {linha.pendenteDinamico} un. pendentes
+                                    </Badge>
+                                  )}
+
+                                  {linha.codigo && (
+                                    <Badge variant="outline" className="font-mono text-[10px] py-0 px-1.5 text-muted-foreground">
+                                      SKU: {linha.codigo}
+                                    </Badge>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  {linha.comVinculo ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                                      <Users className="size-3.5" />
+                                      {linha.totalFila}{" "}
+                                      {linha.totalFila === 1
+                                        ? "vínculo de cliente na fila"
+                                        : "vínculos de clientes na fila"}
+                                    </span>
+                                  ) : (
+                                    <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                                      <Boxes className="size-3.5" />
+                                      {linha.totalFila}{" "}
+                                      {linha.totalFila === 1
+                                        ? "unidade para Estoque Geral"
+                                        : "unidades para Estoque Geral"}
+                                    </span>
+                                  )}
+
+                                  <span>·</span>
+                                  <span>
+                                    Estoque atual:{" "}
+                                    <strong
+                                      className={cn(
+                                        linha.estoqueZerado
+                                          ? "text-destructive"
+                                          : linha.estoqueBaixo
+                                            ? "text-amber-600"
+                                            : "text-foreground",
+                                      )}
+                                    >
+                                      {linha.estoqueAtual} {linha.unidade}
+                                    </strong>
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* CONTROLES DE PREÇO, EXPANSÃO DE VÍNCULOS E AÇÕES DA LINHA CONSOLIDADA */}
+                            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-muted-foreground">Vl. Unit:</span>
                                 <Input
-                                  aria-label={`Valor unitário de ${item.produto.nome}`}
-                                  className="ml-auto h-8 w-24 text-right font-mono"
+                                  aria-label={`Valor unitário de ${linha.nome}`}
+                                  className="h-7 w-24 text-right font-mono text-xs"
                                   type="number"
                                   min="0"
                                   step="0.01"
                                   value={
-                                    valoresCompra[item.produto.id] ??
-                                    String(Number(item.produto.preco_custo))
+                                    valoresCompra[linha.produtoPrincipal.id] ??
+                                    String(Number(linha.produtoPrincipal.preco_custo ?? 0))
                                   }
-                                  onChange={(evento) => {
-                                    const valor = evento.target.value;
-                                    setValoresCompra((atual) => ({
-                                      ...atual,
-                                      [item.produto.id]: valor,
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setValoresCompra((prev) => ({
+                                      ...prev,
+                                      [linha.produtoPrincipal.id]: val,
                                     }));
                                     salvarAutomaticamente(
-                                      item.produto.id,
+                                      linha.produtoPrincipal.id,
                                       "preco_custo",
-                                      Math.max(Number(valor) || 0, 0),
+                                      Math.max(Number(val) || 0, 0),
                                     );
                                   }}
-                                  onBlur={(evento) =>
-                                    salvarAutomaticamente(
-                                      item.produto.id,
-                                      "preco_custo",
-                                      Math.max(Number(evento.target.value) || 0, 0),
-                                      true,
-                                    )
-                                  }
                                 />
-                              </TableCell>
+                              </div>
 
-                              <TableCell>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[11px] text-muted-foreground">% Desc:</span>
                                 <Input
-                                  aria-label={`Desconto percentual de ${item.produto.nome}`}
-                                  className="ml-auto h-8 w-20 text-right font-mono"
+                                  aria-label={`Desconto de ${linha.nome}`}
+                                  className="h-7 w-16 text-right font-mono text-xs"
                                   type="number"
                                   min="0"
                                   max="100"
                                   step="0.01"
                                   value={
-                                    percentuaisCompra[item.produto.id] ??
-                                    String(Number(item.produto.desconto_compra ?? 0))
+                                    percentuaisCompra[linha.produtoPrincipal.id] ??
+                                    String(Number(linha.produtoPrincipal.desconto_compra ?? 0))
                                   }
-                                  onChange={(evento) => {
-                                    const valor = evento.target.value;
-                                    setPercentuaisCompra((atual) => ({
-                                      ...atual,
-                                      [item.produto.id]: valor,
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setPercentuaisCompra((prev) => ({
+                                      ...prev,
+                                      [linha.produtoPrincipal.id]: val,
                                     }));
                                     salvarAutomaticamente(
-                                      item.produto.id,
+                                      linha.produtoPrincipal.id,
                                       "desconto_compra",
-                                      Math.min(Math.max(Number(valor) || 0, 0), 100),
+                                      Math.min(Math.max(Number(val) || 0, 0), 100),
                                     );
                                   }}
-                                  onBlur={(evento) =>
-                                    salvarAutomaticamente(
-                                      item.produto.id,
-                                      "desconto_compra",
-                                      Math.min(Math.max(Number(evento.target.value) || 0, 0), 100),
-                                      true,
-                                    )
-                                  }
                                 />
-                              </TableCell>
+                              </div>
 
-                              <TableCell className="text-right font-semibold font-mono text-sm">
-                                {brl(item.totalItem)}
-                              </TableCell>
+                              <div className="text-right min-w-[90px]">
+                                <p className="text-[10px] text-muted-foreground uppercase">Subtotal Fila</p>
+                                <p className="text-xs font-bold font-mono text-foreground">
+                                  {brl(
+                                    linha.totalFila *
+                                      linha.valorUnitario *
+                                      (1 - linha.descontoPercentual / 100),
+                                  )}
+                                </p>
+                              </div>
 
-                              <TableCell>
+                              {!linha.comVinculo && (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs font-mono"
+                                    title="Adicionar +1 unidade para reposição de estoque"
+                                    onClick={() => {
+                                      const atual = vinculosDoProduto(linha.produtoPrincipal);
+                                      const proximo = [...atual, ""];
+                                      setVinculosCompra((prev) => ({
+                                        ...prev,
+                                        [linha.produtoPrincipal.id]: proximo,
+                                      }));
+                                      setQuantidadesCompra((prev) => ({
+                                        ...prev,
+                                        [linha.produtoPrincipal.id]: String(proximo.length),
+                                      }));
+                                      salvarAutomaticamente(
+                                        linha.produtoPrincipal.id,
+                                        "quantidade_compra",
+                                        proximo.length,
+                                        true,
+                                      );
+                                    }}
+                                  >
+                                    +1 un.
+                                  </Button>
+                                </div>
+                              )}
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setVinculosExpandidosPorLinha((prev) => ({
+                                    ...prev,
+                                    [linha.chaveLinha]: !expandido,
+                                  }))
+                                }
+                                className="h-7 px-2.5 text-xs font-medium gap-1"
+                              >
+                                {expandido ? (
+                                  <>
+                                    <ChevronUp className="size-3.5" />
+                                    Ocultar vínculos ({linha.totalFila})
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="size-3.5" />
+                                    Expandir vínculos ({linha.totalFila})
+                                  </>
+                                )}
+                              </Button>
+
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="size-7"
+                                title="Editar cadastro do produto"
+                                onClick={() => abrirEdicaoProdutoCompra(linha.produtoPrincipal)}
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* LISTA EXPANSÍVEL DE VÍNCULOS INDIVIDUAIS (CLIENTE A, CLIENTE B, CLIENTE C...) */}
+                          {expandido && (
+                            <div className="border-t bg-muted/20 px-4 py-2.5 space-y-1.5">
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                                {linha.comVinculo
+                                  ? "Selecione os vínculos de clientes para transferir à Ordem de Compra:"
+                                  : "Selecione as unidades de reposição de estoque para transferir à Ordem de Compra:"}
+                              </p>
+                              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                                {linha.vinculos.map((vinculo, idx) => {
+                                  const marcado = vinculosKeysSelecionados[vinculo.key] === true;
+                                  return (
+                                    <label
+                                      key={vinculo.key}
+                                      className={cn(
+                                        "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-all select-none",
+                                        marcado
+                                          ? "border-primary bg-primary/10 text-foreground font-semibold shadow-sm"
+                                          : "border-border bg-background hover:border-primary/40 text-foreground",
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0">
+                                        <Checkbox
+                                          checked={marcado}
+                                          onCheckedChange={() =>
+                                            alternarSelecaoVinculoKey(vinculo.key)
+                                          }
+                                        />
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-mono text-[10px] text-muted-foreground">
+                                              #{idx + 1}
+                                            </span>
+                                            {vinculo.comVinculo ? (
+                                              <span className="truncate font-medium text-emerald-700 dark:text-emerald-300">
+                                                {vinculo.clienteNome}
+                                              </span>
+                                            ) : (
+                                              <span className="truncate font-medium text-amber-700 dark:text-amber-300">
+                                                Estoque Geral · Unidade #{idx + 1}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-[10px] text-muted-foreground truncate">
+                                            {vinculo.comVinculo
+                                              ? `Pedido ${vinculo.pedidoNumero ?? "Vinculado"} · 1 ${linha.unidade}`
+                                              : `Reposição sem vínculo · 1 ${linha.unidade}`}
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <Badge
+                                          variant={marcado ? "default" : "outline"}
+                                          className="text-[10px] font-mono py-0 px-1.5"
+                                        >
+                                          {marcado ? "No carrinho" : "1 un."}
+                                        </Badge>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div className="rounded-2xl border-2 border-primary/30 bg-card shadow-lg overflow-hidden animate-in fade-in">
+                        {/* CABEÇALHO DO CARD ABERTO DO FORNECEDOR */}
+                        <div className="flex flex-col gap-4 bg-muted/30 p-5 border-b lg:flex-row lg:items-center lg:justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-primary p-3 text-primary-foreground shadow-sm">
+                              <Factory className="size-6" />
+                            </div>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-xl font-bold text-foreground tracking-tight">
+                                  {grupoAtivo.nome}
+                                </h3>
+                                <Badge variant="secondary" className="font-mono text-xs font-semibold">
+                                  Pendente: {grupoAtivo.totalUnidadesPendentesDinamico} un. (de{" "}
+                                  {grupoAtivo.totalUnidades} un.)
+                                </Badge>
+                                {grupoAtivo.selecionadosVinculosQtd > 0 && (
+                                  <Badge className="bg-primary text-primary-foreground font-mono text-xs">
+                                    {grupoAtivo.selecionadosVinculosQtd} selecionado(s) para OC ·{" "}
+                                    {brl(grupoAtivo.totalValorSelecionados)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Marque os vínculos desejados abaixo e clique em{" "}
+                                <strong>&ldquo;Selecionar Itens&rdquo;</strong> para transferi-los à Ordem de Compra deste fornecedor.
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* BARRA DE AÇÕES DO FORNECEDOR ABERTO */}
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            {(() => {
+                              const idsJaNoGrupo = new Set(grupoAtivo.itens.map((it) => it.produto.id));
+                              const produtosDoFornecedor = produtos.filter(
+                                (p) =>
+                                  !idsJaNoGrupo.has(p.id) &&
+                                  fornecedorDaCompra(p)?.id === grupoAtivo.fornecedor.id,
+                              );
+                              const outrosProdutosCatalogo = produtos.filter(
+                                (p) =>
+                                  !idsJaNoGrupo.has(p.id) &&
+                                  fornecedorDaCompra(p)?.id !== grupoAtivo.fornecedor.id,
+                              );
+                              const produtosDisponiveis = [
+                                ...produtosDoFornecedor,
+                                ...outrosProdutosCatalogo,
+                              ];
+                              if (produtosDisponiveis.length === 0) return null;
+                              return (
                                 <Select
-                                  value={statusCompra[item.produto.id] ?? item.produto.status_compra ?? "a_comprar"}
-                                  onValueChange={(valor) => {
-                                    setStatusCompra((atual) => ({ ...atual, [item.produto.id]: valor }));
-                                    salvarAutomaticamente(item.produto.id, "status_compra", valor, true);
+                                  value=""
+                                  onValueChange={async (prodId) => {
+                                    if (!prodId) return;
+                                    const prod = produtos.find((p) => p.id === prodId);
+                                    if (
+                                      prod &&
+                                      fornecedorDaCompra(prod)?.id !== grupoAtivo.fornecedor.id &&
+                                      fornecedores.some((f) => f.id === grupoAtivo.fornecedor.id)
+                                    ) {
+                                      await supabase
+                                        .from("produtos")
+                                        .update({ fornecedor_id: grupoAtivo.fornecedor.id } as never)
+                                        .eq("id", prodId);
+                                      qc.invalidateQueries({ queryKey: ["produtos"] });
+                                    }
+                                    setSelecionadosCompra((prev) => ({ ...prev, [prodId]: true }));
+                                    setQuantidadesCompra((prev) => ({
+                                      ...prev,
+                                      [prodId]: prev[prodId] ?? "1",
+                                    }));
+                                    toast.success(
+                                      `"${prod?.nome ?? "Produto"}" adicionado à fila de ${grupoAtivo.nome}`,
+                                    );
                                   }}
                                 >
-                                  <SelectTrigger className="h-8 w-28 text-xs">
-                                    <SelectValue />
+                                  <SelectTrigger className="h-9 text-xs w-48 bg-background border-dashed">
+                                    <Plus className="size-3.5 mr-1 text-primary" />
+                                    <SelectValue placeholder="+ Incluir produto na fila..." />
                                   </SelectTrigger>
-                                  <SelectContent>
-                                    {STATUS_COMPRA.map((opcao) => (
-                                      <SelectItem key={opcao.valor} value={opcao.valor}>
-                                        {opcao.rotulo}
+                                  <SelectContent className="max-h-64">
+                                    {produtosDisponiveis.map((prod) => (
+                                      <SelectItem key={prod.id} value={prod.id}>
+                                        {prod.nome} {prod.codigo ? `(${prod.codigo})` : ""} ·{" "}
+                                        {brl(Number(prod.preco_custo ?? 0))}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              </TableCell>
+                              );
+                            })()}
 
-                              <TableCell className="text-right w-40 min-w-[160px] whitespace-nowrap">
-                                <div className="flex justify-end items-center gap-1">
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    className="size-7 text-muted-foreground hover:text-foreground"
-                                    aria-label={`Expandir detalhes de ${item.produto.nome}`}
-                                    title={linhasExpandidas[item.produto.id] ? "Recolher detalhes" : "Expandir detalhes"}
-                                    onClick={() =>
-                                      setLinhasExpandidas((prev) => ({
-                                        ...prev,
-                                        [item.produto.id]: !prev[item.produto.id],
-                                      }))
-                                    }
-                                  >
-                                    {linhasExpandidas[item.produto.id] ? (
-                                      <ChevronUp className="size-3.5" />
-                                    ) : (
-                                      <ChevronDown className="size-3.5" />
-                                    )}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    className="size-7"
-                                    aria-label={`Editar ${item.produto.nome}`}
-                                    title="Editar produto"
-                                    onClick={() => abrirEdicaoProdutoCompra(item.produto)}
-                                  >
-                                    <Pencil className="size-3.5" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    className="size-7 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
-                                    aria-label={`Desvincular ${item.produto.nome}`}
-                                    title="Desvincular de pedidos (enviar para estoque livre)"
-                                    onClick={() => {
-                                      salvarAutomaticamente(item.produto.id, "venda_vinculo_id", null, true);
-                                      setVinculosCompra((prev) => ({
-                                        ...prev,
-                                        [item.produto.id]: [SEM_CLIENTE],
-                                      }));
-                                      toast.success(`Vínculo de "${item.produto.nome}" desfeito.`);
-                                    }}
-                                  >
-                                    <Unlink className="size-3.5" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    className="size-7 text-destructive hover:bg-destructive/10"
-                                    aria-label={`Excluir ${item.produto.nome}`}
-                                    title="Excluir produto"
-                                    disabled={excluirProdutoCompra.isPending}
-                                    onClick={() => {
-                                      if (window.confirm(`Excluir ${item.produto.nome}?`)) {
-                                        excluirProdutoCompra.mutate(item.produto);
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            {linhasExpandidas[item.produto.id] && (
-                              <TableRow className="bg-muted/15 border-b-2">
-                                <TableCell colSpan={12} className="p-3">
-                                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
-                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
-                                      <p className="font-semibold text-muted-foreground flex items-center gap-1 text-[11px] uppercase">
-                                        <Link2 className="size-3 text-emerald-500" />
-                                        Pedidos Vinculados
-                                      </p>
-                                      {item.demanda && item.demanda.pedidos.length > 0 ? (
-                                        <div className="space-y-1 pt-0.5">
-                                          {item.demanda.pedidos.map((p) => (
-                                            <div key={p.id} className="flex items-center justify-between font-medium">
-                                              <span className="truncate max-w-[160px]">{p.rotulo}</span>
-                                              <Badge variant="secondary" className="font-mono text-[10px] py-0 px-1">
-                                                {p.quantidade} un.
-                                              </Badge>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : item.produto.venda_vinculo_id ? (
-                                        <p className="text-foreground">
-                                          {vendaPorId.get(item.produto.venda_vinculo_id)?.numero ?? "Pedido"} —{" "}
-                                          {vendaPorId.get(item.produto.venda_vinculo_id)?.cliente_nome ?? "Cliente"}
-                                        </p>
-                                      ) : (
-                                        <p className="text-muted-foreground italic">Reposição para estoque (sem pedidos diretos)</p>
-                                      )}
-                                    </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-9 text-xs"
+                              onClick={() => alternarSelecaoGrupoFornecedor(grupoAtivo)}
+                            >
+                              {grupoAtivo.todosSelecionados
+                                ? "Desmarcar todos do card"
+                                : "Marcar todos do card"}
+                            </Button>
 
-                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
-                                      <p className="font-semibold text-muted-foreground flex items-center gap-1 text-[11px] uppercase">
-                                        <Boxes className="size-3 text-blue-500" />
-                                        Situação do Estoque
-                                      </p>
-                                      <p className="text-foreground">
-                                        Estoque atual: <strong>{item.estoqueAtual} {item.produto.unidade}</strong>
-                                      </p>
-                                      <p className="text-muted-foreground">
-                                        Estoque mínimo: {item.estoqueMinimo} {item.produto.unidade}
-                                      </p>
-                                    </div>
-
-                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
-                                      <p className="font-semibold text-muted-foreground text-[11px] uppercase">
-                                        Dados Fiscais / Unidade
-                                      </p>
-                                      <p className="text-foreground">
-                                        NCM: <span className="font-mono">{item.produto.ncm ?? "—"}</span> · CST: <span className="font-mono">{item.produto.cst ?? "—"}</span>
-                                      </p>
-                                      <p className="text-muted-foreground">
-                                        Unidade: {item.produto.unidade} · Tipo: {item.produto.tipo}
-                                      </p>
-                                    </div>
-
-                                    <div className="p-2.5 rounded-md border bg-card space-y-1">
-                                      <p className="font-semibold text-muted-foreground text-[11px] uppercase">
-                                        Especificações do Modelo
-                                      </p>
-                                      <p className="text-foreground truncate">
-                                        {item.produto.cor_pastilha ? `Cor: ${item.produto.cor_pastilha}` : "Cor padrão"}
-                                        {item.produto.modelo_pastilha ? ` · Pastilha: ${item.produto.modelo_pastilha}` : ""}
-                                      </p>
-                                      <p className="text-muted-foreground">
-                                        Custo unitário base: {brl(Number(item.produto.preco_custo))}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
+                            {grupoAtivo.totalUnidadesRascunho > 0 && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-9 text-xs font-semibold gap-1.5 border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                                onClick={() => setGavetaOCFornecedorChave(grupoAtivo.chave)}
+                              >
+                                <FileText className="size-4" />
+                                Abrir OC em Rascunho ({grupoAtivo.totalUnidadesRascunho} un.)
+                              </Button>
                             )}
-                          </Fragment>
-                        ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </ExpandableCard>
-              );
-            })
-          )}
+
+                            {/* 4. BOTÃO "SELECIONAR ITENS" */}
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => transferirItensSelecionadosParaOC(grupoAtivo)}
+                              className="h-9 px-4 font-bold gap-2 shadow-sm"
+                            >
+                              <ShoppingCart className="size-4" />
+                              Selecionar Itens
+                              {grupoAtivo.selecionadosVinculosQtd > 0 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="ml-0.5 bg-background/20 text-primary-foreground font-mono text-xs"
+                                >
+                                  {grupoAtivo.selecionadosVinculosQtd}
+                                </Badge>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* CORPO DO CARD ABERTO: SEÇÃO TOPO (COM VÍNCULO) E SEÇÃO ABAIXO (SEM VÍNCULO) */}
+                        <div className="p-5 space-y-8">
+                          {/* TOPO DA LISTA: ITENS COM VÍNCULO ATIVO */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-600 dark:text-emerald-400">
+                                  <Link2 className="size-4" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                    1. Itens com Vínculo Ativo (Pedidos de Venda de Clientes)
+                                  </h4>
+                                  <p className="text-xs text-muted-foreground">
+                                    Produtos atrelados diretamente a pedidos de clientes específicos (prioridade no topo)
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono text-xs"
+                              >
+                                {grupoAtivo.itensComVinculoConsolidados.length} produto(s) ·{" "}
+                                {grupoAtivo.totalComVinculo} vínculo(s)
+                              </Badge>
+                            </div>
+
+                            {grupoAtivo.itensComVinculoConsolidados.length === 0 ? (
+                              <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+                                Nenhum item com vínculo ativo pendente na fila deste fornecedor.
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {grupoAtivo.itensComVinculoConsolidados.map(renderizarLinhaConsolidada)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* ABAIXO: ITENS SEM VÍNCULO (ESTOQUE GERAL) */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                              <div className="flex items-center gap-2">
+                                <div className="rounded-md bg-amber-500/15 p-1.5 text-amber-600 dark:text-amber-400">
+                                  <Boxes className="size-4" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                                    2. Itens sem Vínculo (Reposição de Estoque Geral)
+                                  </h4>
+                                  <p className="text-xs text-muted-foreground">
+                                    Produtos destinados à reposição de estoque livre da loja
+                                  </p>
+                                </div>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-xs"
+                              >
+                                {grupoAtivo.itensSemVinculoConsolidados.length} produto(s) ·{" "}
+                                {grupoAtivo.totalSemVinculo} un.
+                              </Badge>
+                            </div>
+
+                            {grupoAtivo.itensSemVinculoConsolidados.length === 0 ? (
+                              <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+                                Nenhum item sem vínculo pendente para reposição de estoque neste fornecedor.
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {grupoAtivo.itensSemVinculoConsolidados.map(renderizarLinhaConsolidada)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </CardContent>
           </ExpandableCard>
+
+          {/* 4. GAVETA / TELA DA ORDEM DE COMPRA EM ABERTO (RASCUNHO) */}
+          <Sheet
+            open={Boolean(gavetaOCFornecedorChave)}
+            onOpenChange={(aberto) => {
+              if (!aberto) setGavetaOCFornecedorChave(null);
+            }}
+          >
+            <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto flex flex-col gap-5">
+              {(() => {
+                const chave = gavetaOCFornecedorChave;
+                const rascunho = chave ? rascunhosOCPorFornecedor[chave] : undefined;
+                if (!chave || !rascunho) {
+                  return (
+                    <div className="py-12 text-center text-muted-foreground text-sm">
+                      Nenhum item na Ordem de Compra em aberto para este fornecedor.
+                    </div>
+                  );
+                }
+
+                // Agrupa os itens do rascunho por produto para exibição organizada mantendo os vínculos individuais
+                const gruposProdutoRascunho = new Map<
+                  string,
+                  {
+                    produtoId: string;
+                    descricao: string;
+                    codigo: string | null;
+                    unidade: string;
+                    valorUnitario: number;
+                    descontoPercentual: number;
+                    itens: ItemRascunhoOC[];
+                  }
+                >();
+
+                for (const it of rascunho.itens) {
+                  const existente = gruposProdutoRascunho.get(it.produtoId);
+                  if (existente) {
+                    existente.itens.push(it);
+                  } else {
+                    gruposProdutoRascunho.set(it.produtoId, {
+                      produtoId: it.produtoId,
+                      descricao: it.descricao,
+                      codigo: it.codigo,
+                      unidade: it.unidade,
+                      valorUnitario: it.valorUnitario,
+                      descontoPercentual: it.descontoPercentual,
+                      itens: [it],
+                    });
+                  }
+                }
+
+                const valorBrutoRascunho = rascunho.itens.reduce(
+                  (s, it) =>
+                    s +
+                    Number(it.quantidade || 1) *
+                      Number(it.valorUnitario || 0) *
+                      (1 - Number(it.descontoPercentual || 0) / 100),
+                  0,
+                );
+                const creditoAbater = usarCreditoFabricante
+                  ? Math.min(Math.max(Number(creditoFabricante) || 0, 0), valorBrutoRascunho)
+                  : 0;
+                const valorLiquidoOC = Math.max(0, valorBrutoRascunho - creditoAbater);
+
+                return (
+                  <>
+                    <SheetHeader className="border-b pb-4">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">
+                          Rascunho / OC em Aberto
+                        </Badge>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {rascunho.itens.length} un. selecionada(s)
+                        </Badge>
+                      </div>
+                      <SheetTitle className="text-xl flex items-center gap-2 mt-1">
+                        <Factory className="size-5 text-primary" />
+                        Ordem de Compra · {rascunho.fornecedorNome}
+                      </SheetTitle>
+                      <SheetDescription>
+                        Os itens abaixo foram retirados da fila pendente do card e estão reservados nesta Ordem de Compra. Você pode adicionar mais itens do fornecedor ou fechar a compra para gerar o financeiro.
+                      </SheetDescription>
+                    </SheetHeader>
+
+                    {/* LISTA DE PRODUTOS E VÍNCULOS NA ORDEM DE COMPRA EM ABERTO */}
+                    <div className="space-y-3 flex-1">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Itens e Vínculos na Ordem de Compra ({rascunho.itens.length} un.)
+                      </h4>
+
+                      <div className="space-y-3">
+                        {Array.from(gruposProdutoRascunho.values()).map((grp) => {
+                          const qtdProd = grp.itens.reduce((s, i) => s + Number(i.quantidade || 1), 0);
+                          const subtotalProd =
+                            qtdProd * grp.valorUnitario * (1 - grp.descontoPercentual / 100);
+
+                          return (
+                            <div
+                              key={grp.produtoId}
+                              className="rounded-xl border bg-muted/15 p-3.5 space-y-2.5"
+                            >
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <p className="font-bold text-sm text-foreground">
+                                    {grp.descricao} —{" "}
+                                    <span className="text-primary font-mono">{qtdProd} un.</span>
+                                  </p>
+                                  {grp.codigo && (
+                                    <p className="text-[11px] font-mono text-muted-foreground">
+                                      SKU: {grp.codigo}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-muted-foreground">Unit:</span>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="h-7 w-24 text-right font-mono text-xs bg-background"
+                                      value={String(grp.valorUnitario)}
+                                      onChange={(e) =>
+                                        atualizarPrecoDescontoRascunhoOC(
+                                          chave,
+                                          grp.produtoId,
+                                          "valorUnitario",
+                                          Math.max(Number(e.target.value) || 0, 0),
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-muted-foreground">%Desc:</span>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      className="h-7 w-16 text-right font-mono text-xs bg-background"
+                                      value={String(grp.descontoPercentual)}
+                                      onChange={(e) =>
+                                        atualizarPrecoDescontoRascunhoOC(
+                                          chave,
+                                          grp.produtoId,
+                                          "descontoPercentual",
+                                          Math.min(Math.max(Number(e.target.value) || 0, 0), 100),
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                  <span className="font-mono font-bold text-xs min-w-[80px] text-right">
+                                    {brl(subtotalProd)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Vínculos transferidos deste produto */}
+                              <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/60">
+                                {grp.itens.map((vinc) => (
+                                  <Badge
+                                    key={vinc.key}
+                                    variant="outline"
+                                    className={cn(
+                                      "flex items-center gap-1.5 py-1 px-2 text-xs",
+                                      vinc.comVinculo
+                                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                        : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                                    )}
+                                  >
+                                    {vinc.comVinculo ? (
+                                      <Link2 className="size-3" />
+                                    ) : (
+                                      <Boxes className="size-3" />
+                                    )}
+                                    <span>
+                                      {vinc.comVinculo
+                                        ? `${vinc.clienteNome ?? "Cliente"} (${vinc.pedidoNumero ?? "Pedido"})`
+                                        : "Estoque Geral (1 un.)"}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      title="Devolver este vínculo para a fila do card"
+                                      onClick={() => removerVinculoDoRascunhoOC(chave, vinc.key)}
+                                      className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 transition-colors"
+                                    >
+                                      <Trash2 className="size-3" />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* DADOS FINANCEIROS E DE ENTREGA PARA FECHAR A COMPRA */}
+                    <div className="rounded-xl border bg-card p-4 space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Condições Financeiras e Faturamento (Contas a Pagar)
+                      </h4>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Forma de Pagamento
+                          </label>
+                          <Select
+                            value={rascunho.formaPagamento || "Boleto"}
+                            onValueChange={(val) =>
+                              atualizarMetadadosRascunhoOC(chave, { formaPagamento: val })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {FORMAS_PAGAMENTO_COMPRA.map((fp) => (
+                                <SelectItem key={fp} value={fp}>
+                                  {fp}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Vencimento da Cobrança
+                          </label>
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={rascunho.vencimentoFinanceiro || hojeISO()}
+                            onChange={(e) =>
+                              atualizarMetadadosRascunhoOC(chave, {
+                                vencimentoFinanceiro: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Previsão de Entrega
+                          </label>
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={rascunho.previsaoEntrega || ""}
+                            onChange={(e) =>
+                              atualizarMetadadosRascunhoOC(chave, {
+                                previsaoEntrega: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Condições / Prazo (ex: 30/60/90 dias)
+                          </label>
+                          <Input
+                            type="text"
+                            placeholder="Ex.: 28/56 dias no boleto"
+                            className="h-8 text-xs"
+                            value={rascunho.condicoes || ""}
+                            onChange={(e) =>
+                              atualizarMetadadosRascunhoOC(chave, { condicoes: e.target.value })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Observações da Ordem de Compra
+                        </label>
+                        <Input
+                          type="text"
+                          placeholder="Observações opcionais para o fornecedor / financeiro..."
+                          className="h-8 text-xs"
+                          value={rascunho.observacoes || ""}
+                          onChange={(e) =>
+                            atualizarMetadadosRascunhoOC(chave, { observacoes: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Valor Total da Ordem de Compra</p>
+                          {creditoAbater > 0 && (
+                            <p className="text-[11px] text-emerald-600">
+                              Crédito fabricante abatido: −{brl(creditoAbater)}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-xl font-bold font-mono text-primary">
+                          {brl(valorLiquidoOC)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* BOTÕES DE AÇÃO DA ORDEM DE COMPRA: "ADICIONAR MAIS ITENS" E "FECHAR COMPRA" */}
+                    <SheetFooter className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full sm:w-auto flex-1 font-semibold gap-2"
+                        onClick={() => {
+                          setFornecedorCardAberto(chave);
+                          setGavetaOCFornecedorChave(null);
+                        }}
+                      >
+                        <ArrowLeft className="size-4" />
+                        Adicionar mais itens
+                      </Button>
+
+                      <Button
+                        type="button"
+                        disabled={fecharCompraRascunhoOC.isPending || rascunho.itens.length === 0}
+                        onClick={() => fecharCompraRascunhoOC.mutate(chave)}
+                        className="w-full sm:w-auto flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 shadow-sm"
+                      >
+                        <CheckCircle2 className="size-4" />
+                        {fecharCompraRascunhoOC.isPending ? "Fechando Compra..." : "Fechar Compra"}
+                      </Button>
+                    </SheetFooter>
+                  </>
+                );
+              })()}
+            </SheetContent>
+          </Sheet>
         </TabsContent>
 
         {/* ABA 2: GRADE GERAL DE PRODUTOS */}
@@ -4445,7 +5718,7 @@ function OrdensCompra() {
                           type="number"
                           min="0"
                           step="1"
-                          value={quantidadesCompra[produto.id] ?? String(Number(produto.quantidade_compra ?? 1))}
+                          value={quantidadesCompra[produto.id] ?? String(quantidadeCompra(produto))}
                           onChange={(evento) => {
                             const valor = evento.target.value;
                             setQuantidadesCompra((atual) => ({
@@ -6049,13 +7322,15 @@ function OrdensCompra() {
                       <SelectValue placeholder="Produto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {produtos
-                        .filter((p) => {
+                      {[...produtos]
+                        .sort((a, b) => {
                           const fId = formEdicao.fornecedor_id || ordemDetalhe?.fornecedor_id;
                           if (fId) {
-                            return fornecedorDaCompra(p)?.id === fId;
+                            const aMatch = fornecedorDaCompra(a)?.id === fId ? 0 : 1;
+                            const bMatch = fornecedorDaCompra(b)?.id === fId ? 0 : 1;
+                            if (aMatch !== bMatch) return aMatch - bMatch;
                           }
-                          return true;
+                          return a.nome.localeCompare(b.nome);
                         })
                         .map((p) => (
                           <SelectItem key={p.id} value={p.id}>
@@ -6568,32 +7843,59 @@ function OrdensCompra() {
           </div>
 
           <div className="space-y-2 rounded-lg border border-border p-3">
-            <p className="text-sm font-medium">Adicionar item</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Adicionar item</p>
+              <ProdutoRapidoDialog
+                onCreated={async (id) => {
+                  const { data: listaAtualizada } = await refetchProdutos();
+                  const prod = (listaAtualizada ?? produtos).find((p) => p.id === id);
+                  setNovoItem((i) => ({
+                    ...i,
+                    produto_id: id,
+                    valor_unitario: String(prod?.preco_custo ?? i.valor_unitario),
+                    cor: prod?.cor_pastilha ?? i.cor,
+                    pastilha: prod?.modelo_pastilha ?? i.pastilha,
+                  }));
+                }}
+              />
+            </div>
             <div className="grid gap-2 sm:grid-cols-4">
               <Select
                 value={novoItem.produto_id}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
+                  const prodSel = produtos.find((p) => p.id === v);
                   setNovoItem((i) => ({
                     ...i,
                     produto_id: v,
-                    valor_unitario: String(produtos.find((p) => p.id === v)?.preco_custo ?? i.valor_unitario),
-                    cor: produtos.find((p) => p.id === v)?.cor_pastilha ?? i.cor,
-                    pastilha: produtos.find((p) => p.id === v)?.modelo_pastilha ?? i.pastilha,
-                  }))
-                }
+                    valor_unitario: String(prodSel?.preco_custo ?? i.valor_unitario),
+                    cor: prodSel?.cor_pastilha ?? i.cor,
+                    pastilha: prodSel?.modelo_pastilha ?? i.pastilha,
+                  }));
+                  if (prodSel?.fornecedor_id) {
+                    setNovaOrdem((f) => ({
+                      ...f,
+                      fornecedor_id: f.fornecedor_id || prodSel.fornecedor_id || "",
+                    }));
+                  }
+                  setTimeout(() => {
+                    qtdNovaOrdemInputRef.current?.focus();
+                    qtdNovaOrdemInputRef.current?.select();
+                  }, 50);
+                }}
               >
                 <SelectTrigger className="sm:col-span-2">
                   <SelectValue placeholder="Produto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {produtos
-                    .filter((p) => {
+                  {[...produtos]
+                    .sort((a, b) => {
                       if (novaOrdem.fornecedor_id) {
-                        return fornecedorDaCompra(p)?.id === novaOrdem.fornecedor_id;
+                        const aMatch = fornecedorDaCompra(a)?.id === novaOrdem.fornecedor_id ? 0 : 1;
+                        const bMatch = fornecedorDaCompra(b)?.id === novaOrdem.fornecedor_id ? 0 : 1;
+                        if (aMatch !== bMatch) return aMatch - bMatch;
                       }
-                      return true;
+                      return a.nome.localeCompare(b.nome);
                     })
-                    .filter((p) => (!ocultarJaComprados ? true : !ehProdutoJaCompradoOuFaturado(p)))
                     .map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.codigo ? `${p.codigo} — ` : ""}
@@ -6619,6 +7921,7 @@ function OrdensCompra() {
                 </SelectContent>
               </Select>
               <Input
+                ref={qtdNovaOrdemInputRef}
                 type="number"
                 placeholder="Qtd"
                 aria-label="Quantidade"

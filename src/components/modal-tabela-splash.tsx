@@ -42,7 +42,10 @@ import {
   TABELA_PECAS_ESTOQUE_2026,
   type ItemPecaEstoque,
 } from "@/data/tabela-pecas-estoque";
-import { sincronizarPecasEstoqueNoBanco } from "@/hooks/use-sincronizar-pecas-estoque";
+import {
+  garantirFornecedorAnalandiaEMigrarProdutos,
+  sincronizarPecasEstoqueNoBanco,
+} from "@/hooks/use-sincronizar-pecas-estoque";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Produto = Tables<"produtos">;
@@ -147,31 +150,13 @@ export function ModalTabelaSplash({
     return TABELA_PECAS_ESTOQUE_2026.filter((i) => estaPecaCadastrada(i)).length;
   }, [cadastradosSet]);
 
-  // Função auxiliar para garantir fornecedor Splash
+  // Garante fornecedor Analandia Ind Piscinas e migra cadastros antigos de Splash Piscinas by iGUI
   const obterFornecedorSplashId = async (uid: string) => {
-    const { data: fornList, error: fornErr } = await supabase
-      .from("fornecedores")
-      .select("id, nome")
-      .ilike("nome", "%Splash%");
-    if (fornErr) throw fornErr;
-
-    let splashFornecedorId = fornList?.[0]?.id;
-    if (!splashFornecedorId) {
-      const { data: novoForn, error: createFornErr } = await supabase
-        .from("fornecedores")
-        .insert({
-          nome: "Splash Piscinas by iGUI",
-          contato: "Fábrica Splash",
-          observacoes: "Fornecedor oficial de piscinas Splash by iGUI 2026",
-          ativo: true,
-          created_by: uid,
-        })
-        .select("id")
-        .single();
-      if (createFornErr) throw createFornErr;
-      splashFornecedorId = novoForn.id;
+    const { analandiaId } = await garantirFornecedorAnalandiaEMigrarProdutos(uid || null);
+    if (!analandiaId) {
+      throw new Error("Não foi possível localizar ou cadastrar o fornecedor Analandia Ind Piscinas.");
     }
-    return splashFornecedorId;
+    return analandiaId;
   };
 
   // Sincronização de Piscinas

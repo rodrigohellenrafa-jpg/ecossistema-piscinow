@@ -79,7 +79,6 @@ function EstoqueInventario() {
       const { data, error } = await supabase
         .from("produtos")
         .select("id, codigo, nome, categoria, localizacao, unidade, estoque_atual, preco_custo")
-        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data as Produto[];

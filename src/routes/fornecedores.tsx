@@ -33,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { proximoCodigo } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
 import { useAbrirModal } from "@/hooks/use-abrir-modal";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 export const Route = createFileRoute("/fornecedores")({
   staticData: { sitemap: false },
@@ -74,6 +75,7 @@ const vazio = {
 
 function Fornecedores() {
   const qc = useQueryClient();
+  useSincronizarPecasEstoque();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   useAbrirModal("novo", () => setOpen(true));

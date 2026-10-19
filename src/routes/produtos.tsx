@@ -1,7 +1,16 @@
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ExternalLink,
+  Pencil,
+  Plus,
+  Search,
+  ShoppingCart,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/field";
@@ -46,8 +55,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
-import { brl, CATEGORIAS_PRODUTO, margem, pct } from "@/lib/erp";
+import { brl, CATEGORIAS_PRODUTO, hojeISO, margem, pct, proximoCodigo } from "@/lib/erp";
 import type { Tables } from "@/integrations/supabase/types";
 import { useAbrirModal } from "@/hooks/use-abrir-modal";
 import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
@@ -126,6 +141,7 @@ const ORIGENS_MERCADORIA = [
 
 function Produtos() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   useSincronizarPecasEstoque();
   const [q, setQ] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState<string>(TODAS_CATEGORIAS);
@@ -134,6 +150,20 @@ function Produtos() {
   useAbrirModal("novo", () => setOpen(true));
   const [editando, setEditando] = useState<Produto | null>(null);
   const [form, setForm] = useState(vazio);
+
+  // Estado e referência para o modal rápido "Gerar Ordem de Compra"
+  const qtdOcInputRef = useRef<HTMLInputElement | null>(null);
+  const [ocProduto, setOcProduto] = useState<Produto | null>(null);
+  const [ocForm, setOcForm] = useState({
+    produto_id: "",
+    fornecedor_id: "",
+    quantidade: "1",
+    valor_unitario: "0",
+    desconto: "0",
+    previsao_entrega: "",
+    condicoes: "",
+    observacoes: "",
+  });
 
   const { data = [] } = useQuery({
     queryKey: ["produtos"],
@@ -154,6 +184,154 @@ function Produtos() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const resolverFornecedorPadrao = (p: Produto) => {
+    const normalizar = (s: string) =>
+      s
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+    const analandiaForn = fornecedores.find((f) => normalizar(f.nome).includes("analandia"));
+
+    if (p.fornecedor_id) {
+      const fornAtual = fornecedores.find((f) => f.id === p.fornecedor_id);
+      if (fornAtual) {
+        const nomeNorm = normalizar(fornAtual.nome);
+        const eraSplashIgui =
+          nomeNorm.includes("splash piscinas") ||
+          nomeNorm.includes("by igui") ||
+          nomeNorm === "splash";
+        if (eraSplashIgui && analandiaForn) {
+          return analandiaForn.id;
+        }
+        return fornAtual.id;
+      }
+    }
+
+    const ehPiscinaOuSplash =
+      p.codigo?.toUpperCase().startsWith("SPL-") ||
+      p.codigo?.toUpperCase().startsWith("PEC-") ||
+      p.nome.toLowerCase().includes("splash") ||
+      p.nome.toLowerCase().includes("piscina") ||
+      p.categoria === "Piscinas";
+    if (ehPiscinaOuSplash && analandiaForn) {
+      return analandiaForn.id;
+    }
+    return fornecedores[0]?.id ?? "";
+  };
+
+  const abrirGerarOc = (p: Produto) => {
+    const custoPadrao =
+      Number(p.preco_custo) > 0
+        ? Number(p.preco_custo)
+        : Number(p.custo_fabricacao ?? 0) + Number(p.custo_logistico ?? 0);
+    const qtdSugerida =
+      Number(p.estoque_minimo ?? 0) > Number(p.estoque_atual ?? 0)
+        ? Math.max(1, Number(p.estoque_minimo ?? 0) - Number(p.estoque_atual ?? 0))
+        : 1;
+    setOcProduto(p);
+    setOcForm({
+      produto_id: p.id,
+      fornecedor_id: resolverFornecedorPadrao(p),
+      quantidade: String(qtdSugerida),
+      valor_unitario: String(custoPadrao || 0),
+      desconto: "0",
+      previsao_entrega: "",
+      condicoes: "",
+      observacoes: "",
+    });
+    setTimeout(() => {
+      qtdOcInputRef.current?.focus();
+      qtdOcInputRef.current?.select();
+    }, 60);
+  };
+
+  const gerarOrdemCompra = useMutation({
+    mutationFn: async () => {
+      const prod = data.find((x) => x.id === ocForm.produto_id) ?? ocProduto;
+      if (!prod) throw new Error("Produto não encontrado.");
+      if (!ocForm.fornecedor_id) throw new Error("Selecione o fornecedor para a Ordem de Compra.");
+      const quantidade = Number(ocForm.quantidade);
+      if (!Number.isFinite(quantidade) || quantidade <= 0) {
+        throw new Error("Informe uma quantidade válida maior que zero.");
+      }
+      const valorUnitario = Math.max(Number(ocForm.valor_unitario) || 0, 0);
+      const desconto = Math.max(Number(ocForm.desconto) || 0, 0);
+      const totalItem = Math.max(quantidade * valorUnitario - desconto, 0);
+
+      const fornecedor = fornecedores.find((f) => f.id === ocForm.fornecedor_id);
+      const { data: auth } = await supabase.auth.getUser();
+      const { data: existentes } = await supabase.from("ordens_compra").select("numero");
+      const numero = proximoCodigo("OC", (existentes ?? []).map((o) => o.numero));
+
+      const { data: ordemCriada, error: erroOrdem } = await supabase
+        .from("ordens_compra")
+        .insert({
+          numero,
+          fornecedor_id: ocForm.fornecedor_id,
+          fornecedor_nome: fornecedor?.nome ?? null,
+          data_pedido: hojeISO(),
+          previsao_entrega: ocForm.previsao_entrega || null,
+          condicoes: ocForm.condicoes || null,
+          observacoes: ocForm.observacoes || null,
+          valor_produtos: totalItem,
+          desconto,
+          icms_base: totalItem,
+          icms_valor: totalItem * 0.18,
+          icms_st_base: 0,
+          icms_st_valor: 0,
+          valor_total: totalItem,
+          status: "pendente",
+          created_by: auth.user?.id ?? null,
+        })
+        .select("id, numero")
+        .single();
+      if (erroOrdem) throw erroOrdem;
+
+      const { error: erroItem } = await supabase.from("ordem_compra_itens").insert({
+        ordem_id: ordemCriada.id,
+        produto_id: prod.id,
+        codigo: prod.codigo ?? "",
+        descricao: prod.nome,
+        ncm: prod.ncm ?? "",
+        cst: prod.cst ?? "",
+        unidade: prod.unidade || "UN",
+        quantidade,
+        valor_unitario: valorUnitario,
+        desconto,
+        total: totalItem,
+        cliente_id: null,
+        cliente_nome: null,
+        cor: prod.cor_pastilha ?? null,
+        pastilha: prod.modelo_pastilha ?? null,
+      });
+      if (erroItem) throw erroItem;
+
+      // Mantém fornecedor padrão e custo sincronizados no cadastro do produto se necessário
+      const patchProduto: Record<string, unknown> = {};
+      if (!prod.fornecedor_id && ocForm.fornecedor_id) {
+        patchProduto.fornecedor_id = ocForm.fornecedor_id;
+      }
+      if (valorUnitario > 0 && valorUnitario !== Number(prod.preco_custo ?? 0)) {
+        patchProduto.preco_custo = valorUnitario;
+      }
+      if (Object.keys(patchProduto).length > 0) {
+        await supabase.from("produtos").update(patchProduto as never).eq("id", prod.id);
+      }
+
+      return ordemCriada;
+    },
+    onSuccess: (ordemCriada) => {
+      toast.success(`Ordem de Compra ${ordemCriada.numero} gerada com sucesso!`);
+      setOcProduto(null);
+      qc.invalidateQueries({ queryKey: ["ordens_compra"] });
+      qc.invalidateQueries({ queryKey: ["ordem_compra_itens"] });
+      qc.invalidateQueries({ queryKey: ["produtos"] });
+      qc.invalidateQueries({ queryKey: ["produtos-select"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const abrirNovo = () => {
@@ -179,7 +357,7 @@ function Produtos() {
       ),
       custo_fabricacao: String(p.custo_fabricacao ?? 0),
       custo_logistico: String(p.custo_logistico ?? 0),
-      fornecedor_id: p.fornecedor_id ?? SEM_FORNECEDOR,
+      fornecedor_id: resolverFornecedorPadrao(p) || p.fornecedor_id || SEM_FORNECEDOR,
       ncm: p.ncm ?? "",
       cst: p.cst ?? "",
       cfop: p.cfop ?? "",
@@ -283,8 +461,29 @@ function Produtos() {
     );
   const set = (k: keyof typeof vazio) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  const nomeFornecedor = (id: string | null) =>
-    fornecedores.find((f) => f.id === id)?.nome ?? "—";
+  const nomeFornecedor = (id: string | null, p?: Produto) => {
+    const f = fornecedores.find((x) => x.id === id);
+    if (f) {
+      const nomeNorm = f.nome
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+      if (
+        nomeNorm.includes("splash piscinas") ||
+        nomeNorm.includes("by igui") ||
+        nomeNorm === "splash" ||
+        nomeNorm.includes("analandia")
+      ) {
+        return "Analandia Ind Piscinas";
+      }
+      return f.nome;
+    }
+    if (p && (p.categoria === "Piscinas" || p.codigo?.toUpperCase().startsWith("SPL-"))) {
+      return "Analandia Ind Piscinas";
+    }
+    return "—";
+  };
 
   return (
     <div className="space-y-6">
@@ -633,7 +832,7 @@ function Produtos() {
                 <TableHead className="text-right">Venda</TableHead>
                 <TableHead className="text-right">Margem</TableHead>
                 <TableHead className="text-right">Estoque</TableHead>
-                <TableHead className="w-20" />
+                <TableHead className="w-44 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -687,7 +886,7 @@ function Produtos() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{nomeFornecedor(p.fornecedor_id)}</TableCell>
+                    <TableCell>{nomeFornecedor(p.fornecedor_id, p)}</TableCell>
                     <TableCell className="text-right">{brl(Number(p.preco_custo))}</TableCell>
                     <TableCell className="text-right">{brl(Number(p.preco_venda))}</TableCell>
                     <TableCell className="text-right">{pct(m)}</TableCell>
@@ -707,12 +906,32 @@ function Produtos() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
+                    <TableCell className="whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1.5 px-2.5 text-xs font-medium"
+                                onClick={() => abrirGerarOc(p)}
+                                title="Gerar Ordem de Compra"
+                                aria-label={`Gerar Ordem de Compra para ${p.nome}`}
+                              >
+                                <ShoppingCart className="size-3.5 text-primary" />
+                                <span>Gerar OC</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Gerar Ordem de Compra</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <Button
                           size="icon"
                           variant="ghost"
+                          className="size-8 shrink-0"
                           onClick={() => abrirEdicao(p)}
+                          title="Editar produto"
                           aria-label={`Editar ${p.nome}`}
                         >
                           <Pencil className="size-4" />
@@ -720,7 +939,9 @@ function Produtos() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          className="size-8 shrink-0"
                           onClick={() => excluir.mutate(p.id)}
+                          title="Excluir produto"
                           aria-label={`Excluir ${p.nome}`}
                         >
                           <Trash2 className="size-4" />
@@ -741,6 +962,180 @@ function Produtos() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Modal rápido de criação de Ordem de Compra com produto pré-selecionado */}
+      <Dialog open={!!ocProduto} onOpenChange={(v) => !v && setOcProduto(null)}>
+        <DialogContent
+          className="sm:max-w-lg"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            qtdOcInputRef.current?.focus();
+            qtdOcInputRef.current?.select();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="size-5 text-primary" />
+              Nova Ordem de Compra
+            </DialogTitle>
+            <DialogDescription>
+              Crie rapidamente uma Ordem de Compra com o produto, fornecedor padrão e custo unitário
+              já preenchidos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {ocProduto && (
+            <form
+              className="grid gap-4 py-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                gerarOrdemCompra.mutate();
+              }}
+            >
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Produto selecionado
+                    </p>
+                    <p className="text-sm font-semibold text-foreground">{ocProduto.nome}</p>
+                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                      ID: {ocProduto.id.slice(0, 8)}
+                      {ocProduto.codigo ? ` • SKU: ${ocProduto.codigo}` : ""}
+                      {` • Estoque atual: ${Number(ocProduto.estoque_atual)} ${ocProduto.unidade}`}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{ocProduto.unidade || "UN"}</Badge>
+                </div>
+              </div>
+
+              <Field label="Fornecedor *">
+                <Select
+                  value={ocForm.fornecedor_id || "none"}
+                  onValueChange={(v) =>
+                    setOcForm({ ...ocForm, fornecedor_id: v === "none" ? "" : v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o fornecedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Selecione um fornecedor...</SelectItem>
+                    {fornecedores.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Field label={`Quantidade (${ocProduto.unidade || "UN"}) *`}>
+                  <Input
+                    ref={qtdOcInputRef}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    autoFocus
+                    value={ocForm.quantidade}
+                    onChange={(e) => setOcForm({ ...ocForm, quantidade: e.target.value })}
+                  />
+                </Field>
+                <Field label="Custo unitário (R$)">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ocForm.valor_unitario}
+                    onChange={(e) => setOcForm({ ...ocForm, valor_unitario: e.target.value })}
+                  />
+                </Field>
+                <Field label="Desconto (R$)">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={ocForm.desconto}
+                    onChange={(e) => setOcForm({ ...ocForm, desconto: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Previsão de entrega">
+                  <Input
+                    type="date"
+                    value={ocForm.previsao_entrega}
+                    onChange={(e) => setOcForm({ ...ocForm, previsao_entrega: e.target.value })}
+                  />
+                </Field>
+                <Field label="Condições de pagamento">
+                  <Input
+                    placeholder="Ex.: 28/56 DDL, PIX..."
+                    value={ocForm.condicoes}
+                    onChange={(e) => setOcForm({ ...ocForm, condicoes: e.target.value })}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Observações">
+                <Input
+                  placeholder="Observações opcionais do pedido..."
+                  value={ocForm.observacoes}
+                  onChange={(e) => setOcForm({ ...ocForm, observacoes: e.target.value })}
+                />
+              </Field>
+
+              <div className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Total estimado da OC:</span>
+                <span className="font-semibold text-foreground">
+                  {brl(
+                    Math.max(
+                      (Number(ocForm.quantidade) || 0) * (Number(ocForm.valor_unitario) || 0) -
+                        (Number(ocForm.desconto) || 0),
+                      0,
+                    ),
+                  )}
+                </span>
+              </div>
+
+              <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-xs text-muted-foreground"
+                  onClick={() => {
+                    const pid = ocProduto.id;
+                    setOcProduto(null);
+                    navigate({
+                      to: "/ordens-compra",
+                      search: { produtoId: pid } as never,
+                    });
+                  }}
+                >
+                  <ExternalLink className="size-3.5" />
+                  Abrir tela completa de OC
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOcProduto(null)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={gerarOrdemCompra.isPending}>
+                    <ShoppingCart className="mr-1.5 size-4" />
+                    {gerarOrdemCompra.isPending ? "Gerando..." : "Gerar Ordem de Compra"}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

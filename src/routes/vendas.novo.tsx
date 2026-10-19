@@ -57,6 +57,7 @@ import {
   NOTA_PORCELANA_POR_LINHA,
   TABELA_CUSTO_VENDA_PISCINAS,
 } from "@/data/tabela-custo-venda-piscinas";
+import { useSincronizarPecasEstoque } from "@/hooks/use-sincronizar-pecas-estoque";
 
 
 export const Route = createFileRoute("/vendas/novo")({
@@ -222,6 +223,7 @@ export function ComparativoPedido({ vendaId }: { vendaId: string }) {
 function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  useSincronizarPecasEstoque();
   const [rascunhoVendaId, setRascunhoVendaId] = useState<string | null>(() => {
     try {
       return localStorage.getItem(RASCUNHO_VENDA_KEY);

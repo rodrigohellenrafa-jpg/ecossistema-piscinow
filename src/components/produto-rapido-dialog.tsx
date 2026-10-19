@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { PackagePlus, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ const vazio = {
 };
 
 export function ProdutoRapidoDialog({ onCreated, iconOnly = false }: Props) {
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [sobEncomenda, setSobEncomenda] = useState(false);
@@ -77,7 +79,11 @@ export function ProdutoRapidoDialog({ onCreated, iconOnly = false }: Props) {
         .select("id")
         .single();
       if (error) throw error;
-      toast.success("Item cadastrado.");
+      toast.success("Item cadastrado no catálogo global.");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["produtos"] }),
+        qc.invalidateQueries({ queryKey: ["produtos-select"] }),
+      ]);
       setForm(vazio);
       setSobEncomenda(false);
       setOpen(false);

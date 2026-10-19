@@ -108,12 +108,11 @@ function EstoqueEntradas() {
     setForm((f) => ({ ...f, [campo]: valor }));
 
   const { data: produtos = [] } = useQuery({
-    queryKey: ["produtos", "lista-simples"],
+    queryKey: ["produtos", "entradas-estoque"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("produtos")
         .select("id, codigo, nome, unidade")
-        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return data as Produto[];
@@ -136,13 +135,14 @@ function EstoqueEntradas() {
   });
 
   const { data: notas = [] } = useQuery({
-    queryKey: ["notas_compra", "recentes"],
+    queryKey: ["notas_compra", "pendentes-entrada"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("notas_compra")
-        .select("id, fornecedor, numero, data_entrada, valor_total")
+        .select("id, fornecedor, numero, data_entrada, valor_total, status")
+        .not("status", "in", "(lancada,cancelada)")
         .order("data_entrada", { ascending: false })
-        .limit(20);
+        .limit(50);
       if (error) throw error;
       return data as NotaCompra[];
     },
@@ -170,6 +170,7 @@ function EstoqueEntradas() {
       setForm(formVazio);
       qc.invalidateQueries({ queryKey: ["estoque_movimentos"] });
       qc.invalidateQueries({ queryKey: ["produtos"] });
+      qc.invalidateQueries({ queryKey: ["produtos-select"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -186,9 +187,18 @@ function EstoqueEntradas() {
       created_by: auth.user?.id ?? null,
     });
     if (error) return toast.error(error.message);
-    toast.success("Entrada lançada a partir da nota");
+
+    await supabase
+      .from("notas_compra")
+      .update({ status: "lancada" })
+      .eq("id", nota.id);
+
+    toast.success("Entrada lançada e Nota Fiscal arquivada no Histórico de NFs");
+    setImportarOpen(false);
     qc.invalidateQueries({ queryKey: ["estoque_movimentos"] });
+    qc.invalidateQueries({ queryKey: ["notas_compra"] });
     qc.invalidateQueries({ queryKey: ["produtos"] });
+    qc.invalidateQueries({ queryKey: ["produtos-select"] });
   };
 
   const excluirMovimento = useMutation({

@@ -86,7 +86,6 @@ function RelatorioEstoque() {
       const { data, error } = await supabase
         .from("produtos")
         .select("id, codigo, nome, unidade, categoria, estoque_atual, estoque_minimo, preco_custo")
-        .eq("ativo", true)
         .order("nome");
       if (error) throw error;
       return (data ?? []) as Produto[];
