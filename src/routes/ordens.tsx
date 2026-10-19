@@ -74,8 +74,8 @@ const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 const STATUS = ["orcamento", "aprovado", "em_execucao", "concluido", "cancelado"] as const;
 const LABEL: Record<string, string> = {
-  orcamento: "Orçamento",
-  aprovado: "Aprovado",
+  orcamento: "Rascunho / Orçamento",
+  aprovado: "OS Emitida / Aprovada",
   em_execucao: "Em execução",
   concluido: "Concluído",
   cancelado: "Cancelado",
@@ -94,7 +94,7 @@ const vazio = {
   tipo_servico: "",
   descricao: "",
   responsavel: "",
-  status: "orcamento",
+  status: "aprovado",
   prioridade: "media",
   data_agendada: "",
   valor: "0",

@@ -1,26 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plane,
   Clock,
-  Radio,
-  AlertTriangle,
   CheckCircle2,
   Calendar,
   FileText,
   Printer,
   Pencil,
+  Trash2,
   Plus,
   Search,
-  SlidersHorizontal,
+  ChevronLeft,
   ChevronRight,
-  ExternalLink,
   ShieldAlert,
   Flame,
-  ArrowUpDown,
   RefreshCw,
-  Info,
+  Wrench,
+  Briefcase,
+  Mail,
+  Users,
+  CheckCheck,
+  LayoutGrid,
+  Columns3,
+  ListFilter,
+  Sparkles,
+  CalendarCheck2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,14 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -69,16 +68,21 @@ import {
 import { BotaoVisualizarFormulariosEmitidos } from "@/components/modal-formularios-emitidos";
 import { supabase } from "@/integrations/supabase/client";
 import { dataBR, hojeISO, addDiasUteis } from "@/lib/erp";
+import {
+  EMAIL_AGENDA_LOJA_PRINCIPAL,
+  sincronizarFlightBoardBidirecionalGoogle,
+  sincronizarItemFlightBoardGoogle,
+} from "@/lib/google-agenda.functions";
 
 export const Route = createFileRoute("/logistica")({
   staticData: { sitemap: false },
   head: () => ({
     meta: [
-      { title: "✈️ Flight Board — Controle de Logística | Piscinow ERP" },
+      { title: "✈️ Flight Board — Quadro de Execução e Cronograma | Piscinow ERP" },
       {
         name: "description",
         content:
-          "Painel de controle de voos operacionais e logística de piscinas com design FIDS de aeroporto, monitoramento de etapas e serviços OUT.",
+          "Quadro de Execução e Cronograma (Flight Board) com alto contraste, filtro obrigatório de OS emitida e sincronização bidirecional com Google Agenda.",
       },
     ],
   }),
@@ -89,1492 +93,2559 @@ export const Route = createFileRoute("/logistica")({
   ),
 });
 
-export type FlightStatus = "CONFIRMADO" | "AGENDADO" | "OUT" | "AGUARDANDO" | "CONCLUÍDO";
-export type EtapaStatus = "pendente" | "em_andamento" | "concluido";
+export type FlightStatus =
+  | "EM_ANDAMENTO"
+  | "AGENDADO"
+  | "CONCLUIDO"
+  | "AGUARDANDO"
+  | "OUT";
 
-export interface FlightBoardItem {
+export type EtapaStatus = "pendente" | "em_andamento" | "concluido";
+export type ModalidadeExecucao = "com_execucao" | "sem_execucao";
+
+export interface FlightBoardCardItem {
   id: string;
-  voo_codigo: string;
+  origem: "flight_board" | "os_emitida" | "agenda_google";
+  registro_id: string; // ID na tabela de origem (logistics_flight_board.id ou agenda_eventos.id ou ordens_servico.id)
+  flight_board_id?: string | null;
+  agenda_evento_id?: string | null;
+  ordem_id?: string | null;
+  os_numero?: string | null;
   obra_id?: string | null;
   venda_id?: string | null;
   cliente_id?: string | null;
+  voo_codigo: string;
   cliente_nome: string;
-  servico_natureza: string;
-  data_pedido: string;
-  prazo_dias: number;
-  prazo_limite: string;
-  escavacao_data?: string | null;
-  escavacao_status: EtapaStatus;
-  instalacao_data?: string | null;
-  instalacao_status: EtapaStatus;
-  os_instalacao?: string | null;
-  os_instalacao_status: EtapaStatus;
-  os_logistica?: string | null;
-  os_logistica_status: EtapaStatus;
-  os_acabamento?: string | null;
-  os_acabamento_status: EtapaStatus;
+  cliente_telefone?: string | null;
+  cliente_cidade?: string | null;
+  kit_titulo: string;
+  etapa_execucao: string;
+  data_execucao: string; // YYYY-MM-DD
+  hora_inicio: string; // HH:mm
+  hora_fim: string; // HH:mm
   status: FlightStatus;
-  is_out: boolean;
-  responsavel?: string | null;
-  endereco_obra?: string | null;
-  observacoes?: string | null;
-  origem: "logistics_board" | "obra" | "venda";
+  modalidade_execucao: ModalidadeExecucao;
+  equipe_responsavel: string;
+  emails_vinculados: string;
+  observacoes: string;
+  google_event_id?: string | null;
+  google_calendar_id?: string | null;
+  tem_os_emitida: boolean;
+  os_status_original?: string | null;
+  etapa_conferencia: EtapaStatus;
+  etapa_separacao: EtapaStatus;
+  etapa_carregamento: EtapaStatus;
+  etapa_transito: EtapaStatus;
+  etapa_entrega: EtapaStatus;
+  etapa_instalacao: EtapaStatus;
+  servico_out: boolean;
+  motivo_out?: string | null;
 }
 
-function calcularPrazoRestante(
-  dataLimiteStr: string | null | undefined,
-  dataPedidoStr: string,
-  prazoDias: number,
-) {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+const DIAS_SEMANA_CURTO = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const DIAS_SEMANA_LONGO = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+];
 
-  let limiteDate: Date;
-  if (dataLimiteStr) {
-    limiteDate = new Date(dataLimiteStr + "T00:00:00");
-  } else {
-    limiteDate = new Date(dataPedidoStr + "T00:00:00");
-    limiteDate.setDate(limiteDate.getDate() + (prazoDias || 30));
+function normalizarStatusFlight(raw?: string | null, servicoOut?: boolean): FlightStatus {
+  if (servicoOut) return "OUT";
+  const s = (raw || "").toUpperCase().trim();
+  if (s === "OUT" || s === "BLOQUEADO") return "OUT";
+  if (
+    s === "EM_ANDAMENTO" ||
+    s === "EM ANDAMENTO" ||
+    s === "CONFIRMADO" ||
+    s === "EXECUCAO" ||
+    s === "EM EXECUÇÃO"
+  ) {
+    return "EM_ANDAMENTO";
   }
-
-  const diffTime = limiteDate.getTime() - hoje.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
+  if (s === "CONCLUIDO" || s === "CONCLUÍDO" || s === "FINALIZADO" || s === "ENTREGUE") {
+    return "CONCLUIDO";
+  }
+  if (s === "AGUARDANDO" || s === "PENDENTE") {
+    return "AGUARDANDO";
+  }
+  return "AGENDADO";
 }
 
-export function FlightBoardPage() {
-  const qc = useQueryClient();
+function statusParaBancoFlight(status: FlightStatus): string {
+  switch (status) {
+    case "EM_ANDAMENTO":
+      return "EM ANDAMENTO";
+    case "CONCLUIDO":
+      return "CONCLUÍDO";
+    case "AGUARDANDO":
+      return "AGUARDANDO";
+    case "OUT":
+      return "OUT";
+    case "AGENDADO":
+    default:
+      return "AGENDADO";
+  }
+}
 
-  // Relógio do aeroporto em tempo real
-  const [horaAeroporto, setHoraAeroporto] = useState("");
+function getStatusBadgeConfig(status: FlightStatus) {
+  switch (status) {
+    case "EM_ANDAMENTO":
+      return {
+        label: "Em Andamento",
+        badgeClass:
+          "bg-emerald-600 text-white border-emerald-700 dark:bg-emerald-500 dark:text-slate-950 font-bold shadow-xs",
+        stripeClass: "bg-emerald-600 dark:bg-emerald-500",
+        headerBg: "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800",
+        headerText: "text-emerald-900 dark:text-emerald-200",
+      };
+    case "AGENDADO":
+      return {
+        label: "Agendado",
+        badgeClass:
+          "bg-blue-600 text-white border-blue-700 dark:bg-blue-500 dark:text-slate-950 font-bold shadow-xs",
+        stripeClass: "bg-blue-600 dark:bg-blue-500",
+        headerBg: "bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800",
+        headerText: "text-blue-900 dark:text-blue-200",
+      };
+    case "CONCLUIDO":
+      return {
+        label: "Concluído",
+        badgeClass:
+          "bg-violet-600 text-white border-violet-700 dark:bg-violet-500 dark:text-slate-950 font-bold shadow-xs",
+        stripeClass: "bg-violet-600 dark:bg-violet-500",
+        headerBg: "bg-violet-50 dark:bg-violet-950/50 border-violet-200 dark:border-violet-800",
+        headerText: "text-violet-900 dark:text-violet-200",
+      };
+    case "AGUARDANDO":
+      return {
+        label: "Aguardando",
+        badgeClass:
+          "bg-amber-500 text-slate-950 border-amber-600 dark:bg-amber-400 dark:text-slate-950 font-bold shadow-xs",
+        stripeClass: "bg-amber-500 dark:bg-amber-400",
+        headerBg: "bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800",
+        headerText: "text-amber-900 dark:text-amber-200",
+      };
+    case "OUT":
+      return {
+        label: "OUT / Impedido",
+        badgeClass:
+          "bg-red-600 text-white border-red-700 dark:bg-red-500 dark:text-white font-bold shadow-xs",
+        stripeClass: "bg-red-600 dark:bg-red-500",
+        headerBg: "bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800",
+        headerText: "text-red-900 dark:text-red-200",
+      };
+  }
+}
+
+function getModalidadeBadgeConfig(modalidade: ModalidadeExecucao) {
+  if (modalidade === "com_execucao") {
+    return {
+      label: "Com Execução",
+      sublabel: "Campo / Instalação",
+      badgeClass:
+        "bg-teal-700 text-white border-teal-800 hover:bg-teal-800 dark:bg-teal-500 dark:text-slate-950 dark:border-teal-400 font-bold",
+      icon: Wrench,
+    };
+  }
+  return {
+    label: "Sem Execução",
+    sublabel: "Reunião / Aviso / Compromisso",
+    badgeClass:
+      "bg-slate-700 text-white border-slate-800 hover:bg-slate-800 dark:bg-slate-300 dark:text-slate-950 dark:border-slate-200 font-bold",
+    icon: Briefcase,
+  };
+}
+
+/**
+ * Extrai metadados embutidos em observações/descrição para manter compatibilidade total
+ * mesmo antes de migrações extras rodarem.
+ */
+function parseMetadadosTexto(texto?: string | null): {
+  modalidade?: ModalidadeExecucao;
+  osNumero?: string;
+  etapaExecucao?: string;
+  horaInicio?: string;
+  horaFim?: string;
+  emailsVinculados?: string;
+  equipe?: string;
+  statusFlight?: FlightStatus;
+  textoLimpo: string;
+} {
+  const raw = texto || "";
+  let modalidade: ModalidadeExecucao | undefined;
+  if (/\[SEM_EXECUCAO\]/i.test(raw)) modalidade = "sem_execucao";
+  else if (/\[COM_EXECUCAO\]/i.test(raw)) modalidade = "com_execucao";
+
+  const osMatch = raw.match(/\[OS:([^\]]+)\]/i);
+  const etapaMatch = raw.match(/\[ETAPA:([^\]]+)\]/i);
+  const horarioMatch = raw.match(/\[HORARIO:(\d{2}:\d{2})-(\d{2}:\d{2})\]/i);
+  const emailsMatch = raw.match(/\[EMAILS:([^\]]+)\]/i);
+  const equipeMatch = raw.match(/\[EQUIPE:([^\]]+)\]/i);
+  const statusMatch = raw.match(/\[STATUS_FB:([^\]]+)\]/i);
+
+  const textoLimpo = raw
+    .replace(/\[(COM_EXECUCAO|SEM_EXECUCAO)\]/gi, "")
+    .replace(/\[OS:[^\]]+\]/gi, "")
+    .replace(/\[ETAPA:[^\]]+\]/gi, "")
+    .replace(/\[HORARIO:[^\]]+\]/gi, "")
+    .replace(/\[EMAILS:[^\]]+\]/gi, "")
+    .replace(/\[EQUIPE:[^\]]+\]/gi, "")
+    .replace(/\[STATUS_FB:[^\]]+\]/gi, "")
+    .trim();
+
+  return {
+    modalidade,
+    osNumero: osMatch?.[1]?.trim(),
+    etapaExecucao: etapaMatch?.[1]?.trim(),
+    horaInicio: horarioMatch?.[1]?.trim(),
+    horaFim: horarioMatch?.[2]?.trim(),
+    emailsVinculados: emailsMatch?.[1]?.trim(),
+    equipe: equipeMatch?.[1]?.trim(),
+    statusFlight: statusMatch?.[1] ? normalizarStatusFlight(statusMatch[1]) : undefined,
+    textoLimpo,
+  };
+}
+
+function empacotarMetadadosTexto(params: {
+  modalidade: ModalidadeExecucao;
+  osNumero?: string | null;
+  etapaExecucao?: string | null;
+  horaInicio?: string | null;
+  horaFim?: string | null;
+  emailsVinculados?: string | null;
+  equipe?: string | null;
+  statusFlight?: FlightStatus;
+  observacoesLimpa?: string | null;
+}): string {
+  const tags: string[] = [
+    params.modalidade === "sem_execucao" ? "[SEM_EXECUCAO]" : "[COM_EXECUCAO]",
+  ];
+  if (params.osNumero?.trim()) tags.push(`[OS:${params.osNumero.trim()}]`);
+  if (params.etapaExecucao?.trim()) tags.push(`[ETAPA:${params.etapaExecucao.trim()}]`);
+  if (params.horaInicio && params.horaFim) {
+    tags.push(`[HORARIO:${params.horaInicio}-${params.horaFim}]`);
+  }
+  if (params.emailsVinculados?.trim()) tags.push(`[EMAILS:${params.emailsVinculados.trim()}]`);
+  if (params.equipe?.trim()) tags.push(`[EQUIPE:${params.equipe.trim()}]`);
+  if (params.statusFlight) tags.push(`[STATUS_FB:${params.statusFlight}]`);
+
+  const corpo = (params.observacoesLimpa || "").trim();
+  return corpo ? `${tags.join(" ")} ${corpo}` : tags.join(" ");
+}
+
+function adicionarDiasISO(baseISO: string, deltaDias: number): string {
+  const partes = baseISO.split("-").map(Number);
+  const dt = new Date(partes[0], (partes[1] || 1) - 1, partes[2] || 1, 12, 0, 0);
+  dt.setDate(dt.getDate() + deltaDias);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function obterInicioSemanaSegundaISO(refISO: string): string {
+  const partes = refISO.split("-").map(Number);
+  const dt = new Date(partes[0], (partes[1] || 1) - 1, partes[2] || 1, 12, 0, 0);
+  const day = dt.getDay(); // 0 = Dom, 1 = Seg...
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatarDiaColuna(iso: string): {
+  diaSemanaCurto: string;
+  diaSemanaLongo: string;
+  diaMes: string;
+  ehHoje: boolean;
+} {
+  const partes = iso.split("-").map(Number);
+  const dt = new Date(partes[0], (partes[1] || 1) - 1, partes[2] || 1, 12, 0, 0);
+  const diaSemanaCurto = DIAS_SEMANA_CURTO[dt.getDay()] || "";
+  const diaSemanaLongo = DIAS_SEMANA_LONGO[dt.getDay()] || "";
+  const diaMes = `${String(partes[2]).padStart(2, "0")}/${String(partes[1]).padStart(2, "0")}`;
+  return {
+    diaSemanaCurto,
+    diaSemanaLongo,
+    diaMes,
+    ehHoje: iso === hojeISO(),
+  };
+}
+
+/**
+ * Verifica se o status de uma Ordem de Serviço (ordens_servico) representa
+ * uma OS formalmente emitida.
+ */
+function isOsFormalmenteEmitida(status?: string | null): boolean {
+  const s = (status || "").toLowerCase().trim();
+  if (!s) return false;
+  return s !== "orcamento" && s !== "orçamento" && s !== "cancelado" && s !== "cancelada";
+}
+
+function FlightBoardPage() {
+  const queryClient = useQueryClient();
+  const [relogio, setRelogio] = useState<string>("");
+  const [busca, setBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<string>("TODOS");
+  const [filtroModalidade, setFiltroModalidade] = useState<string>("TODAS");
+  const [modoVisao, setModoVisao] = useState<"CRONOGRAMA_DIAS" | "COLUNAS_STATUS" | "LISTA">(
+    "CRONOGRAMA_DIAS"
+  );
+  const [semanaBaseISO, setSemanaBaseISO] = useState<string>(() =>
+    obterInicioSemanaSegundaISO(hojeISO())
+  );
+  const [ultimaSyncGoogle, setUltimaSyncGoogle] = useState<string | null>(null);
+
+  // Modal de Visualização de Documento (OS / Pedido)
+  const [docModalAberto, setDocModalAberto] = useState(false);
+  const [docModalTipo, setDocModalTipo] = useState<"os" | "venda">("os");
+  const [docModalId, setDocModalId] = useState<string>("");
+
+  // Modal Unificado de Incluir / Editar Card no Flight Board
+  const [editorModalAberto, setEditorModalAberto] = useState(false);
+  const [modoEditor, setModoEditor] = useState<"INCLUIR" | "EDITAR">("INCLUIR");
+  const [cardEditando, setCardEditando] = useState<FlightBoardCardItem | null>(null);
+
+  // Campos do formulário de Incluir / Editar
+  const [formTipoVinculo, setFormTipoVinculo] = useState<"OS_EMITIDA" | "COMPROMISSO_AGENDA">(
+    "OS_EMITIDA"
+  );
+  const [formOrdemId, setFormOrdemId] = useState<string>("");
+  const [formTituloEvento, setFormTituloEvento] = useState<string>("");
+  const [formEtapaExecucao, setFormEtapaExecucao] = useState<string>(
+    "Instalação e Execução Técnica"
+  );
+  const [formDataExecucao, setFormDataExecucao] = useState<string>(hojeISO());
+  const [formHoraInicio, setFormHoraInicio] = useState<string>("08:00");
+  const [formHoraFim, setFormHoraFim] = useState<string>("17:00");
+  const [formStatus, setFormStatus] = useState<FlightStatus>("AGENDADO");
+  const [formModalidade, setFormModalidade] = useState<ModalidadeExecucao>("com_execucao");
+  const [formEquipe, setFormEquipe] = useState<string>("");
+  const [formEmailsVinculados, setFormEmailsVinculados] = useState<string>(
+    EMAIL_AGENDA_LOJA_PRINCIPAL
+  );
+  const [formObservacoes, setFormObservacoes] = useState<string>("");
+  const [formServicoOut, setFormServicoOut] = useState<boolean>(false);
+  const [formMotivoOut, setFormMotivoOut] = useState<string>("");
+
+  // Modal de Confirmação de Exclusão
+  const [cardParaExcluir, setCardParaExcluir] = useState<FlightBoardCardItem | null>(null);
+
+  // Relógio em tempo real
   useEffect(() => {
-    const atualizar = () => {
-      const agora = new Date();
-      setHoraAeroporto(
-        agora.toLocaleTimeString("pt-BR", {
-          hour12: false,
+    const tick = () => {
+      const now = new Date();
+      setRelogio(
+        now.toLocaleTimeString("pt-BR", {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
-        }),
+        })
       );
     };
-    atualizar();
-    const timer = setInterval(atualizar, 1000);
+    tick();
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Filtros
-  const [busca, setBusca] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState<string>("TODOS");
-  const [apenasOut, setApenasOut] = useState(false);
-  const [ordemCrescente, setOrdemCrescente] = useState(true);
+  // Dias da semana exibidos nas colunas do Cronograma (7 dias: Seg a Dom)
+  const diasDaSemanaISO = useMemo(() => {
+    return Array.from({ length: 7 }, (_, idx) => adicionarDiasISO(semanaBaseISO, idx));
+  }, [semanaBaseISO]);
 
-  // Drawer / Edição
-  const [drawerAberto, setDrawerAberto] = useState(false);
-  const [itemEditando, setItemEditando] = useState<FlightBoardItem | null>(null);
-
-  // Modal Novo Voo
-  const [novoModalAberto, setNovoModalAberto] = useState(false);
-  const [novoItemForm, setNovoItemForm] = useState({
-    voo_codigo: "",
-    cliente_nome: "",
-    cliente_id: "",
-    servico_natureza: "",
-    data_pedido: hojeISO(),
-    prazo_dias: 30,
-    prazo_limite: addDiasUteis(hojeISO(), 30),
-    status: "AGENDADO" as FlightStatus,
-    is_out: false,
-    responsavel: "",
-    endereco_obra: "",
-    observacoes: "",
-    os_instalacao: "OS-02",
-    os_logistica: "OL",
-    os_acabamento: "OS-03",
-  });
-
-  // Modal Visualizador de Documento
-  const [docModalAberto, setDocModalAberto] = useState(false);
-  const [docModalTipo, setDocModalTipo] = useState<"os" | "venda">("os");
-  const [docModalId, setDocModalId] = useState<string | null>(null);
-
-  // 1. Busca da tabela dedicada logistics_flight_board
-  const { data: boardDb = [] } = useQuery({
-    queryKey: ["logistics_flight_board"],
+  // ============================================================================
+  // CONSULTA PRINCIPAL:
+  // 1. Carrega SOMENTE Ordens de Serviço (ordens_servico) formalmente emitidas.
+  // 2. Carrega agendamentos do logistics_flight_board que pertençam a uma OS emitida.
+  // 3. Carrega compromissos do Google Calendar / agenda_eventos (Com ou Sem Execução).
+  // ============================================================================
+  const {
+    data: dadosFlightBoard,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["logistics_flight_board_v2"],
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from("logistics_flight_board" as never)
-          .select("*")
-          .order("data_pedido", { ascending: true });
-        if (error) return [];
-        return (data as unknown as FlightBoardItem[]) ?? [];
-      } catch {
-        return [];
+      // 1. Buscar todas as Ordens de Serviço emitidas
+      const { data: ordensRaw, error: ordensErr } = await supabase
+        .from("ordens_servico")
+        .select(
+          "id, numero, cliente_id, descricao, status, prioridade, responsavel, data_abertura, data_previsao, data_conclusao, valor_servico, valor_pecas, valor_total, observacoes, clientes(id, nome, telefone, cidade, email)"
+        )
+        .order("created_at", { ascending: false });
+
+      if (ordensErr) {
+        console.error("Erro ao carregar ordens_servico:", ordensErr);
       }
-    },
-  });
 
-  // 2. Busca das obras ativas
-  const { data: obrasDb = [] } = useQuery({
-    queryKey: ["obras", "flight-board"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("obras")
-        .select("*")
-        .order("data_pedido", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+      const ordensEmitidas = (ordensRaw || []).filter((os: any) =>
+        isOsFormalmenteEmitida(os.status)
+      );
 
-  // 3. Busca de clientes
-  const { data: clientes = [] } = useQuery({
-    queryKey: ["clientes", "flight-board"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("id, nome, endereco_obra")
-        .order("nome");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+      // 2. Buscar obras e vendas para cruzar vínculo de OS emitida com obra/venda quando houver
+      const [{ data: obrasRaw }, { data: vendasRaw }, { data: boardRaw }, { data: agendaRaw }, { data: funcionariosRaw }] =
+        await Promise.all([
+          supabase
+            .from("obras")
+            .select(
+              "id, codigo, cliente_id, venda_id, titulo, modelo_piscina, status, data_abertura, data_previsao_termino, responsavel_obra, equipe_instalacao, observacoes, clientes(id, nome, telefone, cidade, email)"
+            ),
+          supabase
+            .from("vendas")
+            .select(
+              "id, numero_pedido, cliente_id, observacoes, data_entrega_prevista, status_venda"
+            )
+            .neq("status_venda", "cancelada"),
+          supabase
+            .from("logistics_flight_board")
+            .select(
+              "*, obras(id, codigo, titulo, modelo_piscina, responsavel_obra, equipe_instalacao, data_previsao_termino, venda_id), vendas(id, numero_pedido, observacoes, data_entrega_prevista), clientes(id, nome, telefone, cidade, email)"
+            )
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("agenda_eventos")
+            .select("*")
+            .neq("status", "cancelado")
+            .order("data", { ascending: true })
+            .order("hora", { ascending: true }),
+          supabase
+            .from("funcionarios")
+            .select("id, nome, email, cargo, ativo")
+            .eq("ativo", true),
+        ]);
 
-  // 4. Supabase Realtime Listener
-  useEffect(() => {
-    const channel = supabase
-      .channel("flight-board-realtime-sync")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "logistics_flight_board" },
-        () => {
-          qc.invalidateQueries({ queryKey: ["logistics_flight_board"] });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "obras" },
-        () => {
-          qc.invalidateQueries({ queryKey: ["obras", "flight-board"] });
-          qc.invalidateQueries({ queryKey: ["logistics_flight_board"] });
-        },
-      )
-      .subscribe();
+      const emailsEquipeAtiva = Array.from(
+        new Set([
+          EMAIL_AGENDA_LOJA_PRINCIPAL,
+          ...(funcionariosRaw || [])
+            .map((f: any) => f.email?.trim())
+            .filter(Boolean),
+        ])
+      );
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [qc]);
+      // Mapear OS emitida por ID, por número e por cliente_id
+      const osPorId = new Map<string, any>();
+      const osPorNumero = new Map<string, any>();
+      const osPorClienteId = new Map<string, any[]>();
 
-  // Consolidação unificada de itens (Garantindo que todos os OUTs e Obras constem)
-  const itensConsolidados = useMemo(() => {
-    const mapa = new Map<string, FlightBoardItem>();
+      for (const os of ordensEmitidas) {
+        osPorId.set(os.id, os);
+        if (os.numero) osPorNumero.set(String(os.numero).toUpperCase().trim(), os);
+        if (os.cliente_id) {
+          const lista = osPorClienteId.get(os.cliente_id) || [];
+          lista.push(os);
+          osPorClienteId.set(os.cliente_id, lista);
+        }
+      }
 
-    // 1) Insere itens da tabela de board dedicada
-    for (const item of boardDb) {
-      mapa.set(item.id, {
-        ...item,
-        origem: "logistics_board",
-      });
-    }
+      // Mapear obras por cliente_id e por id
+      const obraPorId = new Map<string, any>();
+      const obraPorClienteId = new Map<string, any>();
+      for (const ob of obrasRaw || []) {
+        obraPorId.set(ob.id, ob);
+        if (ob.cliente_id && !obraPorClienteId.has(ob.cliente_id)) {
+          obraPorClienteId.set(ob.cliente_id, ob);
+        }
+      }
 
-    // 2) Insere/Complementa com dados de obras
-    for (const ob of obrasDb) {
-      const idKey = ob.id;
-      if (!mapa.has(idKey)) {
-        const textoServico = `${ob.tipo_servico || "Piscina"} ${ob.observacoes || ""}`.toUpperCase();
-        const textoStatus = `${ob.status_geral || ""}`.toUpperCase();
-        const ehOut = textoServico.includes("OUT") || textoStatus.includes("OUT");
+      const vendaPorId = new Map<string, any>();
+      for (const vd of vendasRaw || []) {
+        vendaPorId.set(vd.id, vd);
+      }
 
-        let statusNorm: FlightStatus = "AGENDADO";
-        if (ehOut) statusNorm = "OUT";
-        else if (textoStatus.includes("CONCLU")) statusNorm = "CONCLUÍDO";
-        else if (textoStatus.includes("CONFIRM") || textoStatus.includes("ANDAMENTO"))
-          statusNorm = "CONFIRMADO";
-        else if (textoStatus.includes("AGUARD")) statusNorm = "AGUARDANDO";
+      const cards: FlightBoardCardItem[] = [];
+      const ordensJaNoBoard = new Set<string>();
+      const googleEventIdsJaNoBoard = new Set<string>();
 
-        mapa.set(idKey, {
-          id: ob.id,
-          voo_codigo: ob.numero || `OBRA-${ob.id.slice(0, 4).toUpperCase()}`,
-          obra_id: ob.id,
-          venda_id: ob.venda_id,
-          cliente_id: ob.cliente_id,
-          cliente_nome: ob.cliente_nome || "Cliente",
-          servico_natureza: ob.tipo_servico || "Instalação de Piscina",
-          data_pedido: ob.data_pedido || hojeISO(),
-          prazo_dias: ob.prazo_dias || 30,
-          prazo_limite: ob.data_limite || addDiasUteis(ob.data_pedido || hojeISO(), 30),
-          escavacao_data: ob.escavacao_inicio,
-          escavacao_status: (ob.etapa_escavacao as EtapaStatus) || "pendente",
-          instalacao_data: ob.instalacao_inicio,
-          instalacao_status: (ob.etapa_base as EtapaStatus) || "pendente",
-          os_instalacao: ob.os_instalacao || "OS-02",
-          os_instalacao_status:
-            ob.etapa_tubulacao === "concluido" ? "concluido" : "pendente",
-          os_logistica: ob.os_logistica || "OL",
-          os_logistica_status: ob.etapa_furacao === "concluido" ? "concluido" : "pendente",
-          os_acabamento: ob.os_acabamento || "OS-03",
-          os_acabamento_status:
-            ob.etapa_cascata === "concluido" ? "concluido" : "pendente",
+      // 3. Processar registros de logistics_flight_board
+      // REGRA DE OURO #2: Somente clientes/pedidos cuja OS já tenha sido formalmente emitida podem constar!
+      for (const row of (boardRaw || []) as any[]) {
+        const meta = parseMetadadosTexto(row.observacoes);
+
+        // Tentar localizar a OS formalmente emitida correspondente a este registro
+        let osVinculada: any = null;
+        if (row.ordem_id && osPorId.has(row.ordem_id)) {
+          osVinculada = osPorId.get(row.ordem_id);
+        } else if (row.os_numero && osPorNumero.has(String(row.os_numero).toUpperCase().trim())) {
+          osVinculada = osPorNumero.get(String(row.os_numero).toUpperCase().trim());
+        } else if (meta.osNumero && osPorNumero.has(meta.osNumero.toUpperCase().trim())) {
+          osVinculada = osPorNumero.get(meta.osNumero.toUpperCase().trim());
+        } else if (row.cliente_id && osPorClienteId.has(row.cliente_id)) {
+          osVinculada = osPorClienteId.get(row.cliente_id)![0];
+        }
+
+        // Filtro Obrigatório: Se não possui OS formalmente emitida, NÃO entra no Flight Board!
+        if (!osVinculada || !isOsFormalmenteEmitida(osVinculada.status)) {
+          continue;
+        }
+
+        ordensJaNoBoard.add(osVinculada.id);
+        if (row.google_event_id) {
+          googleEventIdsJaNoBoard.add(row.google_event_id);
+        }
+
+        const obra =
+          (row.obra_id && obraPorId.get(row.obra_id)) ||
+          row.obras ||
+          (osVinculada.cliente_id ? obraPorClienteId.get(osVinculada.cliente_id) : null);
+
+        const clienteObj = row.clientes || osVinculada.clientes || obra?.clientes;
+        const numeroOsExibicao =
+          row.os_numero || meta.osNumero || osVinculada.numero || osVinculada.id.slice(0, 8);
+
+        const dataExec =
+          row.data_execucao ||
+          row.previsao_entrega ||
+          (osVinculada.data_previsao ? String(osVinculada.data_previsao).slice(0, 10) : null) ||
+          (osVinculada.data_abertura ? String(osVinculada.data_abertura).slice(0, 10) : null) ||
+          hojeISO();
+
+        const modalidade: ModalidadeExecucao =
+          row.modalidade_execucao === "sem_execucao" || meta.modalidade === "sem_execucao"
+            ? "sem_execucao"
+            : "com_execucao";
+
+        const statusNorm = normalizarStatusFlight(
+          meta.statusFlight || row.status_voo,
+          Boolean(row.servico_out)
+        );
+
+        const emailsCard =
+          row.emails_vinculados ||
+          meta.emailsVinculados ||
+          [EMAIL_AGENDA_LOJA_PRINCIPAL, clienteObj?.email].filter(Boolean).join(", ");
+
+        cards.push({
+          id: `fb-${row.id}`,
+          origem: "flight_board",
+          registro_id: row.id,
+          flight_board_id: row.id,
+          ordem_id: osVinculada.id,
+          os_numero: numeroOsExibicao,
+          obra_id: row.obra_id || obra?.id || null,
+          venda_id: row.venda_id || obra?.venda_id || null,
+          cliente_id: row.cliente_id || osVinculada.cliente_id || clienteObj?.id || null,
+          voo_codigo: row.voo_codigo || `OS-${numeroOsExibicao}`,
+          cliente_nome:
+            row.cliente_nome || clienteObj?.nome || "Cliente com OS Emitida",
+          cliente_telefone: clienteObj?.telefone || null,
+          cliente_cidade: clienteObj?.cidade || null,
+          kit_titulo:
+            row.kit_titulo ||
+            osVinculada.descricao ||
+            obra?.modelo_piscina ||
+            obra?.titulo ||
+            "Ordem de Serviço Emitida",
+          etapa_execucao:
+            row.etapa_execucao ||
+            meta.etapaExecucao ||
+            osVinculada.descricao ||
+            "Execução de OS",
+          data_execucao: String(dataExec).slice(0, 10),
+          hora_inicio: row.hora_inicio || meta.horaInicio || "08:00",
+          hora_fim: row.hora_fim || meta.horaFim || "17:00",
           status: statusNorm,
-          is_out: ehOut,
-          responsavel: ob.responsavel,
-          endereco_obra: ob.endereco_obra,
-          observacoes: ob.observacoes,
-          origem: "obra",
+          modalidade_execucao: modalidade,
+          equipe_responsavel:
+            row.equipe_responsavel ||
+            meta.equipe ||
+            osVinculada.responsavel ||
+            obra?.equipe_instalacao ||
+            obra?.responsavel_obra ||
+            "Equipe Técnica",
+          emails_vinculados: emailsCard,
+          observacoes: meta.textoLimpo || osVinculada.observacoes || "",
+          google_event_id: row.google_event_id || null,
+          google_calendar_id: row.google_calendar_id || EMAIL_AGENDA_LOJA_PRINCIPAL,
+          tem_os_emitida: true,
+          os_status_original: osVinculada.status,
+          etapa_conferencia: (row.etapa_conferencia as EtapaStatus) || "pendente",
+          etapa_separacao: (row.etapa_separacao as EtapaStatus) || "pendente",
+          etapa_carregamento: (row.etapa_carregamento as EtapaStatus) || "pendente",
+          etapa_transito: (row.etapa_transito as EtapaStatus) || "pendente",
+          etapa_entrega: (row.etapa_entrega as EtapaStatus) || "pendente",
+          etapa_instalacao: (row.etapa_instalacao as EtapaStatus) || "pendente",
+          servico_out: Boolean(row.servico_out),
+          motivo_out: row.motivo_out || null,
         });
       }
-    }
 
-    const lista = Array.from(mapa.values());
+      // 4. Incluir automaticamente no Flight Board todas as Ordens de Serviço (ordens_servico)
+      // formalmente emitidas que ainda não possuam linha dedicada em logistics_flight_board
+      for (const os of ordensEmitidas) {
+        if (ordensJaNoBoard.has(os.id)) continue;
 
-    // Regra crítica 2: ordenação estritamente cronológica por data de pedido / execução
-    lista.sort((a, b) => {
-      const dataA = new Date(a.data_pedido).getTime();
-      const dataB = new Date(b.data_pedido).getTime();
-      return ordemCrescente ? dataA - dataB : dataB - dataA;
-    });
+        const obra = os.cliente_id ? obraPorClienteId.get(os.cliente_id) : null;
+        const venda = obra?.venda_id ? vendaPorId.get(obra.venda_id) : null;
+        const clienteObj = os.clientes || obra?.clientes;
+        const meta = parseMetadadosTexto(os.observacoes);
 
-    return lista;
-  }, [boardDb, obrasDb, ordemCrescente]);
+        const dataExec =
+          (os.data_previsao ? String(os.data_previsao).slice(0, 10) : null) ||
+          (obra?.data_previsao_termino
+            ? String(obra.data_previsao_termino).slice(0, 10)
+            : null) ||
+          (venda?.data_entrega_prevista
+            ? String(venda.data_entrega_prevista).slice(0, 10)
+            : null) ||
+          (os.data_abertura ? addDiasUteis(String(os.data_abertura).slice(0, 10), 2) : hojeISO());
 
-  // Contadores para métricas de display
-  const stats = useMemo(() => {
-    let outCount = 0;
-    let confirmadosCount = 0;
-    let agendadosCount = 0;
-    let aguardandoCount = 0;
-    let concluidosCount = 0;
+        let statusInicial: FlightStatus = "AGENDADO";
+        const stLower = String(os.status || "").toLowerCase();
+        if (stLower === "em_andamento" || stLower === "em andamento") {
+          statusInicial = "EM_ANDAMENTO";
+        } else if (stLower === "concluido" || stLower === "concluído" || stLower === "finalizado") {
+          statusInicial = "CONCLUIDO";
+        } else if (meta.statusFlight) {
+          statusInicial = meta.statusFlight;
+        }
 
-    for (const it of itensConsolidados) {
-      if (it.is_out || it.status === "OUT") outCount++;
-      else if (it.status === "CONFIRMADO") confirmadosCount++;
-      else if (it.status === "AGENDADO") agendadosCount++;
-      else if (it.status === "AGUARDANDO") aguardandoCount++;
-      else if (it.status === "CONCLUÍDO") concluidosCount++;
-    }
+        const numeroOs = os.numero || os.id.slice(0, 8).toUpperCase();
 
-    return {
-      total: itensConsolidados.length,
-      out: outCount,
-      confirmados: confirmadosCount,
-      agendados: agendadosCount,
-      aguardando: aguardandoCount,
-      concluidos: concluidosCount,
+        cards.push({
+          id: `os-${os.id}`,
+          origem: "os_emitida",
+          registro_id: os.id,
+          flight_board_id: null,
+          ordem_id: os.id,
+          os_numero: numeroOs,
+          obra_id: obra?.id || null,
+          venda_id: obra?.venda_id || null,
+          cliente_id: os.cliente_id || clienteObj?.id || null,
+          voo_codigo: `OS-${numeroOs}`,
+          cliente_nome: clienteObj?.nome || "Cliente OS Emitida",
+          cliente_telefone: clienteObj?.telefone || null,
+          cliente_cidade: clienteObj?.cidade || null,
+          kit_titulo: os.descricao || obra?.modelo_piscina || obra?.titulo || "Ordem de Serviço",
+          etapa_execucao:
+            meta.etapaExecucao || os.descricao || "Execução Técnica de Ordem de Serviço",
+          data_execucao: String(dataExec).slice(0, 10),
+          hora_inicio: meta.horaInicio || "08:00",
+          hora_fim: meta.horaFim || "17:00",
+          status: statusInicial,
+          modalidade_execucao: meta.modalidade || "com_execucao",
+          equipe_responsavel:
+            meta.equipe ||
+            os.responsavel ||
+            obra?.equipe_instalacao ||
+            obra?.responsavel_obra ||
+            "Equipe Técnica",
+          emails_vinculados:
+            meta.emailsVinculados ||
+            [EMAIL_AGENDA_LOJA_PRINCIPAL, clienteObj?.email].filter(Boolean).join(", "),
+          observacoes: meta.textoLimpo || "",
+          google_event_id: null,
+          google_calendar_id: EMAIL_AGENDA_LOJA_PRINCIPAL,
+          tem_os_emitida: true,
+          os_status_original: os.status,
+          etapa_conferencia: "concluido",
+          etapa_separacao: statusInicial === "CONCLUIDO" ? "concluido" : "em_andamento",
+          etapa_carregamento: statusInicial === "CONCLUIDO" ? "concluido" : "pendente",
+          etapa_transito: statusInicial === "CONCLUIDO" ? "concluido" : "pendente",
+          etapa_entrega: statusInicial === "CONCLUIDO" ? "concluido" : "pendente",
+          etapa_instalacao:
+            statusInicial === "CONCLUIDO"
+              ? "concluido"
+              : statusInicial === "EM_ANDAMENTO"
+                ? "em_andamento"
+                : "pendente",
+          servico_out: false,
+          motivo_out: null,
+        });
+      }
+
+      // 5. Incluir compromissos vindos do Google Calendar / agenda_eventos
+      // (Requisito 4: Qualquer compromisso ou evento criado no Google Calendar deve ser puxado
+      // para o Flight Board com tag "Com Execução" ou "Sem Execução")
+      for (const ev of (agendaRaw || []) as any[]) {
+        if (ev.google_event_id && googleEventIdsJaNoBoard.has(ev.google_event_id)) {
+          continue;
+        }
+
+        const meta = parseMetadadosTexto(ev.descricao);
+        // Se este evento de agenda já referencia uma OS que já está exibida na mesma data, evitamos duplicar
+        if (meta.osNumero) {
+          const osMatch = osPorNumero.get(meta.osNumero.toUpperCase());
+          if (osMatch && ordensJaNoBoard.has(osMatch.id)) {
+            continue;
+          }
+        }
+
+        const temTagComExec =
+          meta.modalidade === "com_execucao" ||
+          /\[(OS|FLIGHT|COM_EXECUCAO)/i.test(ev.titulo || "") ||
+          (ev.tipo === "trabalho" && meta.modalidade !== "sem_execucao");
+
+        const modalidade: ModalidadeExecucao = temTagComExec ? "com_execucao" : "sem_execucao";
+
+        let statusEvento: FlightStatus = "AGENDADO";
+        if (ev.status === "concluido") statusEvento = "CONCLUIDO";
+        else if (meta.statusFlight) statusEvento = meta.statusFlight;
+
+        const horaIni = ev.hora ? String(ev.hora).slice(0, 5) : meta.horaInicio || "09:00";
+        const horaFim = meta.horaFim || "10:00";
+
+        cards.push({
+          id: `ag-${ev.id}`,
+          origem: "agenda_google",
+          registro_id: ev.id,
+          agenda_evento_id: ev.id,
+          ordem_id: null,
+          os_numero: meta.osNumero || null,
+          obra_id: null,
+          venda_id: null,
+          cliente_id: null,
+          voo_codigo: ev.google_event_id ? "G-CAL" : "AGENDA",
+          cliente_nome: ev.titulo || "Compromisso Google Agenda",
+          cliente_telefone: null,
+          cliente_cidade: null,
+          kit_titulo:
+            modalidade === "com_execucao"
+              ? "Atividade de Campo / Execução (Agenda)"
+              : "Compromisso / Reunião / Aviso (Google Agenda)",
+          etapa_execucao:
+            meta.etapaExecucao ||
+            meta.textoLimpo ||
+            (modalidade === "com_execucao"
+              ? "Execução / Visita Técnica"
+              : "Reunião / Compromisso Sem Execução"),
+          data_execucao: String(ev.data || hojeISO()).slice(0, 10),
+          hora_inicio: horaIni,
+          hora_fim: horaFim,
+          status: statusEvento,
+          modalidade_execucao: modalidade,
+          equipe_responsavel: meta.equipe || "Agenda da Loja",
+          emails_vinculados: meta.emailsVinculados || EMAIL_AGENDA_LOJA_PRINCIPAL,
+          observacoes: meta.textoLimpo || "",
+          google_event_id: ev.google_event_id || null,
+          google_calendar_id: ev.google_calendar_id || EMAIL_AGENDA_LOJA_PRINCIPAL,
+          tem_os_emitida: Boolean(meta.osNumero),
+          os_status_original: null,
+          etapa_conferencia: "pendente",
+          etapa_separacao: "pendente",
+          etapa_carregamento: "pendente",
+          etapa_transito: "pendente",
+          etapa_entrega: "pendente",
+          etapa_instalacao: "pendente",
+          servico_out: false,
+          motivo_out: null,
+        });
+      }
+
+      // Ordenar por data_execucao e hora_inicio
+      cards.sort((a, b) => {
+        const cmpData = a.data_execucao.localeCompare(b.data_execucao);
+        if (cmpData !== 0) return cmpData;
+        return a.hora_inicio.localeCompare(b.hora_inicio);
+      });
+
+      return {
+        cards,
+        ordensEmitidas,
+        emailsEquipeAtiva,
+      };
+    },
+  });
+
+  const cards = dadosFlightBoard?.cards ?? [];
+  const ordensEmitidas = dadosFlightBoard?.ordensEmitidas ?? [];
+  const emailsEquipeAtiva = dadosFlightBoard?.emailsEquipeAtiva ?? [EMAIL_AGENDA_LOJA_PRINCIPAL];
+
+  // ============================================================================
+  // SINCRONIZAÇÃO BIDIRECIONAL COM GOOGLE CALENDAR
+  // ============================================================================
+  const syncGoogleMutation = useMutation({
+    mutationFn: async (silencioso?: boolean) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+      if (!userId) {
+        if (!silencioso) {
+          toast.error("Sessão expirada. Faça login novamente para sincronizar.");
+        }
+        return null;
+      }
+
+      const resultado = await sincronizarFlightBoardBidirecionalGoogle({
+        data: {
+          userId,
+          calendarIds: emailsEquipeAtiva,
+        },
+      });
+      return { resultado, silencioso };
+    },
+    onSuccess: (payload) => {
+      const agora = new Date().toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      setUltimaSyncGoogle(agora);
+      queryClient.invalidateQueries({ queryKey: ["logistics_flight_board_v2"] });
+
+      if (payload && !payload.silencioso) {
+        const res = payload.resultado;
+        if (res?.sucesso) {
+          toast.success(
+            `Google Agenda sincronizado (${EMAIL_AGENDA_LOJA_PRINCIPAL})! ${res.importadosDoGoogle} puxado(s) do Google e ${res.enviadosParaGoogle} enviado(s).`
+          );
+        } else {
+          toast.warning(
+            res?.mensagem ||
+              "Sincronização local concluída. Verifique as credenciais Google se desejar espelhamento externo em tempo real."
+          );
+        }
+      }
+    },
+    onError: (err: any) => {
+      console.error("Erro na sincronização com Google Calendar:", err);
+      toast.error(
+        `Falha ao comunicar com Google Calendar: ${err?.message || "Erro inesperado"}`
+      );
+    },
+  });
+
+  // Sincronização automática ao abrir a tela e a cada 3 minutos
+  useEffect(() => {
+    const timeoutInicial = setTimeout(() => {
+      syncGoogleMutation.mutate(true);
+    }, 1200);
+
+    const intervalo = setInterval(() => {
+      syncGoogleMutation.mutate(true);
+    }, 180_000);
+
+    return () => {
+      clearTimeout(timeoutInicial);
+      clearInterval(intervalo);
     };
-  }, [itensConsolidados]);
+  }, []);
 
-  // Filtragem dos voos
-  const itensFiltrados = useMemo(() => {
-    return itensConsolidados.filter((it) => {
-      if (apenasOut && !it.is_out && it.status !== "OUT") return false;
+  // ============================================================================
+  // HELPER PARA SINCRONIZAR UM CARD INDIVIDUAL COM O GOOGLE CALENDAR
+  // ============================================================================
+  const dispararSyncIndividualGoogle = useCallback(
+    async (params: {
+      operacao: "upsert" | "delete";
+      osNumero?: string | null;
+      clienteNome: string;
+      etapaExecucao: string;
+      dataExecucao: string;
+      horaInicio?: string | null;
+      horaFim?: string | null;
+      modalidadeExecucao: ModalidadeExecucao;
+      statusVoo?: string | null;
+      equipeResponsavel?: string | null;
+      observacoes?: string | null;
+      emailsVinculados?: string[];
+      googleEventId?: string | null;
+      flightBoardId?: string | null;
+      agendaEventoId?: string | null;
+    }) => {
+      try {
+        const listaEmails = Array.from(
+          new Set([
+            EMAIL_AGENDA_LOJA_PRINCIPAL,
+            ...emailsEquipeAtiva,
+            ...(params.emailsVinculados || []),
+          ])
+        );
 
-      if (filtroStatus !== "TODOS") {
-        if (filtroStatus === "OUT" && !(it.is_out || it.status === "OUT")) return false;
-        if (filtroStatus !== "OUT" && it.status !== filtroStatus) return false;
+        await sincronizarItemFlightBoardGoogle({
+          data: {
+            operacao: params.operacao,
+            osNumero: params.osNumero,
+            clienteNome: params.clienteNome,
+            etapaExecucao: params.etapaExecucao,
+            dataExecucao: params.dataExecucao,
+            horaInicio: params.horaInicio || "08:00",
+            horaFim: params.horaFim || "17:00",
+            modalidadeExecucao: params.modalidadeExecucao,
+            statusVoo: params.statusVoo,
+            equipeResponsavel: params.equipeResponsavel,
+            observacoes: params.observacoes,
+            emailsVinculados: listaEmails,
+            googleEventId: params.googleEventId,
+            flightBoardId: params.flightBoardId,
+            agendaEventoId: params.agendaEventoId,
+          },
+        });
+      } catch (e) {
+        console.warn("Aviso ao sincronizar item individual com Google Calendar:", e);
+      }
+    },
+    [emailsEquipeAtiva]
+  );
+
+  // ============================================================================
+  // MUTATION: SALVAR (INCLUIR OU EDITAR) CARD NO FLIGHT BOARD + GOOGLE AGENDA
+  // ============================================================================
+  const salvarCardMutation = useMutation({
+    mutationFn: async () => {
+      const emailsArray = formEmailsVinculados
+        .split(/[,;\s]+/)
+        .map((e) => e.trim())
+        .filter((e) => e.includes("@"));
+
+      if (!emailsArray.includes(EMAIL_AGENDA_LOJA_PRINCIPAL)) {
+        emailsArray.unshift(EMAIL_AGENDA_LOJA_PRINCIPAL);
+      }
+      const emailsFormatados = Array.from(new Set(emailsArray)).join(", ");
+
+      const statusFinal: FlightStatus = formServicoOut ? "OUT" : formStatus;
+      const statusBanco = statusParaBancoFlight(statusFinal);
+
+      // Caso 1: Compromisso de Agenda / Google Calendar (sem vínculo direto a uma OS ou evento avulso)
+      if (
+        formTipoVinculo === "COMPROMISSO_AGENDA" &&
+        (!cardEditando || cardEditando.origem === "agenda_google")
+      ) {
+        if (!formTituloEvento.trim()) {
+          throw new Error("Informe o título do compromisso ou evento.");
+        }
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData.session?.user?.id;
+        if (!userId) throw new Error("Usuário não autenticado.");
+
+        const descricaoEmpacotada = empacotarMetadadosTexto({
+          modalidade: formModalidade,
+          osNumero: cardEditando?.os_numero || null,
+          etapaExecucao: formEtapaExecucao,
+          horaInicio: formHoraInicio,
+          horaFim: formHoraFim,
+          emailsVinculados: emailsFormatados,
+          equipe: formEquipe,
+          statusFlight: statusFinal,
+          observacoesLimpa: formObservacoes,
+        });
+
+        let agendaId = cardEditando?.agenda_evento_id || null;
+
+        if (agendaId) {
+          const { error } = await supabase
+            .from("agenda_eventos")
+            .update({
+              titulo: formTituloEvento.trim(),
+              descricao: descricaoEmpacotada,
+              data: formDataExecucao,
+              hora: formHoraInicio || "09:00",
+              tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
+              status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
+            })
+            .eq("id", agendaId);
+          if (error) throw error;
+        } else {
+          const { data: inserido, error } = await supabase
+            .from("agenda_eventos")
+            .insert({
+              user_id: userId,
+              titulo: formTituloEvento.trim(),
+              descricao: descricaoEmpacotada,
+              data: formDataExecucao,
+              hora: formHoraInicio || "09:00",
+              tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
+              status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
+              google_calendar_id: EMAIL_AGENDA_LOJA_PRINCIPAL,
+            })
+            .select("id")
+            .single();
+          if (error) throw error;
+          agendaId = inserido?.id || null;
+        }
+
+        await dispararSyncIndividualGoogle({
+          operacao: "upsert",
+          osNumero: cardEditando?.os_numero || null,
+          clienteNome: formTituloEvento.trim(),
+          etapaExecucao: formEtapaExecucao,
+          dataExecucao: formDataExecucao,
+          horaInicio: formHoraInicio,
+          horaFim: formHoraFim,
+          modalidadeExecucao: formModalidade,
+          statusVoo: statusBanco,
+          equipeResponsavel: formEquipe,
+          observacoes: formObservacoes,
+          emailsVinculados: emailsArray,
+          googleEventId: cardEditando?.google_event_id || null,
+          agendaEventoId: agendaId,
+        });
+
+        return;
       }
 
+      // Caso 2: Card vinculado a uma Ordem de Serviço (OS) formalmente emitida
+      const osSelecionada = ordensEmitidas.find((o: any) => o.id === formOrdemId);
+      if (!osSelecionada) {
+        throw new Error(
+          "Regra do Flight Board: Selecione uma Ordem de Serviço (OS) formalmente emitida."
+        );
+      }
+
+      const numeroOs =
+        osSelecionada.numero || osSelecionada.id.slice(0, 8).toUpperCase();
+      const nomeCliente =
+        osSelecionada.clientes?.nome ||
+        cardEditando?.cliente_nome ||
+        formTituloEvento.trim() ||
+        "Cliente OS";
+
+      const observacoesEmpacotadas = empacotarMetadadosTexto({
+        modalidade: formModalidade,
+        osNumero: numeroOs,
+        etapaExecucao: formEtapaExecucao,
+        horaInicio: formHoraInicio,
+        horaFim: formHoraFim,
+        emailsVinculados: emailsFormatados,
+        equipe: formEquipe,
+        statusFlight: statusFinal,
+        observacoesLimpa: formObservacoes,
+      });
+
+      // Atualizar também a data prevista e responsável na própria OS emitida
+      await supabase
+        .from("ordens_servico")
+        .update({
+          data_previsao: formDataExecucao,
+          responsavel: formEquipe.trim() || osSelecionada.responsavel || null,
+          status:
+            statusFinal === "CONCLUIDO"
+              ? "concluido"
+              : statusFinal === "EM_ANDAMENTO"
+                ? "em_andamento"
+                : osSelecionada.status,
+        })
+        .eq("id", osSelecionada.id);
+
+      const payloadCompleto: Record<string, any> = {
+        voo_codigo: cardEditando?.voo_codigo || `OS-${numeroOs}`,
+        ordem_id: osSelecionada.id,
+        os_numero: numeroOs,
+        cliente_id: osSelecionada.cliente_id || null,
+        cliente_nome: nomeCliente,
+        kit_titulo:
+          osSelecionada.descricao || cardEditando?.kit_titulo || `OS #${numeroOs}`,
+        etapa_execucao: formEtapaExecucao.trim() || "Execução Técnica",
+        data_execucao: formDataExecucao,
+        previsao_entrega: formDataExecucao,
+        hora_inicio: formHoraInicio || "08:00",
+        hora_fim: formHoraFim || "17:00",
+        status_voo: statusBanco,
+        modalidade_execucao: formModalidade,
+        equipe_responsavel: formEquipe.trim() || "Equipe Técnica",
+        emails_vinculados: emailsFormatados,
+        servico_out: formServicoOut,
+        motivo_out: formServicoOut ? formMotivoOut.trim() : null,
+        observacoes: observacoesEmpacotadas,
+        updated_at: new Date().toISOString(),
+      };
+
+      const payloadBasicoFallback: Record<string, any> = {
+        voo_codigo: cardEditando?.voo_codigo || `OS-${numeroOs}`,
+        cliente_id: osSelecionada.cliente_id || null,
+        cliente_nome: nomeCliente,
+        kit_titulo:
+          osSelecionada.descricao || cardEditando?.kit_titulo || `OS #${numeroOs}`,
+        previsao_entrega: formDataExecucao,
+        status_voo: statusBanco,
+        equipe_responsavel: formEquipe.trim() || "Equipe Técnica",
+        servico_out: formServicoOut,
+        motivo_out: formServicoOut ? formMotivoOut.trim() : null,
+        observacoes: observacoesEmpacotadas,
+        updated_at: new Date().toISOString(),
+      };
+
+      let flightBoardId = cardEditando?.flight_board_id || null;
+
+      if (flightBoardId) {
+        const { error } = await supabase
+          .from("logistics_flight_board")
+          .update(payloadCompleto)
+          .eq("id", flightBoardId);
+
+        if (error) {
+          const { error: errFallback } = await supabase
+            .from("logistics_flight_board")
+            .update(payloadBasicoFallback)
+            .eq("id", flightBoardId);
+          if (errFallback) throw errFallback;
+        }
+      } else {
+        const { data: inserido, error } = await supabase
+          .from("logistics_flight_board")
+          .insert(payloadCompleto)
+          .select("id")
+          .single();
+
+        if (error) {
+          const { data: inseridoFb, error: errFallback } = await supabase
+            .from("logistics_flight_board")
+            .insert(payloadBasicoFallback)
+            .select("id")
+            .single();
+          if (errFallback) throw errFallback;
+          flightBoardId = inseridoFb?.id || null;
+        } else {
+          flightBoardId = inserido?.id || null;
+        }
+      }
+
+      // Sincronizar imediatamente com Google Calendar (incluindo obrigatoriamente campinasjardimdotrevo@splashpiscinas.com)
+      await dispararSyncIndividualGoogle({
+        operacao: "upsert",
+        osNumero: numeroOs,
+        clienteNome: nomeCliente,
+        etapaExecucao: formEtapaExecucao.trim() || "Execução Técnica",
+        dataExecucao: formDataExecucao,
+        horaInicio: formHoraInicio,
+        horaFim: formHoraFim,
+        modalidadeExecucao: formModalidade,
+        statusVoo: statusBanco,
+        equipeResponsavel: formEquipe.trim(),
+        observacoes: formObservacoes.trim(),
+        emailsVinculados: emailsArray,
+        googleEventId: cardEditando?.google_event_id || null,
+        flightBoardId,
+      });
+    },
+    onSuccess: () => {
+      toast.success(
+        `Agendamento salvo e sincronizado com ${EMAIL_AGENDA_LOJA_PRINCIPAL}!`
+      );
+      setEditorModalAberto(false);
+      setCardEditando(null);
+      queryClient.invalidateQueries({ queryKey: ["logistics_flight_board_v2"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Erro ao salvar agendamento no Flight Board.");
+    },
+  });
+
+  // ============================================================================
+  // MUTATION: ALTERNAR TAG "COM EXECUÇÃO" / "SEM EXECUÇÃO" DIRETAMENTE NO CARD
+  // ============================================================================
+  const alternarModalidadeMutation = useMutation({
+    mutationFn: async (card: FlightBoardCardItem) => {
+      const novaModalidade: ModalidadeExecucao =
+        card.modalidade_execucao === "com_execucao" ? "sem_execucao" : "com_execucao";
+
+      const novaObs = empacotarMetadadosTexto({
+        modalidade: novaModalidade,
+        osNumero: card.os_numero,
+        etapaExecucao: card.etapa_execucao,
+        horaInicio: card.hora_inicio,
+        horaFim: card.hora_fim,
+        emailsVinculados: card.emails_vinculados,
+        equipe: card.equipe_responsavel,
+        statusFlight: card.status,
+        observacoesLimpa: card.observacoes,
+      });
+
+      if (card.origem === "agenda_google" && card.agenda_evento_id) {
+        const { error } = await supabase
+          .from("agenda_eventos")
+          .update({
+            tipo: novaModalidade === "com_execucao" ? "trabalho" : "pessoal",
+            descricao: novaObs,
+          })
+          .eq("id", card.agenda_evento_id);
+        if (error) throw error;
+      } else if (card.flight_board_id) {
+        const { error } = await supabase
+          .from("logistics_flight_board")
+          .update({
+            modalidade_execucao: novaModalidade,
+            observacoes: novaObs,
+          })
+          .eq("id", card.flight_board_id);
+
+        if (error) {
+          await supabase
+            .from("logistics_flight_board")
+            .update({ observacoes: novaObs })
+            .eq("id", card.flight_board_id);
+        }
+      } else if (card.ordem_id) {
+        await supabase
+          .from("ordens_servico")
+          .update({ observacoes: novaObs })
+          .eq("id", card.ordem_id);
+      }
+
+      await dispararSyncIndividualGoogle({
+        operacao: "upsert",
+        osNumero: card.os_numero,
+        clienteNome: card.cliente_nome,
+        etapaExecucao: card.etapa_execucao,
+        dataExecucao: card.data_execucao,
+        horaInicio: card.hora_inicio,
+        horaFim: card.hora_fim,
+        modalidadeExecucao: novaModalidade,
+        statusVoo: statusParaBancoFlight(card.status),
+        equipeResponsavel: card.equipe_responsavel,
+        observacoes: card.observacoes,
+        emailsVinculados: card.emails_vinculados
+          .split(/[,;\s]+/)
+          .filter((e) => e.includes("@")),
+        googleEventId: card.google_event_id,
+        flightBoardId: card.flight_board_id,
+        agendaEventoId: card.agenda_evento_id,
+      });
+
+      return novaModalidade;
+    },
+    onSuccess: (novaModalidade) => {
+      toast.success(
+        `Etiqueta alterada para "${novaModalidade === "com_execucao" ? "Com Execução" : "Sem Execução"}"!`
+      );
+      queryClient.invalidateQueries({ queryKey: ["logistics_flight_board_v2"] });
+    },
+    onError: (err: any) => {
+      toast.error(`Erro ao atualizar etiqueta: ${err?.message || "Falha"}`);
+    },
+  });
+
+  // ============================================================================
+  // MUTATION: EXCLUIR AGENDAMENTO DO FLIGHT BOARD COM CONFIRMAÇÃO PRÉVIA
+  // ============================================================================
+  const excluirCardMutation = useMutation({
+    mutationFn: async (card: FlightBoardCardItem) => {
+      if (card.flight_board_id) {
+        const { error } = await supabase
+          .from("logistics_flight_board")
+          .delete()
+          .eq("id", card.flight_board_id);
+        if (error) throw error;
+      }
+
+      if (card.agenda_evento_id) {
+        const { error } = await supabase
+          .from("agenda_eventos")
+          .delete()
+          .eq("id", card.agenda_evento_id);
+        if (error) throw error;
+      }
+
+      // Se era uma OS emitida direta sem linha em logistics_flight_board, limpamos a data_previsao ou marcamos cancelado se desejado
+      if (card.origem === "os_emitida" && card.ordem_id && !card.flight_board_id) {
+        await supabase
+          .from("ordens_servico")
+          .update({ status: "cancelado" })
+          .eq("id", card.ordem_id);
+      }
+
+      // Remover também do Google Calendar se houver google_event_id
+      if (card.google_event_id) {
+        await dispararSyncIndividualGoogle({
+          operacao: "delete",
+          osNumero: card.os_numero,
+          clienteNome: card.cliente_nome,
+          etapaExecucao: card.etapa_execucao,
+          dataExecucao: card.data_execucao,
+          modalidadeExecucao: card.modalidade_execucao,
+          googleEventId: card.google_event_id,
+          emailsVinculados: card.emails_vinculados
+            .split(/[,;\s]+/)
+            .filter((e) => e.includes("@")),
+        });
+      }
+    },
+    onSuccess: () => {
+      toast.success("Agendamento removido do Flight Board e do Google Agenda.");
+      setCardParaExcluir(null);
+      queryClient.invalidateQueries({ queryKey: ["logistics_flight_board_v2"] });
+    },
+    onError: (err: any) => {
+      toast.error(`Erro ao excluir agendamento: ${err?.message || "Falha"}`);
+    },
+  });
+
+  // ============================================================================
+  // ABERTURA DOS MODAIS DE INCLUIR E EDITAR
+  // ============================================================================
+  const abrirModalIncluir = (opcoes?: {
+    dataPadrao?: string;
+    statusPadrao?: FlightStatus;
+  }) => {
+    setModoEditor("INCLUIR");
+    setCardEditando(null);
+    setFormTipoVinculo(ordensEmitidas.length > 0 ? "OS_EMITIDA" : "COMPROMISSO_AGENDA");
+    const primeiraOs = ordensEmitidas[0];
+    setFormOrdemId(primeiraOs?.id || "");
+    setFormTituloEvento("");
+    setFormEtapaExecucao(
+      primeiraOs?.descricao || "Instalação e Execução Técnica de Piscina"
+    );
+    setFormDataExecucao(opcoes?.dataPadrao || hojeISO());
+    setFormHoraInicio("08:00");
+    setFormHoraFim("17:00");
+    setFormStatus(opcoes?.statusPadrao || "AGENDADO");
+    setFormModalidade("com_execucao");
+    setFormEquipe(primeiraOs?.responsavel || "");
+    const emailCliente = primeiraOs?.clientes?.email;
+    setFormEmailsVinculados(
+      [EMAIL_AGENDA_LOJA_PRINCIPAL, emailCliente].filter(Boolean).join(", ")
+    );
+    setFormObservacoes("");
+    setFormServicoOut(opcoes?.statusPadrao === "OUT");
+    setFormMotivoOut("");
+    setEditorModalAberto(true);
+  };
+
+  const abrirModalEditar = (card: FlightBoardCardItem) => {
+    setModoEditor("EDITAR");
+    setCardEditando(card);
+    setFormTipoVinculo(
+      card.origem === "agenda_google" && !card.ordem_id
+        ? "COMPROMISSO_AGENDA"
+        : "OS_EMITIDA"
+    );
+    setFormOrdemId(card.ordem_id || ordensEmitidas[0]?.id || "");
+    setFormTituloEvento(card.cliente_nome);
+    setFormEtapaExecucao(card.etapa_execucao);
+    setFormDataExecucao(card.data_execucao || hojeISO());
+    setFormHoraInicio(card.hora_inicio || "08:00");
+    setFormHoraFim(card.hora_fim || "17:00");
+    setFormStatus(card.status);
+    setFormModalidade(card.modalidade_execucao);
+    setFormEquipe(card.equipe_responsavel || "");
+    setFormEmailsVinculados(
+      card.emails_vinculados || EMAIL_AGENDA_LOJA_PRINCIPAL
+    );
+    setFormObservacoes(card.observacoes || "");
+    setFormServicoOut(card.servico_out || card.status === "OUT");
+    setFormMotivoOut(card.motivo_out || "");
+    setEditorModalAberto(true);
+  };
+
+  // Quando o usuário troca a OS selecionada no modal de Incluir
+  const handleSelectOrdemEmitida = (osId: string) => {
+    setFormOrdemId(osId);
+    const os = ordensEmitidas.find((o: any) => o.id === osId);
+    if (os) {
+      setFormEtapaExecucao(os.descricao || "Execução Técnica de OS");
+      if (os.responsavel) setFormEquipe(os.responsavel);
+      const emailCli = os.clientes?.email;
+      setFormEmailsVinculados(
+        Array.from(
+          new Set([EMAIL_AGENDA_LOJA_PRINCIPAL, emailCli].filter(Boolean))
+        ).join(", ")
+      );
+    }
+  };
+
+  // ============================================================================
+  // FILTROS E ESTATÍSTICAS
+  // ============================================================================
+  const cardsFiltrados = useMemo(() => {
+    return cards.filter((c) => {
+      if (filtroStatus !== "TODOS" && c.status !== filtroStatus) {
+        return false;
+      }
+      if (
+        filtroModalidade !== "TODAS" &&
+        c.modalidade_execucao !== filtroModalidade
+      ) {
+        return false;
+      }
       if (busca.trim()) {
-        const t = busca.toLowerCase();
-        const casa =
-          it.voo_codigo.toLowerCase().includes(t) ||
-          it.cliente_nome.toLowerCase().includes(t) ||
-          it.servico_natureza.toLowerCase().includes(t) ||
-          (it.responsavel || "").toLowerCase().includes(t) ||
-          (it.endereco_obra || "").toLowerCase().includes(t);
-        if (!casa) return false;
+        const q = busca.toLowerCase();
+        const match =
+          c.cliente_nome.toLowerCase().includes(q) ||
+          (c.os_numero || "").toLowerCase().includes(q) ||
+          c.voo_codigo.toLowerCase().includes(q) ||
+          c.etapa_execucao.toLowerCase().includes(q) ||
+          c.equipe_responsavel.toLowerCase().includes(q);
+        if (!match) return false;
       }
-
       return true;
     });
-  }, [itensConsolidados, apenasOut, filtroStatus, busca]);
+  }, [cards, filtroStatus, filtroModalidade, busca]);
 
-  // Mutation: Salvar Edição do Voo
-  const salvarEdicao = useMutation({
-    mutationFn: async (dados: FlightBoardItem) => {
-      // 1. Atualiza na tabela de obras se existir obra_id
-      if (dados.obra_id) {
-        await supabase
-          .from("obras")
-          .update({
-            tipo_servico: dados.servico_natureza,
-            data_pedido: dados.data_pedido,
-            prazo_dias: dados.prazo_dias,
-            data_limite: dados.prazo_limite,
-            escavacao_inicio: dados.escavacao_data || null,
-            instalacao_inicio: dados.instalacao_data || null,
-            responsavel: dados.responsavel || null,
-            endereco_obra: dados.endereco_obra || null,
-            observacoes: dados.observacoes || null,
-            status_geral: dados.status === "OUT" ? "OUT" : dados.status,
-          })
-          .eq("id", dados.obra_id);
-      }
+  const estatisticas = useMemo(() => {
+    return {
+      total: cards.length,
+      emAndamento: cards.filter((c) => c.status === "EM_ANDAMENTO").length,
+      agendados: cards.filter((c) => c.status === "AGENDADO").length,
+      concluidos: cards.filter((c) => c.status === "CONCLUIDO").length,
+      comExecucao: cards.filter((c) => c.modalidade_execucao === "com_execucao")
+        .length,
+      semExecucao: cards.filter((c) => c.modalidade_execucao === "sem_execucao")
+        .length,
+      servicosOut: cards.filter((c) => c.status === "OUT" || c.servico_out).length,
+    };
+  }, [cards]);
 
-      // 2. Upsert na tabela logistics_flight_board
-      const payloadBoard = {
-        id: dados.id,
-        voo_codigo: dados.voo_codigo,
-        obra_id: dados.obra_id || null,
-        venda_id: dados.venda_id || null,
-        cliente_id: dados.cliente_id || null,
-        cliente_nome: dados.cliente_nome,
-        servico_natureza: dados.servico_natureza,
-        data_pedido: dados.data_pedido,
-        prazo_dias: dados.prazo_dias,
-        prazo_limite: dados.prazo_limite,
-        escavacao_data: dados.escavacao_data || null,
-        escavacao_status: dados.escavacao_status,
-        instalacao_data: dados.instalacao_data || null,
-        instalacao_status: dados.instalacao_status,
-        os_instalacao: dados.os_instalacao || null,
-        os_instalacao_status: dados.os_instalacao_status,
-        os_logistica: dados.os_logistica || null,
-        os_logistica_status: dados.os_logistica_status,
-        os_acabamento: dados.os_acabamento || null,
-        os_acabamento_status: dados.os_acabamento_status,
-        status: dados.status,
-        is_out: dados.is_out,
-        responsavel: dados.responsavel || null,
-        endereco_obra: dados.endereco_obra || null,
-        observacoes: dados.observacoes || null,
-      };
-
-      const { error } = await supabase
-        .from("logistics_flight_board" as never)
-        .upsert(payloadBoard as never);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Voo / Operação atualizada com sucesso!");
-      setDrawerAberto(false);
-      qc.invalidateQueries({ queryKey: ["logistics_flight_board"] });
-      qc.invalidateQueries({ queryKey: ["obras"] });
-    },
-    onError: (e: Error) => toast.error(`Erro ao salvar: ${e.message}`),
-  });
-
-  // Mutation: Criar Novo Voo
-  const criarNovoVoo = useMutation({
-    mutationFn: async () => {
-      if (!novoItemForm.cliente_nome.trim()) {
-        throw new Error("Informe o nome do cliente");
-      }
-      if (!novoItemForm.servico_natureza.trim()) {
-        throw new Error("Informe a descrição do serviço / modelo");
-      }
-
-      const codigoFinal =
-        novoItemForm.voo_codigo.trim() ||
-        (novoItemForm.is_out
-          ? `OUT-${String(Math.floor(Math.random() * 900) + 100)}`
-          : `FL-${String(Math.floor(Math.random() * 900) + 100)}`);
-
-      // 1. Cria a obra correspondente
-      const { data: novaObra, error: erroObra } = await supabase
-        .from("obras")
-        .insert({
-          numero: codigoFinal,
-          cliente_id: novoItemForm.cliente_id || null,
-          cliente_nome: novoItemForm.cliente_nome,
-          tipo_servico: novoItemForm.servico_natureza,
-          data_pedido: novoItemForm.data_pedido,
-          prazo_dias: novoItemForm.prazo_dias,
-          data_limite: novoItemForm.prazo_limite,
-          responsavel: novoItemForm.responsavel || null,
-          endereco_obra: novoItemForm.endereco_obra || null,
-          observacoes: novoItemForm.observacoes || null,
-          status_geral: novoItemForm.is_out ? "OUT" : novoItemForm.status,
-          os_instalacao: novoItemForm.os_instalacao,
-          os_logistica: novoItemForm.os_logistica,
-          os_acabamento: novoItemForm.os_acabamento,
-        })
-        .select("id")
-        .single();
-
-      if (erroObra) throw erroObra;
-
-      // 2. Registra na tabela logistics_flight_board
-      const payload = {
-        voo_codigo: codigoFinal,
-        obra_id: novaObra.id,
-        cliente_id: novoItemForm.cliente_id || null,
-        cliente_nome: novoItemForm.cliente_nome,
-        servico_natureza: novoItemForm.servico_natureza,
-        data_pedido: novoItemForm.data_pedido,
-        prazo_dias: novoItemForm.prazo_dias,
-        prazo_limite: novoItemForm.prazo_limite,
-        status: novoItemForm.is_out ? "OUT" : novoItemForm.status,
-        is_out: novoItemForm.is_out,
-        responsavel: novoItemForm.responsavel || null,
-        endereco_obra: novoItemForm.endereco_obra || null,
-        observacoes: novoItemForm.observacoes || null,
-        os_instalacao: novoItemForm.os_instalacao,
-        os_logistica: novoItemForm.os_logistica,
-        os_acabamento: novoItemForm.os_acabamento,
-      };
-
-      const { error: erroBoard } = await supabase
-        .from("logistics_flight_board" as never)
-        .insert(payload as never);
-
-      if (erroBoard) throw erroBoard;
-    },
-    onSuccess: () => {
-      toast.success("Novo voo / operação registrado no Flight Board!");
-      setNovoModalAberto(false);
-      qc.invalidateQueries({ queryKey: ["logistics_flight_board"] });
-      qc.invalidateQueries({ queryKey: ["obras"] });
-    },
-    onError: (e: Error) => toast.error(`Erro ao criar: ${e.message}`),
-  });
-
-  const abrirEdicaoLinha = (item: FlightBoardItem) => {
-    setItemEditando({ ...item });
-    setDrawerAberto(true);
-  };
-
-  const abrirVisualizacaoOS = (item: FlightBoardItem) => {
-    setDocModalTipo("os");
-    setDocModalId(item.obra_id || item.id);
-    setDocModalAberto(true);
-  };
-
-  return (
-    <div className="min-h-screen bg-[#070A10] text-slate-100 p-3 md:p-6 space-y-5 font-sans">
-      {/* ========================================================= */}
-      {/* TOP HEADER: ESTILO PAINEL DE AEROPORTO FIDS               */}
-      {/* ========================================================= */}
-      <div className="bg-[#0B0F17] rounded-xl border border-slate-800 p-4 md:p-6 shadow-2xl relative overflow-hidden">
-        {/* Glow de fundo âmbar aeroporto */}
-        <div className="absolute -top-16 -right-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold tracking-widest bg-amber-950/80 text-amber-400 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
-                <Plane className="w-3.5 h-3.5 animate-pulse" />
-                DEPARTURES & LOGISTICS DISPATCH TERMINAL
-              </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30">
-                <Radio className="w-3 h-3 text-emerald-400 animate-ping" />
-                LIVE RADAR ACTIVE
-              </span>
+  const imprimirOrdemCarga = (card: FlightBoardCardItem) => {
+    const win = window.open("", "_blank", "width=850,height=900");
+    if (!win) return;
+    win.document.write(`
+      <html>
+        <head>
+          <title>Ordem de Execução - ${card.os_numero ? `OS #${card.os_numero}` : card.voo_codigo}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            .header { border-bottom: 3px solid #0f172a; padding-bottom: 14px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+            .badge { background: #0f172a; color: #ffffff; padding: 6px 12px; font-weight: bold; border-radius: 6px; font-size: 13px; }
+            .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #f8fafc; }
+            .label { font-size: 11px; text-transform: uppercase; color: #475569; font-weight: bold; }
+            .val { font-size: 15px; font-weight: bold; color: #0f172a; margin-top: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 style="margin:0; font-size: 22px;">CRONOGRAMA FLIGHT BOARD — ORDEM DE EXECUÇÃO</h1>
+              <p style="margin:4px 0 0; font-size: 13px; color:#334155;">Agenda Principal: ${EMAIL_AGENDA_LOJA_PRINCIPAL}</p>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-wider font-mono text-slate-50 uppercase flex items-center gap-2.5">
-              <span>✈️ FLIGHT BOARD</span>
-              <span className="text-slate-500 font-light">|</span>
-              <span className="text-amber-400">CONTROLE DE LOGÍSTICA</span>
-            </h1>
-            <p className="text-xs text-slate-400 font-mono">
-              SISTEMA INTEGRADO DE RASTREAMENTO DE OBRAS, EXECUÇÃO E SERVIÇOS CRÍTICOS (OUT)
+            <div class="badge">${card.os_numero ? `OS #${card.os_numero}` : card.voo_codigo}</div>
+          </div>
+          <div class="box">
+            <div class="label">Cliente / Compromisso</div>
+            <div class="val">${card.cliente_nome}</div>
+            <p style="margin: 6px 0 0; font-size: 13px;">Etapa: <strong>${card.etapa_execucao}</strong></p>
+            <p style="margin: 4px 0 0; font-size: 13px;">Modalidade: <strong>${card.modalidade_execucao === "com_execucao" ? "COM EXECUÇÃO (Campo / Instalação)" : "SEM EXECUÇÃO (Reunião / Compromisso)"}</strong></p>
+          </div>
+          <div class="box">
+            <div class="label">Agendamento e Equipe</div>
+            <p style="margin: 6px 0; font-size: 14px;">Data de Execução: <strong>${dataBR(card.data_execucao)}</strong> das <strong>${card.hora_inicio}</strong> às <strong>${card.hora_fim}</strong></p>
+            <p style="margin: 6px 0; font-size: 14px;">Equipe / Responsável: <strong>${card.equipe_responsavel}</strong></p>
+            <p style="margin: 6px 0; font-size: 13px;">E-mails Sincronizados: ${card.emails_vinculados}</p>
+          </div>
+          ${card.observacoes ? `<div class="box"><div class="label">Observações</div><p style="margin-top:6px; font-size:13px;">${card.observacoes}</p></div>` : ""}
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
+  // ============================================================================
+  // COMPONENTE INTERNO DE CARD DE ALTO CONTRASTE
+  // ============================================================================
+  const renderFlightCard = (card: FlightBoardCardItem) => {
+    const statusCfg = getStatusBadgeConfig(card.status);
+    const modCfg = getModalidadeBadgeConfig(card.modalidade_execucao);
+    const ModIcon = modCfg.icon;
+
+    return (
+      <div
+        key={card.id}
+        className="group relative rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col"
+      >
+        {/* Faixa superior de alto contraste por status */}
+        <div className={`h-1.5 w-full ${statusCfg.stripeClass}`} />
+
+        <div className="p-3.5 flex flex-col gap-2.5 flex-1">
+          {/* Topo do card: Número da OS + Status Badge */}
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {card.os_numero ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-extrabold bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 tracking-tight">
+                  <FileText className="h-3 w-3" />
+                  OS #{card.os_numero}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-700 text-white dark:bg-indigo-400 dark:text-slate-950">
+                  <Calendar className="h-3 w-3" />
+                  Google Agenda
+                </span>
+              )}
+
+              {/* Tag clicável: "Com Execução" ou "Sem Execução" */}
+              <button
+                type="button"
+                onClick={() => alternarModalidadeMutation.mutate(card)}
+                title="Clique para alternar entre 'Com Execução' e 'Sem Execução'"
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border transition-colors cursor-pointer ${modCfg.badgeClass}`}
+              >
+                <ModIcon className="h-3 w-3" />
+                {modCfg.label}
+              </button>
+            </div>
+
+            <Badge
+              variant="outline"
+              className={`text-[11px] px-2 py-0.5 rounded-md border ${statusCfg.badgeClass}`}
+            >
+              {statusCfg.label}
+            </Badge>
+          </div>
+
+          {/* Nome do Cliente e Etapa de Execução com alto contraste */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-950 dark:text-white leading-snug">
+              {card.cliente_nome}
+            </h4>
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5 line-clamp-2">
+              {card.etapa_execucao}
             </p>
           </div>
 
-          {/* Relógio Digital Split-Flap em Tempo Real */}
-          <div className="flex items-center gap-3">
-            <div className="bg-black/90 border border-amber-500/40 px-4 py-2 rounded-lg shadow-inner flex items-center gap-3 font-mono">
-              <Clock className="w-5 h-5 text-amber-400" />
+          {/* Alerta se estiver em OUT */}
+          {(card.servico_out || card.status === "OUT") && (
+            <div className="rounded-lg bg-red-50 dark:bg-red-950/70 border border-red-300 dark:border-red-800 px-2.5 py-1.5 text-xs text-red-900 dark:text-red-200 font-medium flex items-start gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <span>{card.motivo_out || "Impedimento operacional sinalizado (OUT)."}</span>
+            </div>
+          )}
+
+          {/* Metadados: Data, Horário, Equipe e Agenda */}
+          <div className="rounded-lg bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 p-2 space-y-1 text-xs text-slate-800 dark:text-slate-200">
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1 font-semibold">
+                <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                {dataBR(card.data_execucao)}
+              </span>
+              <span className="inline-flex items-center gap-1 font-mono font-semibold text-slate-900 dark:text-slate-100">
+                <Clock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                {card.hora_inicio} - {card.hora_fim}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 truncate">
+              <Users className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
+              <span className="truncate font-medium">{card.equipe_responsavel}</span>
+            </div>
+
+            <div
+              className="flex items-center gap-1.5 text-[11px] text-slate-700 dark:text-slate-300 truncate"
+              title={`Sincronizado com: ${card.emails_vinculados}`}
+            >
+              <Mail className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span className="truncate">{EMAIL_AGENDA_LOJA_PRINCIPAL}</span>
+            </div>
+          </div>
+
+          {/* Rodapé do Card: Botões Diretos de Editar e Excluir + Visualizar OS */}
+          <div className="pt-2 mt-auto border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1">
+              {card.ordem_id && (
+                <BotaoVisualizarDocumento
+                  tipo="os"
+                  id={card.ordem_id}
+                  label="Ver OS"
+                  className="h-7 px-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+                />
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imprimirOrdemCarga(card)}
+                title="Imprimir Ordem de Execução"
+                className="h-7 px-2 text-xs bg-white hover:bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
+              >
+                <Printer className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => abrirModalEditar(card)}
+                className="h-7 px-2.5 text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/80 dark:hover:bg-blue-900 dark:text-blue-100 dark:border-blue-800"
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Editar
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCardParaExcluir(card)}
+                className="h-7 px-2.5 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-900 border-red-300 dark:bg-red-950/80 dark:hover:bg-red-900 dark:text-red-100 dark:border-red-800"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-16">
+      {/* ===================================================================== */}
+      {/* CABEÇALHO DE ALTO CONTRASTE DO FLIGHT BOARD                           */}
+      {/* ===================================================================== */}
+      <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-[1680px] mx-auto px-4 sm:px-6 py-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Identidade + Regra de OS Emitida + E-mail da Loja */}
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="h-12 w-12 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                <Plane className="h-6 w-6" />
+              </div>
               <div>
-                <div className="text-[10px] text-amber-500/70 tracking-widest uppercase">
-                  LOCAL TIME (BRT)
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-950 dark:text-white">
+                    FLIGHT BOARD — QUADRO DE EXECUÇÃO
+                  </h1>
+                  <Badge className="bg-emerald-700 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-0.5">
+                    <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                    Regra Ativa: Somente OS Emitida
+                  </Badge>
                 </div>
-                <div className="text-xl md:text-2xl font-bold text-amber-400 tabular-nums tracking-widest">
-                  {horaAeroporto || "12:00:00"}
-                </div>
+                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 font-medium">
+                    <CalendarCheck2 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    Agenda Principal Sincronizada:{" "}
+                    <strong className="text-slate-950 dark:text-white underline decoration-blue-500">
+                      {EMAIL_AGENDA_LOJA_PRINCIPAL}
+                    </strong>
+                  </span>
+                  {ultimaSyncGoogle && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium">
+                      Última sync: {ultimaSyncGoogle}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
 
-            <Button
-              onClick={() => {
-                setNovoItemForm({
-                  voo_codigo: "",
-                  cliente_nome: "",
-                  cliente_id: "",
-                  servico_natureza: "",
-                  data_pedido: hojeISO(),
-                  prazo_dias: 30,
-                  prazo_limite: addDiasUteis(hojeISO(), 30),
-                  status: "AGENDADO",
-                  is_out: false,
-                  responsavel: "",
-                  endereco_obra: "",
-                  observacoes: "",
-                  os_instalacao: "OS-02",
-                  os_logistica: "OL",
-                  os_acabamento: "OS-03",
-                });
-                setNovoModalAberto(true);
-              }}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold tracking-wider px-4 shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all"
-            >
-              <Plus className="w-4 h-4 mr-1.5" />
-              NOVO VOO / SERVIÇO
-            </Button>
-          </div>
-        </div>
+            {/* Botões Principais de Ação e Sincronização com Google Agenda */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+                <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                  {relogio || "--:--:--"}
+                </span>
+              </div>
 
-        {/* CONTADORES EM ESTILO DISPLAY FIDS */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-4">
-          <div className="bg-[#06090F] border border-slate-800 rounded-lg p-2.5 font-mono">
-            <div className="text-[10px] text-slate-400 tracking-wider uppercase">
-              TOTAL OPERAÇÕES
-            </div>
-            <div className="text-xl font-bold text-slate-100 tabular-nums mt-0.5">
-              {stats.total}
-            </div>
-          </div>
-
-          <div
-            onClick={() => setApenasOut((v) => !v)}
-            className={`border rounded-lg p-2.5 font-mono cursor-pointer transition-all ${
-              apenasOut || stats.out > 0
-                ? "bg-amber-950/40 border-amber-500/70 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
-                : "bg-[#06090F] border-slate-800 text-slate-300"
-            }`}
-          >
-            <div className="text-[10px] flex items-center justify-between tracking-wider uppercase">
-              <span>ALERTA OUT</span>
-              <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-            </div>
-            <div className="text-xl font-bold tabular-nums mt-0.5 text-amber-400 flex items-center gap-1.5">
-              {stats.out}
-              {apenasOut && <span className="text-[10px] text-amber-300">(FILTRADO)</span>}
-            </div>
-          </div>
-
-          <div className="bg-[#06090F] border border-emerald-900/40 rounded-lg p-2.5 font-mono">
-            <div className="text-[10px] text-emerald-400 tracking-wider uppercase">
-              CONFIRMADOS
-            </div>
-            <div className="text-xl font-bold text-emerald-400 tabular-nums mt-0.5">
-              {stats.confirmados}
-            </div>
-          </div>
-
-          <div className="bg-[#06090F] border border-sky-900/40 rounded-lg p-2.5 font-mono">
-            <div className="text-[10px] text-sky-400 tracking-wider uppercase">AGENDADOS</div>
-            <div className="text-xl font-bold text-sky-400 tabular-nums mt-0.5">
-              {stats.agendados}
-            </div>
-          </div>
-
-          <div className="bg-[#06090F] border border-cyan-900/40 rounded-lg p-2.5 font-mono">
-            <div className="text-[10px] text-cyan-400 tracking-wider uppercase">AGUARDANDO</div>
-            <div className="text-xl font-bold text-cyan-400 tabular-nums mt-0.5">
-              {stats.aguardando}
-            </div>
-          </div>
-
-          <div className="bg-[#06090F] border border-slate-800 rounded-lg p-2.5 font-mono">
-            <div className="text-[10px] text-slate-400 tracking-wider uppercase">CONCLUÍDOS</div>
-            <div className="text-xl font-bold text-slate-300 tabular-nums mt-0.5">
-              {stats.concluidos}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================= */}
-      {/* BARRA DE FILTROS & CONTROLE ESTILO TERMINAL               */}
-      {/* ========================================================= */}
-      <div className="bg-[#0B0F17] rounded-xl border border-slate-800 p-3.5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="SEARCH / BUSCAR VOO, CLIENTE, SERVIÇO, RESPONSÁVEL..."
-              className="bg-[#06090F] border-slate-800 text-slate-100 placeholder:text-slate-500 font-mono text-xs pl-9 h-9 tracking-wider focus-visible:ring-amber-500/50"
-            />
-          </div>
-
-          {/* Quick status filters */}
-          <div className="flex items-center gap-1 overflow-x-auto py-1">
-            {["TODOS", "OUT", "CONFIRMADO", "AGENDADO", "AGUARDANDO", "CONCLUÍDO"].map((st) => (
-              <button
-                key={st}
+              <Button
                 type="button"
-                onClick={() => {
-                  setFiltroStatus(st);
-                  if (st === "OUT") setApenasOut(true);
-                }}
-                className={`px-2.5 py-1 rounded text-[11px] font-mono tracking-wider transition-all whitespace-nowrap ${
-                  filtroStatus === st
-                    ? st === "OUT"
-                      ? "bg-amber-500 text-slate-950 font-bold shadow-[0_0_10px_rgba(245,158,11,0.4)]"
-                      : "bg-slate-200 text-slate-950 font-bold"
-                    : "bg-[#06090F] text-slate-400 hover:text-slate-200 border border-slate-800/80"
-                }`}
+                variant="outline"
+                onClick={() => syncGoogleMutation.mutate(false)}
+                disabled={syncGoogleMutation.isPending}
+                className="bg-white hover:bg-blue-50 text-blue-900 border-blue-400 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-blue-200 dark:border-blue-700 font-bold shadow-xs"
               >
-                {st === "OUT" ? "🚨 OUT (CRÍTICO)" : st}
-              </button>
-            ))}
+                <RefreshCw
+                  className={`h-4 w-4 mr-2 text-blue-600 dark:text-blue-400 ${
+                    syncGoogleMutation.isPending ? "animate-spin" : ""
+                  }`}
+                />
+                {syncGoogleMutation.isPending
+                  ? "Sincronizando Agenda..."
+                  : "Sincronizar com Google Agenda"}
+              </Button>
+
+              <Button
+                type="button"
+                onClick={() => abrirModalIncluir({ dataPadrao: hojeISO() })}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Incluir no Quadro
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {/* Botão de Ordenação Cronológica Estrita */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setOrdemCrescente((v) => !v)}
-            className="bg-[#06090F] border-slate-800 text-slate-300 font-mono text-xs hover:bg-[#131A26] hover:text-amber-400"
-          >
-            <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-amber-400" />
-            {ordemCrescente ? "CRONOLÓGICO (MAIS ANTIGO)" : "MAIS RECENTE"}
-          </Button>
+          {/* KPIs de Alto Contraste */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-4">
+            <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 px-3.5 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-slate-600 dark:text-slate-300">
+                  Total no Quadro
+                </p>
+                <p className="text-xl font-extrabold text-slate-950 dark:text-white">
+                  {estatisticas.total}
+                </p>
+              </div>
+              <Plane className="h-6 w-6 text-slate-700 dark:text-slate-300" />
+            </div>
 
-          {/* Botão de Formulários Emitidos */}
-          <BotaoVisualizarFormulariosEmitidos
-            variant="outline"
-            size="sm"
-            rotulo="Formulários"
-            tipoInicial="os"
-          />
+            <div className="rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-3.5 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-emerald-900 dark:text-emerald-200">
+                  Em Andamento
+                </p>
+                <p className="text-xl font-extrabold text-emerald-950 dark:text-white">
+                  {estatisticas.emAndamento}
+                </p>
+              </div>
+              <Flame className="h-6 w-6 text-emerald-700 dark:text-emerald-400" />
+            </div>
 
-          {/* Link para o Formulário Oficial de OS */}
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="bg-[#06090F] border-slate-800 text-slate-300 font-mono text-xs hover:bg-[#131A26] hover:text-amber-400"
-          >
-            <Link to="/os/formulario">
-              <FileText className="w-3.5 h-3.5 mr-1" />
-              Formulário OS
-            </Link>
-          </Button>
+            <div className="rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 px-3.5 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-blue-900 dark:text-blue-200">
+                  Agendados
+                </p>
+                <p className="text-xl font-extrabold text-blue-950 dark:text-white">
+                  {estatisticas.agendados}
+                </p>
+              </div>
+              <Calendar className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+            </div>
+
+            <div className="rounded-xl border border-violet-300 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/60 px-3.5 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-violet-900 dark:text-violet-200">
+                  Concluídos
+                </p>
+                <p className="text-xl font-extrabold text-violet-950 dark:text-white">
+                  {estatisticas.concluidos}
+                </p>
+              </div>
+              <CheckCircle2 className="h-6 w-6 text-violet-700 dark:text-violet-400" />
+            </div>
+
+            <div className="rounded-xl border border-teal-300 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/60 px-3.5 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-teal-900 dark:text-teal-200">
+                  Com Execução
+                </p>
+                <p className="text-xl font-extrabold text-teal-950 dark:text-white">
+                  {estatisticas.comExecucao}
+                </p>
+              </div>
+              <Wrench className="h-6 w-6 text-teal-700 dark:text-teal-400" />
+            </div>
+
+            <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3.5 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold uppercase text-slate-800 dark:text-slate-200">
+                  Sem Execução
+                </p>
+                <p className="text-xl font-extrabold text-slate-950 dark:text-white">
+                  {estatisticas.semExecucao}
+                </p>
+              </div>
+              <Briefcase className="h-6 w-6 text-slate-700 dark:text-slate-300" />
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* TABELA DE VOO OPERACIONAL (FIDS / SPLIT-FLAP DISPLAY)     */}
-      {/* ========================================================= */}
-      <div className="bg-[#0B0F17] rounded-xl border border-slate-800 overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <Table className="w-full text-left border-collapse">
-            <TableHeader className="bg-[#05080E] border-b-2 border-amber-500/40">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="text-amber-400 font-mono text-[11px] tracking-widest uppercase font-bold py-3.5 w-32">
-                  STATUS
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-28">
-                  DATA PEDIDO
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-28">
-                  PEDIDO / VOO
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold min-w-[180px]">
-                  CLIENTE
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold min-w-[200px]">
-                  SERVIÇO / NATUREZA
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-36">
-                  PRAZO RESTANTE
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-32">
-                  ESCAVAÇÃO / ET.1
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-32">
-                  INSTALAÇÃO / EXEC.
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-28">
-                  PRAZO LIMITE
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-48 text-center">
-                  ETAPAS TÉCNICAS (OS)
-                </TableHead>
-                <TableHead className="text-slate-400 font-mono text-[11px] tracking-widest uppercase font-bold w-28 text-right pr-4">
-                  AÇÕES / OS
-                </TableHead>
-              </TableRow>
-            </TableHeader>
+      {/* ===================================================================== */}
+      {/* BARRA DE FILTROS, NAVEGAÇÃO DE SEMANA E ALTERNÂNCIA DE VISÃO          */}
+      {/* ===================================================================== */}
+      <div className="max-w-[1680px] mx-auto px-4 sm:px-6 pt-5">
+        <div className="rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          {/* Busca e filtros de Status / Modalidade */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="h-4 w-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por OS, cliente, etapa ou equipe..."
+                className="pl-9 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+              />
+            </div>
 
-            <TableBody>
-              {itensFiltrados.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={11}
-                    className="h-32 text-center text-slate-500 font-mono text-sm"
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="w-full sm:w-44 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-semibold">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODOS">Todos os Status</SelectItem>
+                <SelectItem value="EM_ANDAMENTO">Em Andamento</SelectItem>
+                <SelectItem value="AGENDADO">Agendado</SelectItem>
+                <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+                <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                <SelectItem value="OUT">OUT / Impedido</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
+              <SelectTrigger className="w-full sm:w-48 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-semibold">
+                <SelectValue placeholder="Modalidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODAS">Todas as Etiquetas</SelectItem>
+                <SelectItem value="com_execucao">🔧 Com Execução</SelectItem>
+                <SelectItem value="sem_execucao">📅 Sem Execução</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Controles de Semana (quando em visão de Cronograma por Dias) + Seletor de Visão */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+            {modoVisao === "CRONOGRAMA_DIAS" && (
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-300 dark:border-slate-700">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSemanaBaseISO((prev) => adicionarDiasISO(prev, -7))}
+                  className="h-7 px-2 text-xs font-bold text-slate-900 dark:text-slate-100"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-0.5" />
+                  Semana Ant.
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setSemanaBaseISO(obterInicioSemanaSegundaISO(hojeISO()))
+                  }
+                  className="h-7 px-2.5 text-xs font-bold bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-300 border-slate-300 dark:border-slate-700"
+                >
+                  Hoje ({dataBR(hojeISO()).slice(0, 5)})
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSemanaBaseISO((prev) => adicionarDiasISO(prev, 7))}
+                  className="h-7 px-2 text-xs font-bold text-slate-900 dark:text-slate-100"
+                >
+                  Próx. Semana
+                  <ChevronRight className="h-4 w-4 ml-0.5" />
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-300 dark:border-slate-700">
+              <Button
+                type="button"
+                size="sm"
+                variant={modoVisao === "CRONOGRAMA_DIAS" ? "default" : "ghost"}
+                onClick={() => setModoVisao("CRONOGRAMA_DIAS")}
+                className={
+                  modoVisao === "CRONOGRAMA_DIAS"
+                    ? "h-7 px-2.5 text-xs font-bold bg-blue-600 text-white"
+                    : "h-7 px-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                }
+              >
+                <Columns3 className="h-3.5 w-3.5 mr-1" />
+                Por Dia
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={modoVisao === "COLUNAS_STATUS" ? "default" : "ghost"}
+                onClick={() => setModoVisao("COLUNAS_STATUS")}
+                className={
+                  modoVisao === "COLUNAS_STATUS"
+                    ? "h-7 px-2.5 text-xs font-bold bg-blue-600 text-white"
+                    : "h-7 px-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                }
+              >
+                <LayoutGrid className="h-3.5 w-3.5 mr-1" />
+                Por Status
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={modoVisao === "LISTA" ? "default" : "ghost"}
+                onClick={() => setModoVisao("LISTA")}
+                className={
+                  modoVisao === "LISTA"
+                    ? "h-7 px-2.5 text-xs font-bold bg-blue-600 text-white"
+                    : "h-7 px-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                }
+              >
+                <ListFilter className="h-3.5 w-3.5 mr-1" />
+                Tabela
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* =================================================================== */}
+        {/* VISÃO 1: CRONOGRAMA EM COLUNAS POR DIA DA SEMANA (COM BOTÃO INCLUIR)*/}
+        {/* =================================================================== */}
+        {isLoading ? (
+          <div className="mt-6 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center">
+            <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-3" />
+            <p className="text-base font-bold text-slate-900 dark:text-white">
+              Carregando Quadro de Execução e OS Emitidas...
+            </p>
+          </div>
+        ) : modoVisao === "CRONOGRAMA_DIAS" ? (
+          <div className="mt-5 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+              {diasDaSemanaISO.map((diaISO) => {
+                const infoDia = formatarDiaColuna(diaISO);
+                const cardsDoDia = cardsFiltrados.filter(
+                  (c) => c.data_execucao === diaISO
+                );
+
+                return (
+                  <div
+                    key={diaISO}
+                    className={`rounded-xl border flex flex-col min-h-[420px] ${
+                      infoDia.ehHoje
+                        ? "border-blue-500 dark:border-blue-500 bg-blue-50/40 dark:bg-slate-900 ring-2 ring-blue-500/20"
+                        : "border-slate-300 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900/60"
+                    }`}
                   >
-                    NENHUM VOO OU OPERAÇÃO ENCONTRADA COM OS FILTROS APLICADOS.
-                  </TableCell>
+                    {/* Topo da Coluna do Dia + Botão Direto "+ Incluir" */}
+                    <div
+                      className={`p-3 border-b rounded-t-xl flex items-center justify-between gap-2 ${
+                        infoDia.ehHoje
+                          ? "bg-blue-600 text-white border-blue-700"
+                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-extrabold uppercase tracking-wider">
+                            {infoDia.diaSemanaCurto}
+                          </span>
+                          <span
+                            className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded ${
+                              infoDia.ehHoje
+                                ? "bg-white text-blue-700"
+                                : "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200"
+                            }`}
+                          >
+                            {infoDia.diaMes}
+                          </span>
+                        </div>
+                        <p
+                          className={`text-[11px] mt-0.5 font-medium ${
+                            infoDia.ehHoje
+                              ? "text-blue-100"
+                              : "text-slate-600 dark:text-slate-400"
+                          }`}
+                        >
+                          {cardsDoDia.length} agendamento(s)
+                        </p>
+                      </div>
+
+                      {/* Requisito 3: Botão Incluir visível no topo de cada coluna/dia */}
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => abrirModalIncluir({ dataPadrao: diaISO })}
+                        className={`h-7 px-2.5 text-xs font-bold shadow-xs ${
+                          infoDia.ehHoje
+                            ? "bg-white hover:bg-blue-50 text-blue-900"
+                            : "bg-blue-600 hover:bg-blue-700 text-white"
+                        }`}
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Incluir
+                      </Button>
+                    </div>
+
+                    {/* Lista de Cards do Dia */}
+                    <div className="p-2.5 space-y-2.5 flex-1">
+                      {cardsDoDia.length === 0 ? (
+                        <div className="h-44 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 flex flex-col items-center justify-center p-4 text-center">
+                          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                            Sem execuções ou eventos neste dia.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => abrirModalIncluir({ dataPadrao: diaISO })}
+                            className="mt-2 h-7 text-xs font-bold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800"
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            Agendar em {infoDia.diaMes}
+                          </Button>
+                        </div>
+                      ) : (
+                        cardsDoDia.map((card) => renderFlightCard(card))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Seção de OS Emitidas / Eventos agendados fora da semana visível */}
+            {(() => {
+              const inicioSemana = diasDaSemanaISO[0];
+              const fimSemana = diasDaSemanaISO[diasDaSemanaISO.length - 1];
+              const cardsForaDaSemana = cardsFiltrados.filter(
+                (c) =>
+                  c.data_execucao < inicioSemana || c.data_execucao > fimSemana
+              );
+              if (cardsForaDaSemana.length === 0) return null;
+
+              return (
+                <div className="rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+                  <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                    <div>
+                      <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-900 dark:text-white flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-blue-600" />
+                        Outras Datas Agendadas ({cardsForaDaSemana.length})
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Ordens de Serviço emitidas e compromissos do Google Agenda programados para outras semanas.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => abrirModalIncluir({ dataPadrao: hojeISO() })}
+                      className="h-8 text-xs font-bold border-blue-400 text-blue-800 dark:text-blue-200"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Incluir Novo Agendamento
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {cardsForaDaSemana.map((card) => renderFlightCard(card))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        ) : modoVisao === "COLUNAS_STATUS" ? (
+          /* ================================================================= */
+          /* VISÃO 2: QUADRO KANBAN EM COLUNAS POR STATUS (COM BOTÃO INCLUIR)  */
+          /* ================================================================= */
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {(
+              [
+                "AGENDADO",
+                "EM_ANDAMENTO",
+                "AGUARDANDO",
+                "CONCLUIDO",
+                "OUT",
+              ] as FlightStatus[]
+            ).map((statusCol) => {
+              const cfg = getStatusBadgeConfig(statusCol);
+              const cardsColuna = cardsFiltrados.filter(
+                (c) => c.status === statusCol
+              );
+
+              return (
+                <div
+                  key={statusCol}
+                  className="rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/60 flex flex-col min-h-[480px]"
+                >
+                  <div
+                    className={`p-3 border-b rounded-t-xl flex items-center justify-between gap-2 ${cfg.headerBg}`}
+                  >
+                    <div>
+                      <span
+                        className={`text-xs font-extrabold uppercase tracking-wide ${cfg.headerText}`}
+                      >
+                        {cfg.label}
+                      </span>
+                      <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                        {cardsColuna.length} item(ns)
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() =>
+                        abrirModalIncluir({
+                          dataPadrao: hojeISO(),
+                          statusPadrao: statusCol,
+                        })
+                      }
+                      className="h-7 px-2.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Incluir
+                    </Button>
+                  </div>
+
+                  <div className="p-2.5 space-y-2.5 flex-1">
+                    {cardsColuna.length === 0 ? (
+                      <div className="h-40 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 flex flex-col items-center justify-center p-4 text-center">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                          Nenhum item em {cfg.label}.
+                        </p>
+                      </div>
+                    ) : (
+                      cardsColuna.map((card) => renderFlightCard(card))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* ================================================================= */
+          /* VISÃO 3: TABELA CONSOLIDADA DE ALTO CONTRASTE                     */
+          /* ================================================================= */
+          <div className="mt-5 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-100 dark:bg-slate-800/90">
+                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
+                    OS / Origem
+                  </TableHead>
+                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
+                    Cliente / Compromisso
+                  </TableHead>
+                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
+                    Etapa de Execução
+                  </TableHead>
+                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
+                    Modalidade
+                  </TableHead>
+                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
+                    Data & Horário
+                  </TableHead>
+                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
+                    Equipe
+                  </TableHead>
+                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-right font-bold text-slate-900 dark:text-slate-100">
+                    Ações Diretas
+                  </TableHead>
                 </TableRow>
-              ) : (
-                itensFiltrados.map((item, idx) => {
-                  const diasRestantes = calcularPrazoRestante(
-                    item.prazo_limite,
-                    item.data_pedido,
-                    item.prazo_dias,
-                  );
-
-                  // Zebrado contrastante alternado estilo terminal
-                  // Linha par: #06090F (preto absoluto) / Linha ímpar: #0E1522 (cinza azulado escuro)
-                  const zebradoClass =
-                    idx % 2 === 0
-                      ? "bg-[#06090F]"
-                      : "bg-[#0E1522]/90 border-t border-b border-[#141E30]";
-
+              </TableHeader>
+              <TableBody>
+                {cardsFiltrados.map((card) => {
+                  const stCfg = getStatusBadgeConfig(card.status);
+                  const modCfg = getModalidadeBadgeConfig(card.modalidade_execucao);
                   return (
                     <TableRow
-                      key={item.id}
-                      onClick={() => abrirEdicaoLinha(item)}
-                      className={`${zebradoClass} hover:bg-[#1A263D] hover:border-amber-500/50 hover:shadow-[0_0_15px_rgba(245,158,11,0.15)] cursor-pointer transition-all duration-150 border-b border-slate-800/60`}
+                      key={card.id}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     >
-                      {/* 1. STATUS (Badge Luminoso) */}
-                      <TableCell className="py-3 font-mono">
-                        {item.is_out || item.status === "OUT" ? (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-widest bg-amber-950/90 text-amber-300 border border-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)] animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                            OUT
-                          </span>
-                        ) : item.status === "CONFIRMADO" ? (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-widest bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.35)]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            CONFIRMADO
-                          </span>
-                        ) : item.status === "AGENDADO" ? (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-widest bg-sky-950/90 text-sky-300 border border-sky-500/80 shadow-[0_0_12px_rgba(14,165,233,0.35)]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                            AGENDADO
-                          </span>
-                        ) : item.status === "CONCLUÍDO" ? (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-widest bg-slate-900 text-emerald-400 border border-slate-700">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            CONCLUÍDO
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-widest bg-cyan-950/90 text-cyan-300 border border-cyan-500/80 shadow-[0_0_12px_rgba(6,182,212,0.35)]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                            AGUARDANDO
-                          </span>
-                        )}
+                      <TableCell className="font-mono font-bold text-slate-950 dark:text-white">
+                        {card.os_numero ? `OS #${card.os_numero}` : card.voo_codigo}
                       </TableCell>
-
-                      {/* 2. DATA DO PEDIDO */}
-                      <TableCell className="font-mono text-xs text-slate-300 tracking-wider">
-                        {dataBR(item.data_pedido)}
+                      <TableCell className="font-bold text-slate-900 dark:text-slate-100">
+                        {card.cliente_nome}
                       </TableCell>
-
-                      {/* 3. PEDIDO / VOO */}
+                      <TableCell className="text-slate-700 dark:text-slate-300 max-w-xs truncate">
+                        {card.etapa_execucao}
+                      </TableCell>
                       <TableCell>
-                        <span className="font-mono font-bold text-amber-400 bg-black/70 px-2 py-1 rounded border border-amber-500/30 text-xs tracking-wider shadow-inner">
-                          {item.voo_codigo}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => alternarModalidadeMutation.mutate(card)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs border cursor-pointer ${modCfg.badgeClass}`}
+                        >
+                          {modCfg.label}
+                        </button>
                       </TableCell>
-
-                      {/* 4. CLIENTE */}
-                      <TableCell>
-                        <div className="font-semibold text-slate-100 uppercase tracking-wide text-xs">
-                          {item.cliente_nome}
-                        </div>
-                        {item.endereco_obra && (
-                          <div className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]">
-                            {item.endereco_obra}
-                          </div>
-                        )}
+                      <TableCell className="font-semibold text-slate-900 dark:text-slate-100">
+                        {dataBR(card.data_execucao)} • {card.hora_inicio}-{card.hora_fim}
                       </TableCell>
-
-                      {/* 5. SERVIÇO / NATUREZA */}
+                      <TableCell className="text-slate-800 dark:text-slate-200">
+                        {card.equipe_responsavel}
+                      </TableCell>
                       <TableCell>
-                        <div className="text-xs text-slate-200 font-mono flex items-center gap-1.5">
-                          {item.servico_natureza}
-                          {item.is_out && (
-                            <span className="text-[10px] font-bold text-amber-400 bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-500/40">
-                              [OUT]
-                            </span>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${stCfg.badgeClass}`}
+                        >
+                          {stCfg.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          {card.ordem_id && (
+                            <BotaoVisualizarDocumento
+                              tipo="os"
+                              id={card.ordem_id}
+                              label="OS"
+                              className="h-7 px-2 text-xs"
+                            />
                           )}
-                        </div>
-                        {item.responsavel && (
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            Resp: {item.responsavel}
-                          </div>
-                        )}
-                      </TableCell>
-
-                      {/* 6. PRAZO RESTANTE (Countdown) */}
-                      <TableCell className="font-mono text-xs">
-                        {diasRestantes < 0 ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-950/90 text-rose-300 border border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)] animate-pulse font-bold">
-                            <AlertTriangle className="w-3 h-3 text-rose-400" />
-                            {Math.abs(diasRestantes)}D ATRASADO
-                          </span>
-                        ) : diasRestantes === 0 ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)] font-bold">
-                            ⏳ HOJE (TODAY)
-                          </span>
-                        ) : diasRestantes <= 3 ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-950/80 text-orange-300 border border-orange-500/60 font-bold">
-                            ⚡ {diasRestantes} DIAS
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-500/50">
-                            🟢 {diasRestantes} DIAS
-                          </span>
-                        )}
-                      </TableCell>
-
-                      {/* 7. ESCAVAÇÃO / ETAPA 1 */}
-                      <TableCell className="font-mono text-xs text-slate-300">
-                        {item.escavacao_data ? (
-                          <div className="flex items-center gap-1">
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                item.escavacao_status === "concluido"
-                                  ? "bg-emerald-400"
-                                  : "bg-cyan-400 animate-pulse"
-                              }`}
-                            />
-                            <span>{dataBR(item.escavacao_data)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-600 text-[11px]">— PENDENTE —</span>
-                        )}
-                      </TableCell>
-
-                      {/* 8. INSTALAÇÃO / EXECUÇÃO */}
-                      <TableCell className="font-mono text-xs text-slate-300">
-                        {item.instalacao_data ? (
-                          <div className="flex items-center gap-1">
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                item.instalacao_status === "concluido"
-                                  ? "bg-emerald-400"
-                                  : "bg-cyan-400 animate-pulse"
-                              }`}
-                            />
-                            <span>{dataBR(item.instalacao_data)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-600 text-[11px]">— PENDENTE —</span>
-                        )}
-                      </TableCell>
-
-                      {/* 9. PRAZO LIMITE */}
-                      <TableCell className="font-mono text-xs text-amber-300 font-semibold tracking-wider">
-                        {dataBR(item.prazo_limite)}
-                      </TableCell>
-
-                      {/* 10. ETAPAS TÉCNICAS (OS-02, OL, OS-03) */}
-                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5 font-mono text-[11px]">
-                          {/* OS-02 */}
-                          <span
-                            title="OS-02: Instalação"
-                            className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${
-                              item.os_instalacao_status === "concluido"
-                                ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/70"
-                                : "bg-black/80 text-slate-400 border-slate-700"
-                            }`}
-                          >
-                            {item.os_instalacao || "OS-02"}
-                          </span>
-
-                          {/* OL */}
-                          <span
-                            title="OL: Logística & Transporte"
-                            className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${
-                              item.os_logistica_status === "concluido"
-                                ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/70"
-                                : "bg-black/80 text-slate-400 border-slate-700"
-                            }`}
-                          >
-                            {item.os_logistica || "OL"}
-                          </span>
-
-                          {/* OS-03 */}
-                          <span
-                            title="OS-03: Acabamento"
-                            className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${
-                              item.os_acabamento_status === "concluido"
-                                ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/70"
-                                : "bg-black/80 text-slate-400 border-slate-700"
-                            }`}
-                          >
-                            {item.os_acabamento || "OS-03"}
-                          </span>
-                        </div>
-                      </TableCell>
-
-                      {/* 11. AÇÕES / ABRIR OS */}
-                      <TableCell className="text-right pr-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => abrirVisualizacaoOS(item)}
-                            title="Visualizar e Imprimir Formulário de OS"
-                            className="h-7 w-7 text-amber-400 hover:text-amber-300 hover:bg-amber-950/40"
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => abrirModalEditar(card)}
+                            className="h-7 px-2.5 text-xs font-semibold text-blue-800 border-blue-300 bg-blue-50 hover:bg-blue-100"
                           >
-                            <Printer className="w-3.5 h-3.5" />
+                            <Pencil className="h-3 w-3 mr-1" />
+                            Editar
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => abrirEdicaoLinha(item)}
-                            title="Editar detalhes do voo"
-                            className="h-7 w-7 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCardParaExcluir(card)}
+                            className="h-7 px-2.5 text-xs font-semibold text-red-800 border-red-300 bg-red-50 hover:bg-red-100"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Excluir
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
-      {/* ========================================================= */}
-      {/* DRAWER LATERAL: EDIÇÃO RÁPIDA 100% COMPLETA (SHEET)       */}
-      {/* ========================================================= */}
-      <Sheet open={drawerAberto} onOpenChange={setDrawerAberto}>
-        <SheetContent className="bg-[#0B0F17] text-slate-100 border-l border-slate-800 w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader className="border-b border-slate-800 pb-3">
-            <SheetTitle className="font-mono text-amber-400 flex items-center gap-2">
-              <Plane className="w-4 h-4" />
-              <span>EDITAR VOO: {itemEditando?.voo_codigo}</span>
-            </SheetTitle>
-            <SheetDescription className="text-slate-400 text-xs font-mono">
-              Atualize prazos, cronograma, status e etapas de execução do cliente.
-            </SheetDescription>
-          </SheetHeader>
-
-          {itemEditando && (
-            <div className="space-y-4 py-4 text-xs font-mono">
-              {/* Flag Serviço OUT */}
-              <div className="bg-[#06090F] p-3 rounded-lg border border-amber-500/40 flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <div className="font-bold text-amber-400 flex items-center gap-1.5">
-                    <Flame className="w-4 h-4 text-amber-400" />
-                    SERVIÇO OUT (EMERGÊNCIA / CRÍTICO)
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    Marca para exibição destacada de manutenção química, reforma ou transporte.
-                  </div>
-                </div>
-                <Switch
-                  checked={itemEditando.is_out}
-                  onCheckedChange={(checked) =>
-                    setItemEditando({
-                      ...itemEditando,
-                      is_out: checked,
-                      status: checked ? "OUT" : itemEditando.status === "OUT" ? "AGENDADO" : itemEditando.status,
-                    })
-                  }
-                />
-              </div>
-
-              {/* Status do Voo */}
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Status Operacional</Label>
-                <Select
-                  value={itemEditando.status}
-                  onValueChange={(val: FlightStatus) =>
-                    setItemEditando({
-                      ...itemEditando,
-                      status: val,
-                      is_out: val === "OUT" ? true : itemEditando.is_out,
-                    })
-                  }
-                >
-                  <SelectTrigger className="bg-[#06090F] border-slate-700 text-slate-100">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100">
-                    <SelectItem value="CONFIRMADO">🟢 CONFIRMADO</SelectItem>
-                    <SelectItem value="AGENDADO">🔵 AGENDADO</SelectItem>
-                    <SelectItem value="OUT">🚨 OUT (ALERTA CRÍTICO)</SelectItem>
-                    <SelectItem value="AGUARDANDO">⚡ AGUARDANDO</SelectItem>
-                    <SelectItem value="CONCLUÍDO">🏁 CONCLUÍDO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Identificador & Cliente */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-slate-300">Código de Voo</Label>
-                  <Input
-                    value={itemEditando.voo_codigo}
-                    onChange={(e) =>
-                      setItemEditando({ ...itemEditando, voo_codigo: e.target.value })
-                    }
-                    className="bg-[#06090F] border-slate-700 text-slate-100"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-slate-300">Cliente</Label>
-                  <Input
-                    value={itemEditando.cliente_nome}
-                    onChange={(e) =>
-                      setItemEditando({ ...itemEditando, cliente_nome: e.target.value })
-                    }
-                    className="bg-[#06090F] border-slate-700 text-slate-100"
-                  />
-                </div>
-              </div>
-
-              {/* Serviço / Natureza */}
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Serviço / Natureza (Modelo Piscina)</Label>
-                <Input
-                  value={itemEditando.servico_natureza}
-                  onChange={(e) =>
-                    setItemEditando({ ...itemEditando, servico_natureza: e.target.value })
-                  }
-                  className="bg-[#06090F] border-slate-700 text-slate-100"
-                />
-              </div>
-
-              {/* Prazos */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1.5">
-                  <Label className="text-slate-300">Data Pedido</Label>
-                  <Input
-                    type="date"
-                    value={itemEditando.data_pedido}
-                    onChange={(e) =>
-                      setItemEditando({ ...itemEditando, data_pedido: e.target.value })
-                    }
-                    className="bg-[#06090F] border-slate-700 text-slate-100 text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-slate-300">Prazo (Dias)</Label>
-                  <Input
-                    type="number"
-                    value={itemEditando.prazo_dias}
-                    onChange={(e) => {
-                      const p = Number(e.target.value) || 0;
-                      setItemEditando({
-                        ...itemEditando,
-                        prazo_dias: p,
-                        prazo_limite: addDiasUteis(itemEditando.data_pedido, p),
-                      });
-                    }}
-                    className="bg-[#06090F] border-slate-700 text-slate-100 text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-slate-300">Prazo Limite</Label>
-                  <Input
-                    type="date"
-                    value={itemEditando.prazo_limite}
-                    onChange={(e) =>
-                      setItemEditando({ ...itemEditando, prazo_limite: e.target.value })
-                    }
-                    className="bg-[#06090F] border-slate-700 text-slate-100 text-xs text-amber-400 font-bold"
-                  />
-                </div>
-              </div>
-
-              {/* Etapa 1: Escavação */}
-              <div className="p-2.5 rounded-lg bg-[#06090F] border border-slate-800 space-y-2">
-                <div className="text-xs font-bold text-slate-200">ETAPA 1: ESCAVAÇÃO</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-slate-400">Data Prevista</Label>
-                    <Input
-                      type="date"
-                      value={itemEditando.escavacao_data || ""}
-                      onChange={(e) =>
-                        setItemEditando({ ...itemEditando, escavacao_data: e.target.value })
-                      }
-                      className="bg-[#0B0F17] border-slate-700 text-slate-100 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-slate-400">Status</Label>
-                    <Select
-                      value={itemEditando.escavacao_status}
-                      onValueChange={(val: EtapaStatus) =>
-                        setItemEditando({ ...itemEditando, escavacao_status: val })
-                      }
-                    >
-                      <SelectTrigger className="bg-[#0B0F17] border-slate-700 text-slate-100 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100">
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="em_andamento">Em andamento</SelectItem>
-                        <SelectItem value="concluido">Concluído</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Etapa 2: Instalação */}
-              <div className="p-2.5 rounded-lg bg-[#06090F] border border-slate-800 space-y-2">
-                <div className="text-xs font-bold text-slate-200">ETAPA 2: INSTALAÇÃO / BASE</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-slate-400">Data Prevista</Label>
-                    <Input
-                      type="date"
-                      value={itemEditando.instalacao_data || ""}
-                      onChange={(e) =>
-                        setItemEditando({ ...itemEditando, instalacao_data: e.target.value })
-                      }
-                      className="bg-[#0B0F17] border-slate-700 text-slate-100 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-slate-400">Status</Label>
-                    <Select
-                      value={itemEditando.instalacao_status}
-                      onValueChange={(val: EtapaStatus) =>
-                        setItemEditando({ ...itemEditando, instalacao_status: val })
-                      }
-                    >
-                      <SelectTrigger className="bg-[#0B0F17] border-slate-700 text-slate-100 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100">
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="em_andamento">Em andamento</SelectItem>
-                        <SelectItem value="concluido">Concluído</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Etapas Técnicas (OS-02, OL, OS-03) */}
-              <div className="p-2.5 rounded-lg bg-[#06090F] border border-slate-800 space-y-2">
-                <div className="text-xs font-bold text-slate-200">
-                  CÓDIGOS E STATUS DE OS (TÉCNICA)
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-slate-400">OS-02 (Instalação)</Label>
-                    <Select
-                      value={itemEditando.os_instalacao_status}
-                      onValueChange={(val: EtapaStatus) =>
-                        setItemEditando({ ...itemEditando, os_instalacao_status: val })
-                      }
-                    >
-                      <SelectTrigger className="bg-[#0B0F17] border-slate-700 text-slate-100 text-[11px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100">
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="concluido">Concluído</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-[10px] text-slate-400">OL (Logística)</Label>
-                    <Select
-                      value={itemEditando.os_logistica_status}
-                      onValueChange={(val: EtapaStatus) =>
-                        setItemEditando({ ...itemEditando, os_logistica_status: val })
-                      }
-                    >
-                      <SelectTrigger className="bg-[#0B0F17] border-slate-700 text-slate-100 text-[11px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100">
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="concluido">Concluído</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-[10px] text-slate-400">OS-03 (Acabamento)</Label>
-                    <Select
-                      value={itemEditando.os_acabamento_status}
-                      onValueChange={(val: EtapaStatus) =>
-                        setItemEditando({ ...itemEditando, os_acabamento_status: val })
-                      }
-                    >
-                      <SelectTrigger className="bg-[#0B0F17] border-slate-700 text-slate-100 text-[11px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100">
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="concluido">Concluído</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Responsável e Endereço */}
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Responsável Técnico</Label>
-                <Input
-                  value={itemEditando.responsavel || ""}
-                  onChange={(e) =>
-                    setItemEditando({ ...itemEditando, responsavel: e.target.value })
-                  }
-                  className="bg-[#06090F] border-slate-700 text-slate-100"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Endereço da Obra</Label>
-                <Input
-                  value={itemEditando.endereco_obra || ""}
-                  onChange={(e) =>
-                    setItemEditando({ ...itemEditando, endereco_obra: e.target.value })
-                  }
-                  className="bg-[#06090F] border-slate-700 text-slate-100"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Observações Operacionais</Label>
-                <Textarea
-                  value={itemEditando.observacoes || ""}
-                  onChange={(e) =>
-                    setItemEditando({ ...itemEditando, observacoes: e.target.value })
-                  }
-                  className="bg-[#06090F] border-slate-700 text-slate-100 text-xs"
-                  rows={2}
-                />
-              </div>
-            </div>
-          )}
-
-          <SheetFooter className="border-t border-slate-800 pt-3 flex flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => itemEditando && abrirVisualizacaoOS(itemEditando)}
-              className="bg-[#06090F] border-slate-700 text-amber-400 hover:bg-slate-800 font-mono text-xs w-full sm:w-auto"
-            >
-              <Printer className="w-3.5 h-3.5 mr-1.5" />
-              Ver OS Oficial
-            </Button>
-            <Button
-              onClick={() => itemEditando && salvarEdicao.mutate(itemEditando)}
-              disabled={salvarEdicao.isPending}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs w-full sm:w-auto"
-            >
-              {salvarEdicao.isPending ? "SALVANDO..." : "SALVAR ALTERAÇÕES"}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      {/* ========================================================= */}
-      {/* MODAL: NOVO VOO / SERVIÇO                                 */}
-      {/* ========================================================= */}
-      <Dialog open={novoModalAberto} onOpenChange={setNovoModalAberto}>
-        <DialogContent className="bg-[#0B0F17] text-slate-100 border border-slate-800 max-w-lg font-mono text-xs">
+      {/* ===================================================================== */}
+      {/* MODAL DE INCLUIR / EDITAR AGENDAMENTO NO FLIGHT BOARD                 */}
+      {/* ===================================================================== */}
+      <Dialog open={editorModalAberto} onOpenChange={setEditorModalAberto}>
+        <DialogContent className="sm:max-w-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700 max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-amber-400 text-base font-bold flex items-center gap-2">
-              <Plus className="w-4 h-4" /> NOVO VOO / OPERAÇÃO NO FLIGHT BOARD
+            <DialogTitle className="text-lg font-extrabold text-slate-950 dark:text-white flex items-center gap-2">
+              <Plane className="h-5 w-5 text-blue-600" />
+              {modoEditor === "INCLUIR"
+                ? "Incluir Agendamento no Flight Board"
+                : `Editar Agendamento — ${
+                    cardEditando?.os_numero
+                      ? `OS #${cardEditando.os_numero}`
+                      : cardEditando?.cliente_nome
+                  }`}
             </DialogTitle>
-            <DialogDescription className="text-slate-400 text-xs">
-              Cadastre um novo voo, instalação ou serviço OUT para controle logístico imediato.
+            <DialogDescription className="text-xs text-slate-600 dark:text-slate-300">
+              Qualquer inclusão ou alteração sincroniza automaticamente com{" "}
+              <strong>{EMAIL_AGENDA_LOJA_PRINCIPAL}</strong> e os e-mails vinculados.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            {/* Toggle OUT */}
-            <div className="bg-[#06090F] p-2.5 rounded border border-amber-500/40 flex items-center justify-between">
-              <div>
-                <div className="font-bold text-amber-400 flex items-center gap-1">
-                  <Flame className="w-3.5 h-3.5 text-amber-400" />
-                  FLAG SERVIÇO OUT (EMERGÊNCIA/CRÍTICO)
-                </div>
-                <div className="text-[10px] text-slate-400">
-                  Manutenção química, reforma de fibra ou transporte técnico.
-                </div>
-              </div>
-              <Switch
-                checked={novoItemForm.is_out}
-                onCheckedChange={(c) =>
-                  setNovoItemForm({
-                    ...novoItemForm,
-                    is_out: c,
-                    status: c ? "OUT" : "AGENDADO",
-                  })
-                }
-              />
+          <div className="space-y-4 py-2">
+            {/* Seletor do Tipo de Registro */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setFormTipoVinculo("OS_EMITIDA")}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  formTipoVinculo === "OS_EMITIDA"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                Ordem de Serviço (OS Emitida)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormTipoVinculo("COMPROMISSO_AGENDA")}
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  formTipoVinculo === "COMPROMISSO_AGENDA"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                }`}
+              >
+                <Calendar className="h-4 w-4" />
+                Compromisso / Evento Google Agenda
+              </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-[11px]">Código Identificador</Label>
-                <Input
-                  value={novoItemForm.voo_codigo}
-                  onChange={(e) =>
-                    setNovoItemForm({ ...novoItemForm, voo_codigo: e.target.value })
-                  }
-                  placeholder={novoItemForm.is_out ? "OUT-042" : "FL-042"}
-                  className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-[11px]">Status Inicial</Label>
+            {formTipoVinculo === "OS_EMITIDA" ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Ordem de Serviço (Somente OS Formalmente Emitida) *
+                </Label>
                 <Select
-                  value={novoItemForm.status}
-                  onValueChange={(val: FlightStatus) =>
-                    setNovoItemForm({
-                      ...novoItemForm,
-                      status: val,
-                      is_out: val === "OUT" ? true : novoItemForm.is_out,
-                    })
-                  }
+                  value={formOrdemId}
+                  onValueChange={handleSelectOrdemEmitida}
                 >
-                  <SelectTrigger className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono">
-                    <SelectValue />
+                  <SelectTrigger className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-semibold">
+                    <SelectValue placeholder="Selecione uma Ordem de Serviço emitida..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100 font-mono text-xs">
-                    <SelectItem value="CONFIRMADO">🟢 CONFIRMADO</SelectItem>
-                    <SelectItem value="AGENDADO">🔵 AGENDADO</SelectItem>
-                    <SelectItem value="OUT">🚨 OUT (CRÍTICO)</SelectItem>
-                    <SelectItem value="AGUARDANDO">⚡ AGUARDANDO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-slate-300 text-[11px]">Cliente</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={novoItemForm.cliente_id}
-                  onValueChange={(cid) => {
-                    const c = clientes.find((cli) => cli.id === cid);
-                    setNovoItemForm({
-                      ...novoItemForm,
-                      cliente_id: cid,
-                      cliente_nome: c?.nome || novoItemForm.cliente_nome,
-                      endereco_obra: c?.endereco_obra || novoItemForm.endereco_obra,
-                    });
-                  }}
-                >
-                  <SelectTrigger className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono w-1/2">
-                    <SelectValue placeholder="Selecionar cliente..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0B0F17] border-slate-800 text-slate-100 font-mono text-xs">
-                    {clientes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
+                  <SelectContent>
+                    {ordensEmitidas.length === 0 ? (
+                      <SelectItem value="__none" disabled>
+                        Nenhuma OS emitida encontrada
                       </SelectItem>
-                    ))}
+                    ) : (
+                      ordensEmitidas.map((os: any) => (
+                        <SelectItem key={os.id} value={os.id}>
+                          OS #{os.numero || os.id.slice(0, 6)} —{" "}
+                          {os.clientes?.nome || "Cliente"} ({os.descricao})
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                  ✓ Pedidos em orçamento ou sem OS emitida são bloqueados automaticamente.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Título do Compromisso / Evento (Google Agenda) *
+                </Label>
                 <Input
-                  value={novoItemForm.cliente_nome}
-                  onChange={(e) =>
-                    setNovoItemForm({ ...novoItemForm, cliente_nome: e.target.value })
-                  }
-                  placeholder="Ou digite o nome do cliente..."
-                  className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono flex-1"
+                  value={formTituloEvento}
+                  onChange={(e) => setFormTituloEvento(e.target.value)}
+                  placeholder="Ex.: Reunião Técnica, Vistoria, Alinhamento de Equipe..."
+                  className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
+              </div>
+            )}
+
+            {/* Etiqueta Obrigatória: Com Execução vs Sem Execução */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Etiqueta de Execução no Flight Board *
+              </Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setFormModalidade("com_execucao")}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                    formModalidade === "com_execucao"
+                      ? "border-teal-600 bg-teal-50 dark:bg-teal-950/70 text-teal-950 dark:text-teal-100 ring-2 ring-teal-500/30"
+                      : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  <Wrench className="h-5 w-5 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-xs font-extrabold">Com Execução</div>
+                    <div className="text-[11px] opacity-85">
+                      Trabalho de campo, instalação de piscina, entrega ou montagem técnica.
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFormModalidade("sem_execucao")}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                    formModalidade === "sem_execucao"
+                      ? "border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-950 dark:text-white ring-2 ring-slate-500/30"
+                      : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  <Briefcase className="h-5 w-5 text-slate-700 dark:text-slate-300 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-xs font-extrabold">Sem Execução</div>
+                    <div className="text-[11px] opacity-85">
+                      Reuniões, compromissos avulsos, avisos administrativos ou pessoais.
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-slate-300 text-[11px]">Serviço / Natureza</Label>
+            {/* Detalhes da Etapa de Execução */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Detalhes da Etapa de Execução / Atividade *
+              </Label>
               <Input
-                value={novoItemForm.servico_natureza}
-                onChange={(e) =>
-                  setNovoItemForm({ ...novoItemForm, servico_natureza: e.target.value })
-                }
-                placeholder="Ex: Piscina Splash Tradicional 6x3, Tratamento Químico OUT..."
-                className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono"
+                value={formEtapaExecucao}
+                onChange={(e) => setFormEtapaExecucao(e.target.value)}
+                placeholder="Ex.: Escavação + Entrega do Casco + Casa de Máquinas"
+                className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            {/* Data, Horário Inicial, Horário Final e Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
-                <Label className="text-slate-300 text-[11px]">Data do Pedido</Label>
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Data de Execução *
+                </Label>
                 <Input
                   type="date"
-                  value={novoItemForm.data_pedido}
-                  onChange={(e) =>
-                    setNovoItemForm({
-                      ...novoItemForm,
-                      data_pedido: e.target.value,
-                      prazo_limite: addDiasUteis(e.target.value, novoItemForm.prazo_dias),
-                    })
-                  }
-                  className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono"
+                  value={formDataExecucao}
+                  onChange={(e) => setFormDataExecucao(e.target.value)}
+                  className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
               </div>
+
               <div className="space-y-1">
-                <Label className="text-slate-300 text-[11px]">Prazo (Dias)</Label>
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Hora Início
+                </Label>
                 <Input
-                  type="number"
-                  value={novoItemForm.prazo_dias}
-                  onChange={(e) => {
-                    const p = Number(e.target.value) || 0;
-                    setNovoItemForm({
-                      ...novoItemForm,
-                      prazo_dias: p,
-                      prazo_limite: addDiasUteis(novoItemForm.data_pedido, p),
-                    });
-                  }}
-                  className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono"
+                  type="time"
+                  value={formHoraInicio}
+                  onChange={(e) => setFormHoraInicio(e.target.value)}
+                  className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                 />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Hora Término
+                </Label>
+                <Input
+                  type="time"
+                  value={formHoraFim}
+                  onChange={(e) => setFormHoraFim(e.target.value)}
+                  className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Status no Quadro
+                </Label>
+                <Select
+                  value={formStatus}
+                  onValueChange={(v) => setFormStatus(v as FlightStatus)}
+                >
+                  <SelectTrigger className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-semibold">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AGENDADO">Agendado</SelectItem>
+                    <SelectItem value="EM_ANDAMENTO">Em Andamento</SelectItem>
+                    <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                    <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+                    <SelectItem value="OUT">OUT / Impedido</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-slate-300 text-[11px]">Endereço da Obra / Local</Label>
-              <Input
-                value={novoItemForm.endereco_obra}
-                onChange={(e) =>
-                  setNovoItemForm({ ...novoItemForm, endereco_obra: e.target.value })
-                }
-                placeholder="Rua, Número, Bairro, Cidade..."
-                className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono"
-              />
+            {/* Equipe e E-mails do Google Calendar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Equipe / Técnico Responsável
+                </Label>
+                <Input
+                  value={formEquipe}
+                  onChange={(e) => setFormEquipe(e.target.value)}
+                  placeholder="Ex.: Equipe Alfa / João Técnico"
+                  className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  E-mails Vinculados (Google Calendar)
+                </Label>
+                <Input
+                  value={formEmailsVinculados}
+                  onChange={(e) => setFormEmailsVinculados(e.target.value)}
+                  placeholder={EMAIL_AGENDA_LOJA_PRINCIPAL}
+                  className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                />
+                <p className="text-[10px] text-slate-600 dark:text-slate-400">
+                  A agenda principal <strong>{EMAIL_AGENDA_LOJA_PRINCIPAL}</strong> é incluída obrigatoriamente.
+                </p>
+              </div>
             </div>
 
+            {/* Impedimento Operacional (OUT) */}
+            <div className="rounded-xl border border-slate-300 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-800/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    Sinalizar Impedimento Operacional (OUT)
+                  </p>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                    Marque caso haja chuva, pendência no terreno ou bloqueio de execução.
+                  </p>
+                </div>
+                <Switch
+                  checked={formServicoOut}
+                  onCheckedChange={setFormServicoOut}
+                />
+              </div>
+              {formServicoOut && (
+                <Input
+                  value={formMotivoOut}
+                  onChange={(e) => setFormMotivoOut(e.target.value)}
+                  placeholder="Descreva o motivo do impedimento..."
+                  className="bg-white dark:bg-slate-950 border-red-300 dark:border-red-800 text-slate-900 dark:text-slate-100"
+                />
+              )}
+            </div>
+
+            {/* Observações Adicionais */}
             <div className="space-y-1">
-              <Label className="text-slate-300 text-[11px]">Responsável Técnico</Label>
-              <Input
-                value={novoItemForm.responsavel}
-                onChange={(e) =>
-                  setNovoItemForm({ ...novoItemForm, responsavel: e.target.value })
-                }
-                placeholder="Nome do encarregado ou técnico..."
-                className="bg-[#06090F] border-slate-700 text-slate-100 text-xs font-mono"
+              <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Observações Adicionais
+              </Label>
+              <Textarea
+                rows={2}
+                value={formObservacoes}
+                onChange={(e) => setFormObservacoes(e.target.value)}
+                placeholder="Instruções de acesso ao condomínio, materiais extras..."
+                className="bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
               />
             </div>
           </div>
 
-          <DialogFooter className="border-t border-slate-800 pt-3">
+          <DialogFooter className="gap-2">
             <Button
+              type="button"
               variant="outline"
-              onClick={() => setNovoModalAberto(false)}
-              className="bg-[#06090F] border-slate-700 text-slate-300"
+              onClick={() => setEditorModalAberto(false)}
+              className="border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
             >
               Cancelar
             </Button>
             <Button
-              onClick={() => criarNovoVoo.mutate()}
-              disabled={criarNovoVoo.isPending}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold font-mono"
+              type="button"
+              onClick={() => salvarCardMutation.mutate()}
+              disabled={salvarCardMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
             >
-              {criarNovoVoo.isPending ? "REGISTRANDO..." : "REGISTRAR NO FLIGHT BOARD"}
+              {salvarCardMutation.isPending
+                ? "Salvando e Sincronizando..."
+                : "Salvar e Sincronizar Agenda"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ========================================================= */}
-      {/* MODAL OFICIAL: VISUALIZADOR DE DOCUMENTOS (OS / VENDA)    */}
-      {/* ========================================================= */}
+      {/* ===================================================================== */}
+      {/* MODAL DE CONFIRMAÇÃO PRÉVIA PARA EXCLUIR DO FLIGHT BOARD              */}
+      {/* ===================================================================== */}
+      <Dialog
+        open={Boolean(cardParaExcluir)}
+        onOpenChange={(open) => {
+          if (!open) setCardParaExcluir(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-base font-extrabold text-red-700 dark:text-red-400 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Confirmar Exclusão do Agendamento
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-700 dark:text-slate-300 pt-1">
+              Tem certeza que deseja remover{" "}
+              <strong>
+                {cardParaExcluir?.os_numero
+                  ? `OS #${cardParaExcluir.os_numero} — ${cardParaExcluir.cliente_nome}`
+                  : cardParaExcluir?.cliente_nome}
+              </strong>{" "}
+              do Flight Board e da agenda Google ({EMAIL_AGENDA_LOJA_PRINCIPAL})?
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCardParaExcluir(null)}
+              className="border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() =>
+                cardParaExcluir && excluirCardMutation.mutate(cardParaExcluir)
+              }
+              disabled={excluirCardMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold"
+            >
+              {excluirCardMutation.isPending
+                ? "Excluindo..."
+                : "Sim, Excluir Agendamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===================================================================== */}
+      {/* MODAL OFICIAL: VISUALIZADOR DE DOCUMENTOS (OS / VENDA)                */}
+      {/* ===================================================================== */}
       {docModalId && (
         <VisualizadorDocumentoModal
           open={docModalAberto}
