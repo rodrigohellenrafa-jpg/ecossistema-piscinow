@@ -747,6 +747,7 @@ export interface BotaoVisualizarDocumentoProps {
   dados?: any;
   titulo?: string;
   rotulo?: string;
+  label?: string;
   icone?: React.ReactNode;
   variant?: "ghost" | "outline" | "default" | "secondary";
   size?: "icon" | "sm" | "default";
@@ -759,11 +760,13 @@ export function BotaoVisualizarDocumento({
   dados,
   titulo = "Visualizar formulário / documento",
   rotulo,
+  label,
   icone,
   variant = "ghost",
   size = "icon",
   className,
 }: BotaoVisualizarDocumentoProps) {
+  const rotuloFinal = rotulo ?? label;
   const [aberto, setAberto] = useState(false);
 
   return (
@@ -781,7 +784,7 @@ export function BotaoVisualizarDocumento({
         }}
       >
         {icone ?? <Eye className="size-4" />}
-        {rotulo ? <span>{rotulo}</span> : null}
+        {rotuloFinal ? <span>{rotuloFinal}</span> : null}
       </Button>
 
       <VisualizadorDocumentoModal

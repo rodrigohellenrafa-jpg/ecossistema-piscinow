@@ -1127,7 +1127,7 @@ function FlightBoardPage() {
         })
         .eq("id", osSelecionada.id);
 
-      const payloadCompleto: Record<string, any> = {
+      const payloadCompleto: any = {
         voo_codigo: cardEditando?.voo_codigo || `OS-${numeroOs}`,
         ordem_id: osSelecionada.id,
         os_numero: numeroOs,
@@ -1150,7 +1150,7 @@ function FlightBoardPage() {
         updated_at: new Date().toISOString(),
       };
 
-      const payloadBasicoFallback: Record<string, any> = {
+      const payloadBasicoFallback: any = {
         voo_codigo: cardEditando?.voo_codigo || `OS-${numeroOs}`,
         cliente_id: osSelecionada.cliente_id || null,
         cliente_nome: nomeCliente,
