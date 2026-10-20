@@ -785,7 +785,15 @@ function FlightBoardPage() {
         if (ev.status === "concluido") statusEvento = "CONCLUIDO";
         else if (meta.statusFlight) statusEvento = meta.statusFlight;
 
-        const horaIni = ev.hora ? String(ev.hora).slice(0, 5) : meta.horaInicio || "09:00";
+        const inicioEv = ev.inicio ? new Date(ev.inicio) : null;
+        const horaIni =
+          inicioEv && !ev.dia_inteiro
+            ? inicioEv.toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "America/Sao_Paulo",
+              })
+            : meta.horaInicio || "09:00";
         const horaFim = meta.horaFim || "10:00";
 
         cards.push({
@@ -812,7 +820,9 @@ function FlightBoardPage() {
             (modalidade === "com_execucao"
               ? "Execução / Visita Técnica"
               : "Reunião / Compromisso Sem Execução"),
-          data_execucao: String(ev.data || hojeISO()).slice(0, 10),
+          data_execucao: inicioEv
+            ? inicioEv.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+            : hojeISO(),
           hora_inicio: horaIni,
           hora_fim: horaFim,
           status: statusEvento,
@@ -1107,7 +1117,7 @@ function FlightBoardPage() {
       await supabase
         .from("ordens_servico")
         .update({
-          data_previsao: formDataExecucao,
+          data_agendada: formDataExecucao,
           responsavel: formEquipe.trim() || osSelecionada.responsavel || null,
           status:
             statusFinal === "CONCLUIDO"
