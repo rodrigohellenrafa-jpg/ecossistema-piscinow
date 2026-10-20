@@ -2046,6 +2046,7 @@ export type Database = {
           id: string
           materiais_utilizados: string | null
           numero: string | null
+          observacoes: string | null
           prioridade: string
           responsavel: string | null
           status: string
@@ -2074,6 +2075,7 @@ export type Database = {
           id?: string
           materiais_utilizados?: string | null
           numero?: string | null
+          observacoes?: string | null
           prioridade?: string
           responsavel?: string | null
           status?: string
@@ -2102,6 +2104,7 @@ export type Database = {
           id?: string
           materiais_utilizados?: string | null
           numero?: string | null
+          observacoes?: string | null
           prioridade?: string
           responsavel?: string | null
           status?: string
