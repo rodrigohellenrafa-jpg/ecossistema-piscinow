@@ -730,8 +730,7 @@ function FlightBoardPage() {
           equipe_responsavel:
             meta.equipe ||
             os.responsavel ||
-            obra?.equipe_instalacao ||
-            obra?.responsavel_obra ||
+            obra?.responsavel ||
             "Equipe Técnica",
           emails_vinculados:
             meta.emailsVinculados ||
