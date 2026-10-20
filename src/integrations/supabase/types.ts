@@ -1229,6 +1229,140 @@ export type Database = {
           },
         ]
       }
+      logistics_flight_board: {
+        Row: {
+          cliente_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          created_by: string | null
+          data_execucao: string | null
+          emails_vinculados: string | null
+          equipe_responsavel: string | null
+          etapa_carregamento: string
+          etapa_conferencia: string
+          etapa_entrega: string
+          etapa_execucao: string | null
+          etapa_instalacao: string
+          etapa_separacao: string
+          etapa_transito: string
+          google_calendar_id: string | null
+          google_event_id: string | null
+          hora_fim: string | null
+          hora_inicio: string | null
+          id: string
+          kit_titulo: string | null
+          modalidade_execucao: string
+          motivo_out: string | null
+          obra_id: string | null
+          observacoes: string | null
+          ordem_id: string | null
+          os_numero: string | null
+          previsao_entrega: string | null
+          servico_out: boolean
+          status_voo: string
+          updated_at: string
+          venda_id: string | null
+          voo_codigo: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_execucao?: string | null
+          emails_vinculados?: string | null
+          equipe_responsavel?: string | null
+          etapa_carregamento?: string
+          etapa_conferencia?: string
+          etapa_entrega?: string
+          etapa_execucao?: string | null
+          etapa_instalacao?: string
+          etapa_separacao?: string
+          etapa_transito?: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          kit_titulo?: string | null
+          modalidade_execucao?: string
+          motivo_out?: string | null
+          obra_id?: string | null
+          observacoes?: string | null
+          ordem_id?: string | null
+          os_numero?: string | null
+          previsao_entrega?: string | null
+          servico_out?: boolean
+          status_voo?: string
+          updated_at?: string
+          venda_id?: string | null
+          voo_codigo?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_execucao?: string | null
+          emails_vinculados?: string | null
+          equipe_responsavel?: string | null
+          etapa_carregamento?: string
+          etapa_conferencia?: string
+          etapa_entrega?: string
+          etapa_execucao?: string | null
+          etapa_instalacao?: string
+          etapa_separacao?: string
+          etapa_transito?: string
+          google_calendar_id?: string | null
+          google_event_id?: string | null
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          kit_titulo?: string | null
+          modalidade_execucao?: string
+          motivo_out?: string | null
+          obra_id?: string | null
+          observacoes?: string | null
+          ordem_id?: string | null
+          os_numero?: string | null
+          previsao_entrega?: string | null
+          servico_out?: boolean
+          status_voo?: string
+          updated_at?: string
+          venda_id?: string | null
+          voo_codigo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_flight_board_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_flight_board_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_flight_board_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_flight_board_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notas_compra: {
         Row: {
           chave_acesso: string | null
@@ -1912,6 +2046,7 @@ export type Database = {
           id: string
           materiais_utilizados: string | null
           numero: string | null
+          observacoes: string | null
           prioridade: string
           responsavel: string | null
           status: string
@@ -1940,6 +2075,7 @@ export type Database = {
           id?: string
           materiais_utilizados?: string | null
           numero?: string | null
+          observacoes?: string | null
           prioridade?: string
           responsavel?: string | null
           status?: string
@@ -1968,6 +2104,7 @@ export type Database = {
           id?: string
           materiais_utilizados?: string | null
           numero?: string | null
+          observacoes?: string | null
           prioridade?: string
           responsavel?: string | null
           status?: string
