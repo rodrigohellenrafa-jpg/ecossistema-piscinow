@@ -15,6 +15,13 @@
       "when": 1792065016459,
       "tag": "0001_modulo_dossie_documentos_e_cargas",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792496362336,
+      "tag": "0002_create_logistics_flight_board",
+      "breakpoints": true
     }
   ]
 }

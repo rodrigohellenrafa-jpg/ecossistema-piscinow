@@ -476,7 +476,7 @@ function FlightBoardPage() {
       const { data: ordensRaw, error: ordensErr } = await supabase
         .from("ordens_servico")
         .select(
-          "id, numero, cliente_id, descricao, status, prioridade, responsavel, data_abertura, data_previsao, data_conclusao, valor_servico, valor_pecas, valor_total, observacoes, clientes(id, nome, telefone, cidade, email)"
+          "id, numero, cliente_id, descricao, status, prioridade, responsavel, data_agendada, created_at, valor, observacoes, clientes(id, nome, telefone, cidade, email)"
         )
         .order("created_at", { ascending: false });
 
@@ -494,26 +494,25 @@ function FlightBoardPage() {
           supabase
             .from("obras")
             .select(
-              "id, codigo, cliente_id, venda_id, titulo, modelo_piscina, status, data_abertura, data_previsao_termino, responsavel_obra, equipe_instalacao, observacoes, clientes(id, nome, telefone, cidade, email)"
+              "id, numero, cliente_id, venda_id, tipo_servico, status_geral, data_inicio, data_limite, responsavel, endereco_obra, observacoes, clientes(id, nome, telefone, cidade, email)"
             ),
           supabase
             .from("vendas")
             .select(
-              "id, numero_pedido, cliente_id, observacoes, data_entrega_prevista, status_venda"
+              "id, numero, cliente_id, observacoes, prazo_entrega, status_pedido"
             )
-            .neq("status_venda", "cancelada"),
+            .neq("status_pedido", "cancelada"),
           supabase
             .from("logistics_flight_board")
             .select(
-              "*, obras(id, codigo, titulo, modelo_piscina, responsavel_obra, equipe_instalacao, data_previsao_termino, venda_id), vendas(id, numero_pedido, observacoes, data_entrega_prevista), clientes(id, nome, telefone, cidade, email)"
+              "*, obras(id, numero, tipo_servico, responsavel, data_limite, venda_id), vendas(id, numero, observacoes, prazo_entrega), clientes(id, nome, telefone, cidade, email)"
             )
             .order("created_at", { ascending: false }),
           supabase
             .from("agenda_eventos")
             .select("*")
             .neq("status", "cancelado")
-            .order("data", { ascending: true })
-            .order("hora", { ascending: true }),
+            .order("inicio", { ascending: true }),
           supabase
             .from("funcionarios")
             .select("id, nome, email, cargo, ativo")
@@ -602,8 +601,8 @@ function FlightBoardPage() {
         const dataExec =
           row.data_execucao ||
           row.previsao_entrega ||
-          (osVinculada.data_previsao ? String(osVinculada.data_previsao).slice(0, 10) : null) ||
-          (osVinculada.data_abertura ? String(osVinculada.data_abertura).slice(0, 10) : null) ||
+          (osVinculada.data_agendada ? String(osVinculada.data_agendada).slice(0, 10) : null) ||
+          (osVinculada.created_at ? String(osVinculada.created_at).slice(0, 10) : null) ||
           hojeISO();
 
         const modalidade: ModalidadeExecucao =
@@ -639,8 +638,7 @@ function FlightBoardPage() {
           kit_titulo:
             row.kit_titulo ||
             osVinculada.descricao ||
-            obra?.modelo_piscina ||
-            obra?.titulo ||
+            obra?.tipo_servico ||
             "Ordem de Serviço Emitida",
           etapa_execucao:
             row.etapa_execucao ||
@@ -656,8 +654,7 @@ function FlightBoardPage() {
             row.equipe_responsavel ||
             meta.equipe ||
             osVinculada.responsavel ||
-            obra?.equipe_instalacao ||
-            obra?.responsavel_obra ||
+            obra?.responsavel ||
             "Equipe Técnica",
           emails_vinculados: emailsCard,
           observacoes: meta.textoLimpo || osVinculada.observacoes || "",
@@ -687,14 +684,14 @@ function FlightBoardPage() {
         const meta = parseMetadadosTexto(os.observacoes);
 
         const dataExec =
-          (os.data_previsao ? String(os.data_previsao).slice(0, 10) : null) ||
-          (obra?.data_previsao_termino
-            ? String(obra.data_previsao_termino).slice(0, 10)
+          (os.data_agendada ? String(os.data_agendada).slice(0, 10) : null) ||
+          (obra?.data_limite
+            ? String(obra.data_limite).slice(0, 10)
             : null) ||
-          (venda?.data_entrega_prevista
-            ? String(venda.data_entrega_prevista).slice(0, 10)
+          (venda?.prazo_entrega
+            ? String(venda.prazo_entrega).slice(0, 10)
             : null) ||
-          (os.data_abertura ? addDiasUteis(String(os.data_abertura).slice(0, 10), 2) : hojeISO());
+          (os.created_at ? addDiasUteis(String(os.created_at).slice(0, 10), 2) : hojeISO());
 
         let statusInicial: FlightStatus = "AGENDADO";
         const stLower = String(os.status || "").toLowerCase();
@@ -722,7 +719,7 @@ function FlightBoardPage() {
           cliente_nome: clienteObj?.nome || "Cliente OS Emitida",
           cliente_telefone: clienteObj?.telefone || null,
           cliente_cidade: clienteObj?.cidade || null,
-          kit_titulo: os.descricao || obra?.modelo_piscina || obra?.titulo || "Ordem de Serviço",
+          kit_titulo: os.descricao || obra?.tipo_servico || "Ordem de Serviço",
           etapa_execucao:
             meta.etapaExecucao || os.descricao || "Execução Técnica de Ordem de Serviço",
           data_execucao: String(dataExec).slice(0, 10),
