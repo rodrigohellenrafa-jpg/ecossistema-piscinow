@@ -878,10 +878,7 @@ function FlightBoardPage() {
       }
 
       const resultado = await sincronizarFlightBoardBidirecionalGoogle({
-        data: {
-          userId,
-          calendarIds: emailsEquipeAtiva,
-        },
+        data: { calendarId: "primary" },
       });
       return { resultado, silencioso };
     },
@@ -895,16 +892,9 @@ function FlightBoardPage() {
 
       if (payload && !payload.silencioso) {
         const res = payload.resultado;
-        if (res?.sucesso) {
-          toast.success(
-            `Google Agenda sincronizado (${EMAIL_AGENDA_LOJA_PRINCIPAL})! ${res.importadosDoGoogle} puxado(s) do Google e ${res.enviadosParaGoogle} enviado(s).`
-          );
-        } else {
-          toast.warning(
-            res?.mensagem ||
-              "Sincronização local concluída. Verifique as credenciais Google se desejar espelhamento externo em tempo real."
-          );
-        }
+        toast.success(
+          `Google Agenda sincronizado (${EMAIL_AGENDA_LOJA_PRINCIPAL})! ${res?.importados ?? 0} puxado(s) do Google e ${res?.enviados ?? 0} enviado(s).`
+        );
       }
     },
     onError: (err: any) => {
@@ -963,21 +953,25 @@ function FlightBoardPage() {
 
         await sincronizarItemFlightBoardGoogle({
           data: {
-            operacao: params.operacao,
+            acao: params.operacao,
+            registroId:
+              params.flightBoardId ||
+              params.agendaEventoId ||
+              crypto.randomUUID(),
+            prefixoId: params.flightBoardId ? "fb" : "ev",
+            googleEventIdExistente: params.googleEventId,
             osNumero: params.osNumero,
             clienteNome: params.clienteNome,
             etapaExecucao: params.etapaExecucao,
-            dataExecucao: params.dataExecucao,
+            status: params.statusVoo,
+            modalidadeExecucao: params.modalidadeExecucao,
+            dataInicio: params.dataExecucao,
             horaInicio: params.horaInicio || "08:00",
             horaFim: params.horaFim || "17:00",
-            modalidadeExecucao: params.modalidadeExecucao,
-            statusVoo: params.statusVoo,
-            equipeResponsavel: params.equipeResponsavel,
+            diaInteiro: false,
+            responsavel: params.equipeResponsavel,
             observacoes: params.observacoes,
             emailsVinculados: listaEmails,
-            googleEventId: params.googleEventId,
-            flightBoardId: params.flightBoardId,
-            agendaEventoId: params.agendaEventoId,
           },
         });
       } catch (e) {
@@ -1032,30 +1026,35 @@ function FlightBoardPage() {
 
         let agendaId = cardEditando?.agenda_evento_id || null;
 
+        const inicioIso = new Date(
+          `${formDataExecucao}T${formHoraInicio || "09:00"}:00-03:00`
+        ).toISOString();
+        const fimIso = new Date(
+          `${formDataExecucao}T${formHoraFim || "10:00"}:00-03:00`
+        ).toISOString();
+        const dadosEvento = {
+          titulo: formTituloEvento.trim(),
+          descricao: descricaoEmpacotada,
+          inicio: inicioIso,
+          fim: fimIso,
+          dia_inteiro: false,
+          tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
+          status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
+        };
+
         if (agendaId) {
           const { error } = await supabase
             .from("agenda_eventos")
-            .update({
-              titulo: formTituloEvento.trim(),
-              descricao: descricaoEmpacotada,
-              data: formDataExecucao,
-              hora: formHoraInicio || "09:00",
-              tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
-              status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
-            })
+            .update(dadosEvento)
             .eq("id", agendaId);
           if (error) throw error;
         } else {
           const { data: inserido, error } = await supabase
             .from("agenda_eventos")
             .insert({
-              user_id: userId,
-              titulo: formTituloEvento.trim(),
-              descricao: descricaoEmpacotada,
-              data: formDataExecucao,
-              hora: formHoraInicio || "09:00",
-              tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
-              status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
+              ...dadosEvento,
+              responsavel_id: userId,
+              created_by: userId,
               google_calendar_id: EMAIL_AGENDA_LOJA_PRINCIPAL,
             })
             .select("id")
