@@ -121,6 +121,17 @@ export const Route = createFileRoute("/ordens-compra")({
   ),
 });
 
+const FORMAS_PAGAMENTO_COMPRA = [
+  "Boleto",
+  "Pix",
+  "Transferência",
+  "Cartão de Crédito",
+  "Cartão de Débito",
+  "Dinheiro",
+  "Financiamento bancário",
+  "Cheque",
+] as const;
+
 const STATUS = [
   "sob_encomenda",
   "pendente",

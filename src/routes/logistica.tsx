@@ -476,7 +476,7 @@ function FlightBoardPage() {
       const { data: ordensRaw, error: ordensErr } = await supabase
         .from("ordens_servico")
         .select(
-          "id, numero, cliente_id, descricao, status, prioridade, responsavel, data_abertura, data_previsao, data_conclusao, valor_servico, valor_pecas, valor_total, observacoes, clientes(id, nome, telefone, cidade, email)"
+          "id, numero, cliente_id, descricao, status, prioridade, responsavel, data_agendada, created_at, valor, observacoes, clientes(id, nome, telefone, cidade, email)"
         )
         .order("created_at", { ascending: false });
 
@@ -494,26 +494,25 @@ function FlightBoardPage() {
           supabase
             .from("obras")
             .select(
-              "id, codigo, cliente_id, venda_id, titulo, modelo_piscina, status, data_abertura, data_previsao_termino, responsavel_obra, equipe_instalacao, observacoes, clientes(id, nome, telefone, cidade, email)"
+              "id, numero, cliente_id, venda_id, tipo_servico, status_geral, data_inicio, data_limite, responsavel, endereco_obra, observacoes, clientes(id, nome, telefone, cidade, email)"
             ),
           supabase
             .from("vendas")
             .select(
-              "id, numero_pedido, cliente_id, observacoes, data_entrega_prevista, status_venda"
+              "id, numero, cliente_id, observacoes, prazo_entrega, status_pedido"
             )
-            .neq("status_venda", "cancelada"),
+            .neq("status_pedido", "cancelada"),
           supabase
             .from("logistics_flight_board")
             .select(
-              "*, obras(id, codigo, titulo, modelo_piscina, responsavel_obra, equipe_instalacao, data_previsao_termino, venda_id), vendas(id, numero_pedido, observacoes, data_entrega_prevista), clientes(id, nome, telefone, cidade, email)"
+              "*, obras(id, numero, tipo_servico, responsavel, data_limite, venda_id), vendas(id, numero, observacoes, prazo_entrega), clientes(id, nome, telefone, cidade, email)"
             )
             .order("created_at", { ascending: false }),
           supabase
             .from("agenda_eventos")
             .select("*")
             .neq("status", "cancelado")
-            .order("data", { ascending: true })
-            .order("hora", { ascending: true }),
+            .order("inicio", { ascending: true }),
           supabase
             .from("funcionarios")
             .select("id, nome, email, cargo, ativo")
@@ -602,8 +601,8 @@ function FlightBoardPage() {
         const dataExec =
           row.data_execucao ||
           row.previsao_entrega ||
-          (osVinculada.data_previsao ? String(osVinculada.data_previsao).slice(0, 10) : null) ||
-          (osVinculada.data_abertura ? String(osVinculada.data_abertura).slice(0, 10) : null) ||
+          (osVinculada.data_agendada ? String(osVinculada.data_agendada).slice(0, 10) : null) ||
+          (osVinculada.created_at ? String(osVinculada.created_at).slice(0, 10) : null) ||
           hojeISO();
 
         const modalidade: ModalidadeExecucao =
@@ -639,8 +638,7 @@ function FlightBoardPage() {
           kit_titulo:
             row.kit_titulo ||
             osVinculada.descricao ||
-            obra?.modelo_piscina ||
-            obra?.titulo ||
+            obra?.tipo_servico ||
             "Ordem de Serviço Emitida",
           etapa_execucao:
             row.etapa_execucao ||
@@ -656,8 +654,7 @@ function FlightBoardPage() {
             row.equipe_responsavel ||
             meta.equipe ||
             osVinculada.responsavel ||
-            obra?.equipe_instalacao ||
-            obra?.responsavel_obra ||
+            obra?.responsavel ||
             "Equipe Técnica",
           emails_vinculados: emailsCard,
           observacoes: meta.textoLimpo || osVinculada.observacoes || "",
@@ -687,14 +684,14 @@ function FlightBoardPage() {
         const meta = parseMetadadosTexto(os.observacoes);
 
         const dataExec =
-          (os.data_previsao ? String(os.data_previsao).slice(0, 10) : null) ||
-          (obra?.data_previsao_termino
-            ? String(obra.data_previsao_termino).slice(0, 10)
+          (os.data_agendada ? String(os.data_agendada).slice(0, 10) : null) ||
+          (obra?.data_limite
+            ? String(obra.data_limite).slice(0, 10)
             : null) ||
-          (venda?.data_entrega_prevista
-            ? String(venda.data_entrega_prevista).slice(0, 10)
+          (venda?.prazo_entrega
+            ? String(venda.prazo_entrega).slice(0, 10)
             : null) ||
-          (os.data_abertura ? addDiasUteis(String(os.data_abertura).slice(0, 10), 2) : hojeISO());
+          (os.created_at ? addDiasUteis(String(os.created_at).slice(0, 10), 2) : hojeISO());
 
         let statusInicial: FlightStatus = "AGENDADO";
         const stLower = String(os.status || "").toLowerCase();
@@ -722,7 +719,7 @@ function FlightBoardPage() {
           cliente_nome: clienteObj?.nome || "Cliente OS Emitida",
           cliente_telefone: clienteObj?.telefone || null,
           cliente_cidade: clienteObj?.cidade || null,
-          kit_titulo: os.descricao || obra?.modelo_piscina || obra?.titulo || "Ordem de Serviço",
+          kit_titulo: os.descricao || obra?.tipo_servico || "Ordem de Serviço",
           etapa_execucao:
             meta.etapaExecucao || os.descricao || "Execução Técnica de Ordem de Serviço",
           data_execucao: String(dataExec).slice(0, 10),
@@ -733,8 +730,7 @@ function FlightBoardPage() {
           equipe_responsavel:
             meta.equipe ||
             os.responsavel ||
-            obra?.equipe_instalacao ||
-            obra?.responsavel_obra ||
+            obra?.responsavel ||
             "Equipe Técnica",
           emails_vinculados:
             meta.emailsVinculados ||
@@ -788,7 +784,15 @@ function FlightBoardPage() {
         if (ev.status === "concluido") statusEvento = "CONCLUIDO";
         else if (meta.statusFlight) statusEvento = meta.statusFlight;
 
-        const horaIni = ev.hora ? String(ev.hora).slice(0, 5) : meta.horaInicio || "09:00";
+        const inicioEv = ev.inicio ? new Date(ev.inicio) : null;
+        const horaIni =
+          inicioEv && !ev.dia_inteiro
+            ? inicioEv.toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "America/Sao_Paulo",
+              })
+            : meta.horaInicio || "09:00";
         const horaFim = meta.horaFim || "10:00";
 
         cards.push({
@@ -815,7 +819,9 @@ function FlightBoardPage() {
             (modalidade === "com_execucao"
               ? "Execução / Visita Técnica"
               : "Reunião / Compromisso Sem Execução"),
-          data_execucao: String(ev.data || hojeISO()).slice(0, 10),
+          data_execucao: inicioEv
+            ? inicioEv.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+            : hojeISO(),
           hora_inicio: horaIni,
           hora_fim: horaFim,
           status: statusEvento,
@@ -872,10 +878,7 @@ function FlightBoardPage() {
       }
 
       const resultado = await sincronizarFlightBoardBidirecionalGoogle({
-        data: {
-          userId,
-          calendarIds: emailsEquipeAtiva,
-        },
+        data: { calendarId: "primary" },
       });
       return { resultado, silencioso };
     },
@@ -889,16 +892,9 @@ function FlightBoardPage() {
 
       if (payload && !payload.silencioso) {
         const res = payload.resultado;
-        if (res?.sucesso) {
-          toast.success(
-            `Google Agenda sincronizado (${EMAIL_AGENDA_LOJA_PRINCIPAL})! ${res.importadosDoGoogle} puxado(s) do Google e ${res.enviadosParaGoogle} enviado(s).`
-          );
-        } else {
-          toast.warning(
-            res?.mensagem ||
-              "Sincronização local concluída. Verifique as credenciais Google se desejar espelhamento externo em tempo real."
-          );
-        }
+        toast.success(
+          `Google Agenda sincronizado (${EMAIL_AGENDA_LOJA_PRINCIPAL})! ${res?.importados ?? 0} puxado(s) do Google e ${res?.enviados ?? 0} enviado(s).`
+        );
       }
     },
     onError: (err: any) => {
@@ -957,21 +953,25 @@ function FlightBoardPage() {
 
         await sincronizarItemFlightBoardGoogle({
           data: {
-            operacao: params.operacao,
+            acao: params.operacao,
+            registroId:
+              params.flightBoardId ||
+              params.agendaEventoId ||
+              crypto.randomUUID(),
+            prefixoId: params.flightBoardId ? "fb" : "ev",
+            googleEventIdExistente: params.googleEventId,
             osNumero: params.osNumero,
             clienteNome: params.clienteNome,
             etapaExecucao: params.etapaExecucao,
-            dataExecucao: params.dataExecucao,
+            status: params.statusVoo,
+            modalidadeExecucao: params.modalidadeExecucao,
+            dataInicio: params.dataExecucao,
             horaInicio: params.horaInicio || "08:00",
             horaFim: params.horaFim || "17:00",
-            modalidadeExecucao: params.modalidadeExecucao,
-            statusVoo: params.statusVoo,
-            equipeResponsavel: params.equipeResponsavel,
+            diaInteiro: false,
+            responsavel: params.equipeResponsavel,
             observacoes: params.observacoes,
             emailsVinculados: listaEmails,
-            googleEventId: params.googleEventId,
-            flightBoardId: params.flightBoardId,
-            agendaEventoId: params.agendaEventoId,
           },
         });
       } catch (e) {
@@ -1026,30 +1026,35 @@ function FlightBoardPage() {
 
         let agendaId = cardEditando?.agenda_evento_id || null;
 
+        const inicioIso = new Date(
+          `${formDataExecucao}T${formHoraInicio || "09:00"}:00-03:00`
+        ).toISOString();
+        const fimIso = new Date(
+          `${formDataExecucao}T${formHoraFim || "10:00"}:00-03:00`
+        ).toISOString();
+        const dadosEvento = {
+          titulo: formTituloEvento.trim(),
+          descricao: descricaoEmpacotada,
+          inicio: inicioIso,
+          fim: fimIso,
+          dia_inteiro: false,
+          tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
+          status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
+        };
+
         if (agendaId) {
           const { error } = await supabase
             .from("agenda_eventos")
-            .update({
-              titulo: formTituloEvento.trim(),
-              descricao: descricaoEmpacotada,
-              data: formDataExecucao,
-              hora: formHoraInicio || "09:00",
-              tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
-              status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
-            })
+            .update(dadosEvento)
             .eq("id", agendaId);
           if (error) throw error;
         } else {
           const { data: inserido, error } = await supabase
             .from("agenda_eventos")
             .insert({
-              user_id: userId,
-              titulo: formTituloEvento.trim(),
-              descricao: descricaoEmpacotada,
-              data: formDataExecucao,
-              hora: formHoraInicio || "09:00",
-              tipo: formModalidade === "com_execucao" ? "trabalho" : "pessoal",
-              status: statusFinal === "CONCLUIDO" ? "concluido" : "agendado",
+              ...dadosEvento,
+              responsavel_id: userId,
+              created_by: userId,
               google_calendar_id: EMAIL_AGENDA_LOJA_PRINCIPAL,
             })
             .select("id")
@@ -1110,7 +1115,7 @@ function FlightBoardPage() {
       await supabase
         .from("ordens_servico")
         .update({
-          data_previsao: formDataExecucao,
+          data_agendada: formDataExecucao,
           responsavel: formEquipe.trim() || osSelecionada.responsavel || null,
           status:
             statusFinal === "CONCLUIDO"
@@ -1121,7 +1126,7 @@ function FlightBoardPage() {
         })
         .eq("id", osSelecionada.id);
 
-      const payloadCompleto: Record<string, any> = {
+      const payloadCompleto: any = {
         voo_codigo: cardEditando?.voo_codigo || `OS-${numeroOs}`,
         ordem_id: osSelecionada.id,
         os_numero: numeroOs,
@@ -1144,7 +1149,7 @@ function FlightBoardPage() {
         updated_at: new Date().toISOString(),
       };
 
-      const payloadBasicoFallback: Record<string, any> = {
+      const payloadBasicoFallback: any = {
         voo_codigo: cardEditando?.voo_codigo || `OS-${numeroOs}`,
         cliente_id: osSelecionada.cliente_id || null,
         cliente_nome: nomeCliente,

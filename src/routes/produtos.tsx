@@ -357,7 +357,7 @@ function Produtos() {
       ),
       custo_fabricacao: String(p.custo_fabricacao ?? 0),
       custo_logistico: String(p.custo_logistico ?? 0),
-      fornecedor_id: resolverFornecedorPadrao(p) || p.fornecedor_id || SEM_FORNECEDOR,
+      fornecedor_id: p.fornecedor_id ?? SEM_FORNECEDOR,
       ncm: p.ncm ?? "",
       cst: p.cst ?? "",
       cfop: p.cfop ?? "",
