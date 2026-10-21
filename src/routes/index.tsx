@@ -801,7 +801,7 @@ function Dashboard() {
               : "max-h-[85vh] max-w-lg overflow-y-auto"
           }
         >
-          <DialogHeader className="flex-row items-center justify-between gap-2 pr-8">
+          <DialogHeader>
             <DialogTitle>
               {detalhe === "mensagem" && "Mensagem do dia"}
               {detalhe === "agenda" && "Agenda da semana"}
@@ -809,15 +809,6 @@ function Dashboard() {
               {detalhe === "contas" && "Contas que vencem hoje"}
               {detalhe === "equilibrio" && "Ponto de equilíbrio do mês"}
             </DialogTitle>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7"
-              onClick={() => setExpandido((v) => !v)}
-              aria-label="Expandir"
-            >
-              {expandido ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-            </Button>
           </DialogHeader>
 
           {detalhe === "mensagem" && (

@@ -1767,6 +1767,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
           </ExpandableCard>
 
           </>}
+          {comparativoId && (
           <ExpandableCard>
             <CardHeader className="pr-12">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2097,6 +2098,7 @@ function NovoPedido({ comparativoId }: { comparativoId?: string } = {}) {
               )}
             </CardContent>
           </ExpandableCard>
+          )}
 
 
           {!comparativoId && <>

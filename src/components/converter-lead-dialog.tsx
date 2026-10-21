@@ -113,11 +113,8 @@ export function ConverterLeadDialog({ lead, clientes, onClose }: Props) {
   return (
     <Dialog open={!!lead} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className={expandido ? "max-w-[95vw] h-[95vh] overflow-auto" : "max-w-lg"}>
-        <DialogHeader className="flex-row items-center justify-between gap-2 pr-8">
+        <DialogHeader>
           <DialogTitle>Converter em cliente / gerar orçamento</DialogTitle>
-          <Button size="icon" variant="ghost" onClick={() => setExpandido((v) => !v)} aria-label="Expandir">
-            {expandido ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </Button>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           Lead: <span className="font-medium text-foreground">{lead?.nome}</span>

@@ -1774,13 +1774,25 @@ function DetalhePedido() {
       </div>
 
       <section className="space-y-4 print:hidden">
-      <ComparativoPedido vendaId={id} />
-      <TelaPermitida tela="vendas.historico"><HistoricoVenda
-        vendaId={id}
-        clienteId={venda.cliente_id ?? null}
-        clienteNome={venda.cliente_nome ?? null}
-        itens={itens}
-      /></TelaPermitida>
+        <div className="flex items-center justify-between border-t border-border pt-6">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              Pós-venda · Composição da Piscina (Multipartido) e Acompanhamento
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Configure a composição multipartido (casco, filtro, acessórios e tabela de custos do fabricante) e acompanhe o histórico pós-venda do pedido.
+            </p>
+          </div>
+        </div>
+        <ComparativoPedido vendaId={id} />
+        <TelaPermitida tela="vendas.historico">
+          <HistoricoVenda
+            vendaId={id}
+            clienteId={venda.cliente_id ?? null}
+            clienteNome={venda.cliente_nome ?? null}
+            itens={itens}
+          />
+        </TelaPermitida>
       </section>
 
       <Dialog open={editPedido !== null} onOpenChange={(o) => !o && setEditPedido(null)}>

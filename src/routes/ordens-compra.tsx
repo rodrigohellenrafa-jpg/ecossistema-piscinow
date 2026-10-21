@@ -289,8 +289,25 @@ const novoItemVazio = {
   pastilha: "",
 };
 
+function arredondarQtdCompra(valor: number): number {
+  const num = Number(valor || 0);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(num * 10000) / 10000;
+}
+
+function formatarQtdCompra(valor: number): string {
+  const arredondado = Math.round(Number(valor || 0) * 1000) / 1000;
+  if (!Number.isFinite(arredondado)) return "0";
+  if (Number.isInteger(arredondado)) return String(arredondado);
+  return arredondado.toLocaleString("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+}
+
 type VinculoFilaDetalhe = {
   key: string;
+  keysOriginais?: string[];
   produto: Produto;
   indiceOriginal: number;
   vendaId: string;
@@ -299,6 +316,7 @@ type VinculoFilaDetalhe = {
   clienteNome: string;
   rotulo: string;
   comVinculo: boolean;
+  quantidade: number;
   valorUnitario: number;
   descontoPercentual: number;
   valorLiquido: number;
@@ -313,6 +331,8 @@ type LinhaConsolidadaFornecedor = {
   categoria: string | null;
   unidade: string;
   comVinculo: boolean;
+  comVinculoCount: number;
+  semVinculoCount: number;
   vinculos: VinculoFilaDetalhe[];
   totalFila: number;
   selecionadosCount: number;
@@ -331,6 +351,7 @@ type LinhaConsolidadaFornecedor = {
 
 type ItemRascunhoOC = {
   key: string;
+  keysOriginais?: string[];
   produtoId: string;
   codigo: string | null;
   descricao: string;
@@ -364,22 +385,24 @@ type RascunhoOCFornecedor = {
 
 const STORAGE_KEY_RASCUNHOS_OC = "erp:rascunhos_oc_fornecedor_v1";
 
-function OrdensCompra() {
+export function OrdensCompra() {
   const qc = useQueryClient();
   useSincronizarPecasEstoque();
   const navigate = useNavigate();
   const [abaVisao, setAbaVisao] = useState<"fornecedores" | "grade" | "executadas">("fornecedores");
   const [filtroVinculo, setFiltroVinculo] = useState<"todos" | "com_vinculo" | "sem_vinculo">("todos");
-  const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("precisa_comprar");
+  const [filtroNecessidade, setFiltroNecessidade] = useState<"precisa_comprar" | "todos">("todos");
   const [filtroExibicaoCatalogo, setFiltroExibicaoCatalogo] = useState<
     "apenas_vinculados_selecionados" | "catalogo_completo"
-  >("apenas_vinculados_selecionados");
+  >("catalogo_completo");
   const [ocultarJaComprados, setOcultarJaComprados] = useState(true);
   const [linhasExpandidas, setLinhasExpandidas] = useState<Record<string, boolean>>({});
   const [ordensExpandidas, setOrdensExpandidas] = useState<Record<string, boolean>>({});
   const [fornecedoresRecolhidos, setFornecedoresRecolhidos] = useState<Record<string, boolean>>({});
   const [fornecedorCardAberto, setFornecedorCardAberto] = useState<string | null>(null);
   const [gavetaOCFornecedorChave, setGavetaOCFornecedorChave] = useState<string | null>(null);
+  const [telaPosInclusaoFornecedorChave, setTelaPosInclusaoFornecedorChave] = useState<string | null>(null);
+  const [ultimosItensIncluidosCount, setUltimosItensIncluidosCount] = useState<number>(0);
   const [vinculosKeysSelecionados, setVinculosKeysSelecionados] = useState<Record<string, boolean>>({});
   const [vinculosExpandidosPorLinha, setVinculosExpandidosPorLinha] = useState<Record<string, boolean>>({});
   const [rascunhosOCPorFornecedor, setRascunhosOCPorFornecedor] = useState<
@@ -408,6 +431,7 @@ function OrdensCompra() {
   const [filtroFornecedor, setFiltroFornecedor] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
   const [buscaFornecedor, setBuscaFornecedor] = useState("");
+  const [buscaCliente, setBuscaCliente] = useState("");
   const [detalheId, setDetalheId] = useState<string | null>(null);
   const [modoEdicao, setModoEdicao] = useState(false);
   const [modalDetalheMaximized, setModalDetalheMaximized] = useState(false);
@@ -1102,72 +1126,48 @@ function OrdensCompra() {
     };
   }, [itensTodos, ordens, vendasVinculo]);
 
-  /** Demanda consolidada PENDENTE: pedidos de venda ativos que ainda precisam ser comprados e que não foram entregues/instalados/concluídos. Desmembra combos de venda_kit automaticamente. */
+  /** Demanda consolidada PENDENTE: pedidos de venda ativos que ainda precisam ser comprados e que não foram entregues/instalados/concluídos. Consolida demandas do mesmo cliente em um único vínculo, refletindo a quantidade total (inclusive medidas como metros) em um só registro. */
   const demandaPorProduto = useMemo(() => {
     const mapa = new Map<
       string,
-      { total: number; pedidos: { id: string; rotulo: string; quantidade: number }[] }
+      {
+        total: number;
+        pedidos: {
+          id: string;
+          chaveCliente: string;
+          clienteId: string | null;
+          clienteNome: string;
+          pedidoNumero: string;
+          pedidosNumeros: string[];
+          rotulo: string;
+          quantidade: number;
+        }[];
+      }
     >();
 
-    const paresProcessados = new Set<string>();
+    // 1. Soma primeiro a quantidade total consumida por par (produto_id::venda_id)
+    const qtdConsumidaPorProdutoVenda = new Map<string, { prodId: string; vendaId: string; qtd: number }>();
 
     for (const item of consumoItens) {
       if (!item.produto_id) continue;
-      const quantidadeTotal = Number(item.quantidade ?? 0);
-      if (quantidadeTotal <= 0) continue;
+      const quantidadeItem = Number(item.quantidade ?? 0);
+      if (quantidadeItem <= 0) continue;
 
-      paresProcessados.add(`${item.produto_id}::${item.venda_id}`);
-
-      const venda = vendaPorId.get(item.venda_id);
-      // Oculta automaticamente itens de pedidos já entregues, instalados, concluídos, cancelados ou orçamento
-      const statusVenda = (venda?.status_pedido || "").toLowerCase().trim();
-      if (
-        statusVenda === "entregue" ||
-        statusVenda === "instalado" ||
-        statusVenda === "instalada" ||
-        statusVenda === "concluido" ||
-        statusVenda === "concluida" ||
-        statusVenda === "cancelado" ||
-        statusVenda === "cancelada" ||
-        statusVenda === "orcamento"
-      ) {
-        continue;
-      }
-
-      // Abate o que já foi efetivamente comprado para esta venda específica
       const chave = `${item.produto_id}::${item.venda_id}`;
-      const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
-      const quantidadePendente = Math.max(0, quantidadeTotal - jaComprado);
-
-      // Se já foi totalmente comprado, não há demanda pendente para esta venda
-      if (quantidadePendente <= 0) continue;
-
-      const atual = mapa.get(item.produto_id) ?? { total: 0, pedidos: [] };
-      const rotulo = `${venda?.numero ?? "Pedido"} — ${venda?.cliente_nome ?? "Cliente"}`;
-      const existente = atual.pedidos.find((p) => p.id === item.venda_id);
-      if (existente) existente.quantidade += quantidadePendente;
-      else atual.pedidos.push({ id: item.venda_id, rotulo, quantidade: quantidadePendente });
-      atual.total += quantidadePendente;
-      mapa.set(item.produto_id, atual);
+      const ant = qtdConsumidaPorProdutoVenda.get(chave);
+      if (ant) {
+        ant.qtd = arredondarQtdCompra(ant.qtd + quantidadeItem);
+      } else {
+        qtdConsumidaPorProdutoVenda.set(chave, {
+          prodId: item.produto_id,
+          vendaId: item.venda_id,
+          qtd: arredondarQtdCompra(quantidadeItem),
+        });
+      }
     }
 
-    // Desmembramento automático de kits/combos gravados em venda_kit
+    // 2. Desmembramento automático de kits/combos gravados em venda_kit (quando não já em consumoItens)
     for (const kit of kitsVendas) {
-      const venda = vendaPorId.get(kit.venda_id);
-      const statusVenda = (venda?.status_pedido || "").toLowerCase().trim();
-      if (
-        statusVenda === "entregue" ||
-        statusVenda === "instalado" ||
-        statusVenda === "instalada" ||
-        statusVenda === "concluido" ||
-        statusVenda === "concluida" ||
-        statusVenda === "cancelado" ||
-        statusVenda === "cancelada" ||
-        statusVenda === "orcamento"
-      ) {
-        continue;
-      }
-
       const itensKit: string[] = [];
       if (kit.casco_id) itensKit.push(kit.casco_id);
       if (kit.filtro_id) itensKit.push(kit.filtro_id);
@@ -1179,21 +1179,68 @@ function OrdensCompra() {
 
       for (const prodId of itensKit) {
         const chave = `${prodId}::${kit.venda_id}`;
-        if (paresProcessados.has(chave)) continue;
-        paresProcessados.add(chave);
-
-        const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
-        const quantidadePendente = Math.max(0, 1 - jaComprado);
-        if (quantidadePendente <= 0) continue;
-
-        const atual = mapa.get(prodId) ?? { total: 0, pedidos: [] };
-        const rotulo = `${venda?.numero ?? "Pedido"} — ${venda?.cliente_nome ?? "Cliente"}`;
-        const existente = atual.pedidos.find((p) => p.id === kit.venda_id);
-        if (existente) existente.quantidade += quantidadePendente;
-        else atual.pedidos.push({ id: kit.venda_id, rotulo, quantidade: quantidadePendente });
-        atual.total += quantidadePendente;
-        mapa.set(prodId, atual);
+        if (qtdConsumidaPorProdutoVenda.has(chave)) continue;
+        qtdConsumidaPorProdutoVenda.set(chave, {
+          prodId,
+          vendaId: kit.venda_id,
+          qtd: 1,
+        });
       }
+    }
+
+    // 3. Abate o que já foi comprado por (produto_id::venda_id) e consolida por CLIENTE em um único registro
+    for (const [chave, { prodId, vendaId, qtd }] of qtdConsumidaPorProdutoVenda.entries()) {
+      const venda = vendaPorId.get(vendaId);
+      const statusVenda = (venda?.status_pedido || "").toLowerCase().trim();
+      if (
+        statusVenda === "entregue" ||
+        statusVenda === "instalado" ||
+        statusVenda === "instalada" ||
+        statusVenda === "concluido" ||
+        statusVenda === "concluida" ||
+        statusVenda === "cancelado" ||
+        statusVenda === "cancelada" ||
+        statusVenda === "orcamento"
+      ) {
+        continue;
+      }
+
+      const jaComprado = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chave) ?? 0;
+      const quantidadePendente = arredondarQtdCompra(Math.max(0, qtd - jaComprado));
+      if (quantidadePendente <= 0) continue;
+
+      const clienteId = venda?.cliente_id ?? null;
+      const clienteNome = (venda?.cliente_nome ?? "Cliente").trim() || "Cliente";
+      const pedidoNum = (venda?.numero ?? "Pedido").trim() || "Pedido";
+      const chaveCliente = clienteId
+        ? `cid:${clienteId}`
+        : venda?.cliente_nome
+          ? `cnome:${normalizar(clienteNome)}`
+          : `venda:${vendaId}`;
+
+      const atual = mapa.get(prodId) ?? { total: 0, pedidos: [] };
+      const existente = atual.pedidos.find((p) => p.chaveCliente === chaveCliente);
+      if (existente) {
+        existente.quantidade = arredondarQtdCompra(existente.quantidade + quantidadePendente);
+        if (!existente.pedidosNumeros.includes(pedidoNum)) {
+          existente.pedidosNumeros.push(pedidoNum);
+          existente.pedidoNumero = existente.pedidosNumeros.join(", ");
+          existente.rotulo = `${existente.pedidoNumero} — ${existente.clienteNome}`;
+        }
+      } else {
+        atual.pedidos.push({
+          id: vendaId,
+          chaveCliente,
+          clienteId,
+          clienteNome,
+          pedidoNumero: pedidoNum,
+          pedidosNumeros: [pedidoNum],
+          rotulo: `${pedidoNum} — ${clienteNome}`,
+          quantidade: quantidadePendente,
+        });
+      }
+      atual.total = arredondarQtdCompra(atual.total + quantidadePendente);
+      mapa.set(prodId, atual);
     }
 
     return mapa;
@@ -1201,6 +1248,7 @@ function OrdensCompra() {
 
 
   const termoBusca = useMemo(() => normalizar(buscaFornecedor.trim()), [buscaFornecedor]);
+  const termoBuscaCliente = useMemo(() => normalizar(buscaCliente.trim()), [buscaCliente]);
 
   const ordensFiltradas = useMemo(() => {
     const casaStatus = (ordem: Ordem) =>
@@ -1474,7 +1522,36 @@ function OrdensCompra() {
       const estaExplicitamenteVinculado =
         temDemandaPendente || temVinculoManual || temVinculoProduto;
 
-      // 3. Ocultar automaticamente itens já comprados SOMENTE se não tiverem demanda pendente e não estivermos no catálogo completo
+      // Filtro dedicado de Busca por Cliente
+      if (termoBuscaCliente) {
+        const vendaVinculo = produto.venda_vinculo_id
+          ? vendaPorId.get(produto.venda_vinculo_id)
+          : undefined;
+        const casaVinculoDireto = Boolean(
+          vendaVinculo &&
+            (normalizar(vendaVinculo.cliente_nome ?? "").includes(termoBuscaCliente) ||
+              normalizar(vendaVinculo.numero ?? "").includes(termoBuscaCliente)),
+        );
+        const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
+        const casaDemandaCliente = pedidos.some((p) =>
+          normalizar(p.rotulo).includes(termoBuscaCliente),
+        );
+        const vinculosManuaisIds = vinculosCompra[produto.id] ?? [];
+        const casaVinculoManual = vinculosManuaisIds.some((vid) => {
+          if (!vid || vid === SEM_CLIENTE) return false;
+          const v = vendaPorId.get(vid);
+          return Boolean(
+            v &&
+              (normalizar(v.cliente_nome ?? "").includes(termoBuscaCliente) ||
+                normalizar(v.numero ?? "").includes(termoBuscaCliente)),
+          );
+        });
+        if (!casaVinculoDireto && !casaDemandaCliente && !casaVinculoManual) {
+          return false;
+        }
+      }
+
+      // 3. Ocultar automaticamente itens já comprados SOMENTE se não tiverem demanda pendente e não estivermos no catálogo completo unificado
       if (
         ocultarJaComprados &&
         jaComprado &&
@@ -1484,9 +1561,14 @@ function OrdensCompra() {
         return false;
       }
 
-      // 4. Se o usuário ativou o modo "Catálogo completo"
+      // 4. Modo "Catálogo Unificado" (catalogo_completo)
       if (filtroExibicaoCatalogo === "catalogo_completo") {
-        if (ocultarJaComprados && jaComprado && !estaExplicitamenteVinculado) {
+        if (
+          filtroNecessidade === "precisa_comprar" &&
+          ocultarJaComprados &&
+          jaComprado &&
+          !estaExplicitamenteVinculado
+        ) {
           return false;
         }
         if (termoBusca) {
@@ -1505,12 +1587,12 @@ function OrdensCompra() {
           const pedidos = demandaPorProduto.get(produto.id)?.pedidos ?? [];
           const casaDemanda = pedidos.some((p) => normalizar(p.rotulo).includes(termoBusca));
 
-          return casaFornecedor || casaProduto || casaVinculo || casaDemanda;
+          return Boolean(casaFornecedor || casaProduto || casaVinculo || casaDemanda);
         }
         return true;
       }
 
-      // 5. Padrão: "Apenas Vinculados / Demanda" + Itens que precisam de reposição de estoque
+      // 5. Modo "Apenas Demanda Pendente" + Itens que precisam de reposição de estoque
       if (termoBusca) {
         const casaProduto =
           normalizar(produto.nome).includes(termoBusca) ||
@@ -1550,12 +1632,14 @@ function OrdensCompra() {
     filtroFornecedor,
     fornecedorDaCompra,
     termoBusca,
+    termoBuscaCliente,
     vendaPorId,
     demandaPorProduto,
     selecionadosCompra,
     vinculosCompra,
     ocultarJaComprados,
     filtroExibicaoCatalogo,
+    filtroNecessidade,
     filtroVinculo,
     ehProdutoJaCompradoOuFaturado,
     itensCompradosInfo,
@@ -1569,19 +1653,207 @@ function OrdensCompra() {
     return Number(produto.quantidade_compra ?? 1);
   };
 
-  const vinculosDoProduto = (produto: Produto) => {
-    const quantidade = Math.max(0, Math.trunc(quantidadeCompra(produto)));
-    const salvos = vinculosCompra[produto.id];
-    if (salvos) return Array.from({ length: quantidade }, (_, indice) => salvos[indice] ?? "");
+  /**
+   * Retorna os vínculos consolidados do produto (1 único registro por cliente com a quantidade total,
+   * mesmo para produtos vendidos por medida como metros).
+   */
+  const vinculosConsolidadosDoProduto = useCallback(
+    (
+      produto: Produto,
+    ): {
+      key: string;
+      vendaId: string;
+      pedidoNumero: string | null;
+      clienteId: string | null;
+      clienteNome: string;
+      rotulo: string;
+      comVinculo: boolean;
+      quantidade: number;
+    }[] => {
+      const demanda = demandaPorProduto.get(produto.id)?.pedidos ?? [];
+      const salvos = vinculosCompra[produto.id];
+      const qtdDesejada = arredondarQtdCompra(Math.max(0, Number(quantidadeCompra(produto)) || 0));
 
-    const demanda = demandaPorProduto.get(produto.id)?.pedidos ?? [];
-    const automaticos = demanda.flatMap((pedido) =>
-      Array.from({ length: Math.max(0, Math.trunc(pedido.quantidade)) }, () => pedido.id),
-    );
-    return Array.from(
-      { length: quantidade },
-      (_, indice) => automaticos[indice] ?? (indice === 0 ? produto.venda_vinculo_id ?? "" : ""),
-    );
+      const clientesConsolidados = new Map<
+        string,
+        {
+          vendaId: string;
+          pedidosNumeros: string[];
+          clienteId: string | null;
+          clienteNome: string;
+          quantidade: number;
+        }
+      >();
+      let qtdEstoqueManual = 0;
+
+      if (salvos && salvos.length > 0) {
+        // Caso o usuário tenha editado vínculos manualmente na Grade Geral, consolida mesmo cliente em 1 único vínculo
+        const demandaPorVenda = new Map(demanda.map((p) => [p.id, p]));
+        const totalSalvos = salvos.length;
+        for (const vidBruto of salvos) {
+          const vid = vidBruto && vidBruto !== SEM_CLIENTE ? vidBruto : "";
+          if (!vid) {
+            qtdEstoqueManual = arredondarQtdCompra(
+              qtdEstoqueManual + (totalSalvos === 1 && qtdDesejada > 0 ? qtdDesejada : 1),
+            );
+            continue;
+          }
+          const venda = vendaPorId.get(vid);
+          const pedidoDemanda = demandaPorVenda.get(vid);
+          const clienteId = venda?.cliente_id ?? pedidoDemanda?.clienteId ?? null;
+          const clienteNome =
+            (venda?.cliente_nome ?? pedidoDemanda?.clienteNome ?? "Cliente Vinculado").trim() ||
+            "Cliente Vinculado";
+          const pedidoNum = (venda?.numero ?? pedidoDemanda?.pedidoNumero ?? "Pedido").trim() || "Pedido";
+          const chaveCli = clienteId
+            ? `cid_${clienteId}`
+            : `cnome_${normalizar(clienteNome) || vid}`;
+
+          const qtdParcela =
+            totalSalvos === 1 && qtdDesejada > 0
+              ? qtdDesejada
+              : pedidoDemanda && salvos.filter((s) => s === vid).length === 1
+                ? pedidoDemanda.quantidade
+                : 1;
+
+          const existente = clientesConsolidados.get(chaveCli);
+          if (existente) {
+            existente.quantidade = arredondarQtdCompra(existente.quantidade + qtdParcela);
+            if (!existente.pedidosNumeros.includes(pedidoNum)) {
+              existente.pedidosNumeros.push(pedidoNum);
+            }
+          } else {
+            clientesConsolidados.set(chaveCli, {
+              vendaId: vid,
+              pedidosNumeros: [pedidoNum],
+              clienteId,
+              clienteNome,
+              quantidade: arredondarQtdCompra(qtdParcela),
+            });
+          }
+        }
+      } else if (demanda.length > 0) {
+        for (const p of demanda) {
+          const venda = vendaPorId.get(p.id);
+          const clienteId = p.clienteId ?? venda?.cliente_id ?? null;
+          const clienteNome =
+            (p.clienteNome || venda?.cliente_nome || "Cliente Vinculado").trim() ||
+            "Cliente Vinculado";
+          const chaveCli = clienteId
+            ? `cid_${clienteId}`
+            : `cnome_${normalizar(clienteNome) || p.id}`;
+          const nums =
+            p.pedidosNumeros && p.pedidosNumeros.length > 0
+              ? p.pedidosNumeros
+              : [p.pedidoNumero || venda?.numero || "Pedido"];
+
+          const existente = clientesConsolidados.get(chaveCli);
+          if (existente) {
+            existente.quantidade = arredondarQtdCompra(existente.quantidade + p.quantidade);
+            for (const n of nums) {
+              if (!existente.pedidosNumeros.includes(n)) existente.pedidosNumeros.push(n);
+            }
+          } else {
+            clientesConsolidados.set(chaveCli, {
+              vendaId: p.id,
+              pedidosNumeros: [...nums],
+              clienteId,
+              clienteNome,
+              quantidade: arredondarQtdCompra(p.quantidade),
+            });
+          }
+        }
+      } else if (produto.venda_vinculo_id) {
+        const venda = vendaPorId.get(produto.venda_vinculo_id);
+        const st = (venda?.status_pedido || "").toLowerCase().trim();
+        const chaveComp = `${produto.id}::${produto.venda_vinculo_id}`;
+        const jaComp = itensCompradosInfo.qtdCompradaPorProdutoVenda.get(chaveComp) ?? 0;
+        const vendaAtiva =
+          jaComp === 0 &&
+          st !== "entregue" &&
+          st !== "instalado" &&
+          st !== "instalada" &&
+          st !== "concluido" &&
+          st !== "concluida" &&
+          st !== "cancelado" &&
+          st !== "cancelada" &&
+          st !== "orcamento";
+        if (vendaAtiva) {
+          const clienteId = venda?.cliente_id ?? null;
+          const clienteNome = (venda?.cliente_nome ?? "Cliente Vinculado").trim() || "Cliente Vinculado";
+          const pedidoNum = (venda?.numero ?? "Pedido").trim() || "Pedido";
+          const chaveCli = clienteId
+            ? `cid_${clienteId}`
+            : `cnome_${normalizar(clienteNome) || produto.venda_vinculo_id}`;
+          clientesConsolidados.set(chaveCli, {
+            vendaId: produto.venda_vinculo_id,
+            pedidosNumeros: [pedidoNum],
+            clienteId,
+            clienteNome,
+            quantidade: qtdDesejada > 0 ? qtdDesejada : 1,
+          });
+        }
+      }
+
+      const resultado: {
+        key: string;
+        vendaId: string;
+        pedidoNumero: string | null;
+        clienteId: string | null;
+        clienteNome: string;
+        rotulo: string;
+        comVinculo: boolean;
+        quantidade: number;
+      }[] = [];
+
+      let somaClientes = 0;
+      for (const [chaveCli, info] of clientesConsolidados.entries()) {
+        if (info.quantidade <= 0) continue;
+        somaClientes = arredondarQtdCompra(somaClientes + info.quantidade);
+        const pedidoNumero = info.pedidosNumeros.join(", ");
+        resultado.push({
+          key: `${produto.id}::cliente::${chaveCli}`,
+          vendaId: info.vendaId,
+          pedidoNumero,
+          clienteId: info.clienteId,
+          clienteNome: info.clienteNome,
+          rotulo: `${pedidoNumero} — ${info.clienteNome}`,
+          comVinculo: true,
+          quantidade: info.quantidade,
+        });
+      }
+
+      const qtdEstoque =
+        salvos && salvos.length > 0
+          ? qtdEstoqueManual
+          : somaClientes > 0
+            ? quantidadesCompra[produto.id] !== undefined
+              ? arredondarQtdCompra(Math.max(0, qtdDesejada - somaClientes))
+              : 0
+            : qtdDesejada;
+
+      if (qtdEstoque > 0) {
+        resultado.push({
+          key: `${produto.id}::estoque::consolidado`,
+          vendaId: "",
+          pedidoNumero: null,
+          clienteId: null,
+          clienteNome: "Estoque Geral",
+          rotulo: "Reposição de Estoque Geral",
+          comVinculo: false,
+          quantidade: qtdEstoque,
+        });
+      }
+
+      return resultado;
+    },
+    [demandaPorProduto, vinculosCompra, quantidadesCompra, vendaPorId, itensCompradosInfo],
+  );
+
+  const vinculosDoProduto = (produto: Produto) => {
+    const consolidados = vinculosConsolidadosDoProduto(produto);
+    if (consolidados.length === 0) return [];
+    return consolidados.map((v) => v.vendaId);
   };
 
   const valorCompra = (produto: Produto) => {
@@ -1595,13 +1867,15 @@ function OrdensCompra() {
       : Math.min(Math.max(Number(percentuaisCompra[produto.id]) || 0, 0), 100);
 
   const totalCompra = (produto: Produto) => {
-    const vinculos = vinculosDoProduto(produto);
+    const consolidados = vinculosConsolidadosDoProduto(produto);
     const vincSel = vinculosSelecionadosCompra[produto.id];
     let qtd = quantidadeCompra(produto);
     if (vincSel && Object.keys(vincSel).length > 0) {
-      const selecionadosCount = vinculos.filter((_, idx) => isVinculoSelecionado(produto.id, idx)).length;
-      if (selecionadosCount > 0) {
-        qtd = selecionadosCount;
+      const somaSelecionada = consolidados
+        .filter((_, idx) => isVinculoSelecionado(produto.id, idx))
+        .reduce((s, v) => s + v.quantidade, 0);
+      if (somaSelecionada > 0) {
+        qtd = arredondarQtdCompra(somaSelecionada);
       }
     }
     return qtd * valorCompra(produto) * (1 - percentualCompra(produto) / 100);
@@ -1660,6 +1934,9 @@ function OrdensCompra() {
     for (const rascunho of Object.values(rascunhosOCPorFornecedor)) {
       for (const it of rascunho?.itens ?? []) {
         if (it?.key) s.add(it.key);
+        for (const k of it?.keysOriginais ?? []) {
+          if (k) s.add(k);
+        }
       }
     }
     return s;
@@ -1667,54 +1944,39 @@ function OrdensCompra() {
 
   const vinculosDetalhadosDoProduto = useCallback(
     (produto: Produto): VinculoFilaDetalhe[] => {
-      const brutos = vinculosDoProduto(produto);
-      const contadores = new Map<string, number>();
+      const consolidados = vinculosConsolidadosDoProduto(produto);
       const vlrUnit = valorCompra(produto);
       const descPct = percentualCompra(produto);
-      const vlrLiq = vlrUnit * (1 - descPct / 100);
+      const vlrLiqUnit = vlrUnit * (1 - descPct / 100);
       const lista: VinculoFilaDetalhe[] = [];
 
-      brutos.forEach((vendaIdBruto, indiceOriginal) => {
-        const vendaId = vendaIdBruto && vendaIdBruto !== SEM_CLIENTE ? vendaIdBruto : "";
-        const chaveTipo = vendaId ? `venda::${vendaId}` : "estoque";
-        const ocorrencia = contadores.get(chaveTipo) ?? 0;
-        contadores.set(chaveTipo, ocorrencia + 1);
-        const key = `${produto.id}::${chaveTipo}::${ocorrencia}`;
-
+      consolidados.forEach((v, indiceOriginal) => {
         // Se já foi transferido para a Ordem de Compra em aberto (rascunho), sai da fila pendente do card
-        if (chavesEmRascunho.has(key)) {
+        if (chavesEmRascunho.has(v.key)) {
           return;
         }
 
-        const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
-        const comVinculo = Boolean(vendaId);
-        const clienteNome = comVinculo
-          ? (venda?.cliente_nome ?? "Cliente Vinculado")
-          : "Estoque Geral";
-        const pedidoNumero = comVinculo ? (venda?.numero ?? "Pedido") : null;
-        const rotulo = comVinculo
-          ? `${pedidoNumero} — ${clienteNome}`
-          : "Reposição de Estoque Geral";
-
         lista.push({
-          key,
+          key: v.key,
+          keysOriginais: [v.key],
           produto,
           indiceOriginal,
-          vendaId,
-          pedidoNumero,
-          clienteId: venda?.cliente_id ?? null,
-          clienteNome,
-          rotulo,
-          comVinculo,
+          vendaId: v.vendaId,
+          pedidoNumero: v.pedidoNumero,
+          clienteId: v.clienteId,
+          clienteNome: v.clienteNome,
+          rotulo: v.rotulo,
+          comVinculo: v.comVinculo,
+          quantidade: v.quantidade,
           valorUnitario: vlrUnit,
           descontoPercentual: descPct,
-          valorLiquido: vlrLiq,
+          valorLiquido: v.quantidade * vlrLiqUnit,
         });
       });
 
       return lista;
     },
-    [vinculosDoProduto, valorCompra, percentualCompra, chavesEmRascunho, vendaPorId],
+    [vinculosConsolidadosDoProduto, valorCompra, percentualCompra, chavesEmRascunho],
   );
 
   type ItemVisaoFornecedor = {
@@ -1746,6 +2008,7 @@ function OrdensCompra() {
     chave: string;
     nome: string;
     itens: ItemVisaoFornecedor[];
+    itensUnificadosConsolidados: LinhaConsolidadaFornecedor[];
     itensComVinculoConsolidados: LinhaConsolidadaFornecedor[];
     itensSemVinculoConsolidados: LinhaConsolidadaFornecedor[];
     totalItens: number;
@@ -1775,12 +2038,20 @@ function OrdensCompra() {
       const estoqueBaixo = estoqueAtual <= estoqueMinimo && estoqueMinimo > 0;
       const vinculosDetalhados = vinculosDetalhadosDoProduto(p);
       const vinculos = vinculosDetalhados.map((v) => v.vendaId);
-      const quantidadeAComprar = vinculosDetalhados.length;
+      const comVinculoCount = arredondarQtdCompra(
+        vinculosDetalhados
+          .filter((v) => v.comVinculo)
+          .reduce((s, v) => s + v.quantidade, 0),
+      );
+      const semVinculoCount = arredondarQtdCompra(
+        vinculosDetalhados
+          .filter((v) => !v.comVinculo)
+          .reduce((s, v) => s + v.quantidade, 0),
+      );
+      const quantidadeAComprar = arredondarQtdCompra(comVinculoCount + semVinculoCount);
       const valorUnitario = valorCompra(p);
       const desconto = percentualCompra(p);
       const totalItem = quantidadeAComprar * valorUnitario * (1 - desconto / 100);
-      const comVinculoCount = vinculosDetalhados.filter((v) => v.comVinculo).length;
-      const semVinculoCount = vinculosDetalhados.filter((v) => !v.comVinculo).length;
       const status = statusCompra[p.id] ?? p.status_compra ?? "a_comprar";
 
       const jaComprado = ehProdutoJaCompradoOuFaturado(p);
@@ -1834,6 +2105,33 @@ function OrdensCompra() {
     vinculosDetalhadosDoProduto,
   ]);
 
+  /** Lista consolidada de clientes que possuem demandas vinculadas pendentes para busca rápida */
+  const clientesComDemandaAtiva = useMemo(() => {
+    const mapa = new Map<
+      string,
+      { clienteNome: string; pedidos: Set<string>; totalUnidades: number }
+    >();
+    for (const item of dadosItensCompra) {
+      for (const v of item.vinculosDetalhados) {
+        if (!v.comVinculo || !v.clienteNome) continue;
+        const chave = normalizar(v.clienteNome);
+        const atual = mapa.get(chave) ?? {
+          clienteNome: v.clienteNome,
+          pedidos: new Set<string>(),
+          totalUnidades: 0,
+        };
+        if (v.pedidoNumero) atual.pedidos.add(v.pedidoNumero);
+        atual.totalUnidades = arredondarQtdCompra(atual.totalUnidades + v.quantidade);
+        mapa.set(chave, atual);
+      }
+    }
+    return Array.from(mapa.values())
+      .sort(
+        (a, b) => b.totalUnidades - a.totalUnidades || a.clienteNome.localeCompare(b.clienteNome),
+      )
+      .map((c) => c.clienteNome);
+  }, [dadosItensCompra]);
+
   const totalJaCompradosOcultos = useMemo(() => {
     let count = 0;
     for (const p of produtos) {
@@ -1849,23 +2147,28 @@ function OrdensCompra() {
 
   const contagensFiltroVinculo = useMemo(() => {
     const exibirTodosCatalogo =
-      Boolean(buscaFornecedor.trim()) || filtroExibicaoCatalogo === "catalogo_completo";
-    const base = dadosItensCompra.filter((item) =>
-      item.quantidadeAComprar > 0 &&
-      (!exibirTodosCatalogo && filtroNecessidade === "precisa_comprar"
-        ? item.precisaComprar
-        : true),
+      Boolean(buscaFornecedor.trim()) ||
+      Boolean(buscaCliente.trim()) ||
+      filtroExibicaoCatalogo === "catalogo_completo";
+    const base = dadosItensCompra.filter(
+      (item) =>
+        item.quantidadeAComprar > 0 &&
+        (!exibirTodosCatalogo && filtroNecessidade === "precisa_comprar"
+          ? item.precisaComprar
+          : true),
     );
     return {
       todos: base.length,
       comVinculo: base.filter((i) => i.temVinculo).length,
       semVinculo: base.filter((i) => i.temSemVinculo).length,
     };
-  }, [dadosItensCompra, filtroNecessidade, buscaFornecedor, filtroExibicaoCatalogo]);
+  }, [dadosItensCompra, filtroNecessidade, buscaFornecedor, buscaCliente, filtroExibicaoCatalogo]);
 
   const itensVisaoFiltrados = useMemo(() => {
     const exibirTodosCatalogo =
-      Boolean(buscaFornecedor.trim()) || filtroExibicaoCatalogo === "catalogo_completo";
+      Boolean(buscaFornecedor.trim()) ||
+      Boolean(buscaCliente.trim()) ||
+      filtroExibicaoCatalogo === "catalogo_completo";
     return dadosItensCompra.filter((item) => {
       if (item.quantidadeAComprar <= 0) return false;
       if (
@@ -1875,7 +2178,7 @@ function OrdensCompra() {
       ) {
         return false;
       }
-      if (!Boolean(buscaFornecedor.trim())) {
+      if (!Boolean(buscaFornecedor.trim()) && !Boolean(buscaCliente.trim())) {
         if (filtroVinculo === "com_vinculo" && !item.temVinculo) {
           return false;
         }
@@ -1885,7 +2188,7 @@ function OrdensCompra() {
       }
       return true;
     });
-  }, [dadosItensCompra, filtroNecessidade, filtroVinculo, buscaFornecedor, filtroExibicaoCatalogo]);
+  }, [dadosItensCompra, filtroNecessidade, filtroVinculo, buscaFornecedor, buscaCliente, filtroExibicaoCatalogo]);
 
   const gruposVisaoFornecedor = useMemo(() => {
     const mapa = new Map<string, GrupoVisaoFornecedor>();
@@ -1895,9 +2198,8 @@ function OrdensCompra() {
       let grupo = mapa.get(chave);
       if (!grupo) {
         const rascunho = rascunhosOCPorFornecedor[chave];
-        const totalUnidadesRascunho = (rascunho?.itens ?? []).reduce(
-          (s, it) => s + Number(it.quantidade || 1),
-          0,
+        const totalUnidadesRascunho = arredondarQtdCompra(
+          (rascunho?.itens ?? []).reduce((s, it) => s + Number(it.quantidade || 1), 0),
         );
         const totalValorRascunho = (rascunho?.itens ?? []).reduce(
           (s, it) =>
@@ -1912,6 +2214,7 @@ function OrdensCompra() {
           chave,
           nome: forn.nome,
           itens: [],
+          itensUnificadosConsolidados: [],
           itensComVinculoConsolidados: [],
           itensSemVinculoConsolidados: [],
           totalItens: 0,
@@ -1941,24 +2244,35 @@ function OrdensCompra() {
     }
 
     // Também garante que fornecedores com rascunho ativo apareçam nos cards
-    for (const [chave, rascunho] of Object.entries(rascunhosOCPorFornecedor)) {
-      if ((rascunho?.itens?.length ?? 0) > 0 && !mapa.has(chave)) {
-        if (filtroFornecedor === "todos" || filtroFornecedor === chave) {
-          garantirGrupo({ id: rascunho.fornecedorId || chave, nome: rascunho.fornecedorNome });
+    if (!termoBuscaCliente) {
+      for (const [chave, rascunho] of Object.entries(rascunhosOCPorFornecedor)) {
+        if ((rascunho?.itens?.length ?? 0) > 0 && !mapa.has(chave)) {
+          if (filtroFornecedor === "todos" || filtroFornecedor === chave) {
+            garantirGrupo({ id: rascunho.fornecedorId || chave, nome: rascunho.fornecedorNome });
+          }
         }
       }
     }
 
     const montarLinhaConsolidada = (
       fornecedorChave: string,
-      tipo: "vinculo" | "estoque",
+      tipo: "unificado" | "vinculo" | "estoque",
       chaveNorm: string,
       produtoPrincipal: Produto,
       vinculos: VinculoFilaDetalhe[],
     ): LinhaConsolidadaFornecedor => {
-      const totalFila = vinculos.length;
-      const selecionadosCount = vinculos.filter((v) => vinculosKeysSelecionados[v.key] === true).length;
-      const pendenteDinamico = Math.max(0, totalFila - selecionadosCount);
+      const comVinculoCount = arredondarQtdCompra(
+        vinculos.filter((v) => v.comVinculo).reduce((s, v) => s + v.quantidade, 0),
+      );
+      const semVinculoCount = arredondarQtdCompra(
+        vinculos.filter((v) => !v.comVinculo).reduce((s, v) => s + v.quantidade, 0),
+      );
+      const totalFila = arredondarQtdCompra(comVinculoCount + semVinculoCount);
+      const vinculosMarcados = vinculos.filter((v) => vinculosKeysSelecionados[v.key] === true);
+      const selecionadosCount = arredondarQtdCompra(
+        vinculosMarcados.reduce((s, v) => s + v.quantidade, 0),
+      );
+      const pendenteDinamico = Math.max(0, arredondarQtdCompra(totalFila - selecionadosCount));
       const valorUnitario = valorCompra(produtoPrincipal);
       const descontoPercentual = percentualCompra(produtoPrincipal);
       const vlrLiquidoUnit = valorUnitario * (1 - descontoPercentual / 100);
@@ -1973,13 +2287,15 @@ function OrdensCompra() {
         codigo: produtoPrincipal.codigo,
         categoria: produtoPrincipal.categoria,
         unidade: produtoPrincipal.unidade || "UN",
-        comVinculo: tipo === "vinculo",
+        comVinculo: comVinculoCount > 0,
+        comVinculoCount,
+        semVinculoCount,
         vinculos,
         totalFila,
         selecionadosCount,
         pendenteDinamico,
-        todosMarcados: totalFila > 0 && selecionadosCount === totalFila,
-        algumMarcado: selecionadosCount > 0,
+        todosMarcados: vinculos.length > 0 && vinculosMarcados.length === vinculos.length,
+        algumMarcado: vinculosMarcados.length > 0,
         valorUnitario,
         descontoPercentual,
         totalValorPendente: pendenteDinamico * vlrLiquidoUnit,
@@ -1991,68 +2307,216 @@ function OrdensCompra() {
       };
     };
 
+    /** Consolida vínculos do mesmo cliente em um único registro dentro da linha do produto */
+    const consolidarVinculosMesmoCliente = (
+      vinculosBrutos: VinculoFilaDetalhe[],
+      prodBase: Produto,
+    ): VinculoFilaDetalhe[] => {
+      const porCliente = new Map<string, VinculoFilaDetalhe>();
+      const vlrUnit = valorCompra(prodBase);
+      const descPct = percentualCompra(prodBase);
+      const vlrLiqUnit = vlrUnit * (1 - descPct / 100);
+
+      for (const v of vinculosBrutos) {
+        const chaveCli = v.comVinculo
+          ? v.clienteId
+            ? `cid_${v.clienteId}`
+            : `cnome_${normalizar(v.clienteNome) || v.vendaId}`
+          : "estoque_geral";
+
+        const existente = porCliente.get(chaveCli);
+        if (!existente) {
+          porCliente.set(chaveCli, {
+            ...v,
+            keysOriginais: [...(v.keysOriginais ?? [v.key])],
+          });
+        } else {
+          const novaQtd = arredondarQtdCompra(existente.quantidade + v.quantidade);
+          const pedidosAtuais = (existente.pedidoNumero ?? "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const novosPedidos = (v.pedidoNumero ?? "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          for (const np of novosPedidos) {
+            if (!pedidosAtuais.includes(np)) pedidosAtuais.push(np);
+          }
+          const pedidoNumeroConsolidado =
+            pedidosAtuais.length > 0 ? pedidosAtuais.join(", ") : existente.pedidoNumero;
+
+          existente.quantidade = novaQtd;
+          existente.pedidoNumero = pedidoNumeroConsolidado;
+          if (existente.comVinculo) {
+            existente.rotulo = `${pedidoNumeroConsolidado ?? "Pedido"} — ${existente.clienteNome}`;
+          }
+          existente.valorLiquido = novaQtd * vlrLiqUnit;
+          existente.keysOriginais = Array.from(
+            new Set([
+              ...(existente.keysOriginais ?? [existente.key]),
+              ...(v.keysOriginais ?? [v.key]),
+            ]),
+          );
+        }
+      }
+
+      return Array.from(porCliente.values());
+    };
+
     const lista = Array.from(mapa.values());
     for (const g of lista) {
-      const mapaComVinculo = new Map<string, { prod: Produto; vincs: VinculoFilaDetalhe[] }>();
-      const mapaSemVinculo = new Map<string, { prod: Produto; vincs: VinculoFilaDetalhe[] }>();
+      // Unificação do catálogo por produto idêntico (chave normalizada do nome)
+      const mapaUnificado = new Map<
+        string,
+        {
+          prod: Produto;
+          vincsCom: VinculoFilaDetalhe[];
+          vincsSemPrimario: VinculoFilaDetalhe[];
+          vincsSemExtrasManuais: VinculoFilaDetalhe[];
+        }
+      >();
       const pedidosSet = new Set<string>();
 
       for (const item of g.itens) {
         const chaveProd = normalizar(item.produto.nome.trim()) || item.produto.id;
-        const vincsCom = item.vinculosDetalhados.filter((v) => v.comVinculo);
+        let vincsCom = item.vinculosDetalhados.filter((v) => v.comVinculo);
         const vincsSem = item.vinculosDetalhados.filter((v) => !v.comVinculo);
+
+        // Se o campo de Busca por Cliente estiver preenchido, filtra os vínculos para exibir os do cliente buscado
+        if (termoBuscaCliente) {
+          vincsCom = vincsCom.filter(
+            (v) =>
+              normalizar(v.clienteNome).includes(termoBuscaCliente) ||
+              normalizar(v.pedidoNumero ?? "").includes(termoBuscaCliente) ||
+              normalizar(v.rotulo).includes(termoBuscaCliente),
+          );
+        }
 
         for (const v of vincsCom) {
           if (v.vendaId) pedidosSet.add(v.vendaId);
         }
 
-        if (vincsCom.length > 0 && filtroVinculo !== "sem_vinculo") {
-          const atual = mapaComVinculo.get(chaveProd) ?? { prod: item.produto, vincs: [] };
-          atual.vincs.push(...vincsCom);
-          mapaComVinculo.set(chaveProd, atual);
-        }
+        const foiEditadoManual =
+          quantidadesCompra[item.produto.id] !== undefined ||
+          vinculosCompra[item.produto.id] !== undefined;
 
-        if (vincsSem.length > 0 && filtroVinculo !== "com_vinculo") {
-          const atual = mapaSemVinculo.get(chaveProd) ?? { prod: item.produto, vincs: [] };
-          atual.vincs.push(...vincsSem);
-          mapaSemVinculo.set(chaveProd, atual);
+        const existente = mapaUnificado.get(chaveProd);
+        if (!existente) {
+          mapaUnificado.set(chaveProd, {
+            prod: item.produto,
+            vincsCom: [...vincsCom],
+            vincsSemPrimario: [...vincsSem],
+            vincsSemExtrasManuais: foiEditadoManual ? [...vincsSem] : [],
+          });
+        } else {
+          // Prioriza como produtoPrincipal aquele que tem código ou vínculo
+          if (!existente.prod.codigo && item.produto.codigo) {
+            existente.prod = item.produto;
+          }
+          existente.vincsCom.push(...vincsCom);
+          if (foiEditadoManual) {
+            existente.vincsSemExtrasManuais.push(...vincsSem);
+          } else if (existente.vincsSemPrimario.length === 0 && vincsSem.length > 0) {
+            existente.vincsSemPrimario.push(...vincsSem);
+          }
         }
       }
 
-      g.itensComVinculoConsolidados = Array.from(mapaComVinculo.entries())
-        .map(([chaveNorm, { prod, vincs }]) =>
-          montarLinhaConsolidada(g.chave, "vinculo", chaveNorm, prod, vincs),
-        )
-        .sort((a, b) => b.totalFila - a.totalFila || a.nome.localeCompare(b.nome));
+      const linhasUnificadas: LinhaConsolidadaFornecedor[] = [];
+      const linhasComVinculo: LinhaConsolidadaFornecedor[] = [];
+      const linhasSemVinculo: LinhaConsolidadaFornecedor[] = [];
 
-      g.itensSemVinculoConsolidados = Array.from(mapaSemVinculo.entries())
-        .map(([chaveNorm, { prod, vincs }]) =>
-          montarLinhaConsolidada(g.chave, "estoque", chaveNorm, prod, vincs),
-        )
-        .sort((a, b) => b.totalFila - a.totalFila || a.nome.localeCompare(b.nome));
+      for (const [chaveNorm, { prod, vincsCom, vincsSemPrimario, vincsSemExtrasManuais }] of mapaUnificado.entries()) {
+        // Consolida demandas do mesmo cliente em um único vínculo com a quantidade total somada
+        const vincsComConsolidados = consolidarVinculosMesmoCliente(vincsCom, prod);
 
-      const todasLinhas = [
-        ...g.itensComVinculoConsolidados,
-        ...g.itensSemVinculoConsolidados,
-      ];
+        // Se o produto já possui demandas de clientes, inclui unidades de estoque apenas se adicionadas manualmente (ou se filtrado por sem_vinculo)
+        const vincsEstoqueBrutos = termoBuscaCliente
+          ? []
+          : vincsComConsolidados.length > 0
+            ? vincsSemExtrasManuais
+            : vincsSemExtrasManuais.length > 0
+              ? vincsSemExtrasManuais
+              : vincsSemPrimario;
+        const vincsEstoqueEfetivos = consolidarVinculosMesmoCliente(vincsEstoqueBrutos, prod);
 
-      g.totalItens = todasLinhas.length;
-      g.totalComVinculo = g.itensComVinculoConsolidados.reduce((s, l) => s + l.totalFila, 0);
-      g.totalSemVinculo = g.itensSemVinculoConsolidados.reduce((s, l) => s + l.totalFila, 0);
-      g.totalUnidades = g.totalComVinculo + g.totalSemVinculo;
-      g.totalUnidadesPendentesDinamico = todasLinhas.reduce((s, l) => s + l.pendenteDinamico, 0);
-      g.totalValor = todasLinhas.reduce(
+        const vincsCombinados =
+          filtroVinculo === "com_vinculo"
+            ? vincsComConsolidados
+            : filtroVinculo === "sem_vinculo"
+              ? consolidarVinculosMesmoCliente(vincsSemPrimario, prod)
+              : [...vincsComConsolidados, ...vincsEstoqueEfetivos];
+
+        if (vincsCombinados.length === 0) continue;
+
+        const linhaUnificada = montarLinhaConsolidada(
+          g.chave,
+          "unificado",
+          chaveNorm,
+          prod,
+          vincsCombinados,
+        );
+        linhasUnificadas.push(linhaUnificada);
+
+        if (vincsComConsolidados.length > 0 && filtroVinculo !== "sem_vinculo") {
+          linhasComVinculo.push(
+            montarLinhaConsolidada(g.chave, "vinculo", chaveNorm, prod, vincsComConsolidados),
+          );
+        }
+        if (vincsEstoqueEfetivos.length > 0 && filtroVinculo !== "com_vinculo") {
+          linhasSemVinculo.push(
+            montarLinhaConsolidada(g.chave, "estoque", chaveNorm, prod, vincsEstoqueEfetivos),
+          );
+        }
+      }
+
+      // Ordena priorizando SEMPRE as demandas vinculadas a clientes no topo do catálogo unificado
+      linhasUnificadas.sort((a, b) => {
+        if ((a.comVinculoCount > 0) !== (b.comVinculoCount > 0)) {
+          return a.comVinculoCount > 0 ? -1 : 1;
+        }
+        if (a.comVinculoCount !== b.comVinculoCount) {
+          return b.comVinculoCount - a.comVinculoCount;
+        }
+        if ((a.estoqueZerado || a.estoqueBaixo) !== (b.estoqueZerado || b.estoqueBaixo)) {
+          return a.estoqueZerado || a.estoqueBaixo ? -1 : 1;
+        }
+        return b.totalFila - a.totalFila || a.nome.localeCompare(b.nome);
+      });
+
+      linhasComVinculo.sort((a, b) => b.totalFila - a.totalFila || a.nome.localeCompare(b.nome));
+      linhasSemVinculo.sort((a, b) => b.totalFila - a.totalFila || a.nome.localeCompare(b.nome));
+
+      g.itensUnificadosConsolidados = linhasUnificadas;
+      g.itensComVinculoConsolidados = linhasComVinculo;
+      g.itensSemVinculoConsolidados = linhasSemVinculo;
+
+      g.totalItens = linhasUnificadas.length;
+      g.totalComVinculo = arredondarQtdCompra(
+        linhasUnificadas.reduce((s, l) => s + l.comVinculoCount, 0),
+      );
+      g.totalSemVinculo = arredondarQtdCompra(
+        linhasUnificadas.reduce((s, l) => s + l.semVinculoCount, 0),
+      );
+      g.totalUnidades = arredondarQtdCompra(g.totalComVinculo + g.totalSemVinculo);
+      g.totalUnidadesPendentesDinamico = arredondarQtdCompra(
+        linhasUnificadas.reduce((s, l) => s + l.pendenteDinamico, 0),
+      );
+      g.totalValor = linhasUnificadas.reduce(
         (s, l) =>
           s + l.totalFila * l.valorUnitario * (1 - l.descontoPercentual / 100),
         0,
       );
       g.totalDemandaPedidos = g.totalComVinculo;
       g.pedidosDistintosCount = pedidosSet.size;
-      g.selecionadosQtd = todasLinhas.filter((l) => l.algumMarcado).length;
-      g.selecionadosVinculosQtd = todasLinhas.reduce((s, l) => s + l.selecionadosCount, 0);
-      g.totalValorSelecionados = todasLinhas.reduce((s, l) => s + l.totalValorSelecionado, 0);
+      g.selecionadosQtd = linhasUnificadas.filter((l) => l.algumMarcado).length;
+      g.selecionadosVinculosQtd = arredondarQtdCompra(
+        linhasUnificadas.reduce((s, l) => s + l.selecionadosCount, 0),
+      );
+      g.totalValorSelecionados = linhasUnificadas.reduce((s, l) => s + l.totalValorSelecionado, 0);
       g.todosSelecionados =
-        g.totalUnidades > 0 && g.selecionadosVinculosQtd === g.totalUnidades;
+        linhasUnificadas.length > 0 && linhasUnificadas.every((l) => l.todosMarcados);
 
       g.itens.sort((a, b) => {
         if (a.temVinculo !== b.temVinculo) return a.temVinculo ? -1 : 1;
@@ -2063,12 +2527,25 @@ function OrdensCompra() {
       });
     }
 
-    return lista.sort((a, b) => a.nome.localeCompare(b.nome));
+    const filtradosFinal = termoBuscaCliente
+      ? lista.filter((g) => g.totalComVinculo > 0)
+      : lista;
+
+    // Prioriza fornecedores com maior demanda vinculada a clientes no topo
+    return filtradosFinal.sort(
+      (a, b) =>
+        b.totalComVinculo - a.totalComVinculo ||
+        b.totalItens - a.totalItens ||
+        a.nome.localeCompare(b.nome),
+    );
   }, [
     itensVisaoFiltrados,
     rascunhosOCPorFornecedor,
     filtroFornecedor,
     filtroVinculo,
+    termoBuscaCliente,
+    quantidadesCompra,
+    vinculosCompra,
     vinculosKeysSelecionados,
     valorCompra,
     percentualCompra,
@@ -2087,11 +2564,13 @@ function OrdensCompra() {
     for (const g of gruposVisaoFornecedor) {
       if (g.totalItens > 0 || g.totalUnidadesRascunho > 0) totalFornecedoresComItens++;
       totalValor += g.totalValor;
-      totalUnidades += g.totalUnidades;
+      totalUnidades = arredondarQtdCompra(totalUnidades + g.totalUnidades);
       totalProdutos += g.totalItens;
-      totalComVinculo += g.totalComVinculo;
-      totalSemVinculo += g.totalSemVinculo;
-      totalSelecionadosVinculos += g.selecionadosVinculosQtd;
+      totalComVinculo = arredondarQtdCompra(totalComVinculo + g.totalComVinculo);
+      totalSemVinculo = arredondarQtdCompra(totalSemVinculo + g.totalSemVinculo);
+      totalSelecionadosVinculos = arredondarQtdCompra(
+        totalSelecionadosVinculos + g.selecionadosVinculosQtd,
+      );
       totalValorSelecionadosVinculos += g.totalValorSelecionados;
     }
 
@@ -2131,6 +2610,44 @@ function OrdensCompra() {
     [],
   );
 
+  const selecionarTodosDoClienteFiltrado = useCallback(
+    (termoOuGrupo?: string | GrupoVisaoFornecedor) => {
+      const termoAlvo =
+        typeof termoOuGrupo === "string"
+          ? normalizar(termoOuGrupo.trim())
+          : termoBuscaCliente;
+      if (!termoAlvo) return;
+      const grupos =
+        termoOuGrupo && typeof termoOuGrupo === "object"
+          ? [termoOuGrupo]
+          : gruposVisaoFornecedor;
+      let count = 0;
+      setVinculosKeysSelecionados((prev) => {
+        const proximo = { ...prev };
+        for (const g of grupos) {
+          for (const linha of g.itensUnificadosConsolidados) {
+            for (const v of linha.vinculos) {
+              if (
+                v.comVinculo &&
+                (normalizar(v.clienteNome).includes(termoAlvo) ||
+                  normalizar(v.pedidoNumero ?? "").includes(termoAlvo) ||
+                  normalizar(v.rotulo).includes(termoAlvo))
+              ) {
+                proximo[v.key] = true;
+                count++;
+              }
+            }
+          }
+        }
+        return proximo;
+      });
+      if (count > 0) {
+        toast.success(`${count} vínculo(s) do cliente selecionado(s)!`);
+      }
+    },
+    [termoBuscaCliente, gruposVisaoFornecedor],
+  );
+
   const alternarRecolhimentoFornecedor = (chave: string) => {
     setFornecedoresRecolhidos((atual) => ({
       ...atual,
@@ -2154,10 +2671,7 @@ function OrdensCompra() {
 
   const alternarSelecaoGrupoFornecedor = (grupo: GrupoVisaoFornecedor) => {
     const marcar = !grupo.todosSelecionados;
-    const todasLinhas = [
-      ...grupo.itensComVinculoConsolidados,
-      ...grupo.itensSemVinculoConsolidados,
-    ];
+    const todasLinhas = grupo.itensUnificadosConsolidados;
     setVinculosKeysSelecionados((atual) => {
       const proximo = { ...atual };
       for (const linha of todasLinhas) {
@@ -2174,32 +2688,37 @@ function OrdensCompra() {
   };
 
   /**
-   * Ação "Selecionar Itens":
-   * Remove os vínculos/produtos marcados da fila de pendências do card e os transfere
-   * para a tela/gaveta da Ordem de Compra em aberto (rascunho) deste fornecedor.
+   * Ação de Inclusão / "Selecionar Itens":
+   * Remove os vínculos/produtos marcados da fila de pendências do card, transfere-os
+   * para o carrinho/Ordem de Compra em aberto deste fornecedor (mantendo a quantidade total consolidada
+   * do cliente em um único registro) e abre a Tela Posterior à Inclusão.
    */
-  const transferirItensSelecionadosParaOC = (grupo: GrupoVisaoFornecedor) => {
-    const todasLinhas = [
-      ...grupo.itensComVinculoConsolidados,
-      ...grupo.itensSemVinculoConsolidados,
-    ];
-    const vinculosMarcados = todasLinhas.flatMap((l) =>
-      l.vinculos.filter((v) => vinculosKeysSelecionados[v.key] === true),
-    );
+  const transferirItensSelecionadosParaOC = (
+    grupo: GrupoVisaoFornecedor,
+    vinculosDiretos?: VinculoFilaDetalhe[],
+  ) => {
+    const todasLinhas = grupo.itensUnificadosConsolidados;
+    const vinculosMarcados =
+      vinculosDiretos ??
+      todasLinhas.flatMap((l) =>
+        l.vinculos.filter((v) => vinculosKeysSelecionados[v.key] === true),
+      );
 
     if (vinculosMarcados.length === 0) {
       if ((grupo.rascunho?.itens.length ?? 0) > 0) {
-        setGavetaOCFornecedorChave(grupo.chave);
+        setUltimosItensIncluidosCount(0);
+        setTelaPosInclusaoFornecedorChave(grupo.chave);
         return;
       }
       toast.error(
-        "Selecione ao menos um vínculo ou produto marcando os checkboxes antes de clicar em Selecionar Itens.",
+        "Selecione ao menos um vínculo ou produto marcando os checkboxes antes de incluir no carrinho.",
       );
       return;
     }
 
     const novosItensRascunho: ItemRascunhoOC[] = vinculosMarcados.map((v) => ({
       key: v.key,
+      keysOriginais: v.keysOriginais ?? [v.key],
       produtoId: v.produto.id,
       codigo: v.produto.codigo,
       descricao: v.produto.nome,
@@ -2213,18 +2732,50 @@ function OrdensCompra() {
       clienteId: v.clienteId,
       clienteNome: v.comVinculo ? v.clienteNome : null,
       comVinculo: v.comVinculo,
-      quantidade: 1,
+      quantidade: arredondarQtdCompra(Math.max(Number(v.quantidade) || 1, 0.0001)),
       valorUnitario: valorCompra(v.produto),
       descontoPercentual: percentualCompra(v.produto),
     }));
 
     setRascunhosOCPorFornecedor((prev) => {
       const existente = prev[grupo.chave];
-      const chavesExistentes = new Set((existente?.itens ?? []).map((i) => i.key));
-      const itensMesclados = [
-        ...(existente?.itens ?? []),
-        ...novosItensRascunho.filter((novo) => !chavesExistentes.has(novo.key)),
-      ];
+      const listaMesclada: ItemRascunhoOC[] = [...(existente?.itens ?? [])];
+
+      for (const novo of novosItensRascunho) {
+        const idxMesmo = listaMesclada.findIndex((item) => {
+          if (item.key === novo.key) return true;
+          if (normalizar(item.descricao) !== normalizar(novo.descricao)) return false;
+          if (item.comVinculo !== novo.comVinculo) return false;
+          if (novo.comVinculo) {
+            return (
+              (item.clienteId && novo.clienteId && item.clienteId === novo.clienteId) ||
+              normalizar(item.clienteNome ?? "") === normalizar(novo.clienteNome ?? "")
+            );
+          }
+          return true;
+        });
+
+        if (idxMesmo >= 0) {
+          const itemAtual = listaMesclada[idxMesmo];
+          if (itemAtual.key !== novo.key) {
+            listaMesclada[idxMesmo] = {
+              ...itemAtual,
+              quantidade: arredondarQtdCompra(
+                Number(itemAtual.quantidade || 0) + Number(novo.quantidade || 0),
+              ),
+              keysOriginais: Array.from(
+                new Set([
+                  ...(itemAtual.keysOriginais ?? [itemAtual.key]),
+                  ...(novo.keysOriginais ?? [novo.key]),
+                ]),
+              ),
+            };
+          }
+        } else {
+          listaMesclada.push(novo);
+        }
+      }
+
       return {
         ...prev,
         [grupo.chave]: {
@@ -2236,7 +2787,7 @@ function OrdensCompra() {
           formaPagamento: existente?.formaPagamento ?? "Boleto",
           vencimentoFinanceiro: existente?.vencimentoFinanceiro ?? hojeISO(),
           observacoes: existente?.observacoes ?? "",
-          itens: itensMesclados,
+          itens: listaMesclada,
           updatedAt: new Date().toISOString(),
         },
       };
@@ -2251,10 +2802,84 @@ function OrdensCompra() {
       return proximo;
     });
 
-    toast.success(
-      `${novosItensRascunho.length} vínculo(s)/item(ns) transferido(s) para a Ordem de Compra em aberto de ${grupo.nome}.`,
+    const totalQtdIncluida = arredondarQtdCompra(
+      novosItensRascunho.reduce((s, it) => s + Number(it.quantidade || 1), 0),
     );
-    setGavetaOCFornecedorChave(grupo.chave);
+    setUltimosItensIncluidosCount(totalQtdIncluida);
+    setTelaPosInclusaoFornecedorChave(grupo.chave);
+  };
+
+  /** Permite adicionar +1 unidade de estoque de um produto diretamente na tela de Revisar/editar carrinho (consolidado no registro de estoque) */
+  const adicionarUnidadeExtraRascunhoOC = (fornecedorChave: string, produtoId: string) => {
+    setRascunhosOCPorFornecedor((prev) => {
+      const atual = prev[fornecedorChave];
+      if (!atual) return prev;
+      const baseItem = atual.itens.find((i) => i.produtoId === produtoId);
+      if (!baseItem) return prev;
+
+      const idxEstoque = atual.itens.findIndex(
+        (i) => i.produtoId === produtoId && !i.comVinculo,
+      );
+      if (idxEstoque >= 0) {
+        const novosItens = [...atual.itens];
+        novosItens[idxEstoque] = {
+          ...novosItens[idxEstoque],
+          quantidade: arredondarQtdCompra(Number(novosItens[idxEstoque].quantidade || 0) + 1),
+        };
+        return {
+          ...prev,
+          [fornecedorChave]: {
+            ...atual,
+            itens: novosItens,
+            updatedAt: new Date().toISOString(),
+          },
+        };
+      }
+
+      const novaKey = `${produtoId}::estoque::consolidado`;
+      const novoItem: ItemRascunhoOC = {
+        ...baseItem,
+        key: novaKey,
+        keysOriginais: [novaKey],
+        vendaId: null,
+        pedidoNumero: null,
+        clienteId: null,
+        clienteNome: null,
+        comVinculo: false,
+        quantidade: 1,
+      };
+      return {
+        ...prev,
+        [fornecedorChave]: {
+          ...atual,
+          itens: [...atual.itens, novoItem],
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
+  };
+
+  /** Permite ajustar a quantidade total de um vínculo consolidado diretamente no carrinho */
+  const atualizarQuantidadeVinculoRascunhoOC = (
+    fornecedorChave: string,
+    itemKey: string,
+    novaQuantidade: number,
+  ) => {
+    const qtdValida = arredondarQtdCompra(Math.max(Number(novaQuantidade) || 0, 0.01));
+    setRascunhosOCPorFornecedor((prev) => {
+      const atual = prev[fornecedorChave];
+      if (!atual) return prev;
+      return {
+        ...prev,
+        [fornecedorChave]: {
+          ...atual,
+          itens: atual.itens.map((it) =>
+            it.key === itemKey ? { ...it, quantidade: qtdValida } : it,
+          ),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    });
   };
 
   const removerVinculoDoRascunhoOC = (fornecedorChave: string, itemKey: string) => {
@@ -2355,11 +2980,16 @@ function OrdensCompra() {
       const ordensPreGeradasAfetadas = new Set<string>();
       const mapaOrdens = new Map(ordens.map((o) => [o.id, o]));
       for (const itemRascunho of rascunho.itens) {
-        if (!itemRascunho.vendaId) continue;
-        const candidatoPreGerado = itensTodos.find((it) => {
-          if (it.produto_id !== itemRascunho.produtoId || it.venda_id !== itemRascunho.vendaId) {
-            return false;
-          }
+        if (!itemRascunho.vendaId && !itemRascunho.clienteId && !itemRascunho.clienteNome) continue;
+        const candidatosPreGerados = itensTodos.filter((it) => {
+          if (it.produto_id !== itemRascunho.produtoId) return false;
+          const mesmoVinculo =
+            (itemRascunho.vendaId && it.venda_id === itemRascunho.vendaId) ||
+            (itemRascunho.clienteId && it.cliente_id === itemRascunho.clienteId) ||
+            (itemRascunho.clienteNome &&
+              it.cliente_nome &&
+              normalizar(it.cliente_nome) === normalizar(itemRascunho.clienteNome));
+          if (!mesmoVinculo) return false;
           const ord = mapaOrdens.get(it.ordem_id);
           if (!ord || ord.status !== "pendente") return false;
           const ehConfirmada = Boolean(
@@ -2369,7 +2999,7 @@ function OrdensCompra() {
           );
           return !ehConfirmada && !it.carga_id && !it.numero_nf;
         });
-        if (candidatoPreGerado) {
+        for (const candidatoPreGerado of candidatosPreGerados) {
           ordensPreGeradasAfetadas.add(candidatoPreGerado.ordem_id);
           await supabase.from("ordem_compra_itens").delete().eq("id", candidatoPreGerado.id);
         }
@@ -2512,8 +3142,12 @@ function OrdensCompra() {
       const grupoAtual = gruposVisaoFornecedor.find((g) => g.chave === fornecedorChave);
       const produtosDistintosIds = Array.from(new Set(rascunho.itens.map((i) => i.produtoId)));
       for (const pid of produtosDistintosIds) {
-        const restantesNoCard =
-          grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados.length ?? 0;
+        const restantesNoCard = arredondarQtdCompra(
+          (grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados ?? []).reduce(
+            (s, v) => s + v.quantidade,
+            0,
+          ),
+        );
         if (restantesNoCard <= 0) {
           await supabase
             .from("produtos")
@@ -2551,8 +3185,12 @@ function OrdensCompra() {
       setStatusCompra((prev) => {
         const proximo = { ...prev };
         for (const pid of produtosDistintosIds) {
-          const rest =
-            grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados.length ?? 0;
+          const rest = arredondarQtdCompra(
+            (grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados ?? []).reduce(
+              (s, v) => s + v.quantidade,
+              0,
+            ),
+          );
           if (rest <= 0) proximo[pid] = "comprado";
         }
         return proximo;
@@ -2560,8 +3198,12 @@ function OrdensCompra() {
       setQuantidadesCompra((prev) => {
         const proximo = { ...prev };
         for (const pid of produtosDistintosIds) {
-          const rest =
-            grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados.length ?? 0;
+          const rest = arredondarQtdCompra(
+            (grupoAtual?.itens.find((i) => i.produto.id === pid)?.vinculosDetalhados ?? []).reduce(
+              (s, v) => s + v.quantidade,
+              0,
+            ),
+          );
           if (rest > 0) proximo[pid] = String(rest);
           else delete proximo[pid];
         }
@@ -2587,6 +3229,7 @@ function OrdensCompra() {
         return copia;
       });
       setGavetaOCFornecedorChave(null);
+      setTelaPosInclusaoFornecedorChave(null);
 
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["ordens_compra"] }),
@@ -2786,35 +3429,46 @@ function OrdensCompra() {
         for (const produto of itens) {
           const valorUnitario = valorCompra(produto);
           const descontoUnitario = valorUnitario * (percentualCompra(produto) / 100);
-          const vinculosTodos = vinculosDoProduto(produto);
-          const vinculosParaComprar = vinculosTodos
-            .map((vendaId, idx) => ({ vendaId, idx }))
+          const vinculosConsolidados = vinculosConsolidadosDoProduto(produto);
+          const vinculosParaComprar = vinculosConsolidados
+            .map((vinc, idx) => ({ vinc, idx }))
             .filter(({ idx }) => isVinculoSelecionado(produto.id, idx));
 
-          for (const { vendaId } of vinculosParaComprar) {
+          for (const { vinc } of vinculosParaComprar) {
+            const vendaId = vinc.vendaId;
+            const qtdVinculo = arredondarQtdCompra(Math.max(Number(vinc.quantidade || 1), 0.01));
             const venda = vendaId ? vendaPorId.get(vendaId) : undefined;
+            const clienteIdAlvo = vinc.clienteId ?? venda?.cliente_id ?? null;
+            const clienteNomeAlvo = vinc.clienteNome ?? venda?.cliente_nome ?? null;
             const itemExistente = itensJaNaOrdem.find(
               (it) =>
                 !idsJaUsadosNaOrdem.has(it.id) &&
                 it.produto_id === produto.id &&
                 ((vendaId && it.venda_id === vendaId) ||
-                  (!vendaId && !it.venda_id && (!it.cliente_id || it.cliente_id === venda?.cliente_id))),
+                  (clienteIdAlvo && it.cliente_id === clienteIdAlvo) ||
+                  (!vendaId && !it.venda_id && (!it.cliente_id || it.cliente_id === clienteIdAlvo))),
             );
 
             if (itemExistente) {
               idsJaUsadosNaOrdem.add(itemExistente.id);
               todosItensCriadosIds.push(itemExistente.id);
+              const qtdFinal = arredondarQtdCompra(
+                Math.max(Number(itemExistente.quantidade) || 0, qtdVinculo),
+              );
+              const descTotal = qtdFinal * descontoUnitario;
               await supabase
                 .from("ordem_compra_itens")
                 .update({
+                  quantidade: qtdFinal,
                   valor_unitario: valorUnitario,
-                  desconto: descontoUnitario,
-                  total: (Number(itemExistente.quantidade) || 1) * valorUnitario - descontoUnitario,
+                  desconto: descTotal,
+                  total: qtdFinal * valorUnitario - descTotal,
                   cor: coresCompra[produto.id] ?? produto.cor_pastilha ?? itemExistente.cor ?? null,
                   pastilha: modelosCompra[produto.id] ?? produto.modelo_pastilha ?? itemExistente.pastilha ?? null,
                 })
                 .eq("id", itemExistente.id);
             } else {
+              const descTotal = qtdVinculo * descontoUnitario;
               payloadParaInserir.push({
                 ordem_id: ordemFinalId,
                 produto_id: produto.id,
@@ -2823,12 +3477,12 @@ function OrdensCompra() {
                 ncm: produto.ncm,
                 cst: produto.cst,
                 unidade: produto.unidade,
-                quantidade: 1,
+                quantidade: qtdVinculo,
                 valor_unitario: valorUnitario,
-                desconto: descontoUnitario,
-                total: valorUnitario - descontoUnitario,
-                cliente_id: venda?.cliente_id ?? null,
-                cliente_nome: venda?.cliente_nome ?? null,
+                desconto: descTotal,
+                total: qtdVinculo * valorUnitario - descTotal,
+                cliente_id: clienteIdAlvo,
+                cliente_nome: clienteNomeAlvo,
                 venda_id: vendaId || null,
                 cor: coresCompra[produto.id] ?? produto.cor_pastilha ?? null,
                 pastilha: modelosCompra[produto.id] ?? produto.modelo_pastilha ?? null,
@@ -2910,12 +3564,15 @@ function OrdensCompra() {
       setQuantidadesCompra((prev) => {
         const proximo = { ...prev };
         for (const produto of produtosSelecionados) {
-          const vinculosTodos = vinculosDoProduto(produto);
-          const restantes = vinculosTodos.filter(
+          const vinculosConsolidados = vinculosConsolidadosDoProduto(produto);
+          const restantes = vinculosConsolidados.filter(
             (_, idx) => !isVinculoSelecionado(produto.id, idx),
           );
-          if (restantes.length > 0) {
-            proximo[produto.id] = String(restantes.length);
+          const qtdRestante = arredondarQtdCompra(
+            restantes.reduce((s, v) => s + v.quantidade, 0),
+          );
+          if (qtdRestante > 0) {
+            proximo[produto.id] = String(qtdRestante);
           } else {
             delete proximo[produto.id];
           }
@@ -4082,16 +4739,26 @@ function OrdensCompra() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Ordens de Compra"
-        subtitle="Controle de pedidos por fornecedor, ICMS, status e impressão."
+        title="Gestão de Compras · Ordens de Compra"
+        subtitle="Visualização por fornecedor com catálogo unificado, agrupamento de produtos idênticos priorizando demandas vinculadas a clientes e busca por cliente."
         actions={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
-            <div className="relative min-w-56 flex-1 sm:flex-none">
+            <div className="relative min-w-52 flex-1 sm:flex-none">
+              <Users className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-emerald-600" />
+              <Input
+                aria-label="Buscar por cliente"
+                className="pl-9 sm:w-64 border-emerald-500/40 focus-visible:ring-emerald-500"
+                placeholder="Buscar por cliente ou pedido..."
+                value={buscaCliente}
+                onChange={(evento) => setBuscaCliente(evento.target.value)}
+              />
+            </div>
+            <div className="relative min-w-52 flex-1 sm:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                aria-label="Buscar por fornecedor, cliente, produto ou vínculo"
-                className="pl-9 sm:w-72"
-                placeholder="Buscar por fornecedor, cliente, produto ou vínculo"
+                aria-label="Buscar por fornecedor, produto ou código"
+                className="pl-9 sm:w-64"
+                placeholder="Buscar por fornecedor ou produto..."
                 value={buscaFornecedor}
                 onChange={(evento) => setBuscaFornecedor(evento.target.value)}
               />
@@ -4156,7 +4823,7 @@ function OrdensCompra() {
           <TabsList className="grid w-full grid-cols-3 sm:w-auto">
             <TabsTrigger value="fornecedores" className="flex items-center gap-2">
               <Building2 className="size-4" />
-              <span>Cards por Fornecedor</span>
+              <span>Por Fornecedor (Catálogo Unificado)</span>
               {resumoGeralCompra.totalProdutos > 0 && (
                 <Badge
                   variant="secondary"
@@ -4195,183 +4862,226 @@ function OrdensCompra() {
           </div>
         </div>
 
-        {/* ABA 1: VISÃO GERAL EM CARDS POR FORNECEDOR E AGRUPAMENTO POR VÍNCULOS */}
+        {/* ABA 1: VISÃO GERAL EM CARDS POR FORNECEDOR E CATÁLOGO UNIFICADO */}
         <TabsContent value="fornecedores" className="space-y-6 m-0 print:hidden">
           <ExpandableCard>
             <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <CardTitle>Gestão de Compras · Cards por Fornecedor</CardTitle>
+                <CardTitle>Gestão de Compras · Catálogo Unificado por Fornecedor</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Selecione um card de fornecedor para visualizar os itens agrupados por vínculo de venda e montar a Ordem de Compra.
+                  Produtos idênticos agrupados automaticamente em uma única linha, priorizando demandas vinculadas a clientes no topo.
                 </p>
               </div>
               {Object.values(rascunhosOCPorFornecedor).some((r) => (r?.itens?.length ?? 0) > 0) && (
                 <div className="flex flex-wrap items-center gap-2">
                   {Object.values(rascunhosOCPorFornecedor)
                     .filter((r) => (r?.itens?.length ?? 0) > 0)
-                    .map((r) => (
-                      <Button
-                        key={r.fornecedorChave}
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setFornecedorCardAberto(r.fornecedorChave);
-                          setGavetaOCFornecedorChave(r.fornecedorChave);
-                        }}
-                        className="border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 font-semibold gap-1.5 text-xs"
-                      >
-                        <ShoppingCart className="size-3.5" />
-                        OC Aberta · {r.fornecedorNome} ({r.itens.length} un.)
-                      </Button>
-                    ))}
+                    .map((r) => {
+                      const qtdTotalRascunho = arredondarQtdCompra(
+                        r.itens.reduce((s, it) => s + Number(it.quantidade || 1), 0),
+                      );
+                      return (
+                        <Button
+                          key={r.fornecedorChave}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setFornecedorCardAberto(r.fornecedorChave);
+                            setGavetaOCFornecedorChave(r.fornecedorChave);
+                          }}
+                          className="border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 font-semibold gap-1.5 text-xs"
+                        >
+                          <ShoppingCart className="size-3.5" />
+                          Revisar/editar carrinho · {r.fornecedorNome} ({formatarQtdCompra(qtdTotalRascunho)} un.)
+                        </Button>
+                      );
+                    })}
                 </div>
               )}
             </CardHeader>
 
             <CardContent className="space-y-6">
-              {/* BARRA DE CONTROLES: FILTRO DE VÍNCULO E NECESSIDADE */}
-              <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-wrap items-center gap-4">
-                  {/* FILTRO DE VÍNCULO */}
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      <Filter className="size-3.5" />
-                      Vínculo:
-                    </span>
-                    <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setFiltroVinculo("todos")}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                          filtroVinculo === "todos"
-                            ? "bg-background text-foreground shadow-sm font-semibold"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        Todos ({contagensFiltroVinculo.todos})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFiltroVinculo("com_vinculo")}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
-                          filtroVinculo === "com_vinculo"
-                            ? "bg-emerald-600 text-white shadow-sm font-semibold"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <Link2 className="size-3" />
-                        Com Vínculo ({contagensFiltroVinculo.comVinculo})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFiltroVinculo("sem_vinculo")}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
-                          filtroVinculo === "sem_vinculo"
-                            ? "bg-amber-600 text-white shadow-sm font-semibold"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <Boxes className="size-3" />
-                        Sem Vínculo / Estoque ({contagensFiltroVinculo.semVinculo})
-                      </button>
+              {/* BARRA DE CONTROLES: BUSCA POR CLIENTE, FILTRO DE VÍNCULO E CATÁLOGO UNIFICADO */}
+              <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  {/* CAMPO DE BUSCA POR CLIENTE */}
+                  <div className="flex flex-1 flex-wrap items-center gap-2">
+                    <div className="relative flex-1 min-w-[240px] max-w-md">
+                      <Users className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-emerald-600" />
+                      <Input
+                        aria-label="Filtrar itens por cliente"
+                        className="pl-9 h-9 text-xs border-emerald-500/40 bg-emerald-500/[0.03]"
+                        placeholder="Buscar por cliente (ex.: nome do cliente ou nº do pedido)..."
+                        value={buscaCliente}
+                        onChange={(e) => setBuscaCliente(e.target.value)}
+                      />
                     </div>
-                  </div>
-
-                  {/* FILTRO DE NECESSIDADE E CATÁLOGO */}
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Catálogo:
-                    </span>
-                    <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFiltroExibicaoCatalogo("apenas_vinculados_selecionados");
-                          setFiltroNecessidade("precisa_comprar");
-                        }}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
-                          filtroExibicaoCatalogo === "apenas_vinculados_selecionados"
-                            ? "bg-background text-foreground shadow-sm font-semibold"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <span>Apenas Demanda Pendente</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFiltroExibicaoCatalogo("catalogo_completo");
-                          setFiltroNecessidade("todos");
-                        }}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1",
-                          filtroExibicaoCatalogo === "catalogo_completo"
-                            ? "bg-background text-foreground shadow-sm font-semibold"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <span>Catálogo Completo</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* BOTÃO TOGGLE OCULTAR JÁ COMPRADOS */}
-                  <Button
-                    type="button"
-                    variant={ocultarJaComprados ? "outline" : "secondary"}
-                    size="sm"
-                    onClick={() => setOcultarJaComprados(!ocultarJaComprados)}
-                    className={cn(
-                      "text-xs h-8 gap-1.5 transition-all",
-                      ocultarJaComprados
-                        ? "border-primary/30 text-foreground hover:bg-muted"
-                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30",
-                    )}
-                    title={
-                      ocultarJaComprados
-                        ? "Itens que já tiveram ordem de compra gerada ou já foram comprados estão ocultos. Clique para exibir."
-                        : "Exibindo itens já comprados. Clique para ocultar."
-                    }
-                  >
-                    {ocultarJaComprados ? (
+                    {buscaCliente.trim() && (
                       <>
-                        <EyeOff className="size-3.5 text-muted-foreground" />
-                        <span>Ocultando já comprados</span>
-                        {totalJaCompradosOcultos > 0 && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] py-0 px-1 font-mono font-bold bg-muted"
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-9 text-xs font-semibold gap-1.5 border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                          onClick={() => selecionarTodosDoClienteFiltrado(buscaCliente)}
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                          Selecionar demandas deste cliente
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-9 text-xs"
+                          onClick={() => setBuscaCliente("")}
+                        >
+                          Limpar cliente
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* ATALHOS DE CLIENTES COM DEMANDA VINCULADA */}
+                  {clientesComDemandaAtiva.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-muted-foreground mr-1">
+                        Clientes com demanda:
+                      </span>
+                      {clientesComDemandaAtiva.slice(0, 6).map((nomeCli) => {
+                        const ativo =
+                          termoBuscaCliente.length > 0 &&
+                          normalizar(nomeCli).includes(termoBuscaCliente);
+                        return (
+                          <button
+                            key={nomeCli}
+                            type="button"
+                            onClick={() =>
+                              setBuscaCliente((atual) => (atual === nomeCli ? "" : nomeCli))
+                            }
+                            className={cn(
+                              "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all flex items-center gap-1",
+                              ativo
+                                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm font-semibold"
+                                : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20",
+                            )}
                           >
-                            {totalJaCompradosOcultos}
-                          </Badge>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="size-3.5 text-amber-600" />
-                        <span className="font-semibold">Exibindo já comprados</span>
-                      </>
-                    )}
-                  </Button>
+                            <Users className="size-3" />
+                            <span className="max-w-[140px] truncate">{nomeCli}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
-                {fornecedorCardAberto && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setFornecedorCardAberto(null)}
-                    className="text-xs h-8 gap-1.5"
-                  >
-                    <ArrowLeft className="size-3.5" />
-                    Ver todos os cards de fornecedor
-                  </Button>
-                )}
+                <div className="flex flex-col gap-3 border-t pt-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* FILTRO DE VÍNCULO */}
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                        <Filter className="size-3.5" />
+                        Exibir:
+                      </span>
+                      <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFiltroVinculo("todos");
+                            setFiltroExibicaoCatalogo("catalogo_completo");
+                            setFiltroNecessidade("todos");
+                          }}
+                          className={cn(
+                            "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                            filtroVinculo === "todos"
+                              ? "bg-background text-foreground shadow-sm font-semibold"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          Catálogo Unificado ({contagensFiltroVinculo.todos})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFiltroVinculo("com_vinculo")}
+                          className={cn(
+                            "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                            filtroVinculo === "com_vinculo"
+                              ? "bg-emerald-600 text-white shadow-sm font-semibold"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          <Link2 className="size-3" />
+                          Com Vínculo de Cliente ({contagensFiltroVinculo.comVinculo})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFiltroVinculo("sem_vinculo")}
+                          className={cn(
+                            "px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                            filtroVinculo === "sem_vinculo"
+                              ? "bg-amber-600 text-white shadow-sm font-semibold"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          <Boxes className="size-3" />
+                          Apenas Estoque ({contagensFiltroVinculo.semVinculo})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* BOTÃO TOGGLE OCULTAR JÁ COMPRADOS */}
+                    <Button
+                      type="button"
+                      variant={ocultarJaComprados ? "outline" : "secondary"}
+                      size="sm"
+                      onClick={() => setOcultarJaComprados(!ocultarJaComprados)}
+                      className={cn(
+                        "text-xs h-8 gap-1.5 transition-all",
+                        ocultarJaComprados
+                          ? "border-primary/30 text-foreground hover:bg-muted"
+                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30",
+                      )}
+                      title={
+                        ocultarJaComprados
+                          ? "Itens que já tiveram ordem de compra gerada ou já foram comprados estão ocultos. Clique para exibir."
+                          : "Exibindo itens já comprados. Clique para ocultar."
+                      }
+                    >
+                      {ocultarJaComprados ? (
+                        <>
+                          <EyeOff className="size-3.5 text-muted-foreground" />
+                          <span>Ocultando já comprados</span>
+                          {totalJaCompradosOcultos > 0 && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] py-0 px-1 font-mono font-bold bg-muted"
+                            >
+                              {totalJaCompradosOcultos}
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="size-3.5 text-amber-600" />
+                          <span className="font-semibold">Exibindo já comprados</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {fornecedorCardAberto && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFornecedorCardAberto(null)}
+                      className="text-xs h-8 gap-1.5"
+                    >
+                      <ArrowLeft className="size-3.5" />
+                      Ver todos os fornecedores
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* CARDS DE RESUMO GLOBAL */}
@@ -4386,7 +5096,7 @@ function OrdensCompra() {
                       {brl(resumoGeralCompra.totalValor)}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {resumoGeralCompra.totalProdutos} produtos · {resumoGeralCompra.totalUnidades} un. na fila
+                      {resumoGeralCompra.totalProdutos} produtos · {resumoGeralCompra.totalUnidades} un. no catálogo
                     </p>
                   </CardContent>
                 </Card>
@@ -4395,13 +5105,13 @@ function OrdensCompra() {
                   <CardContent className="p-4 space-y-1">
                     <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <Factory className="size-3.5 text-blue-500" />
-                      Cards de Fornecedores
+                      Fornecedores Ativos
                     </p>
                     <p className="text-2xl font-bold tracking-tight text-foreground font-mono">
                       {resumoGeralCompra.totalFornecedoresComItens}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      Fabricantes com pendências ou OC aberta
+                      Fabricantes com catálogo unificado
                     </p>
                   </CardContent>
                 </Card>
@@ -4410,13 +5120,13 @@ function OrdensCompra() {
                   <CardContent className="p-4 space-y-1">
                     <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                       <Link2 className="size-3.5" />
-                      Itens com Vínculo Ativo
+                      Demandas Vinculadas a Clientes
                     </p>
                     <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
                       {resumoGeralCompra.totalComVinculo} un.
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      Atrelados a pedidos de clientes
+                      Priorizadas no topo de cada fornecedor
                     </p>
                   </CardContent>
                 </Card>
@@ -4425,13 +5135,13 @@ function OrdensCompra() {
                   <CardContent className="p-4 space-y-1">
                     <p className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                       <Boxes className="size-3.5" />
-                      Itens sem Vínculo (Estoque)
+                      Itens de Catálogo / Estoque
                     </p>
                     <p className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400 font-mono">
                       {resumoGeralCompra.totalSemVinculo} un.
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      Reposição de Estoque Geral
+                      Unificados junto ao catálogo do fornecedor
                     </p>
                   </CardContent>
                 </Card>
@@ -4442,9 +5152,11 @@ function OrdensCompra() {
                 <Card className="border-dashed">
                   <CardContent className="py-12 text-center text-muted-foreground space-y-3">
                     <Package className="size-10 mx-auto text-muted-foreground/60" />
-                    <p className="text-base font-medium">Nenhum fornecedor com itens pendentes para estes filtros.</p>
+                    <p className="text-base font-medium">
+                      Nenhum fornecedor ou produto encontrado para os filtros atuais.
+                    </p>
                     <p className="text-xs">
-                      Altere os filtros acima ou mude para &ldquo;Catálogo Completo&rdquo; para incluir produtos de reposição.
+                      Limpe o filtro de cliente ou exiba o catálogo completo unificado.
                     </p>
                     <Button
                       type="button"
@@ -4455,9 +5167,10 @@ function OrdensCompra() {
                         setFiltroNecessidade("todos");
                         setFiltroExibicaoCatalogo("catalogo_completo");
                         setBuscaFornecedor("");
+                        setBuscaCliente("");
                       }}
                     >
-                      Exibir catálogo completo
+                      Restaurar catálogo unificado
                     </Button>
                   </CardContent>
                 </Card>
@@ -4467,7 +5180,7 @@ function OrdensCompra() {
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                         <Factory className="size-3.5 text-primary" />
-                        Fornecedores ({gruposVisaoFornecedor.length}) — Clique em um card para abrir os itens e selecionar vínculos
+                        Fornecedores ({gruposVisaoFornecedor.length}) — Clique em um fornecedor para abrir o catálogo unificado
                       </h3>
                     </div>
 
@@ -4522,8 +5235,11 @@ function OrdensCompra() {
                                       {grupo.nome}
                                     </h4>
                                     <p className="text-xs text-muted-foreground mt-0.5">
-                                      {grupo.totalItens}{" "}
-                                      {grupo.totalItens === 1 ? "produto pendente" : "produtos pendentes"} ·{" "}
+                                      {grupo.itensUnificadosConsolidados.length}{" "}
+                                      {grupo.itensUnificadosConsolidados.length === 1
+                                        ? "produto agrupado"
+                                        : "produtos agrupados"}{" "}
+                                      ·{" "}
                                       <strong className="text-foreground">
                                         {grupo.totalUnidadesPendentesDinamico} un.
                                       </strong>
@@ -4546,12 +5262,12 @@ function OrdensCompra() {
                                   className={cn(
                                     "text-[11px] font-medium",
                                     grupo.totalComVinculo > 0
-                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold"
                                       : "text-muted-foreground",
                                   )}
                                 >
                                   <Link2 className="size-3 mr-1" />
-                                  {grupo.totalComVinculo} un. com vínculo
+                                  {grupo.totalComVinculo} un. de clientes
                                   {grupo.pedidosDistintosCount > 0
                                     ? ` (${grupo.pedidosDistintosCount} ${grupo.pedidosDistintosCount === 1 ? "pedido" : "pedidos"})`
                                     : ""}
@@ -4567,7 +5283,7 @@ function OrdensCompra() {
                                   )}
                                 >
                                   <Boxes className="size-3 mr-1" />
-                                  {grupo.totalSemVinculo} un. estoque geral
+                                  {grupo.totalSemVinculo} un. catálogo/estoque
                                 </Badge>
                               </div>
 
@@ -4576,7 +5292,7 @@ function OrdensCompra() {
                                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                                   {temMarcados && (
                                     <Badge className="bg-primary text-primary-foreground text-[11px] font-semibold">
-                                      {grupo.selecionadosVinculosQtd} vínculo(s) marcado(s) ({brl(grupo.totalValorSelecionados)})
+                                      {grupo.selecionadosVinculosQtd} item(ns) marcado(s) ({brl(grupo.totalValorSelecionados)})
                                     </Badge>
                                   )}
                                   {temRascunho && (
@@ -4585,7 +5301,7 @@ function OrdensCompra() {
                                       className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-[11px] font-semibold"
                                     >
                                       <ShoppingCart className="size-3 mr-1" />
-                                      OC em rascunho: {grupo.totalUnidadesRascunho} un. ({brl(grupo.totalValorRascunho)})
+                                      Carrinho: {grupo.totalUnidadesRascunho} un. ({brl(grupo.totalValorRascunho)})
                                     </Badge>
                                   )}
                                 </div>
@@ -4616,7 +5332,7 @@ function OrdensCompra() {
                                       setGavetaOCFornecedorChave(grupo.chave);
                                     }}
                                   >
-                                    Ver OC ({grupo.totalUnidadesRascunho})
+                                    Carrinho ({grupo.totalUnidadesRascunho})
                                   </Button>
                                 )}
                                 <span
@@ -4627,7 +5343,7 @@ function OrdensCompra() {
                                       : "bg-muted text-foreground group-hover:bg-primary/15 group-hover:text-primary",
                                   )}
                                 >
-                                  {estaAberto ? "Card Aberto" : "Abrir Card"}
+                                  {estaAberto ? "Catálogo Aberto" : "Abrir Catálogo"}
                                 </span>
                               </div>
                             </div>
@@ -4637,7 +5353,7 @@ function OrdensCompra() {
                     </div>
                   </div>
 
-                  {/* 2 & 3. ABERTURA DO CARD DO FORNECEDOR: HIERARQUIA (TOPO COM VÍNCULO / ABAIXO SEM VÍNCULO) E LINHAS CONSOLIDADAS */}
+                  {/* 2 & 3. ABERTURA DO FORNECEDOR: CATÁLOGO UNIFICADO COM PRODUTOS IDÊNTICOS AGRUPADOS E PRIORIDADE PARA DEMANDAS VINCULADAS A CLIENTES */}
                   {(() => {
                     const grupoAtivo = gruposVisaoFornecedor.find(
                       (g) => g.chave === fornecedorCardAberto,
@@ -4645,7 +5361,9 @@ function OrdensCompra() {
                     if (!grupoAtivo) return null;
 
                     const renderizarLinhaConsolidada = (linha: LinhaConsolidadaFornecedor) => {
-                      const expandido = vinculosExpandidosPorLinha[linha.chaveLinha] ?? true;
+                      const expandido =
+                        vinculosExpandidosPorLinha[linha.chaveLinha] ??
+                        (linha.comVinculoCount > 0 || Boolean(termoBuscaCliente));
 
                       return (
                         <div
@@ -4654,10 +5372,12 @@ function OrdensCompra() {
                             "rounded-xl border transition-all overflow-hidden",
                             linha.algumMarcado
                               ? "border-primary/50 bg-primary/[0.03] shadow-sm"
-                              : "bg-card",
+                              : linha.comVinculoCount > 0
+                                ? "border-emerald-500/35 bg-emerald-500/[0.015]"
+                                : "bg-card",
                           )}
                         >
-                          {/* LINHA CONSOLIDADA DO PRODUTO */}
+                          {/* LINHA CONSOLIDADA DO PRODUTO IDÊNTICO */}
                           <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-start gap-3 min-w-0">
                               <Checkbox
@@ -4671,6 +5391,12 @@ function OrdensCompra() {
 
                               <div className="min-w-0 space-y-1">
                                 <div className="flex flex-wrap items-center gap-2">
+                                  {linha.comVinculoCount > 0 && (
+                                    <Badge className="bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-0">
+                                      Prioridade Cliente ({formatarQtdCompra(linha.comVinculoCount)} {linha.unidade})
+                                    </Badge>
+                                  )}
+
                                   <span className="font-bold text-sm sm:text-base text-foreground">
                                     {linha.nome} — Total:{" "}
                                     <span
@@ -4681,40 +5407,48 @@ function OrdensCompra() {
                                           : "text-primary",
                                       )}
                                     >
-                                      {linha.pendenteDinamico} un.
+                                      {formatarQtdCompra(linha.pendenteDinamico)} {linha.unidade}
                                     </span>
                                   </span>
 
                                   {linha.selecionadosCount > 0 && (
                                     <Badge className="bg-primary/15 text-primary border border-primary/30 text-xs font-mono font-semibold">
-                                      {linha.totalFila} un. − {linha.selecionadosCount} selecionado(s) ={" "}
-                                      {linha.pendenteDinamico} un. pendentes
+                                      {formatarQtdCompra(linha.totalFila)} {linha.unidade} −{" "}
+                                      {formatarQtdCompra(linha.selecionadosCount)} {linha.unidade} selecionado(s) ={" "}
+                                      {formatarQtdCompra(linha.pendenteDinamico)} {linha.unidade} restantes
                                     </Badge>
                                   )}
 
                                   {linha.codigo && (
-                                    <Badge variant="outline" className="font-mono text-[10px] py-0 px-1.5 text-muted-foreground">
+                                    <Badge
+                                      variant="outline"
+                                      className="font-mono text-[10px] py-0 px-1.5 text-muted-foreground"
+                                    >
                                       SKU: {linha.codigo}
                                     </Badge>
                                   )}
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  {linha.comVinculo ? (
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                                  {linha.comVinculoCount > 0 && (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                                       <Users className="size-3.5" />
-                                      {linha.totalFila}{" "}
-                                      {linha.totalFila === 1
-                                        ? "vínculo de cliente na fila"
-                                        : "vínculos de clientes na fila"}
+                                      {linha.vinculos.filter((v) => v.comVinculo).length}{" "}
+                                      {linha.vinculos.filter((v) => v.comVinculo).length === 1
+                                        ? "vínculo consolidado de cliente"
+                                        : "vínculos consolidados de clientes"}{" "}
+                                      ({formatarQtdCompra(linha.comVinculoCount)} {linha.unidade})
                                     </span>
-                                  ) : (
+                                  )}
+
+                                  {linha.comVinculoCount > 0 && linha.semVinculoCount > 0 && (
+                                    <span>+</span>
+                                  )}
+
+                                  {linha.semVinculoCount > 0 && (
                                     <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
                                       <Boxes className="size-3.5" />
-                                      {linha.totalFila}{" "}
-                                      {linha.totalFila === 1
-                                        ? "unidade para Estoque Geral"
-                                        : "unidades para Estoque Geral"}
+                                      {formatarQtdCompra(linha.semVinculoCount)} {linha.unidade} para Estoque / Catálogo
                                     </span>
                                   )}
 
@@ -4737,7 +5471,7 @@ function OrdensCompra() {
                               </div>
                             </div>
 
-                            {/* CONTROLES DE PREÇO, EXPANSÃO DE VÍNCULOS E AÇÕES DA LINHA CONSOLIDADA */}
+                            {/* CONTROLES DE PREÇO, ADIÇÃO DE UNIDADE E EXPANSÃO DE VÍNCULOS */}
                             <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[11px] text-muted-foreground">Vl. Unit:</span>
@@ -4795,7 +5529,7 @@ function OrdensCompra() {
                               </div>
 
                               <div className="text-right min-w-[90px]">
-                                <p className="text-[10px] text-muted-foreground uppercase">Subtotal Fila</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">Subtotal</p>
                                 <p className="text-xs font-bold font-mono text-foreground">
                                   {brl(
                                     linha.totalFila *
@@ -4805,37 +5539,32 @@ function OrdensCompra() {
                                 </p>
                               </div>
 
-                              {!linha.comVinculo && (
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 px-2 text-xs font-mono"
-                                    title="Adicionar +1 unidade para reposição de estoque"
-                                    onClick={() => {
-                                      const atual = vinculosDoProduto(linha.produtoPrincipal);
-                                      const proximo = [...atual, ""];
-                                      setVinculosCompra((prev) => ({
-                                        ...prev,
-                                        [linha.produtoPrincipal.id]: proximo,
-                                      }));
-                                      setQuantidadesCompra((prev) => ({
-                                        ...prev,
-                                        [linha.produtoPrincipal.id]: String(proximo.length),
-                                      }));
-                                      salvarAutomaticamente(
-                                        linha.produtoPrincipal.id,
-                                        "quantidade_compra",
-                                        proximo.length,
-                                        true,
-                                      );
-                                    }}
-                                  >
-                                    +1 un.
-                                  </Button>
-                                </div>
-                              )}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs font-mono"
+                                title="Adicionar +1 unidade/medida extra de reposição de estoque a este produto"
+                                onClick={() => {
+                                  const qtdBase = Math.max(
+                                    quantidadeCompra(linha.produtoPrincipal),
+                                    linha.totalFila,
+                                  );
+                                  const novaQtd = arredondarQtdCompra(qtdBase + 1);
+                                  setQuantidadesCompra((prev) => ({
+                                    ...prev,
+                                    [linha.produtoPrincipal.id]: String(novaQtd),
+                                  }));
+                                  salvarAutomaticamente(
+                                    linha.produtoPrincipal.id,
+                                    "quantidade_compra",
+                                    novaQtd,
+                                    true,
+                                  );
+                                }}
+                              >
+                                +1 {linha.unidade}
+                              </Button>
 
                               <Button
                                 type="button"
@@ -4852,12 +5581,12 @@ function OrdensCompra() {
                                 {expandido ? (
                                   <>
                                     <ChevronUp className="size-3.5" />
-                                    Ocultar vínculos ({linha.totalFila})
+                                    Ocultar ({linha.vinculos.length})
                                   </>
                                 ) : (
                                   <>
                                     <ChevronDown className="size-3.5" />
-                                    Expandir vínculos ({linha.totalFila})
+                                    Vínculos ({linha.vinculos.length})
                                   </>
                                 )}
                               </Button>
@@ -4875,17 +5604,20 @@ function OrdensCompra() {
                             </div>
                           </div>
 
-                          {/* LISTA EXPANSÍVEL DE VÍNCULOS INDIVIDUAIS (CLIENTE A, CLIENTE B, CLIENTE C...) */}
+                          {/* LISTA EXPANSÍVEL UNIFICADA DE VÍNCULOS (DEMANDAS DE CLIENTES CONSOLIDADAS NO TOPO + REPOSIÇÃO DE ESTOQUE) */}
                           {expandido && (
                             <div className="border-t bg-muted/20 px-4 py-2.5 space-y-1.5">
                               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                                {linha.comVinculo
-                                  ? "Selecione os vínculos de clientes para transferir à Ordem de Compra:"
-                                  : "Selecione as unidades de reposição de estoque para transferir à Ordem de Compra:"}
+                                Demandas consolidadas por cliente (quantidade total unificada em um único vínculo):
                               </p>
                               <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                                 {linha.vinculos.map((vinculo, idx) => {
                                   const marcado = vinculosKeysSelecionados[vinculo.key] === true;
+                                  const qtdFormatada = formatarQtdCompra(vinculo.quantidade);
+                                  const subtotalVinculo =
+                                    vinculo.quantidade *
+                                    linha.valorUnitario *
+                                    (1 - linha.descontoPercentual / 100);
                                   return (
                                     <label
                                       key={vinculo.key}
@@ -4893,7 +5625,9 @@ function OrdensCompra() {
                                         "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer transition-all select-none",
                                         marcado
                                           ? "border-primary bg-primary/10 text-foreground font-semibold shadow-sm"
-                                          : "border-border bg-background hover:border-primary/40 text-foreground",
+                                          : vinculo.comVinculo
+                                            ? "border-emerald-500/30 bg-background hover:border-emerald-500/60 text-foreground"
+                                            : "border-border bg-background hover:border-primary/40 text-foreground",
                                       )}
                                     >
                                       <div className="flex items-center gap-2.5 min-w-0">
@@ -4909,30 +5643,37 @@ function OrdensCompra() {
                                               #{idx + 1}
                                             </span>
                                             {vinculo.comVinculo ? (
-                                              <span className="truncate font-medium text-emerald-700 dark:text-emerald-300">
+                                              <span className="truncate font-semibold text-emerald-700 dark:text-emerald-300">
                                                 {vinculo.clienteNome}
                                               </span>
                                             ) : (
                                               <span className="truncate font-medium text-amber-700 dark:text-amber-300">
-                                                Estoque Geral · Unidade #{idx + 1}
+                                                Catálogo / Estoque Geral
                                               </span>
                                             )}
                                           </div>
                                           <p className="text-[10px] text-muted-foreground truncate">
                                             {vinculo.comVinculo
-                                              ? `Pedido ${vinculo.pedidoNumero ?? "Vinculado"} · 1 ${linha.unidade}`
-                                              : `Reposição sem vínculo · 1 ${linha.unidade}`}
+                                              ? `Pedido ${vinculo.pedidoNumero ?? "Vinculado"} · Qtd. total: ${qtdFormatada} ${linha.unidade}`
+                                              : `Reposição sem vínculo · Qtd. total: ${qtdFormatada} ${linha.unidade}`}
                                           </p>
                                         </div>
                                       </div>
 
-                                      <div className="flex items-center gap-1.5 shrink-0">
+                                      <div className="flex flex-col items-end gap-0.5 shrink-0">
                                         <Badge
                                           variant={marcado ? "default" : "outline"}
                                           className="text-[10px] font-mono py-0 px-1.5"
                                         >
-                                          {marcado ? "No carrinho" : "1 un."}
+                                          {marcado
+                                            ? `Selecionado · ${qtdFormatada} ${linha.unidade}`
+                                            : `${qtdFormatada} ${linha.unidade}`}
                                         </Badge>
+                                        {subtotalVinculo > 0 && (
+                                          <span className="text-[10px] font-mono text-muted-foreground">
+                                            {brl(subtotalVinculo)}
+                                          </span>
+                                        )}
                                       </div>
                                     </label>
                                   );
@@ -4958,84 +5699,36 @@ function OrdensCompra() {
                                   {grupoAtivo.nome}
                                 </h3>
                                 <Badge variant="secondary" className="font-mono text-xs font-semibold">
-                                  Pendente: {grupoAtivo.totalUnidadesPendentesDinamico} un. (de{" "}
-                                  {grupoAtivo.totalUnidades} un.)
+                                  Catálogo Unificado: {grupoAtivo.itensUnificadosConsolidados.length} produto(s) ·{" "}
+                                  {grupoAtivo.totalUnidadesPendentesDinamico} un. disponíveis
                                 </Badge>
                                 {grupoAtivo.selecionadosVinculosQtd > 0 && (
                                   <Badge className="bg-primary text-primary-foreground font-mono text-xs">
-                                    {grupoAtivo.selecionadosVinculosQtd} selecionado(s) para OC ·{" "}
+                                    {grupoAtivo.selecionadosVinculosQtd} marcado(s) ·{" "}
                                     {brl(grupoAtivo.totalValorSelecionados)}
                                   </Badge>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Marque os vínculos desejados abaixo e clique em{" "}
-                                <strong>&ldquo;Selecionar Itens&rdquo;</strong> para transferi-los à Ordem de Compra deste fornecedor.
+                                Produtos idênticos estão consolidados em uma única linha com as demandas de clientes priorizadas no topo. Selecione os itens e clique em{" "}
+                                <strong>&ldquo;Incluir no Carrinho / Selecionar Itens&rdquo;</strong>.
                               </p>
                             </div>
                           </div>
 
                           {/* BARRA DE AÇÕES DO FORNECEDOR ABERTO */}
                           <div className="flex flex-wrap items-center gap-2.5">
-                            {(() => {
-                              const idsJaNoGrupo = new Set(grupoAtivo.itens.map((it) => it.produto.id));
-                              const produtosDoFornecedor = produtos.filter(
-                                (p) =>
-                                  !idsJaNoGrupo.has(p.id) &&
-                                  fornecedorDaCompra(p)?.id === grupoAtivo.fornecedor.id,
-                              );
-                              const outrosProdutosCatalogo = produtos.filter(
-                                (p) =>
-                                  !idsJaNoGrupo.has(p.id) &&
-                                  fornecedorDaCompra(p)?.id !== grupoAtivo.fornecedor.id,
-                              );
-                              const produtosDisponiveis = [
-                                ...produtosDoFornecedor,
-                                ...outrosProdutosCatalogo,
-                              ];
-                              if (produtosDisponiveis.length === 0) return null;
-                              return (
-                                <Select
-                                  value=""
-                                  onValueChange={async (prodId) => {
-                                    if (!prodId) return;
-                                    const prod = produtos.find((p) => p.id === prodId);
-                                    if (
-                                      prod &&
-                                      fornecedorDaCompra(prod)?.id !== grupoAtivo.fornecedor.id &&
-                                      fornecedores.some((f) => f.id === grupoAtivo.fornecedor.id)
-                                    ) {
-                                      await supabase
-                                        .from("produtos")
-                                        .update({ fornecedor_id: grupoAtivo.fornecedor.id } as never)
-                                        .eq("id", prodId);
-                                      qc.invalidateQueries({ queryKey: ["produtos"] });
-                                    }
-                                    setSelecionadosCompra((prev) => ({ ...prev, [prodId]: true }));
-                                    setQuantidadesCompra((prev) => ({
-                                      ...prev,
-                                      [prodId]: prev[prodId] ?? "1",
-                                    }));
-                                    toast.success(
-                                      `"${prod?.nome ?? "Produto"}" adicionado à fila de ${grupoAtivo.nome}`,
-                                    );
-                                  }}
-                                >
-                                  <SelectTrigger className="h-9 text-xs w-48 bg-background border-dashed">
-                                    <Plus className="size-3.5 mr-1 text-primary" />
-                                    <SelectValue placeholder="+ Incluir produto na fila..." />
-                                  </SelectTrigger>
-                                  <SelectContent className="max-h-64">
-                                    {produtosDisponiveis.map((prod) => (
-                                      <SelectItem key={prod.id} value={prod.id}>
-                                        {prod.nome} {prod.codigo ? `(${prod.codigo})` : ""} ·{" "}
-                                        {brl(Number(prod.preco_custo ?? 0))}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              );
-                            })()}
+                            {/* BUSCA POR CLIENTE DENTRO DO FORNECEDOR */}
+                            <div className="relative min-w-[210px]">
+                              <Users className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-emerald-600" />
+                              <Input
+                                aria-label="Buscar por cliente neste fornecedor"
+                                className="pl-8 h-9 text-xs bg-background border-emerald-500/40"
+                                placeholder="Filtrar cliente neste fornecedor..."
+                                value={buscaCliente}
+                                onChange={(e) => setBuscaCliente(e.target.value)}
+                              />
+                            </div>
 
                             <Button
                               type="button"
@@ -5045,8 +5738,8 @@ function OrdensCompra() {
                               onClick={() => alternarSelecaoGrupoFornecedor(grupoAtivo)}
                             >
                               {grupoAtivo.todosSelecionados
-                                ? "Desmarcar todos do card"
-                                : "Marcar todos do card"}
+                                ? "Desmarcar todos"
+                                : "Marcar todos do fornecedor"}
                             </Button>
 
                             {grupoAtivo.totalUnidadesRascunho > 0 && (
@@ -5057,12 +5750,12 @@ function OrdensCompra() {
                                 className="h-9 text-xs font-semibold gap-1.5 border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400"
                                 onClick={() => setGavetaOCFornecedorChave(grupoAtivo.chave)}
                               >
-                                <FileText className="size-4" />
-                                Abrir OC em Rascunho ({grupoAtivo.totalUnidadesRascunho} un.)
+                                <ShoppingCart className="size-4" />
+                                Revisar/editar carrinho ({grupoAtivo.totalUnidadesRascunho} un.)
                               </Button>
                             )}
 
-                            {/* 4. BOTÃO "SELECIONAR ITENS" */}
+                            {/* 4. BOTÃO DE INCLUSÃO QUE ABRE A TELA POSTERIOR À INCLUSÃO */}
                             <Button
                               type="button"
                               size="sm"
@@ -5070,7 +5763,7 @@ function OrdensCompra() {
                               className="h-9 px-4 font-bold gap-2 shadow-sm"
                             >
                               <ShoppingCart className="size-4" />
-                              Selecionar Itens
+                              Incluir no Carrinho / Selecionar Itens
                               {grupoAtivo.selecionadosVinculosQtd > 0 && (
                                 <Badge
                                   variant="secondary"
@@ -5083,79 +5776,58 @@ function OrdensCompra() {
                           </div>
                         </div>
 
-                        {/* CORPO DO CARD ABERTO: SEÇÃO TOPO (COM VÍNCULO) E SEÇÃO ABAIXO (SEM VÍNCULO) */}
-                        <div className="p-5 space-y-8">
-                          {/* TOPO DA LISTA: ITENS COM VÍNCULO ATIVO */}
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                              <div className="flex items-center gap-2">
-                                <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-600 dark:text-emerald-400">
-                                  <Link2 className="size-4" />
-                                </div>
-                                <div>
-                                  <h4 className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                                    1. Itens com Vínculo Ativo (Pedidos de Venda de Clientes)
-                                  </h4>
-                                  <p className="text-xs text-muted-foreground">
-                                    Produtos atrelados diretamente a pedidos de clientes específicos (prioridade no topo)
-                                  </p>
-                                </div>
+                        {/* CORPO DO CARD ABERTO: CATÁLOGO UNIFICADO COM PRODUTOS IDÊNTICOS AGRUPADOS E CLIENTES PRIORIZADOS NO TOPO */}
+                        <div className="p-5 space-y-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-600 dark:text-emerald-400">
+                                <Layers className="size-4" />
                               </div>
+                              <div>
+                                <h4 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                                  Catálogo Unificado de {grupoAtivo.nome} (Produtos Idênticos Agrupados)
+                                </h4>
+                                <p className="text-xs text-muted-foreground">
+                                  Demandas vinculadas a clientes aparecem primeiro no topo da lista e dentro de cada produto consolidado.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <Badge
                                 variant="outline"
                                 className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono text-xs"
                               >
-                                {grupoAtivo.itensComVinculoConsolidados.length} produto(s) ·{" "}
-                                {grupoAtivo.totalComVinculo} vínculo(s)
+                                {grupoAtivo.totalComVinculo} vínculo(s) de cliente
                               </Badge>
-                            </div>
-
-                            {grupoAtivo.itensComVinculoConsolidados.length === 0 ? (
-                              <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
-                                Nenhum item com vínculo ativo pendente na fila deste fornecedor.
-                              </div>
-                            ) : (
-                              <div className="space-y-3">
-                                {grupoAtivo.itensComVinculoConsolidados.map(renderizarLinhaConsolidada)}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* ABAIXO: ITENS SEM VÍNCULO (ESTOQUE GERAL) */}
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
-                              <div className="flex items-center gap-2">
-                                <div className="rounded-md bg-amber-500/15 p-1.5 text-amber-600 dark:text-amber-400">
-                                  <Boxes className="size-4" />
-                                </div>
-                                <div>
-                                  <h4 className="text-sm font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                                    2. Itens sem Vínculo (Reposição de Estoque Geral)
-                                  </h4>
-                                  <p className="text-xs text-muted-foreground">
-                                    Produtos destinados à reposição de estoque livre da loja
-                                  </p>
-                                </div>
-                              </div>
                               <Badge
                                 variant="outline"
                                 className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono text-xs"
                               >
-                                {grupoAtivo.itensSemVinculoConsolidados.length} produto(s) ·{" "}
-                                {grupoAtivo.totalSemVinculo} un.
+                                {grupoAtivo.totalSemVinculo} un. estoque/catálogo
                               </Badge>
                             </div>
-
-                            {grupoAtivo.itensSemVinculoConsolidados.length === 0 ? (
-                              <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
-                                Nenhum item sem vínculo pendente para reposição de estoque neste fornecedor.
-                              </div>
-                            ) : (
-                              <div className="space-y-3">
-                                {grupoAtivo.itensSemVinculoConsolidados.map(renderizarLinhaConsolidada)}
-                              </div>
-                            )}
                           </div>
+
+                          {grupoAtivo.itensUnificadosConsolidados.length === 0 ? (
+                            <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground space-y-2">
+                              <p>Nenhum item encontrado neste fornecedor para o filtro selecionado.</p>
+                              {buscaCliente.trim() && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setBuscaCliente("")}
+                                >
+                                  Limpar busca por cliente
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {grupoAtivo.itensUnificadosConsolidados.map(renderizarLinhaConsolidada)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -5165,7 +5837,143 @@ function OrdensCompra() {
             </CardContent>
           </ExpandableCard>
 
-          {/* 4. GAVETA / TELA DA ORDEM DE COMPRA EM ABERTO (RASCUNHO) */}
+          {/* TELA POSTERIOR À INCLUSÃO NO FLUXO DE SELEÇÃO */}
+          <Dialog
+            open={Boolean(telaPosInclusaoFornecedorChave)}
+            onOpenChange={(aberto) => {
+              if (!aberto) setTelaPosInclusaoFornecedorChave(null);
+            }}
+          >
+            <DialogContent className="sm:max-w-lg">
+              {(() => {
+                const chave = telaPosInclusaoFornecedorChave;
+                const rascunho = chave ? rascunhosOCPorFornecedor[chave] : undefined;
+                if (!chave || !rascunho) return null;
+
+                const valorTotalCarrinho = rascunho.itens.reduce(
+                  (s, it) =>
+                    s +
+                    Number(it.quantidade || 1) *
+                      Number(it.valorUnitario || 0) *
+                      (1 - Number(it.descontoPercentual || 0) / 100),
+                  0,
+                );
+                const qtdTotalCarrinho = arredondarQtdCompra(
+                  rascunho.itens.reduce((s, it) => s + Number(it.quantidade || 1), 0),
+                );
+                const qtdComVinculo = rascunho.itens.filter((it) => it.comVinculo).length;
+                const qtdUnidadesComVinculo = arredondarQtdCompra(
+                  rascunho.itens
+                    .filter((it) => it.comVinculo)
+                    .reduce((s, it) => s + Number(it.quantidade || 1), 0),
+                );
+                const qtdEstoque = arredondarQtdCompra(
+                  rascunho.itens
+                    .filter((it) => !it.comVinculo)
+                    .reduce((s, it) => s + Number(it.quantidade || 1), 0),
+                );
+
+                return (
+                  <>
+                    <DialogHeader>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge className="bg-emerald-600 text-white font-semibold">
+                          Itens Incluídos com Sucesso
+                        </Badge>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          +{formatarQtdCompra(ultimosItensIncluidosCount)} un. adicionada(s)
+                        </Badge>
+                      </div>
+                      <DialogTitle className="text-xl flex items-center gap-2">
+                        <ShoppingCart className="size-5 text-primary" />
+                        Ordem de Compra · {rascunho.fornecedorNome}
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                      <p className="text-sm text-muted-foreground">
+                        Os produtos selecionados foram incluídos no carrinho da ordem de compra de{" "}
+                        <strong className="text-foreground">{rascunho.fornecedorNome}</strong>. Como deseja prosseguir?
+                      </p>
+
+                      <div className="rounded-xl border bg-muted/20 p-4 space-y-2.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Total acumulado no carrinho:</span>
+                          <span className="font-mono font-bold text-foreground">
+                            {formatarQtdCompra(qtdTotalCarrinho)} un. ({rascunho.itens.length} registro(s))
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Demandas vinculadas a clientes:</span>
+                          <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                            {qtdComVinculo} vínculo(s) ({formatarQtdCompra(qtdUnidadesComVinculo)} un.)
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Reposição de estoque / catálogo:</span>
+                          <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">
+                            {formatarQtdCompra(qtdEstoque)} unidade(s)
+                          </span>
+                        </div>
+                        <div className="border-t pt-2 flex items-center justify-between">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            Valor Estimado do Carrinho
+                          </span>
+                          <span className="text-lg font-bold font-mono text-primary">
+                            {brl(valorTotalCarrinho)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2.5 pt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-start h-11 px-4 font-semibold gap-3"
+                          onClick={() => {
+                            setFornecedorCardAberto(chave);
+                            setTelaPosInclusaoFornecedorChave(null);
+                          }}
+                        >
+                          <ArrowLeft className="size-4 text-primary" />
+                          <span>Continuar comprando</span>
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-full justify-start h-11 px-4 font-semibold gap-3 border border-primary/30 bg-primary/10 text-primary hover:bg-primary/15"
+                          onClick={() => {
+                            setTelaPosInclusaoFornecedorChave(null);
+                            setGavetaOCFornecedorChave(chave);
+                          }}
+                        >
+                          <Pencil className="size-4" />
+                          <span>Revisar/editar carrinho</span>
+                        </Button>
+
+                        <Button
+                          type="button"
+                          disabled={fecharCompraRascunhoOC.isPending || rascunho.itens.length === 0}
+                          onClick={() => fecharCompraRascunhoOC.mutate(chave)}
+                          className="w-full justify-start h-11 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-3 shadow-sm"
+                        >
+                          <CheckCircle2 className="size-4" />
+                          <span>
+                            {fecharCompraRascunhoOC.isPending
+                              ? "Fechando ordem de compra..."
+                              : "Fechar ordem de compra"}
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </DialogContent>
+          </Dialog>
+
+          {/* 4. GAVETA / TELA DE REVISAR / EDITAR CARRINHO E FECHAR ORDEM DE COMPRA */}
           <Sheet
             open={Boolean(gavetaOCFornecedorChave)}
             onOpenChange={(aberto) => {
@@ -5179,7 +5987,7 @@ function OrdensCompra() {
                 if (!chave || !rascunho) {
                   return (
                     <div className="py-12 text-center text-muted-foreground text-sm">
-                      Nenhum item na Ordem de Compra em aberto para este fornecedor.
+                      Nenhum item no carrinho da Ordem de Compra para este fornecedor.
                     </div>
                   );
                 }
@@ -5215,6 +6023,9 @@ function OrdensCompra() {
                   }
                 }
 
+                const qtdTotalNoRascunho = arredondarQtdCompra(
+                  rascunho.itens.reduce((s, it) => s + Number(it.quantidade || 1), 0),
+                );
                 const valorBrutoRascunho = rascunho.itens.reduce(
                   (s, it) =>
                     s +
@@ -5233,10 +6044,10 @@ function OrdensCompra() {
                     <SheetHeader className="border-b pb-4">
                       <div className="flex items-center gap-2">
                         <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">
-                          Rascunho / OC em Aberto
+                          Revisar / Editar Carrinho
                         </Badge>
                         <Badge variant="outline" className="font-mono text-xs">
-                          {rascunho.itens.length} un. selecionada(s)
+                          {formatarQtdCompra(qtdTotalNoRascunho)} un. selecionada(s)
                         </Badge>
                       </div>
                       <SheetTitle className="text-xl flex items-center gap-2 mt-1">
@@ -5244,19 +6055,21 @@ function OrdensCompra() {
                         Ordem de Compra · {rascunho.fornecedorNome}
                       </SheetTitle>
                       <SheetDescription>
-                        Os itens abaixo foram retirados da fila pendente do card e estão reservados nesta Ordem de Compra. Você pode adicionar mais itens do fornecedor ou fechar a compra para gerar o financeiro.
+                        Revise ou edite quantidades consolidadas por vínculo, preços, descontos e condições antes de fechar a ordem de compra ou volte para continuar comprando.
                       </SheetDescription>
                     </SheetHeader>
 
                     {/* LISTA DE PRODUTOS E VÍNCULOS NA ORDEM DE COMPRA EM ABERTO */}
                     <div className="space-y-3 flex-1">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Itens e Vínculos na Ordem de Compra ({rascunho.itens.length} un.)
+                        Itens Agrupados no Carrinho ({formatarQtdCompra(qtdTotalNoRascunho)} un.)
                       </h4>
 
                       <div className="space-y-3">
                         {Array.from(gruposProdutoRascunho.values()).map((grp) => {
-                          const qtdProd = grp.itens.reduce((s, i) => s + Number(i.quantidade || 1), 0);
+                          const qtdProd = arredondarQtdCompra(
+                            grp.itens.reduce((s, i) => s + Number(i.quantidade || 1), 0),
+                          );
                           const subtotalProd =
                             qtdProd * grp.valorUnitario * (1 - grp.descontoPercentual / 100);
 
@@ -5269,7 +6082,9 @@ function OrdensCompra() {
                                 <div>
                                   <p className="font-bold text-sm text-foreground">
                                     {grp.descricao} —{" "}
-                                    <span className="text-primary font-mono">{qtdProd} un.</span>
+                                    <span className="text-primary font-mono">
+                                      {formatarQtdCompra(qtdProd)} {grp.unidade}
+                                    </span>
                                   </p>
                                   {grp.codigo && (
                                     <p className="text-[11px] font-mono text-muted-foreground">
@@ -5279,6 +6094,17 @@ function OrdensCompra() {
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs font-mono"
+                                    onClick={() =>
+                                      adicionarUnidadeExtraRascunhoOC(chave, grp.produtoId)
+                                    }
+                                  >
+                                    +1 {grp.unidade}
+                                  </Button>
                                   <div className="flex items-center gap-1">
                                     <span className="text-[10px] text-muted-foreground">Unit:</span>
                                     <Input
@@ -5322,7 +6148,7 @@ function OrdensCompra() {
                                 </div>
                               </div>
 
-                              {/* Vínculos transferidos deste produto */}
+                              {/* Vínculos consolidados transferidos deste produto */}
                               <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/60">
                                 {grp.itens.map((vinc) => (
                                   <Badge
@@ -5343,11 +6169,31 @@ function OrdensCompra() {
                                     <span>
                                       {vinc.comVinculo
                                         ? `${vinc.clienteNome ?? "Cliente"} (${vinc.pedidoNumero ?? "Pedido"})`
-                                        : "Estoque Geral (1 un.)"}
+                                        : "Estoque Geral"}
                                     </span>
+                                    <div className="flex items-center gap-1 ml-1">
+                                      <Input
+                                        type="number"
+                                        min="0.01"
+                                        step="any"
+                                        aria-label={`Quantidade do vínculo ${vinc.clienteNome ?? "Estoque"}`}
+                                        className="h-5 w-16 px-1 text-right font-mono text-[11px] bg-background"
+                                        value={String(vinc.quantidade)}
+                                        onChange={(e) =>
+                                          atualizarQuantidadeVinculoRascunhoOC(
+                                            chave,
+                                            vinc.key,
+                                            Math.max(Number(e.target.value) || 0.01, 0.01),
+                                          )
+                                        }
+                                      />
+                                      <span className="font-mono text-[10px]">
+                                        {grp.unidade}
+                                      </span>
+                                    </div>
                                     <button
                                       type="button"
-                                      title="Devolver este vínculo para a fila do card"
+                                      title="Remover este item do carrinho e devolver para a fila do fornecedor"
                                       onClick={() => removerVinculoDoRascunhoOC(chave, vinc.key)}
                                       className="ml-1 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 transition-colors"
                                     >
@@ -5470,7 +6316,7 @@ function OrdensCompra() {
                       </div>
                     </div>
 
-                    {/* BOTÕES DE AÇÃO DA ORDEM DE COMPRA: "ADICIONAR MAIS ITENS" E "FECHAR COMPRA" */}
+                    {/* BOTÕES DE AÇÃO: "CONTINUAR COMPRANDO" E "FECHAR ORDEM DE COMPRA" */}
                     <SheetFooter className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t">
                       <Button
                         type="button"
@@ -5479,10 +6325,11 @@ function OrdensCompra() {
                         onClick={() => {
                           setFornecedorCardAberto(chave);
                           setGavetaOCFornecedorChave(null);
+                          setTelaPosInclusaoFornecedorChave(null);
                         }}
                       >
                         <ArrowLeft className="size-4" />
-                        Adicionar mais itens
+                        Continuar comprando
                       </Button>
 
                       <Button
@@ -5492,7 +6339,9 @@ function OrdensCompra() {
                         className="w-full sm:w-auto flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 shadow-sm"
                       >
                         <CheckCircle2 className="size-4" />
-                        {fecharCompraRascunhoOC.isPending ? "Fechando Compra..." : "Fechar Compra"}
+                        {fecharCompraRascunhoOC.isPending
+                          ? "Fechando ordem de compra..."
+                          : "Fechar ordem de compra"}
                       </Button>
                     </SheetFooter>
                   </>
@@ -5717,7 +6566,7 @@ function OrdensCompra() {
                           className="ml-auto w-20 text-right"
                           type="number"
                           min="0"
-                          step="1"
+                          step="any"
                           value={quantidadesCompra[produto.id] ?? String(quantidadeCompra(produto))}
                           onChange={(evento) => {
                             const valor = evento.target.value;
@@ -5778,64 +6627,72 @@ function OrdensCompra() {
                       <TableCell className="text-right font-semibold">{brl(totalCompra(produto))}</TableCell>
                       <TableCell>
                         <div className="space-y-1.5">
-                          {vinculosDoProduto(produto).map((vinculoAtual, indice) => (
-                            <div key={`${produto.id}-vinculo-${indice}`} className="flex items-center gap-1.5">
-                              <Checkbox
-                                aria-label={`Comprar vínculo ${indice + 1} de ${produto.nome}`}
-                                checked={isVinculoSelecionado(produto.id, indice)}
-                                onCheckedChange={() =>
-                                  alternarSelecaoVinculo(
-                                    produto.id,
-                                    indice,
-                                    vinculosDoProduto(produto).length,
-                                  )
-                                }
-                              />
-                              <span className="w-5 shrink-0 text-xs text-muted-foreground">{indice + 1}.</span>
-                              <Select
-                                value={vinculoAtual || SEM_CLIENTE}
-                                onValueChange={(valor) => {
-                                  const vinculo = valor === SEM_CLIENTE ? "" : valor;
-                                  const proximos = vinculosDoProduto(produto);
-                                  proximos[indice] = vinculo;
-                                  setVinculosCompra((atual) => ({ ...atual, [produto.id]: proximos }));
-                                  if (indice === 0) {
-                                    salvarAutomaticamente(
+                          {vinculosConsolidadosDoProduto(produto).map((vincInfo, indice, todosVincs) => {
+                            const vinculoAtual = vincInfo.vendaId;
+                            return (
+                              <div key={`${produto.id}-vinculo-${indice}`} className="flex items-center gap-1.5">
+                                <Checkbox
+                                  aria-label={`Comprar vínculo ${indice + 1} de ${produto.nome}`}
+                                  checked={isVinculoSelecionado(produto.id, indice)}
+                                  onCheckedChange={() =>
+                                    alternarSelecaoVinculo(
                                       produto.id,
-                                      "venda_vinculo_id",
-                                      vinculo || (null as unknown as string),
-                                      true,
-                                    );
+                                      indice,
+                                      todosVincs.length,
+                                    )
                                   }
-                                }}
-                              >
-                                <SelectTrigger className="w-48" aria-label={`Vínculo ${indice + 1} de ${produto.nome}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value={SEM_CLIENTE}>Estoque</SelectItem>
-                                  {vendasVinculo.map((venda) => (
-                                    <SelectItem key={venda.id} value={venda.id}>
-                                      {venda.numero ?? "Pedido"} — {venda.cliente_nome ?? "Cliente"}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ))}
+                                />
+                                <span className="w-5 shrink-0 text-xs text-muted-foreground">{indice + 1}.</span>
+                                <Select
+                                  value={vinculoAtual || SEM_CLIENTE}
+                                  onValueChange={(valor) => {
+                                    const vinculo = valor === SEM_CLIENTE ? "" : valor;
+                                    const proximos = todosVincs.map((v) => v.vendaId);
+                                    proximos[indice] = vinculo;
+                                    setVinculosCompra((atual) => ({ ...atual, [produto.id]: proximos }));
+                                    if (indice === 0) {
+                                      salvarAutomaticamente(
+                                        produto.id,
+                                        "venda_vinculo_id",
+                                        vinculo || (null as unknown as string),
+                                        true,
+                                      );
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="w-44" aria-label={`Vínculo ${indice + 1} de ${produto.nome}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={SEM_CLIENTE}>Estoque</SelectItem>
+                                    {vendasVinculo.map((venda) => (
+                                      <SelectItem key={venda.id} value={venda.id}>
+                                        {venda.numero ?? "Pedido"} — {venda.cliente_nome ?? "Cliente"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Badge variant="outline" className="font-mono text-[10px] py-0 px-1.5 shrink-0">
+                                  {formatarQtdCompra(vincInfo.quantidade)} {produto.unidade || "UN"}
+                                </Badge>
+                              </div>
+                            );
+                          })}
                         </div>
                         {(() => {
                           const demanda = demandaPorProduto.get(produto.id);
                           if (!demanda || demanda.pedidos.length === 0) return null;
+                          const unid = produto.unidade || "un.";
                           return (
-                            <div className="mt-1 w-48 text-xs text-muted-foreground">
+                            <div className="mt-1 w-56 text-xs text-muted-foreground">
                               <p className="font-medium">
-                                Demanda: {demanda.total} un. em {demanda.pedidos.length} pedido(s)
+                                Demanda consolidada: {formatarQtdCompra(demanda.total)} {unid} em {demanda.pedidos.length}{" "}
+                                {demanda.pedidos.length === 1 ? "cliente" : "clientes"}
                               </p>
                               <ul className="space-y-0.5">
                                 {demanda.pedidos.slice(0, 4).map((p) => (
                                   <li key={p.id} className="truncate">
-                                    {p.rotulo} · {p.quantidade} un.
+                                    {p.rotulo} · {formatarQtdCompra(p.quantidade)} {unid}
                                   </li>
                                 ))}
                                 {demanda.pedidos.length > 4 && (
@@ -6543,16 +7400,6 @@ function OrdensCompra() {
                       <FileText className="size-3.5" />
                       <span>NFs de Compra</span>
                       <ExternalLink className="size-3 text-muted-foreground" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-muted-foreground hover:text-primary"
-                      title={modalDetalheMaximized ? "Reduzir tela (Esc)" : "Expandir para tela cheia"}
-                      onClick={() => setModalDetalheMaximized((v) => !v)}
-                    >
-                      {modalDetalheMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                     </Button>
                     <BotaoVisualizarDocumento
                       tipo="ordem_compra"

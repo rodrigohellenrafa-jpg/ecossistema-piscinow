@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { PageHeader, Kpi } from "@/components/page-header";
 import { ModalPedirCarga } from "@/components/modal-pedir-carga";
 import { RequireAuth } from "@/components/require-auth";
+import { OrdensCompra } from "./ordens-compra";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,16 +29,16 @@ export const Route = createFileRoute("/compras")({
   staticData: { sitemap: false },
   head: () => ({
     meta: [
-      { title: "Central de Reposição | Piscinow ERP" },
+      { title: "Gestão de Compras | Piscinow ERP" },
       {
         name: "description",
         content:
-          "Reposição inteligente de estoque: produtos abaixo do mínimo, sugestão de compra e geração automática de ordens de compra por fornecedor.",
+          "Gestão de compras por fornecedor com catálogo unificado, agrupamento de produtos idênticos priorizando demandas vinculadas a clientes e busca por cliente.",
       },
-      { property: "og:title", content: "Central de Reposição | Piscinow ERP" },
+      { property: "og:title", content: "Gestão de Compras | Piscinow ERP" },
       {
         property: "og:description",
-        content: "Gere ordens de compra automaticamente a partir do estoque mínimo.",
+        content: "Gerencie compras por fornecedor com catálogo unificado e prioridade por cliente.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/compras")({
   }),
   component: () => (
     <RequireAuth>
-      <Compras />
+      <OrdensCompra />
     </RequireAuth>
   ),
 });

@@ -3,9 +3,10 @@
 import * as React from "react";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
-import { X } from "lucide-react";
+import { ChevronDown, ChevronUp, Maximize2, Minimize2, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const Sheet = SheetPrimitive.Root;
 
@@ -57,22 +58,71 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </SheetPrimitive.Close>
-      {children}
-    </SheetPrimitive.Content>
-  </SheetPortal>
-));
+>(({ side = "right", className, children, ...props }, ref) => {
+  const [expanded, setExpanded] = React.useState(false);
+  const [minimized, setMinimized] = React.useState(false);
+  return (
+    <SheetPortal>
+      <SheetOverlay className={cn(minimized && "bg-black/20")} />
+      <SheetPrimitive.Content
+        ref={ref}
+        className={cn(
+          sheetVariants({ side }),
+          className,
+          expanded && !minimized && "!inset-2 !h-[calc(100dvh-1rem)] !w-[calc(100vw-1rem)] !max-w-none rounded-lg border overflow-y-auto",
+          minimized && "!h-auto !max-h-20 !py-3 overflow-hidden [&>*:not(:first-child):not([data-slot=modal-controls])]:hidden",
+        )}
+        {...props}
+      >
+        {children}
+        <div
+          data-slot="modal-controls"
+          className="absolute right-2.5 top-2.5 z-10 flex items-center gap-0.5 rounded-md bg-background/80 p-0.5 backdrop-blur-xs print:hidden"
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 text-muted-foreground hover:text-foreground"
+            aria-label={minimized ? "Expandir painel" : "Minimizar painel"}
+            title={minimized ? "Expandir conteúdo" : "Minimizar / recolher"}
+            onClick={() => setMinimized((v) => !v)}
+          >
+            {minimized ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 text-muted-foreground hover:text-foreground"
+            aria-label={expanded ? "Restaurar tamanho" : "Maximizar em tela cheia"}
+            title={expanded ? "Restaurar tamanho" : "Maximizar (tela cheia)"}
+            onClick={() => {
+              setExpanded((v) => {
+                const next = !v;
+                if (next && minimized) setMinimized(false);
+                return next;
+              });
+            }}
+          >
+            {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+          </Button>
+          <SheetPrimitive.Close
+            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-80 ring-offset-background cursor-pointer transition-colors hover:bg-accent hover:text-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            title="Fechar"
+          >
+            <X className="size-4" />
+            <span className="sr-only">Fechar</span>
+          </SheetPrimitive.Close>
+        </div>
+      </SheetPrimitive.Content>
+    </SheetPortal>
+  );
+});
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />
+  <div className={cn("flex flex-col space-y-2 pr-24 text-center sm:text-left", className)} {...props} />
 );
 SheetHeader.displayName = "SheetHeader";
 

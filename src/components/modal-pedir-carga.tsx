@@ -837,19 +837,6 @@ export function ModalPedirCarga({
                   </DialogDescription>
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5 mr-6">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 text-muted-foreground hover:text-primary"
-                  title={isMaximized ? "Reduzir tela (Esc)" : "Expandir para tela cheia"}
-                  onClick={() => setIsMaximized((v) => !v)}
-                >
-                  {isMaximized ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-                </Button>
-              </div>
             </div>
 
             {/* STEPPER / PROGRESSO */}

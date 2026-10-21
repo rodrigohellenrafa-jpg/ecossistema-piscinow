@@ -394,8 +394,8 @@ function FlightBoardPage() {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("TODOS");
   const [filtroModalidade, setFiltroModalidade] = useState<string>("TODAS");
-  const [modoVisao, setModoVisao] = useState<"CRONOGRAMA_DIAS" | "COLUNAS_STATUS" | "LISTA">(
-    "CRONOGRAMA_DIAS"
+  const [modoVisao, setModoVisao] = useState<"LISTA" | "CRONOGRAMA_DIAS" | "COLUNAS_STATUS">(
+    "LISTA"
   );
   const [semanaBaseISO, setSemanaBaseISO] = useState<string>(() =>
     obterInicioSemanaSegundaISO(hojeISO())
@@ -1525,151 +1525,197 @@ function FlightBoardPage() {
   };
 
   // ============================================================================
-  // COMPONENTE INTERNO DE CARD DE ALTO CONTRASTE
+  // COMPONENTE INTERNO DE LINHA DE ALTO CONTRASTE (FLIGHT BOARD EM LINHA)
   // ============================================================================
-  const renderFlightCard = (card: FlightBoardCardItem) => {
+  const renderCabecalhoTabelaFlight = () => (
+    <TableHeader>
+      <TableRow className="bg-slate-900 hover:bg-slate-900 dark:bg-slate-950 border-b border-slate-800">
+        <TableHead className="w-[140px] font-extrabold text-[11px] uppercase tracking-wider text-white">
+          OS / Origem
+        </TableHead>
+        <TableHead className="w-[155px] font-extrabold text-[11px] uppercase tracking-wider text-white">
+          Data & Horário
+        </TableHead>
+        <TableHead className="min-w-[200px] font-extrabold text-[11px] uppercase tracking-wider text-white">
+          Cliente / Compromisso
+        </TableHead>
+        <TableHead className="min-w-[220px] font-extrabold text-[11px] uppercase tracking-wider text-white">
+          Etapa de Execução
+        </TableHead>
+        <TableHead className="w-[150px] font-extrabold text-[11px] uppercase tracking-wider text-white">
+          Modalidade
+        </TableHead>
+        <TableHead className="min-w-[180px] font-extrabold text-[11px] uppercase tracking-wider text-white">
+          Equipe & Agenda
+        </TableHead>
+        <TableHead className="w-[140px] font-extrabold text-[11px] uppercase tracking-wider text-white">
+          Status
+        </TableHead>
+        <TableHead className="w-[230px] text-right font-extrabold text-[11px] uppercase tracking-wider text-white pr-4">
+          Ações Diretas
+        </TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+
+  const renderFlightRow = (card: FlightBoardCardItem) => {
     const statusCfg = getStatusBadgeConfig(card.status);
     const modCfg = getModalidadeBadgeConfig(card.modalidade_execucao);
     const ModIcon = modCfg.icon;
+    const infoDia = formatarDiaColuna(card.data_execucao);
 
     return (
-      <div
+      <TableRow
         key={card.id}
-        className="group relative rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs hover:shadow-md transition-all overflow-hidden flex flex-col"
+        className="group bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 transition-colors"
       >
-        {/* Faixa superior de alto contraste por status */}
-        <div className={`h-1.5 w-full ${statusCfg.stripeClass}`} />
-
-        <div className="p-3.5 flex flex-col gap-2.5 flex-1">
-          {/* Topo do card: Número da OS + Status Badge */}
-          <div className="flex items-start justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {card.os_numero ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-extrabold bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 tracking-tight">
-                  <FileText className="h-3 w-3" />
-                  OS #{card.os_numero}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-700 text-white dark:bg-indigo-400 dark:text-slate-950">
-                  <Calendar className="h-3 w-3" />
-                  Google Agenda
-                </span>
-              )}
-
-              {/* Tag clicável: "Com Execução" ou "Sem Execução" */}
-              <button
-                type="button"
-                onClick={() => alternarModalidadeMutation.mutate(card)}
-                title="Clique para alternar entre 'Com Execução' e 'Sem Execução'"
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border transition-colors cursor-pointer ${modCfg.badgeClass}`}
-              >
-                <ModIcon className="h-3 w-3" />
-                {modCfg.label}
-              </button>
-            </div>
-
-            <Badge
-              variant="outline"
-              className={`text-[11px] px-2 py-0.5 rounded-md border ${statusCfg.badgeClass}`}
-            >
-              {statusCfg.label}
-            </Badge>
+        {/* 1. OS / Origem com barra lateral de status */}
+        <TableCell className="py-3 pl-3 pr-2 align-middle">
+          <div className="flex items-center gap-2">
+            <span className={`w-1.5 h-8 rounded-full shrink-0 ${statusCfg.stripeClass}`} />
+            {card.os_numero ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-extrabold font-mono bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 tracking-tight whitespace-nowrap">
+                <FileText className="h-3 w-3 shrink-0" />
+                OS #{card.os_numero}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-indigo-700 text-white dark:bg-indigo-400 dark:text-slate-950 whitespace-nowrap">
+                <Calendar className="h-3 w-3 shrink-0" />
+                Google Agenda
+              </span>
+            )}
           </div>
+        </TableCell>
 
-          {/* Nome do Cliente e Etapa de Execução com alto contraste */}
-          <div>
-            <h4 className="text-sm font-bold text-slate-950 dark:text-white leading-snug">
-              {card.cliente_nome}
-            </h4>
-            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5 line-clamp-2">
-              {card.etapa_execucao}
-            </p>
+        {/* 2. Data & Horário */}
+        <TableCell className="py-3 px-2 align-middle whitespace-nowrap">
+          <div className="flex flex-col">
+            <span className="inline-flex items-center gap-1 text-xs font-extrabold text-slate-950 dark:text-white">
+              <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+              {dataBR(card.data_execucao)}
+              <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                {infoDia.diaSemanaCurto}
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">
+              <Clock className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              {card.hora_inicio} às {card.hora_fim}
+            </span>
           </div>
+        </TableCell>
 
-          {/* Alerta se estiver em OUT */}
-          {(card.servico_out || card.status === "OUT") && (
-            <div className="rounded-lg bg-red-50 dark:bg-red-950/70 border border-red-300 dark:border-red-800 px-2.5 py-1.5 text-xs text-red-900 dark:text-red-200 font-medium flex items-start gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-              <span>{card.motivo_out || "Impedimento operacional sinalizado (OUT)."}</span>
+        {/* 3. Cliente / Compromisso */}
+        <TableCell className="py-3 px-2 align-middle">
+          <div className="font-bold text-sm text-slate-950 dark:text-white leading-snug">
+            {card.cliente_nome}
+          </div>
+          {(card.cliente_cidade || card.cliente_telefone) && (
+            <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400 mt-0.5">
+              {[card.cliente_cidade, card.cliente_telefone].filter(Boolean).join(" • ")}
             </div>
           )}
+        </TableCell>
 
-          {/* Metadados: Data, Horário, Equipe e Agenda */}
-          <div className="rounded-lg bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 p-2 space-y-1 text-xs text-slate-800 dark:text-slate-200">
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1 font-semibold">
-                <Calendar className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                {dataBR(card.data_execucao)}
-              </span>
-              <span className="inline-flex items-center gap-1 font-mono font-semibold text-slate-900 dark:text-slate-100">
-                <Clock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                {card.hora_inicio} - {card.hora_fim}
-              </span>
+        {/* 4. Etapa de Execução + Observações / Alerta OUT */}
+        <TableCell className="py-3 px-2 align-middle">
+          <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+            {card.etapa_execucao}
+          </div>
+          {card.observacoes && (
+            <div className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-1 mt-0.5">
+              {card.observacoes}
             </div>
-
-            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 truncate">
-              <Users className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
-              <span className="truncate font-medium">{card.equipe_responsavel}</span>
+          )}
+          {(card.servico_out || card.status === "OUT") && (
+            <div className="mt-1 inline-flex items-center gap-1 rounded bg-red-100 dark:bg-red-950/80 border border-red-300 dark:border-red-800 px-2 py-0.5 text-[11px] text-red-900 dark:text-red-200 font-semibold">
+              <AlertTriangle className="h-3 w-3 text-red-600 dark:text-red-400 shrink-0" />
+              <span>{card.motivo_out || "Impedimento operacional (OUT)"}</span>
             </div>
+          )}
+        </TableCell>
 
-            <div
-              className="flex items-center gap-1.5 text-[11px] text-slate-700 dark:text-slate-300 truncate"
-              title={`Sincronizado com: ${card.emails_vinculados}`}
+        {/* 5. Etiqueta clicável: Com Execução vs Sem Execução */}
+        <TableCell className="py-3 px-2 align-middle whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => alternarModalidadeMutation.mutate(card)}
+            title="Clique para alternar entre 'Com Execução' e 'Sem Execução'"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors cursor-pointer ${modCfg.badgeClass}`}
+          >
+            <ModIcon className="h-3.5 w-3.5 shrink-0" />
+            {modCfg.label}
+          </button>
+        </TableCell>
+
+        {/* 6. Equipe & E-mail Google Agenda */}
+        <TableCell className="py-3 px-2 align-middle">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100">
+            <Users className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
+            <span className="truncate max-w-[180px]">{card.equipe_responsavel}</span>
+          </div>
+          <div
+            className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-400 mt-0.5 truncate max-w-[200px]"
+            title={`Sincronizado com: ${card.emails_vinculados}`}
+          >
+            <Mail className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span className="truncate">{EMAIL_AGENDA_LOJA_PRINCIPAL}</span>
+          </div>
+        </TableCell>
+
+        {/* 7. Status Badge */}
+        <TableCell className="py-3 px-2 align-middle whitespace-nowrap">
+          <Badge
+            variant="outline"
+            className={`text-xs px-2.5 py-0.5 rounded-md border ${statusCfg.badgeClass}`}
+          >
+            {statusCfg.label}
+          </Badge>
+        </TableCell>
+
+        {/* 8. Botões de Ação Direta na Linha */}
+        <TableCell className="py-3 pl-2 pr-4 text-right align-middle whitespace-nowrap">
+          <div className="inline-flex items-center justify-end gap-1.5">
+            {card.ordem_id && (
+              <BotaoVisualizarDocumento
+                tipo="os"
+                id={card.ordem_id}
+                label="Ver OS"
+                className="h-7 px-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border-slate-300 dark:border-slate-700"
+              />
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => imprimirOrdemCarga(card)}
+              title="Imprimir Ordem de Execução"
+              className="h-7 px-2 text-xs bg-white hover:bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
             >
-              <Mail className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
-              <span className="truncate">{EMAIL_AGENDA_LOJA_PRINCIPAL}</span>
-            </div>
+              <Printer className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => abrirModalEditar(card)}
+              className="h-7 px-2.5 text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/80 dark:hover:bg-blue-900 dark:text-blue-100 dark:border-blue-800"
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Editar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCardParaExcluir(card)}
+              className="h-7 px-2.5 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-900 border-red-300 dark:bg-red-950/80 dark:hover:bg-red-900 dark:text-red-100 dark:border-red-800"
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Excluir
+            </Button>
           </div>
-
-          {/* Rodapé do Card: Botões Diretos de Editar e Excluir + Visualizar OS */}
-          <div className="pt-2 mt-auto border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-1.5 flex-wrap">
-            <div className="flex items-center gap-1">
-              {card.ordem_id && (
-                <BotaoVisualizarDocumento
-                  tipo="os"
-                  id={card.ordem_id}
-                  label="Ver OS"
-                  className="h-7 px-2 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 border-slate-300 dark:border-slate-700"
-                />
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => imprimirOrdemCarga(card)}
-                title="Imprimir Ordem de Execução"
-                className="h-7 px-2 text-xs bg-white hover:bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
-              >
-                <Printer className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => abrirModalEditar(card)}
-                className="h-7 px-2.5 text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/80 dark:hover:bg-blue-900 dark:text-blue-100 dark:border-blue-800"
-              >
-                <Pencil className="h-3 w-3 mr-1" />
-                Editar
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCardParaExcluir(card)}
-                className="h-7 px-2.5 text-xs font-semibold bg-red-50 hover:bg-red-100 text-red-900 border-red-300 dark:bg-red-950/80 dark:hover:bg-red-900 dark:text-red-100 dark:border-red-800"
-              >
-                <Trash2 className="h-3 w-3 mr-1" />
-                Excluir
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+        </TableCell>
+      </TableRow>
     );
   };
 
@@ -1750,79 +1796,32 @@ function FlightBoardPage() {
             </div>
           </div>
 
-          {/* KPIs de Alto Contraste */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mt-4">
-            <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 px-3.5 py-2.5 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase text-slate-600 dark:text-slate-300">
-                  Total no Quadro
-                </p>
-                <p className="text-xl font-extrabold text-slate-950 dark:text-white">
-                  {estatisticas.total}
-                </p>
-              </div>
-              <Plane className="h-6 w-6 text-slate-700 dark:text-slate-300" />
-            </div>
-
-            <div className="rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 px-3.5 py-2.5 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase text-emerald-900 dark:text-emerald-200">
-                  Em Andamento
-                </p>
-                <p className="text-xl font-extrabold text-emerald-950 dark:text-white">
-                  {estatisticas.emAndamento}
-                </p>
-              </div>
-              <Flame className="h-6 w-6 text-emerald-700 dark:text-emerald-400" />
-            </div>
-
-            <div className="rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 px-3.5 py-2.5 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase text-blue-900 dark:text-blue-200">
-                  Agendados
-                </p>
-                <p className="text-xl font-extrabold text-blue-950 dark:text-white">
-                  {estatisticas.agendados}
-                </p>
-              </div>
-              <Calendar className="h-6 w-6 text-blue-700 dark:text-blue-400" />
-            </div>
-
-            <div className="rounded-xl border border-violet-300 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/60 px-3.5 py-2.5 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase text-violet-900 dark:text-violet-200">
-                  Concluídos
-                </p>
-                <p className="text-xl font-extrabold text-violet-950 dark:text-white">
-                  {estatisticas.concluidos}
-                </p>
-              </div>
-              <CheckCircle2 className="h-6 w-6 text-violet-700 dark:text-violet-400" />
-            </div>
-
-            <div className="rounded-xl border border-teal-300 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/60 px-3.5 py-2.5 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase text-teal-900 dark:text-teal-200">
-                  Com Execução
-                </p>
-                <p className="text-xl font-extrabold text-teal-950 dark:text-white">
-                  {estatisticas.comExecucao}
-                </p>
-              </div>
-              <Wrench className="h-6 w-6 text-teal-700 dark:text-teal-400" />
-            </div>
-
-            <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-3.5 py-2.5 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase text-slate-800 dark:text-slate-200">
-                  Sem Execução
-                </p>
-                <p className="text-xl font-extrabold text-slate-950 dark:text-white">
-                  {estatisticas.semExecucao}
-                </p>
-              </div>
-              <Briefcase className="h-6 w-6 text-slate-700 dark:text-slate-300" />
-            </div>
+          {/* Faixa Resumo em Linha (Alto Contraste) */}
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 font-bold text-slate-900 dark:text-white">
+              <Plane className="h-3.5 w-3.5 text-slate-700 dark:text-slate-300" />
+              Total em Linha: <strong className="font-mono text-sm">{estatisticas.total}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 font-bold text-emerald-950 dark:text-emerald-200">
+              <Flame className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" />
+              Em Andamento: <strong className="font-mono text-sm">{estatisticas.emAndamento}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 font-bold text-blue-950 dark:text-blue-200">
+              <Calendar className="h-3.5 w-3.5 text-blue-700 dark:text-blue-400" />
+              Agendados: <strong className="font-mono text-sm">{estatisticas.agendados}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-violet-300 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/60 font-bold text-violet-950 dark:text-violet-200">
+              <CheckCircle2 className="h-3.5 w-3.5 text-violet-700 dark:text-violet-400" />
+              Concluídos: <strong className="font-mono text-sm">{estatisticas.concluidos}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-teal-300 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/60 font-bold text-teal-950 dark:text-teal-200">
+              <Wrench className="h-3.5 w-3.5 text-teal-700 dark:text-teal-400" />
+              Com Execução: <strong className="font-mono text-sm">{estatisticas.comExecucao}</strong>
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 font-bold text-slate-900 dark:text-slate-200">
+              <Briefcase className="h-3.5 w-3.5 text-slate-700 dark:text-slate-300" />
+              Sem Execução: <strong className="font-mono text-sm">{estatisticas.semExecucao}</strong>
+            </span>
           </div>
         </div>
       </div>
@@ -1912,6 +1911,20 @@ function FlightBoardPage() {
               <Button
                 type="button"
                 size="sm"
+                variant={modoVisao === "LISTA" ? "default" : "ghost"}
+                onClick={() => setModoVisao("LISTA")}
+                className={
+                  modoVisao === "LISTA"
+                    ? "h-7 px-2.5 text-xs font-bold bg-blue-600 text-white"
+                    : "h-7 px-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                }
+              >
+                <ListFilter className="h-3.5 w-3.5 mr-1" />
+                Em Linha (Geral)
+              </Button>
+              <Button
+                type="button"
+                size="sm"
                 variant={modoVisao === "CRONOGRAMA_DIAS" ? "default" : "ghost"}
                 onClick={() => setModoVisao("CRONOGRAMA_DIAS")}
                 className={
@@ -1921,7 +1934,7 @@ function FlightBoardPage() {
                 }
               >
                 <Columns3 className="h-3.5 w-3.5 mr-1" />
-                Por Dia
+                Linhas por Dia
               </Button>
               <Button
                 type="button"
@@ -1935,28 +1948,14 @@ function FlightBoardPage() {
                 }
               >
                 <LayoutGrid className="h-3.5 w-3.5 mr-1" />
-                Por Status
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={modoVisao === "LISTA" ? "default" : "ghost"}
-                onClick={() => setModoVisao("LISTA")}
-                className={
-                  modoVisao === "LISTA"
-                    ? "h-7 px-2.5 text-xs font-bold bg-blue-600 text-white"
-                    : "h-7 px-2.5 text-xs font-semibold text-slate-800 dark:text-slate-200"
-                }
-              >
-                <ListFilter className="h-3.5 w-3.5 mr-1" />
-                Tabela
+                Linhas por Status
               </Button>
             </div>
           </div>
         </div>
 
         {/* =================================================================== */}
-        {/* VISÃO 1: CRONOGRAMA EM COLUNAS POR DIA DA SEMANA (COM BOTÃO INCLUIR)*/}
+        {/* PAINEL FLIGHT BOARD EM LINHA (SEM CARDS)                            */}
         {/* =================================================================== */}
         {isLoading ? (
           <div className="mt-6 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-12 text-center">
@@ -1965,102 +1964,157 @@ function FlightBoardPage() {
               Carregando Quadro de Execução e OS Emitidas...
             </p>
           </div>
-        ) : modoVisao === "CRONOGRAMA_DIAS" ? (
-          <div className="mt-5 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-              {diasDaSemanaISO.map((diaISO) => {
-                const infoDia = formatarDiaColuna(diaISO);
-                const cardsDoDia = cardsFiltrados.filter(
-                  (c) => c.data_execucao === diaISO
-                );
-
-                return (
-                  <div
-                    key={diaISO}
-                    className={`rounded-xl border flex flex-col min-h-[420px] ${
-                      infoDia.ehHoje
-                        ? "border-blue-500 dark:border-blue-500 bg-blue-50/40 dark:bg-slate-900 ring-2 ring-blue-500/20"
-                        : "border-slate-300 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900/60"
-                    }`}
-                  >
-                    {/* Topo da Coluna do Dia + Botão Direto "+ Incluir" */}
-                    <div
-                      className={`p-3 border-b rounded-t-xl flex items-center justify-between gap-2 ${
-                        infoDia.ehHoje
-                          ? "bg-blue-600 text-white border-blue-700"
-                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-extrabold uppercase tracking-wider">
-                            {infoDia.diaSemanaCurto}
-                          </span>
-                          <span
-                            className={`text-xs font-mono font-bold px-1.5 py-0.2 rounded ${
-                              infoDia.ehHoje
-                                ? "bg-white text-blue-700"
-                                : "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200"
-                            }`}
-                          >
-                            {infoDia.diaMes}
-                          </span>
-                        </div>
-                        <p
-                          className={`text-[11px] mt-0.5 font-medium ${
-                            infoDia.ehHoje
-                              ? "text-blue-100"
-                              : "text-slate-600 dark:text-slate-400"
-                          }`}
-                        >
-                          {cardsDoDia.length} agendamento(s)
-                        </p>
-                      </div>
-
-                      {/* Requisito 3: Botão Incluir visível no topo de cada coluna/dia */}
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => abrirModalIncluir({ dataPadrao: diaISO })}
-                        className={`h-7 px-2.5 text-xs font-bold shadow-xs ${
-                          infoDia.ehHoje
-                            ? "bg-white hover:bg-blue-50 text-blue-900"
-                            : "bg-blue-600 hover:bg-blue-700 text-white"
-                        }`}
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        Incluir
-                      </Button>
-                    </div>
-
-                    {/* Lista de Cards do Dia */}
-                    <div className="p-2.5 space-y-2.5 flex-1">
-                      {cardsDoDia.length === 0 ? (
-                        <div className="h-44 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 flex flex-col items-center justify-center p-4 text-center">
-                          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                            Sem execuções ou eventos neste dia.
-                          </p>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => abrirModalIncluir({ dataPadrao: diaISO })}
-                            className="mt-2 h-7 text-xs font-bold text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800"
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
-                            Agendar em {infoDia.diaMes}
-                          </Button>
-                        </div>
-                      ) : (
-                        cardsDoDia.map((card) => renderFlightCard(card))
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+        ) : modoVisao === "LISTA" ? (
+          /* ================================================================= */
+          /* VISÃO PADRÃO: FLIGHT BOARD EM LINHA (PAINEL CONTÍNUO DE LINHAS)   */
+          /* ================================================================= */
+          <div className="mt-5 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/70 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white">
+                  Painel Flight Board em Linha ({cardsFiltrados.length} registro(s))
+                </span>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => abrirModalIncluir({ dataPadrao: hojeISO() })}
+                className="h-7 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Incluir Linha no Quadro
+              </Button>
             </div>
 
-            {/* Seção de OS Emitidas / Eventos agendados fora da semana visível */}
+            {cardsFiltrados.length === 0 ? (
+              <div className="p-10 text-center space-y-2">
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  Nenhuma Ordem de Serviço emitida ou compromisso encontrado para o filtro atual.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => abrirModalIncluir({ dataPadrao: hojeISO() })}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Incluir Primeiro Agendamento
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  {renderCabecalhoTabelaFlight()}
+                  <TableBody>
+                    {cardsFiltrados.map((card) => renderFlightRow(card))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        ) : modoVisao === "CRONOGRAMA_DIAS" ? (
+          /* ================================================================= */
+          /* VISÃO 2: LINHAS AGRUPADAS POR DIA DA SEMANA (SEM CARDS)           */
+          /* ================================================================= */
+          <div className="mt-5 space-y-4">
+            {diasDaSemanaISO.map((diaISO) => {
+              const infoDia = formatarDiaColuna(diaISO);
+              const cardsDoDia = cardsFiltrados.filter(
+                (c) => c.data_execucao === diaISO
+              );
+
+              return (
+                <div
+                  key={diaISO}
+                  className={`rounded-xl border overflow-hidden shadow-xs ${
+                    infoDia.ehHoje
+                      ? "border-blue-500 dark:border-blue-500 bg-white dark:bg-slate-900 ring-2 ring-blue-500/20"
+                      : "border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900"
+                  }`}
+                >
+                  {/* Faixa Horizontal do Dia + Botão Direto "+ Incluir" */}
+                  <div
+                    className={`px-4 py-2.5 border-b flex items-center justify-between gap-2 flex-wrap ${
+                      infoDia.ehHoje
+                        ? "bg-blue-600 text-white border-blue-700"
+                        : "bg-slate-100 dark:bg-slate-800/90 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs font-extrabold uppercase tracking-wider">
+                        {infoDia.diaSemanaLongo}
+                      </span>
+                      <span
+                        className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
+                          infoDia.ehHoje
+                            ? "bg-white text-blue-700"
+                            : "bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100"
+                        }`}
+                      >
+                        {infoDia.diaMes}
+                      </span>
+                      {infoDia.ehHoje && (
+                        <Badge className="bg-amber-400 text-slate-950 font-extrabold text-[10px]">
+                          HOJE
+                        </Badge>
+                      )}
+                      <span
+                        className={`text-xs font-semibold ${
+                          infoDia.ehHoje
+                            ? "text-blue-100"
+                            : "text-slate-600 dark:text-slate-400"
+                        }`}
+                      >
+                        • {cardsDoDia.length} agendamento(s) em linha
+                      </span>
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => abrirModalIncluir({ dataPadrao: diaISO })}
+                      className={`h-7 px-3 text-xs font-bold shadow-xs ${
+                        infoDia.ehHoje
+                          ? "bg-white hover:bg-blue-50 text-blue-900"
+                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                      }`}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Incluir em {infoDia.diaMes}
+                    </Button>
+                  </div>
+
+                  {/* Linhas do Dia */}
+                  {cardsDoDia.length === 0 ? (
+                    <div className="px-4 py-4 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                      <span>Nenhuma execução ou compromisso agendado para este dia.</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => abrirModalIncluir({ dataPadrao: diaISO })}
+                        className="h-7 text-xs font-bold text-blue-700 dark:text-blue-400"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Agendar linha
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        {renderCabecalhoTabelaFlight()}
+                        <TableBody>
+                          {cardsDoDia.map((card) => renderFlightRow(card))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Outras datas fora da semana selecionada (também em linha) */}
             {(() => {
               const inicioSemana = diasDaSemanaISO[0];
               const fimSemana = diasDaSemanaISO[diasDaSemanaISO.length - 1];
@@ -2071,44 +2125,46 @@ function FlightBoardPage() {
               if (cardsForaDaSemana.length === 0) return null;
 
               return (
-                <div className="rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
-                  <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                    <div>
-                      <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-900 dark:text-white flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-blue-600" />
+                <div className="rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+                  <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-600" />
+                      <h3 className="text-xs font-extrabold uppercase tracking-wide text-slate-900 dark:text-white">
                         Outras Datas Agendadas ({cardsForaDaSemana.length})
                       </h3>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        Ordens de Serviço emitidas e compromissos do Google Agenda programados para outras semanas.
-                      </p>
                     </div>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
                       onClick={() => abrirModalIncluir({ dataPadrao: hojeISO() })}
-                      className="h-8 text-xs font-bold border-blue-400 text-blue-800 dark:text-blue-200"
+                      className="h-7 text-xs font-bold border-blue-400 text-blue-800 dark:text-blue-200"
                     >
                       <Plus className="h-3.5 w-3.5 mr-1" />
                       Incluir Novo Agendamento
                     </Button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {cardsForaDaSemana.map((card) => renderFlightCard(card))}
+                  <div className="overflow-x-auto">
+                    <Table>
+                      {renderCabecalhoTabelaFlight()}
+                      <TableBody>
+                        {cardsForaDaSemana.map((card) => renderFlightRow(card))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
               );
             })()}
           </div>
-        ) : modoVisao === "COLUNAS_STATUS" ? (
+        ) : (
           /* ================================================================= */
-          /* VISÃO 2: QUADRO KANBAN EM COLUNAS POR STATUS (COM BOTÃO INCLUIR)  */
+          /* VISÃO 3: LINHAS AGRUPADAS POR STATUS (SEM CARDS)                  */
           /* ================================================================= */
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="mt-5 space-y-4">
             {(
               [
-                "AGENDADO",
                 "EM_ANDAMENTO",
+                "AGENDADO",
                 "AGUARDANDO",
                 "CONCLUIDO",
                 "OUT",
@@ -2122,20 +2178,20 @@ function FlightBoardPage() {
               return (
                 <div
                   key={statusCol}
-                  className="rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/60 flex flex-col min-h-[480px]"
+                  className="rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs"
                 >
                   <div
-                    className={`p-3 border-b rounded-t-xl flex items-center justify-between gap-2 ${cfg.headerBg}`}
+                    className={`px-4 py-2.5 border-b flex items-center justify-between gap-2 ${cfg.headerBg}`}
                   >
-                    <div>
+                    <div className="flex items-center gap-2.5">
                       <span
                         className={`text-xs font-extrabold uppercase tracking-wide ${cfg.headerText}`}
                       >
                         {cfg.label}
                       </span>
-                      <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                        {cardsColuna.length} item(ns)
-                      </p>
+                      <Badge variant="secondary" className="font-mono text-xs font-bold">
+                        {cardsColuna.length} linha(s)
+                      </Badge>
                     </div>
 
                     <Button
@@ -2147,140 +2203,30 @@ function FlightBoardPage() {
                           statusPadrao: statusCol,
                         })
                       }
-                      className="h-7 px-2.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                      className="h-7 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       <Plus className="h-3.5 w-3.5 mr-1" />
-                      Incluir
+                      Incluir em {cfg.label}
                     </Button>
                   </div>
 
-                  <div className="p-2.5 space-y-2.5 flex-1">
-                    {cardsColuna.length === 0 ? (
-                      <div className="h-40 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 flex flex-col items-center justify-center p-4 text-center">
-                        <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                          Nenhum item em {cfg.label}.
-                        </p>
-                      </div>
-                    ) : (
-                      cardsColuna.map((card) => renderFlightCard(card))
-                    )}
-                  </div>
+                  {cardsColuna.length === 0 ? (
+                    <div className="px-4 py-4 text-xs text-slate-600 dark:text-slate-400 font-medium">
+                      Nenhum registro com status {cfg.label}.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        {renderCabecalhoTabelaFlight()}
+                        <TableBody>
+                          {cardsColuna.map((card) => renderFlightRow(card))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </div>
               );
             })}
-          </div>
-        ) : (
-          /* ================================================================= */
-          /* VISÃO 3: TABELA CONSOLIDADA DE ALTO CONTRASTE                     */
-          /* ================================================================= */
-          <div className="mt-5 rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-100 dark:bg-slate-800/90">
-                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
-                    OS / Origem
-                  </TableHead>
-                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
-                    Cliente / Compromisso
-                  </TableHead>
-                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
-                    Etapa de Execução
-                  </TableHead>
-                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
-                    Modalidade
-                  </TableHead>
-                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
-                    Data & Horário
-                  </TableHead>
-                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
-                    Equipe
-                  </TableHead>
-                  <TableHead className="font-bold text-slate-900 dark:text-slate-100">
-                    Status
-                  </TableHead>
-                  <TableHead className="text-right font-bold text-slate-900 dark:text-slate-100">
-                    Ações Diretas
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cardsFiltrados.map((card) => {
-                  const stCfg = getStatusBadgeConfig(card.status);
-                  const modCfg = getModalidadeBadgeConfig(card.modalidade_execucao);
-                  return (
-                    <TableRow
-                      key={card.id}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                    >
-                      <TableCell className="font-mono font-bold text-slate-950 dark:text-white">
-                        {card.os_numero ? `OS #${card.os_numero}` : card.voo_codigo}
-                      </TableCell>
-                      <TableCell className="font-bold text-slate-900 dark:text-slate-100">
-                        {card.cliente_nome}
-                      </TableCell>
-                      <TableCell className="text-slate-700 dark:text-slate-300 max-w-xs truncate">
-                        {card.etapa_execucao}
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => alternarModalidadeMutation.mutate(card)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs border cursor-pointer ${modCfg.badgeClass}`}
-                        >
-                          {modCfg.label}
-                        </button>
-                      </TableCell>
-                      <TableCell className="font-semibold text-slate-900 dark:text-slate-100">
-                        {dataBR(card.data_execucao)} • {card.hora_inicio}-{card.hora_fim}
-                      </TableCell>
-                      <TableCell className="text-slate-800 dark:text-slate-200">
-                        {card.equipe_responsavel}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${stCfg.badgeClass}`}
-                        >
-                          {stCfg.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-1.5">
-                          {card.ordem_id && (
-                            <BotaoVisualizarDocumento
-                              tipo="os"
-                              id={card.ordem_id}
-                              label="OS"
-                              className="h-7 px-2 text-xs"
-                            />
-                          )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => abrirModalEditar(card)}
-                            className="h-7 px-2.5 text-xs font-semibold text-blue-800 border-blue-300 bg-blue-50 hover:bg-blue-100"
-                          >
-                            <Pencil className="h-3 w-3 mr-1" />
-                            Editar
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCardParaExcluir(card)}
-                            className="h-7 px-2.5 text-xs font-semibold text-red-800 border-red-300 bg-red-50 hover:bg-red-100"
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Excluir
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
           </div>
         )}
       </div>
